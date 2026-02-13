@@ -10,4 +10,9 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "httpx>=0.27.0",
     "pydantic>=2.9.0",
+    "pymupdf>=1.23.0",
+    "tavily-python>=0.3.0",
+    "python-multipart>=0.0.6",
+    "pyyaml>=6.0.3",
+    "yfinance>=1.1.0",
 ]

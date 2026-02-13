@@ -1,0 +1,207 @@
+id: "gold_miner"
+name: "Gold Miner"
+description: "Exchange-aware investment analysis for monometallic gold miners with risked NPV, quality, and value scoring."
+category: "resources"
+version: "1.1"
+author: "LLM Council"
+company_types:
+  - gold_miner
+
+auto_detect_keywords:
+  - "gold"
+  - "gold miner"
+  - "gold mining"
+  - "aisc"
+  - "jorc"
+  - "pfs"
+  - "dfs"
+  - "resource"
+  - "reserve"
+
+inputs:
+  - ticker
+  - company_name
+  - market_data
+  - exchange
+  - pdf_documents
+
+output_schema:
+  type: "object"
+  required_fields:
+    - analysis_type
+    - ticker
+    - company_name
+    - quality_score
+    - value_score
+    - price_targets
+    - development_timeline
+    - investment_recommendation
+
+  structure:
+    analysis_type: "resources"
+    ticker: "string"
+    company_name: "string"
+    analysis_date: "ISO-8601"
+    current_development_stage: "string"
+    certainty_pct_24m: "float (0-100)"
+    market_data:
+      current_price: "float"
+      market_cap_aud_m: "float"
+      shares_outstanding_m: "float"
+      enterprise_value_aud_m: "float"
+      cash_aud_m: "float"
+      debt_aud_m: "float"
+    projects: "array"
+    total_risked_npv_aud_m: "float"
+    quality_score:
+      total: "float (0-100)"
+      breakdown: "object"
+    value_score:
+      total: "float (0-100)"
+      breakdown: "object"
+    development_timeline:
+      - milestone: "string"
+        target_period: "string (e.g., Q3 2026)"
+        status: "string (current/planned/at risk/achieved)"
+        confidence_pct: "float (0-100)"
+    headwinds_tailwinds:
+      quantitative: "array[string]"
+      qualitative: "array[string]"
+    price_targets:
+      current_price: "float"
+      target_12m: "float"
+      target_24m: "float"
+      upside_12m_pct: "float"
+      upside_24m_pct: "float"
+      scenarios:
+        base: "float"
+        bull: "float"
+        bear: "float"
+    investment_recommendation:
+      rating: "BUY/HOLD/SELL"
+      conviction: "HIGH/MEDIUM/LOW"
+      summary: "string"
+    investment_verdict:
+      top_reasons: "array[string]"
+      failure_conditions: "array[string]"
+    market_data_provenance:
+      prepass_as_of_utc: "ISO-8601"
+      prepass_source_urls: "array[string]"
+      prepass_ticker: "string"
+      prepass_currency: "string"
+      override_notes: "array[string]"
+    extended_analysis:
+      next_major_catalysts: "array[string]"
+      sensitivity_analysis: "array[object]"
+      market_context: "array[string]"
+      commentary: "string"
+      dissenting_views: "array[string]"
+      peer_observations: "array[string]"
+
+rubric: |
+  Run an investment analysis on [Company Name] using this rubric. Do not deviate unless data is unavailable; when data is missing, state assumptions explicitly and continue.
+
+  Required outputs:
+  - Quality Score (0-100) and Value Score (0-100)
+  - 12-month and 24-month price targets
+  - Current development stage, milestone timeline, and certainty % for 24-month goals
+  - Key quantitative and qualitative headwinds/tailwinds with explicit thresholds where possible
+
+  Market-data discipline:
+  - Use injected normalized_facts first for current_price, market_cap, shares_outstanding, enterprise_value, and currency.
+  - Only override those values if a newer primary source is found; if overridden, explain in market_data_provenance.override_notes.
+  - For ASX, prefer asx.com.au and/or marketindex.com.au. For other exchanges, use the exchange-appropriate primary filing/market sources from the exchange assumptions.
+
+  Source project/technical data from the latest investor presentation, quarterly/annual reports, and PFS/FS/DFS materials. Summarize relevance and implications from the most recent core filings.
+
+  Data Quality Rule
+  For every key numeric input used in NPV, Quality Score, or Value Score, provide:
+  1) Value used
+  2) Source URL + document date
+  3) ESTIMATE tag if inferred (with one-line justification)
+
+  Step 1: Project-Level NPV Calculation
+  For each major project (up to three), populate the template below from the latest company filings/studies.
+  If inputs are missing (e.g., recovery, AISC), estimate using comparable in-region project norms (e.g., 85-90% recovery, A$2,000-3,000/oz AISC) and justify.
+
+  NPV Template:
+  * Resource Tonnes (Mt): [Fill]
+  * Grade (g/t): [Fill]
+  * Recovery (fraction): [Fill]
+  * Mine Life (years): [Fill]
+  * AISC (AU$/oz): [Fill]
+  * Capex (AU$m): [Fill] (initial capex at Year 0)
+  * Discount Rate: 0.05
+  * Current Gold Price (AU$/oz): [Use latest reliable source]
+  * Royalty Rate (fraction): 0.05 (adjust if project-specific terms differ)
+  * Tax Rate (fraction): 0.30 (adjust for local regime)
+  * Sustaining Capex (AU$m/yr): [Fill; if missing estimate 5-10% of initial capex annually]
+  * Working Capital (% revenue): 0.05 (invested at Year 0, recovered at end of mine life)
+  * Ramp-up years: 1 (default: 50% production in Year 1, full from Year 2 unless specified)
+
+  Core Formulas:
+  * Recovered Ounces (Moz): =(Resource Tonnes * 1000000 * Grade / 31.1034768 * Recovery) / 1000000
+  * Full Annual Production (koz): =Recovered Ounces * 1000 / Mine Life
+  * Effective Annual Production (koz): =Full Annual Production * Ramp-adjusted avg production factor
+  * Revenue per year (AU$m): =Effective Annual Production * Current Gold Price / 1000
+  * Royalty per year (AU$m): =Royalty Rate * Revenue per year
+  * AISC Costs per year (AU$m): =AISC * Effective Annual Production / 1000
+  * Annual Margin before sustaining (AU$m): =Revenue per year - Royalty per year - AISC Costs
+
+  DCF Workflow (explicit timeline):
+  1) Depreciation (AU$m/yr): =Capex / Mine Life
+  2) Pre-tax CF (full production): =Annual Margin before sustaining - Sustaining Capex
+  3) Taxable Profit: =Pre-tax CF - Depreciation; Tax = max(0, Tax Rate * Taxable Profit)
+  4) After-tax CF: =Pre-tax CF - Tax
+  5) Year 1 ramp-up: default 50% production unless specified
+  6) Year 0: -Capex - Initial Working Capital; Final year: +Working Capital recovery
+  7) NPV: discount explicit yearly cash flows at discount rate
+
+  Stage Multiplier (apply to post-tax NPV for risked value):
+  * Scoping - No MRE: 0.10
+  * Scoping - has MRE: 0.15
+  * Pre-Feasibility Study (PFS): 0.25
+  * Definitive Feasibility Study (DFS): 0.40
+  * Development: 0.60
+  * First Gold Pour: 0.80
+  * Ramp-up: 0.90
+  * Peak Production: 1.00
+
+  Step 2: Quality Score (0-100)
+  Weighted framework:
+  * Jurisdiction (20%): Tier 1=100, Tier 2=90, Tier 3=80, Tier 4=60
+  * Infrastructure (10%): Excellent=100, Good=80, Moderate=60, Poor=40
+  * Management Quality (15%): Top-tier=100, Experienced=90, Average=80, Weak=60
+  * Development Stage (15%): JORC/Scoping=10, PFS=25, DFS=40, Development=60, First Gold=80, Ramp-up=90, Peak=100
+  * Funding Chance/Funding Gap (20%): use funding-gap rubric (<A$10M=100; A$10-25M=80; A$25-50M=60; >A$50M=40)
+  * Certainty for 12-month goals (10%): execution probability based on funding and delivery track record
+  * ESG Credentials (10%): permitting, social license, safety record
+
+  Quality Score Formula:
+  = (0.2 * Jurisdiction) + (0.1 * Infrastructure) + (0.15 * Management) + (0.15 * Development Stage) + (0.2 * Funding) + (0.1 * Certainty) + (0.1 * ESG)
+
+  Step 3: Value Score (0-100)
+  Weighted framework:
+  * NPV vs Market Cap (30%): >3x=100, 2-3x=80, 1-2x=60, <1x=40
+  * EV/Resource oz (20%): <A$50/oz=100, A$50-100/oz=70, A$100-150/oz=50, >A$150/oz=40
+  * Exploration Upside (20%): >50%=100, 25-50%=80, 10-25%=60, <10%=40
+  * Cost Competitiveness (15%): <A$1,500/oz=100, A$1,500-2,000/oz=80, A$2,000-2,500/oz=60, >A$2,500/oz=40
+  * M&A/Strategic Value (15%): High=100, Moderate=80, Low=60, None=40
+
+  Value Score Formula:
+  = (0.3 * NPV Ratio Score) + (0.2 * EV/Resource Score) + (0.2 * Exploration Upside Score) + (0.15 * Cost Competitiveness Score) + (0.15 * M&A/Strategic Score)
+
+  Step 4: Additional Outputs
+  Provide:
+  * 12/24-Month Price Targets: Base/Bull/Bear with key drivers (gold price, AISC, capex, timeline, funding)
+  * Development Timeline: milestone | target period | confidence
+  * Headwinds/Tailwinds: 2 quantitative + 2 qualitative factors
+  * Document Analysis: key points and valuation implications from the most recent core filings
+  * Investment Verdict: Rating (BUY/HOLD/SELL), Conviction, Top 3 reasons, Top 3 failure conditions
+  * market_data_provenance and extended_analysis fields in final JSON
+
+  Optional checks if data is available:
+  * Resource conversion rate
+  * Cash burn runway
+  * Debt/financing mix
+  * Peer EV/oz comparison

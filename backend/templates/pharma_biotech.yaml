@@ -1,0 +1,186 @@
+id: "pharma_biotech"
+name: "Pharmaceutical & Biotech"
+description: "Comprehensive investment analysis for pharmaceutical and biotechnology companies with drug pipelines"
+category: "pharma"
+version: "1.0"
+author: "LLM Council"
+company_types:
+  - pharma_biotech
+  - medtech
+
+# Auto-detection keywords
+auto_detect_keywords:
+  - "drug"
+  - "clinical trial"
+  - "phase 1"
+  - "phase 2"
+  - "phase 3"
+  - "fda"
+  - "ema"
+  - "pipeline"
+  - "pharmaceutical"
+  - "biotech"
+  - "indication"
+  - "patient"
+  - "therapy"
+  - "treatment"
+
+# Expected inputs
+inputs:
+  - ticker
+  - company_name
+  - market_data
+  - pdf_documents
+
+# JSON output schema
+output_schema:
+  type: "object"
+  required_fields:
+    - analysis_type
+    - ticker
+    - company_name
+    - quality_score
+    - value_score
+    - price_targets
+    - investment_recommendation
+
+  structure:
+    analysis_type: "pharma"
+    ticker: "string"
+    company_name: "string"
+    analysis_date: "ISO-8601"
+    market_data:
+      current_price: "float"
+      market_cap_usd_m: "float"
+      shares_outstanding_m: "float"
+      enterprise_value_usd_m: "float"
+      cash_usd_m: "float"
+      debt_usd_m: "float"
+    pipeline: "array"
+    total_rnpv_usd_m: "float"
+    quality_score:
+      total: "float (0-100)"
+      breakdown: "object"
+    value_score:
+      total: "float (0-100)"
+      breakdown: "object"
+    price_targets:
+      current_price: "float"
+      target_12m: "float"
+      target_24m: "float"
+      upside_12m_pct: "float"
+      upside_24m_pct: "float"
+    investment_recommendation:
+      rating: "BUY/HOLD/SELL"
+      conviction: "HIGH/MEDIUM/LOW"
+      summary: "string"
+
+# The full rubric/prompt
+rubric: |
+  Run an investment analysis on [Company Name] following this rubric. Include 12-month and 24-month price targets, Quality and Value scores out of 100, a summary of the current drug pipeline and timeline to key milestones, a certainty percentage for achieving stated goals within 24 months, and key quantitative and qualitative headwinds/tailwinds.
+
+  Source market data from official stock exchange websites and financial data providers.
+  Source all scientific and financial data from the latest Investor Presentations, Annual Reports, SEC/ASX filings, and clinical trial registry data.
+
+  Step 1: Drug Candidate rNPV Calculation
+
+  For each major drug candidate in the pipeline (up to three per company), populate the following risk-adjusted Net Present Value (rNPV) template.
+
+  rNPV Template:
+  * Target Patient Population: [Number of patients]
+  * Peak Market Share (%): [e.g., 0.25]
+  * Gross Annual Price ($): [e.g., $150,000]
+  * Net Price after Rebates/Discounts (%): [e.g., 0.70]
+  * Effective Patent Life (years from launch): [e.g., 10]
+  * COGS + SG&A (% of Revenue): [e.g., 0.20]
+  * Remaining R&D Costs to Launch ($m): [Fill]
+  * Discount Rate: 0.10
+  * Royalty Rate Payable (%): [e.g., 0.05]
+  * Tax Rate (%): 0.30
+  * Post-Launch R&D / Lifecycle Management ($m/yr): [e.g., $5m]
+  * Ramp-up Years to Peak Sales: [e.g., 4]
+
+  Probability of Success (PoS) Multiplier (apply to NPV for rNPV):
+  * Pre-Clinical: 0.08
+  * Phase 1: 0.15
+  * Phase 2: 0.35
+  * Phase 3: 0.65
+  * Submitted for Approval (NDA/BLA): 0.90
+  * Approved/Marketed: 1.0
+
+  Step 2: Quality Score (0-100)
+
+  * Regulatory Environment (20%): Primary markets for approval and sales.
+      * Tier 1 (FDA, EMA): 100
+      * Tier 2 (Japan, UK, Australia, Canada): 90
+      * Tier 3 (Other developed markets): 80
+      * Tier 4 (Emerging markets only): 60
+
+  * Scientific & Manufacturing Capability (10%):
+      * Excellent (Proprietary platform, in-house GMP manufacturing): 100
+      * Good (Strong CRO/CMO partnerships, proven tech): 80
+      * Moderate (Heavily reliant on external partners): 60
+      * Poor (Limited internal expertise): 40
+
+  * Management Quality (15%): Track record in drug development.
+      * Top-tier (Proven success, multiple drug approvals): 100
+      * Experienced (Solid pharma/biotech background): 90
+      * Average (Mixed or limited track record): 80
+      * Weak/Unproven: 60
+
+  * Pipeline Maturity (15%): Weighted average PoS across pipeline, scaled to 100.
+
+  * Cash Runway & Funding (20%): Financial stability.
+      * >24 months runway or fully funded: 100
+      * 12-24 months runway: 80
+      * 6-12 months runway: 60
+      * <6 months runway: 40
+
+  * Certainty % for Goals (12 Months) (10%): Probability of achieving milestones.
+  * Clinical & Ethical Standards (10%): GCP record, safety profile, ethical pricing.
+
+  Quality Score Formula:
+  = (0.2 * Regulatory) + (0.1 * Capability) + (0.15 * Management) + (0.15 * Pipeline Maturity) + (0.2 * Funding) + (0.1 * Certainty) + (0.1 * Ethics)
+
+  Step 3: Value Score (0-100)
+
+  * rNPV vs. Market Cap (30%): Total rNPV / Current Market Cap.
+      * Ratio >3x: 100
+      * 2-3x: 80
+      * 1-2x: 60
+      * <1x: 40
+
+  * EV / Risk-Adjusted Peak Sales (20%):
+      * <1x: 100
+      * 1-2x: 80
+      * 2-4x: 60
+      * >4x: 40
+
+  * Pipeline & Platform Potential (20%):
+      * High (Proven platform generating new candidates): 100
+      * Moderate (Some potential for new indications): 80
+      * Low (Single-asset company): 60
+
+  * Market Positioning & Moat (15%):
+      * First-in-class or best-in-class potential: 100
+      * Competitive market with differentiation: 80
+      * "Me-too" drug in crowded field: 60
+      * Significant competitive threats: 40
+
+  * M&A/Strategic Value (15%):
+      * High (Addresses major unmet need, public interest): 100
+      * Moderate (Attractive for mid-sized pharma): 80
+      * Low (Niche indication): 60
+
+  Value Score Formula:
+  = (0.3 * rNPV Ratio) + (0.2 * EV/Peak Sales) + (0.2 * Pipeline Potential) + (0.15 * Market Positioning) + (0.15 * M&A Value)
+
+  Step 4: Additional Outputs
+
+  * 12/24-Month Price Targets: Based on rNPV/share, adjusted for next catalyst.
+  * Development Timeline: Map pipeline stages to future milestones with dates.
+  * Headwinds/Tailwinds: Quantitative and qualitative factors.
+  * Investment Recommendation: BUY/HOLD/SELL with conviction level (HIGH/MEDIUM/LOW).
+  * Key Risks: List major downside risks.
+  * Key Opportunities: List major upside opportunities.
+  * Dissenting Views: Note significant disagreements among council members.

@@ -57,13 +57,37 @@ function App() {
     setCurrentConversationId(id);
   };
 
-  const handleSendMessage = async (content) => {
+  const handleSendMessage = async (
+    content,
+    enableSearch,
+    files,
+    ticker,
+    councilMode,
+    researchDepth,
+    templateId,
+    companyType,
+    exchange
+  ) => {
     if (!currentConversationId) return;
 
     setIsLoading(true);
     try {
-      // Optimistically add user message to UI
-      const userMessage = { role: 'user', content };
+      // Optimistically add user message to UI with metadata
+      const userMessage = {
+        role: 'user',
+        content,
+        enable_search: enableSearch,
+        ticker: ticker,
+        council_mode: councilMode,
+        template_id: templateId,
+        company_type: companyType,
+        exchange: exchange,
+        attachments: files.map(f => ({
+          filename: f.name,
+          size: f.size,
+          processing_status: 'pending'
+        }))
+      };
       setCurrentConversation((prev) => ({
         ...prev,
         messages: [...prev.messages, userMessage],
@@ -75,8 +99,14 @@ function App() {
         stage1: null,
         stage2: null,
         stage3: null,
+        search_results: null,
+        evidence_pack: null,
+        attachments_processed: null,
         metadata: null,
         loading: {
+          search: false,
+          evidence: false,
+          attachments: false,
           stage1: false,
           stage2: false,
           stage3: false,
@@ -90,8 +120,110 @@ function App() {
       }));
 
       // Send message with streaming
-      await api.sendMessageStream(currentConversationId, content, (eventType, event) => {
+      await api.sendMessageStream(
+        currentConversationId,
+        content,
+        enableSearch,
+        files,
+        ticker,
+        councilMode,
+        researchDepth,
+        templateId,
+        companyType,
+        exchange,
+        (eventType, event) => {
         switch (eventType) {
+          case 'council_mode':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.metadata = {
+                ...(lastMsg.metadata || {}),
+                council_mode: event.data?.mode || 'local',
+                research_depth: event.data?.research_depth || 'basic',
+              };
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'template_selected':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.metadata = {
+                ...(lastMsg.metadata || {}),
+                template_id: event.data?.template_id,
+                template_name: event.data?.template_name,
+                company_name: event.data?.company_name,
+                company_type: event.data?.company_type,
+                template_selection_source: event.data?.selection_source,
+                exchange: event.data?.exchange,
+                exchange_selection_source: event.data?.exchange_selection_source,
+              };
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'search_start':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.loading.search = true;
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'search_complete':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.search_results = event.data;
+              lastMsg.loading.search = false;
+              if (event.data?.evidence_pack && !lastMsg.evidence_pack) {
+                lastMsg.evidence_pack = event.data.evidence_pack;
+              }
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'evidence_start':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.loading.evidence = true;
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'evidence_complete':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.evidence_pack = event.data;
+              lastMsg.loading.evidence = false;
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'attachments_start':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.loading.attachments = true;
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'attachments_complete':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.attachments_processed = event.data;
+              lastMsg.loading.attachments = false;
+              return { ...prev, messages };
+            });
+            break;
+
           case 'stage1_start':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
@@ -125,7 +257,10 @@ function App() {
               const messages = [...prev.messages];
               const lastMsg = messages[messages.length - 1];
               lastMsg.stage2 = event.data;
-              lastMsg.metadata = event.metadata;
+              lastMsg.metadata = {
+                ...(lastMsg.metadata || {}),
+                ...(event.metadata || {}),
+              };
               lastMsg.loading.stage2 = false;
               return { ...prev, messages };
             });
@@ -169,7 +304,8 @@ function App() {
           default:
             console.log('Unknown event type:', eventType);
         }
-      });
+        }
+      );
     } catch (error) {
       console.error('Failed to send message:', error);
       // Remove optimistic messages on error

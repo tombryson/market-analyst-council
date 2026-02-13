@@ -170,3 +170,116 @@ def update_conversation_title(conversation_id: str, title: str):
 
     conversation["title"] = title
     save_conversation(conversation)
+
+
+def add_user_message_with_metadata(
+    conversation_id: str,
+    content: str,
+    enable_search: bool,
+    attachments: List[Dict[str, Any]],
+    council_mode: str = "local",
+    template_id: Optional[str] = None,
+    company_name: Optional[str] = None,
+    company_type: Optional[str] = None,
+    exchange: Optional[str] = None,
+    template_selection_source: Optional[str] = None,
+    exchange_selection_source: Optional[str] = None,
+):
+    """
+    Add a user message with search toggle and attachment metadata.
+
+    Args:
+        conversation_id: Conversation identifier
+        content: User message content
+        enable_search: Whether search was enabled
+        attachments: List of attachment metadata dicts
+        council_mode: local or perplexity_emulated
+        template_id: Selected template id (optional)
+        company_name: Selected company name (optional)
+        company_type: Selected company type id (optional)
+        exchange: Selected exchange id (optional)
+        template_selection_source: Selection source metadata (optional)
+        exchange_selection_source: Exchange selection source metadata (optional)
+    """
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    message = {
+        "role": "user",
+        "content": content
+    }
+
+    # Only store if not default (default is True)
+    if not enable_search:
+        message["enable_search"] = False
+
+    # Only store if attachments present
+    if attachments:
+        message["attachments"] = attachments
+
+    # Only store if non-default
+    if council_mode and council_mode != "local":
+        message["council_mode"] = council_mode
+
+    if template_id:
+        message["template_id"] = template_id
+
+    if company_name:
+        message["company_name"] = company_name
+
+    if company_type:
+        message["company_type"] = company_type
+
+    if exchange:
+        message["exchange"] = exchange
+
+    if template_selection_source:
+        message["template_selection_source"] = template_selection_source
+
+    if exchange_selection_source:
+        message["exchange_selection_source"] = exchange_selection_source
+
+    conversation["messages"].append(message)
+    save_conversation(conversation)
+
+
+def add_assistant_message_with_metadata(
+    conversation_id: str,
+    stage1: List[Dict[str, Any]],
+    stage2: List[Dict[str, Any]],
+    stage3: Dict[str, Any],
+    search_results: Optional[Dict[str, Any]],
+    attachments_processed: List[Dict[str, Any]]
+):
+    """
+    Add an assistant message with all 3 stages plus search/attachment metadata.
+
+    Args:
+        conversation_id: Conversation identifier
+        stage1: List of individual model responses
+        stage2: List of model rankings
+        stage3: Final synthesized response
+        search_results: Search results dict (optional)
+        attachments_processed: List of processed attachment results
+    """
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    message = {
+        "role": "assistant",
+        "stage1": stage1,
+        "stage2": stage2,
+        "stage3": stage3
+    }
+
+    # Add optional metadata
+    if search_results:
+        message["search_results"] = search_results
+
+    if attachments_processed:
+        message["attachments_processed"] = attachments_processed
+
+    conversation["messages"].append(message)
+    save_conversation(conversation)
