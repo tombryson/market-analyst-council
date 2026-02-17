@@ -1,0 +1,62 @@
+{
+  "query": "ASX:West Wits Mining Limited latest announcements, investor presentations and quarterly reports",
+  "ticker": "ASX:WWI",
+  "depth": "deep",
+  "lookback_days": 365,
+  "generated_at_utc": "2026-02-17T08:03:48.183352+00:00",
+  "allowed_domains": [
+    "asx.com.au",
+    "marketindex.com.au",
+    "intelligentinvestor.com.au"
+  ],
+  "retrieved_sources": 40,
+  "candidate_sources_in_window": 6,
+  "selected_pdf_candidates": 4,
+  "written_files": [
+    {
+      "index": 1,
+      "file": "outputs/pdf_dump/20260217_080343_asx_wwi/01_2026-02-13_west_wits_mining_limited_asx_wwi_intelligent_investor.md",
+      "title": "West Wits Mining Limited (ASX:WWI) - Intelligent Investor",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-wwi/west-wits-mining-limited",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260217/pdf/03057252.pdf",
+      "published_at": "2026-02-13",
+      "score": 5.15,
+      "decoded_chars": 35468,
+      "page_count": 0
+    },
+    {
+      "index": 2,
+      "file": "outputs/pdf_dump/20260217_080343_asx_wwi/02_2025-09-11_asx_announcement_pdf_2025_09_11.md",
+      "title": "ASX announcement PDF (2025-09-11)",
+      "source_url": "https://announcements.asx.com.au/asxpdf/20250911/pdf/06p2y3c5x8rw7c.pdf",
+      "pdf_url": "https://announcements.asx.com.au/asxpdf/20250911/pdf/06p2y3c5x8rw7c.pdf",
+      "published_at": "2025-09-11",
+      "score": 10.350000000000001,
+      "decoded_chars": 2436,
+      "page_count": 0
+    },
+    {
+      "index": 3,
+      "file": "outputs/pdf_dump/20260217_080343_asx_wwi/03_2025-06-25_pdf_west_wits_mining_asx.md",
+      "title": "[PDF] WEST WITS MINING - ASX",
+      "source_url": "https://announcements.asx.com.au/asxpdf/20250625/pdf/06l2smlcsq3b20.pdf",
+      "pdf_url": "https://announcements.asx.com.au/asxpdf/20250625/pdf/06l2smlcsq3b20.pdf",
+      "published_at": "2025-06-25",
+      "score": 12.55,
+      "decoded_chars": 36009,
+      "page_count": 0
+    },
+    {
+      "index": 4,
+      "file": "outputs/pdf_dump/20260217_080343_asx_wwi/04_2025-03-12_pdf_interim_report_asx.md",
+      "title": "[PDF] INTERIM REPORT - ASX",
+      "source_url": "https://announcements.asx.com.au/asxpdf/20250312/pdf/06gjrt82gkvhbc.pdf",
+      "pdf_url": "https://announcements.asx.com.au/asxpdf/20250312/pdf/06gjrt82gkvhbc.pdf",
+      "published_at": "2025-03-12",
+      "score": 6.6,
+      "decoded_chars": 51584,
+      "page_count": 0
+    }
+  ],
+  "failed_files": []
+}

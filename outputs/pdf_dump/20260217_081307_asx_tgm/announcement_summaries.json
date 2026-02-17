@@ -1,0 +1,853 @@
+{
+  "generated_at_utc": "2026-02-17T08:27:33.202348+00:00",
+  "worker_model": "openai/gpt-4o-mini",
+  "dump_dir": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_081307_asx_tgm",
+  "total_processed": 10,
+  "kept_for_injection": 9,
+  "dropped_as_unimportant": 1,
+  "results": [
+    {
+      "doc_id": "01_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "price_sensitive": {
+        "is_price_sensitive": false,
+        "confidence": 0.8,
+        "reason": "Change of Director’s Interest Notice typically does not impact financials significantly."
+      },
+      "importance": {
+        "is_important": false,
+        "importance_score": 20,
+        "tier": "ignore",
+        "keep_for_injection": false,
+        "reason": "Director's interest changes do not materially affect company valuation."
+      },
+      "summary": {
+        "one_line": "",
+        "key_points": [],
+        "numeric_facts": [],
+        "timeline_milestones": [],
+        "capital_structure": [],
+        "catalysts_next_12m": [],
+        "risks_headwinds": [],
+        "market_impact_assessment": ""
+      },
+      "extraction_quality": {
+        "text_truncated_for_model": false,
+        "signal_quality": "low",
+        "notes": [
+          "Contains routine disclosures without significant financial implications."
+        ]
+      },
+      "source_meta": {
+        "file_name": "01_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_081307_asx_tgm/01_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+        "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+        "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260216/pdf/03056918.pdf",
+        "domain": "www.intelligentinvestor.com.au",
+        "published_at": "2026-02-16",
+        "decoded_chars_in_file": 5394
+      }
+    },
+    {
+      "doc_id": "02_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "price_sensitive": {
+        "is_price_sensitive": true,
+        "confidence": 0.9,
+        "reason": "Issuance of new shares and options affects capital structure and potential dilution."
+      },
+      "importance": {
+        "is_important": true,
+        "importance_score": 85,
+        "tier": "high",
+        "keep_for_injection": true,
+        "reason": "Significant funding raised through share issuance impacts liquidity and market perception."
+      },
+      "summary": {
+        "one_line": "Theta Gold Mines issued new shares and options to raise A$10.3 million.",
+        "key_points": [
+          "66,184,225 new ordinary shares issued.",
+          "Raised A$10.3 million before costs.",
+          "56,469,404 shares from Tranche Three Cornerstone Investment.",
+          "9,714,821 shares issued to Director Mr. Brett Tang.",
+          "An issue price of A$0.155 per share.",
+          "27,808,499 unlisted options granted.",
+          "23,726,641 options for Tranche Three Investors.",
+          "4,081,858 options to Director Mr. Brett Tang.",
+          "Options exercise price set at 80% of 10-day VWAP or A$0.155.",
+          "Options expiry dated 10 October 2027."
+        ],
+        "numeric_facts": [
+          {
+            "metric": "Total Shares Issued",
+            "value": "66184225",
+            "unit": "shares",
+            "context": "Equity raised",
+            "source_snippet": "issued 66,184,225 new fully paid ordinary Shares"
+          },
+          {
+            "metric": "Amount Raised",
+            "value": "10.3",
+            "unit": "million AUD",
+            "context": "Funding raised",
+            "source_snippet": "raising US$7 million, (A$10.3 million) (before costs)"
+          }
+        ],
+        "timeline_milestones": [],
+        "capital_structure": [
+          "New shares increase the total outstanding shares, possible dilution for existing shareholders."
+        ],
+        "catalysts_next_12m": [
+          "Market reaction to new funding and share issuance.",
+          "Potential use of raised funds in operational activities."
+        ],
+        "risks_headwinds": [
+          "Market volatility affecting share price post-issuance.",
+          "Dilution concerns among existing shareholders."
+        ],
+        "market_impact_assessment": "The issuance of new shares and options will likely lead to short-term dilution concerns among existing shareholders but enhances liquidity for future growth initiatives."
+      },
+      "extraction_quality": {
+        "text_truncated_for_model": false,
+        "signal_quality": "high",
+        "notes": [
+          "Details on share issuance and options are clear and significant for investors."
+        ]
+      },
+      "source_meta": {
+        "file_name": "02_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_081307_asx_tgm/02_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+        "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+        "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260213/pdf/03056355.pdf",
+        "domain": "www.intelligentinvestor.com.au",
+        "published_at": "2026-02-16",
+        "decoded_chars_in_file": 2407
+      }
+    },
+    {
+      "doc_id": "03_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "price_sensitive": {
+        "is_price_sensitive": true,
+        "confidence": 0.9,
+        "reason": "Issuance of unquoted options may impact shareholder dilution and company's capital structure."
+      },
+      "importance": {
+        "is_important": true,
+        "importance_score": 75,
+        "tier": "high",
+        "keep_for_injection": true,
+        "reason": "Details on the issuance of options and their implications for capital structure are material for investors."
+      },
+      "summary": {
+        "one_line": "Theta Gold Mines Limited issued 27,808,499 unquoted options as part of a capital raising.",
+        "key_points": [
+          "Total securities to be issued: 27,808,499 options.",
+          "Options exercise price: 80% of 10-day VWAP or 15.5 cents.",
+          "Options expiration date: 10 October 2027.",
+          "Date of issue: 11 February 2026.",
+          "Tranche Three includes 23,726,641 options for Cornerstone Investors.",
+          "4,081,858 director options issued to participating director.",
+          "Unlisted options issued as free attaching options to investors.",
+          "The announcement references a prior Appendix 3B submission.",
+          "Total ordinary shares (fully paid) post-issue: 1,090,581,974.",
+          "Total options (various classes) on issue following this announcement.",
+          "Previous security issuance related to a capital raising effort.",
+          "Unquoted status indicates options will not be publicly traded immediately."
+        ],
+        "numeric_facts": [
+          {
+            "metric": "total_options_issued",
+            "value": "27808499",
+            "unit": "options",
+            "context": "total unquoted options",
+            "source_snippet": "Total number of +securities to be issued/transferred"
+          },
+          {
+            "metric": "exercise_price",
+            "value": "0.155",
+            "unit": "AUD",
+            "context": "exercise price per option",
+            "source_snippet": "Options, exercise price 80% of the 10-day VWAP or 15.5 cents"
+          },
+          {
+            "metric": "expiry_date",
+            "value": "10-10-2027",
+            "unit": "",
+            "context": "expiry date of options",
+            "source_snippet": "expiry date 10 October 2027"
+          }
+        ],
+        "timeline_milestones": [
+          {
+            "milestone": "Issuance of options",
+            "target_window": "11 February 2026",
+            "direction": "new",
+            "source_snippet": "Date of issue: 11 February 2026."
+          }
+        ],
+        "capital_structure": [
+          "Increase in total options leading to potential dilution for shareholders."
+        ],
+        "catalysts_next_12m": [
+          "Potential exercise of options depending on market conditions."
+        ],
+        "risks_headwinds": [
+          "Market reaction to dilution effect from newly issued options."
+        ],
+        "market_impact_assessment": "The issuance of options is likely to impact share price due to potential dilution and reflects the company's efforts to raise capital in a structured manner."
+      },
+      "extraction_quality": {
+        "text_truncated_for_model": false,
+        "signal_quality": "high",
+        "notes": [
+          "All key details relevant for investors included."
+        ]
+      },
+      "source_meta": {
+        "file_name": "03_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_081307_asx_tgm/03_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+        "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+        "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260213/pdf/03056334.pdf",
+        "domain": "www.intelligentinvestor.com.au",
+        "published_at": "2026-02-16",
+        "decoded_chars_in_file": 7203
+      }
+    },
+    {
+      "doc_id": "04_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "price_sensitive": {
+        "is_price_sensitive": true,
+        "confidence": 0.9,
+        "reason": "Announcement involves the issuance of a significant number of securities affecting capital structure."
+      },
+      "importance": {
+        "is_important": true,
+        "importance_score": 80,
+        "tier": "high",
+        "keep_for_injection": true,
+        "reason": "The issuance of over 66 million shares and changes to the capital structure are material to investor analysis."
+      },
+      "summary": {
+        "one_line": "Theta Gold Mines Limited announces the quotation of 66,184,225 new ordinary shares.",
+        "key_points": [
+          "66,184,225 ordinary fully paid shares to be quoted on ASX.",
+          "Issue date for new securities: February 11, 2026.",
+          "Issued for cash consideration at AUD 0.155 per security.",
+          "56,469,404 shares issued to Cornerstone Investors.",
+          "9,714,821 shares issued to Brett Tang via NC New Energy Limited.",
+          "Total quoted securities post-issue: 1,156,766,199 shares.",
+          "Total unquoted options and rights: Multiple series with various expiry dates.",
+          "Significant update affects overall capital structure and liquidity.",
+          "Previous announcement related on October 21, 2025.",
+          "Submission relates to transactions notified previously in Appendix 3B."
+        ],
+        "numeric_facts": [
+          {
+            "metric": "Total new shares issued",
+            "value": "66,184,225",
+            "unit": "",
+            "context": "for quotation",
+            "source_snippet": "... Total number of +securities to be quoted 66,184,225..."
+          },
+          {
+            "metric": "Issue price per security",
+            "value": "0.155",
+            "unit": "AUD",
+            "context": "cash consideration",
+            "source_snippet": "...what is the issue price per +security? AUD 0.15500000..."
+          }
+        ],
+        "timeline_milestones": [],
+        "capital_structure": [
+          "Total issued capital after this issuance will include over 1.15 billion quoted shares."
+        ],
+        "catalysts_next_12m": [
+          "Potential future liquidity changes based on management's strategic capital utilization."
+        ],
+        "risks_headwinds": [
+          "Market volatility affecting stock performance post-issuance."
+        ],
+        "market_impact_assessment": "This issuance will likely impact the share price due to dilution effects and changes in liquidity. Investor perception may shift based on the use of proceeds and strategic plans."
+      },
+      "extraction_quality": {
+        "text_truncated_for_model": false,
+        "signal_quality": "high",
+        "notes": [
+          "Document contains detailed financial announcement relevant for investors."
+        ]
+      },
+      "source_meta": {
+        "file_name": "04_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_081307_asx_tgm/04_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+        "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+        "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260213/pdf/03056332.pdf",
+        "domain": "www.intelligentinvestor.com.au",
+        "published_at": "2026-02-16",
+        "decoded_chars_in_file": 5405
+      }
+    },
+    {
+      "doc_id": "05_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "price_sensitive": {
+        "is_price_sensitive": true,
+        "confidence": 0.9,
+        "reason": "Significant equity funding and share issuance details impact capital structure."
+      },
+      "importance": {
+        "is_important": true,
+        "importance_score": 85,
+        "tier": "high",
+        "keep_for_injection": true,
+        "reason": "Funding of US$7 million affects liquidity and ongoing operations for Theta Gold Mines."
+      },
+      "summary": {
+        "one_line": "Theta Gold Mines secures US$7 million in funding through equity raises from cornerstone investors and directors.",
+        "key_points": [
+          "Total funding received: US$7 million (A$10.3 million).",
+          "Tranche Three: US$6 million from Cornerstone Investors.",
+          "Director Participation: US$1 million from Non-Executive Director.",
+          "Tranche Three consists of 66,184,225 shares issued.",
+          "Cornerstone Investors include Hongkong Ruihua Investment Management Limited.",
+          "Director shares issued: 9,714,821 shares.",
+          "Effective issue price per share for all participants: A$0.155.",
+          "Investors granted 27,808,499 attaching unlisted options.",
+          "Options have an expiry date of 10 October 2027.",
+          "Shares held in voluntary escrow for 24 months.",
+          "Equity raised as part of total ~A$51.4 million fundraising.",
+          "Shareholder approval obtained at AGM on 28 November 2025.",
+          "Newly issued shares do not utilize existing capacity under ASX Listing Rule 7.1.",
+          "Funds aimed to advance TGME Gold Mine Project.",
+          "Notable increase in the total number of issued shares affecting ownership structure."
+        ],
+        "numeric_facts": [
+          {
+            "metric": "funding received",
+            "value": "7",
+            "unit": "million USD",
+            "context": "total funding",
+            "source_snippet": "Theta Gold Mines Limited is pleased to advise that is has received US$7 million, (A$10.3 million) of funding..."
+          },
+          {
+            "metric": "shares issued",
+            "value": "66,184,225",
+            "unit": "shares",
+            "context": "total shares from funding",
+            "source_snippet": "...66,184,225 new fully paid ordinary shares..."
+          },
+          {
+            "metric": "issue price per share",
+            "value": "0.155",
+            "unit": "AUD",
+            "context": "issue price",
+            "source_snippet": "...issued... at the issue price of A$0.155 (15.5 cents) per share..."
+          }
+        ],
+        "timeline_milestones": [],
+        "capital_structure": [
+          "Increase in equity through issuance of new shares.",
+          "Options granted will affect future share dilution."
+        ],
+        "catalysts_next_12m": [
+          "Utilization of raised capital to advance TGME Gold Mine Project."
+        ],
+        "risks_headwinds": [
+          "Market volatility could impact share price and option exercise."
+        ],
+        "market_impact_assessment": "The funding bolsters Theta Gold's liquidity position but increases share count, which may affect per-share metrics and investor sentiment."
+      },
+      "extraction_quality": {
+        "text_truncated_for_model": false,
+        "signal_quality": "high",
+        "notes": [
+          "Detailed funding announcement with specific financial implications."
+        ]
+      },
+      "source_meta": {
+        "file_name": "05_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_081307_asx_tgm/05_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+        "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+        "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260213/pdf/03056329.pdf",
+        "domain": "www.intelligentinvestor.com.au",
+        "published_at": "2026-02-16",
+        "decoded_chars_in_file": 4043
+      }
+    },
+    {
+      "doc_id": "06_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "price_sensitive": {
+        "is_price_sensitive": true,
+        "confidence": 0.9,
+        "reason": "Includes information on key project updates and financing that could impact stock price."
+      },
+      "importance": {
+        "is_important": true,
+        "importance_score": 85,
+        "tier": "high",
+        "keep_for_injection": true,
+        "reason": "Outlines project economics, funding requirements, and construction milestones relevant for investment analysis."
+      },
+      "summary": {
+        "one_line": "Theta Gold Mines Limited presents significant project updates and financing details at the 2026 Mining Conference.",
+        "key_points": [
+          "Bill Guy, Chairman, presented at the 2026 Mining Investment Conference.",
+          "Core project: TGME Gold Mine in South Africa with strong historical production.",
+          "Current resources: 6.1Moz gold resource at 4.17g/t Au.",
+          "Pre-production funding: US$30M raised in equity, US$80M debt facility under negotiation.",
+          "Construction of a new gold processing plant is underway, targeting Q4 2026 commissioning.",
+          "First gold production expected in Q1 2027.",
+          "NVP (10%) of the project at US$2,884/oz gold price projected at US$455M, post-tax.",
+          "Strong planned production of 90-100koz per annum over a 13.1-year mine life.",
+          "All-in sustaining cost (AISC) estimated at US$1,181/oz.",
+          "Expected payback period of 29 months from start of mining.",
+          "Key permits for operations secured; existing infrastructure will reduce development costs.",
+          "Environmental commitments include biodiversity programs and community engagement.",
+          "Initial mining planned to target surface rock dumps leading to early cash flows."
+        ],
+        "numeric_facts": [
+          {
+            "metric": "Gold resource",
+            "value": "6.1",
+            "unit": "Moz",
+            "context": "Total gold resource across projects",
+            "source_snippet": "Combined Mineral Resources Statement"
+          },
+          {
+            "metric": "NVP",
+            "value": "455",
+            "unit": "million",
+            "context": "Post-tax NPV at US$2,884/oz",
+            "source_snippet": "Robust Economics"
+          },
+          {
+            "metric": "AISC",
+            "value": "1,181",
+            "unit": "USD/oz",
+            "context": "Estimated all-in sustaining costs",
+            "source_snippet": "Project Economics at Various Gold Prices"
+          },
+          {
+            "metric": "Production target",
+            "value": "90-100",
+            "unit": "koz",
+            "context": "Annual production target",
+            "source_snippet": "Robust Production Profile"
+          }
+        ],
+        "timeline_milestones": [
+          {
+            "milestone": "Gold plant commissioning",
+            "target_window": "Q4 2026",
+            "direction": "new",
+            "source_snippet": "Plant construction underway"
+          },
+          {
+            "milestone": "First gold pour",
+            "target_window": "Q1 2027",
+            "direction": "new",
+            "source_snippet": "First gold production expected"
+          }
+        ],
+        "capital_structure": [
+          "US$30M raised in equity funding.",
+          "US$80M non-binding debt facility negotiated."
+        ],
+        "catalysts_next_12m": [
+          "Completion of plant commissioning.",
+          "First gold production scheduled for Q1 2027."
+        ],
+        "risks_headwinds": [
+          "Reliability of securing additional funding.",
+          "Commodity price volatility impacting project economics."
+        ],
+        "market_impact_assessment": "Positive updates on construction and financing are expected to boost investor confidence and potentially increase share price due to strong future cash flow projections."
+      },
+      "extraction_quality": {
+        "text_truncated_for_model": false,
+        "signal_quality": "high",
+        "notes": [
+          "Key financial metrics and project timelines provided are highly relevant for investment decisions."
+        ]
+      },
+      "source_meta": {
+        "file_name": "06_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_081307_asx_tgm/06_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+        "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+        "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260209/pdf/03054177.pdf",
+        "domain": "www.intelligentinvestor.com.au",
+        "published_at": "2026-02-16",
+        "decoded_chars_in_file": 52562
+      }
+    },
+    {
+      "doc_id": "07_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "price_sensitive": {
+        "is_price_sensitive": true,
+        "confidence": 0.85,
+        "reason": "Issuance of new shares and options affects capital structure."
+      },
+      "importance": {
+        "is_important": true,
+        "importance_score": 75,
+        "tier": "high",
+        "keep_for_injection": true,
+        "reason": "The announcement involves significant changes in the capital structure due to the issuance of shares and options, which could impact shareholder value and market perception."
+      },
+      "summary": {
+        "one_line": "Theta Gold Mines Limited issued new shares and options affecting capital structure.",
+        "key_points": [
+          "44,029,575 fully paid ordinary shares issued to convertible lenders.",
+          "Issuance price per share was A$0.17647.",
+          "10,000,000 unlisted options were also issued to convertible lenders.",
+          "Options have an exercise price of $0.32.",
+          "Options expire on 3 August 2027.",
+          "Shareholder approval obtained at the AGM on 28 November 2025.",
+          "The issuance was carried out without disclosure per Part 6D.2 of the Act."
+        ],
+        "numeric_facts": [
+          {
+            "metric": "Shares issued",
+            "value": "44,029,575",
+            "unit": "shares",
+            "context": "Convertible lenders",
+            "source_snippet": "issued 44,029,575 fully paid ordinary to Convertible Lenders"
+          },
+          {
+            "metric": "Options issued",
+            "value": "10,000,000",
+            "unit": "options",
+            "context": "Convertible lenders",
+            "source_snippet": "issued a total of 10,000,000 unlisted options"
+          },
+          {
+            "metric": "Share issue price",
+            "value": "0.17647",
+            "unit": "AUD/share",
+            "context": "shares issued to lenders",
+            "source_snippet": "at the issue price of A$0.17647"
+          },
+          {
+            "metric": "Options exercise price",
+            "value": "0.32",
+            "unit": "AUD/option",
+            "context": "exercise price",
+            "source_snippet": "at an exercise price of $0.32"
+          }
+        ],
+        "timeline_milestones": [
+          {
+            "milestone": "AGM for shareholder approval",
+            "target_window": "28 November 2025",
+            "direction": "new",
+            "source_snippet": "shareholder approval at the annual general meeting on 28 November 2025"
+          }
+        ],
+        "capital_structure": [
+          "Convertible loans converted to ordinary shares.",
+          "Increased number of shares outstanding from the issuance."
+        ],
+        "catalysts_next_12m": [
+          "Potential market reaction to increased share count.",
+          "Monitoring of options exercised before expiry."
+        ],
+        "risks_headwinds": [
+          "Dilution of existing shareholder value.",
+          "Potential negative market perception due to large issuance."
+        ],
+        "market_impact_assessment": "The issuance of shares and options may dilute existing shareholder value and could affect market sentiment around Theta Gold Mines Limited. Investors will likely assess the implications of increased shares on future earnings per share."
+      },
+      "extraction_quality": {
+        "text_truncated_for_model": false,
+        "signal_quality": "high",
+        "notes": [
+          "Clear details on share issuance and options provided, with relevant financial metrics."
+        ]
+      },
+      "source_meta": {
+        "file_name": "07_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_081307_asx_tgm/07_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+        "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+        "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053862.pdf",
+        "domain": "www.intelligentinvestor.com.au",
+        "published_at": "2026-02-16",
+        "decoded_chars_in_file": 2168
+      }
+    },
+    {
+      "doc_id": "08_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "price_sensitive": {
+        "is_price_sensitive": true,
+        "confidence": 0.9,
+        "reason": "Announcement involves issuance of securities which can impact share dilution and financial standing."
+      },
+      "importance": {
+        "is_important": true,
+        "importance_score": 75,
+        "tier": "high",
+        "keep_for_injection": true,
+        "reason": "Details on new unlisted options and related securities issuance affect capital structure and investor decisions."
+      },
+      "summary": {
+        "one_line": "Theta Gold Mines Limited announces issuance of unlisted options.",
+        "key_points": [
+          "Company: Theta Gold Mines Limited.",
+          "Announcement date: February 6, 2026.",
+          "Type of security issued: Unlisted Options.",
+          "Total number of options issued: 10,000,000.",
+          "Exercise price of options: AUD 0.32.",
+          "Expiry date of options: August 3, 2027.",
+          "Related to transactions mentioned in a prior Appendix 3B announcement.",
+          "Options issued as conversion for outstanding principal and interest.",
+          "Prior shareholder approval received at 2025 AGM.",
+          "Existing class of security upon conversion: Ordinary Fully Paid Shares."
+        ],
+        "numeric_facts": [
+          {
+            "metric": "Total Options Issued",
+            "value": "10,000,000",
+            "unit": "options",
+            "context": "Unlisted Options",
+            "source_snippet": "10,000,000 Unlisted Options, exercise price of $0.32 (32 cents) and expiry date of 3 August 2027."
+          },
+          {
+            "metric": "Exercise Price",
+            "value": "0.32",
+            "unit": "AUD",
+            "context": "Exercise Price of Unlisted Options",
+            "source_snippet": "exercise price of $0.32 (32 cents)"
+          },
+          {
+            "metric": "Expiry Date",
+            "value": "3 August 2027",
+            "unit": "",
+            "context": "Expiry of Unlisted Options",
+            "source_snippet": "expiry date of 3 August 2027."
+          }
+        ],
+        "timeline_milestones": [
+          {
+            "milestone": "Options Issued",
+            "target_window": "February 3, 2026",
+            "direction": "new",
+            "source_snippet": "Date the +securities the subject of this notification were issued 3/2/2026"
+          }
+        ],
+        "capital_structure": [
+          "10,000,000 Unlisted Options issued.",
+          "Existing securities total 1,046,552,399 Ordinary Shares post-issuance."
+        ],
+        "catalysts_next_12m": [
+          "Potential conversion of options could impact share count and liquidity."
+        ],
+        "risks_headwinds": [
+          "Dilution risk for existing shareholders due to new securities issuance."
+        ],
+        "market_impact_assessment": "The issuance of options could affect the share price due to potential dilution and changes in market perception of company financial health."
+      },
+      "extraction_quality": {
+        "text_truncated_for_model": false,
+        "signal_quality": "high",
+        "notes": [
+          "Details are clear and pertain directly to capital structure changes."
+        ]
+      },
+      "source_meta": {
+        "file_name": "08_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_081307_asx_tgm/08_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+        "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+        "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053861.pdf",
+        "domain": "www.intelligentinvestor.com.au",
+        "published_at": "2026-02-16",
+        "decoded_chars_in_file": 7428
+      }
+    },
+    {
+      "doc_id": "09_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "price_sensitive": {
+        "is_price_sensitive": true,
+        "confidence": 0.9,
+        "reason": "The issuance of a significant number of securities (44,029,575) affects the capital structure."
+      },
+      "importance": {
+        "is_important": true,
+        "importance_score": 85,
+        "tier": "high",
+        "keep_for_injection": true,
+        "reason": "Details on the issuance of securities and its impact on company's capital structure are critical for investors."
+      },
+      "summary": {
+        "one_line": "Theta Gold Mines Limited issued 44,029,575 ordinary shares as part of a capital raise.",
+        "key_points": [
+          "Entity: Theta Gold Mines Limited.",
+          "Announcement Date: February 6, 2026.",
+          "Securities: 44,029,575 ordinary fully paid shares.",
+          "Issue Date: February 3, 2026.",
+          "Consideration: Conversion of Convertible Loans valued at approximately $7.8 million.",
+          "Value per Security: Approximately AUD 0.1765.",
+          "Total Quoted Securities after Issuance: 1,090,581,974 ordinary shares.",
+          "Options Expiring 01-JUN-2027: 24,249,647.",
+          "Unquoted Options include various expiry dates with values between AUD 0.12 to AUD 0.30.",
+          "Past Announcement Date for related transactions: October 21, 2025."
+        ],
+        "numeric_facts": [
+          {
+            "metric": "Number of Shares",
+            "value": "44,029,575",
+            "unit": "shares",
+            "context": "New Issue",
+            "source_snippet": "Number of +securities to be quoted 44,029,575"
+          },
+          {
+            "metric": "Convertible Loans Value",
+            "value": "7.8",
+            "unit": "million AUD",
+            "context": "Conversion consideration",
+            "source_snippet": "The shares were issued as consideration for the conversion of Convertible Loans with an outstanding value of approximately $7.8 million"
+          },
+          {
+            "metric": "Value per Security",
+            "value": "0.176470",
+            "unit": "AUD",
+            "context": "Security value estimation",
+            "source_snippet": "Please provide an estimate (in AUD) of the value of the consideration being provided per +security for the +securities to be quoted 0.176470"
+          }
+        ],
+        "timeline_milestones": [],
+        "capital_structure": [
+          "Total number of quoted ordinary shares post-issue: 1,090,581,974",
+          "Future potential issuances include other options."
+        ],
+        "catalysts_next_12m": [
+          "Monitoring further announcements on additional security issuances."
+        ],
+        "risks_headwinds": [
+          "Potential dilution to existing shareholders.",
+          "Market response to the securities issuance and conversion of convertible loans."
+        ],
+        "market_impact_assessment": "This issuance can affect share price due to dilution and may influence investor sentiment regarding the company's financial health and future financing strategy."
+      },
+      "extraction_quality": {
+        "text_truncated_for_model": false,
+        "signal_quality": "high",
+        "notes": []
+      },
+      "source_meta": {
+        "file_name": "09_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_081307_asx_tgm/09_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+        "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+        "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053860.pdf",
+        "domain": "www.intelligentinvestor.com.au",
+        "published_at": "2026-02-16",
+        "decoded_chars_in_file": 5701
+      }
+    },
+    {
+      "doc_id": "10_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "price_sensitive": {
+        "is_price_sensitive": true,
+        "confidence": 0.9,
+        "reason": "Announcement of issuance of shares and options impacting capital structure."
+      },
+      "importance": {
+        "is_important": true,
+        "importance_score": 85,
+        "tier": "high",
+        "keep_for_injection": true,
+        "reason": "Details on funding through convertible shares and options, which affect capital structure and potential dilution."
+      },
+      "summary": {
+        "one_line": "Theta Gold Mines issued shares and options to repay convertible loans, affecting capital structure.",
+        "key_points": [
+          "Issued 44,029,575 Convertible Lender Shares.",
+          "Issued 10,000,000 unlisted Convertible Lender Options.",
+          "Conversion involved outstanding principal and interest of ~A$7.8 million.",
+          "Shares converted at an exercise price of $0.17647.",
+          "Exercise price for options set at A$0.32.",
+          "Options expiry in 18 months from the grant date.",
+          "Approval received from shareholders at the 2025 AGM.",
+          "No existing capacity under ASX Listing Rule 7.1 used.",
+          "Shares from conversion rank equally with existing shares."
+        ],
+        "numeric_facts": [
+          {
+            "metric": "Convertible Shares Issued",
+            "value": "44,029,575",
+            "unit": "shares",
+            "context": "Conversion event",
+            "source_snippet": "issued 44,029,575 fully paid ordinary shares"
+          },
+          {
+            "metric": "Convertible Options Issued",
+            "value": "10,000,000",
+            "unit": "options",
+            "context": "Conversion event",
+            "source_snippet": "along with 10,000,000 unlisted options"
+          },
+          {
+            "metric": "Principal Amount Converted",
+            "value": "7.8",
+            "unit": "million AUD",
+            "context": "total outstanding amount",
+            "source_snippet": "outstanding principal and interest totalling ~A$7.8 million"
+          },
+          {
+            "metric": "Convertible Share Exercise Price",
+            "value": "0.17647",
+            "unit": "AUD",
+            "context": "conversion price",
+            "source_snippet": "converted at the exercise price of $0.17647"
+          },
+          {
+            "metric": "Convertible Option Exercise Price",
+            "value": "0.32",
+            "unit": "AUD",
+            "context": "exercise price",
+            "source_snippet": "will have an exercise price of A$0.32"
+          },
+          {
+            "metric": "Option Expiry",
+            "value": "18",
+            "unit": "months",
+            "context": "expiry from grant",
+            "source_snippet": "expiry date being 18 months from the date of grant"
+          }
+        ],
+        "timeline_milestones": [],
+        "capital_structure": [
+          "Impact of convertible shares and options on share dilution.",
+          "No utilization of current ASX Listing Rule 7.1 capacity."
+        ],
+        "catalysts_next_12m": [
+          "Potential conversion of options leading to further dilution."
+        ],
+        "risks_headwinds": [
+          "Market reactions to dilution from new shares/options."
+        ],
+        "market_impact_assessment": "Issuance of new shares and options can lead to dilution of existing shareholder value. The convertible nature of these securities may attract further investment if the market perceives potential growth."
+      },
+      "extraction_quality": {
+        "text_truncated_for_model": false,
+        "signal_quality": "high",
+        "notes": [
+          "attempt_1:json_parse_failed"
+        ]
+      },
+      "source_meta": {
+        "file_name": "10_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_081307_asx_tgm/10_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+        "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+        "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+        "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053856.pdf",
+        "domain": "www.intelligentinvestor.com.au",
+        "published_at": "2026-02-16",
+        "decoded_chars_in_file": 2483
+      }
+    }
+  ]
+}

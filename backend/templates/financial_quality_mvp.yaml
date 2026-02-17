@@ -82,6 +82,120 @@ output_schema:
       commentary: "string"
       dissenting_views: "array[string]"
 
+verification_schema:
+  fact_digest:
+    sections:
+      timelines_deadlines:
+        keywords:
+          - "timeline"
+          - "milestone"
+          - "target"
+          - "guidance"
+          - "on track"
+          - "q1"
+          - "q2"
+          - "q3"
+          - "q4"
+          - "launch"
+          - "approval"
+      financing_deals:
+        keywords:
+          - "facility"
+          - "loan"
+          - "debt"
+          - "capital raise"
+          - "placement"
+          - "financing"
+          - "cash"
+          - "runway"
+      project_economics:
+        keywords:
+          - "revenue"
+          - "margin"
+          - "ebitda"
+          - "cash flow"
+          - "guidance"
+          - "forecast"
+      market_share_structure:
+        keywords:
+          - "market cap"
+          - "enterprise value"
+          - "shares"
+          - "share price"
+          - "valuation"
+          - "multiple"
+      operational_objectives:
+        keywords:
+          - "objective"
+          - "execution"
+          - "deliver"
+          - "operational"
+          - "guidance"
+      risks_constraints:
+        keywords:
+          - "risk"
+          - "headwind"
+          - "delay"
+          - "dilution"
+          - "regulatory"
+          - "uncertain"
+      catalysts_tailwinds:
+        keywords:
+          - "tailwind"
+          - "catalyst"
+          - "upside"
+          - "improved"
+          - "expansion"
+    timeline_terms:
+      - "timeline"
+      - "milestone"
+      - "target"
+      - "guidance"
+      - "on track"
+      - "launch"
+      - "approval"
+      - "q1"
+      - "q2"
+      - "q3"
+      - "q4"
+    timeline_focus_terms:
+      - "milestone"
+      - "target"
+      - "launch"
+      - "approval"
+    conflict:
+      field: "milestone_target_window"
+      terms:
+        - "milestone"
+        - "target"
+        - "launch"
+        - "approval"
+      max_shift_quarters: 3
+      resolution_rule: "prefer newest dated primary-source milestone guidance"
+  compliance:
+    section_markers:
+      quality_score:
+        markers: ["quality score", "quality_score"]
+        critical: true
+      confidence_pct:
+        markers: ["confidence", "confidence_pct"]
+      recommendation:
+        markers: ["recommendation", "buy", "hold", "sell", "avoid"]
+        critical: true
+      rationale:
+        markers: ["rationale", "because", "thesis"]
+        critical: true
+      key_positive_drivers:
+        markers: ["key_positive_drivers", "positive drivers", "drivers"]
+      key_risks:
+        markers: ["key_risks", "risks", "headwinds"]
+      extended_analysis:
+        markers: ["next_major_catalysts", "sensitivity_analysis", "market_context", "extended_analysis"]
+    required_sections:
+      - "quality_score"
+      - "recommendation"
+      - "rationale"
+
 rubric: |
   You are producing an MVP financial quality score for one company.
 

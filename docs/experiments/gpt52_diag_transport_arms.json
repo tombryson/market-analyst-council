@@ -1,0 +1,56 @@
+[
+  {
+    "id": "micro_deep_medium_no2nd",
+    "profile": "current_env",
+    "cost_rank": 1,
+    "description": "Transport baseline: deep preset, low context, medium reasoning, no second pass.",
+    "env_overrides": {
+      "PERPLEXITY_COUNCIL_MODELS": "openai/gpt-5.2",
+      "PERPLEXITY_PRESET_STRATEGY": "deep_only",
+      "PERPLEXITY_STREAM_ENABLED": "false",
+      "PERPLEXITY_TIMEOUT_SECONDS": "300",
+      "PERPLEXITY_MAX_STEPS": "1",
+      "PERPLEXITY_REASONING_EFFORT": "medium",
+      "MAX_SOURCES": "3",
+      "PERPLEXITY_MAX_RESULTS_PER_QUERY": "3",
+      "PERPLEXITY_STAGE1_MAX_ATTEMPTS": "1",
+      "PERPLEXITY_STAGE1_SECOND_PASS_ENABLED": "false"
+    }
+  },
+  {
+    "id": "small_deep_medium_no2nd",
+    "profile": "current_env",
+    "cost_rank": 2,
+    "description": "Slightly larger context: deep preset, small context, medium reasoning, no second pass.",
+    "env_overrides": {
+      "PERPLEXITY_COUNCIL_MODELS": "openai/gpt-5.2",
+      "PERPLEXITY_PRESET_STRATEGY": "deep_only",
+      "PERPLEXITY_STREAM_ENABLED": "false",
+      "PERPLEXITY_TIMEOUT_SECONDS": "420",
+      "PERPLEXITY_MAX_STEPS": "2",
+      "PERPLEXITY_REASONING_EFFORT": "medium",
+      "MAX_SOURCES": "5",
+      "PERPLEXITY_MAX_RESULTS_PER_QUERY": "5",
+      "PERPLEXITY_STAGE1_MAX_ATTEMPTS": "1",
+      "PERPLEXITY_STAGE1_SECOND_PASS_ENABLED": "false"
+    }
+  },
+  {
+    "id": "small_deep_high_no2nd",
+    "profile": "current_env",
+    "cost_rank": 3,
+    "description": "High reasoning check with controlled context and no second pass.",
+    "env_overrides": {
+      "PERPLEXITY_COUNCIL_MODELS": "openai/gpt-5.2",
+      "PERPLEXITY_PRESET_STRATEGY": "deep_only",
+      "PERPLEXITY_STREAM_ENABLED": "false",
+      "PERPLEXITY_TIMEOUT_SECONDS": "600",
+      "PERPLEXITY_MAX_STEPS": "2",
+      "PERPLEXITY_REASONING_EFFORT": "high",
+      "MAX_SOURCES": "5",
+      "PERPLEXITY_MAX_RESULTS_PER_QUERY": "5",
+      "PERPLEXITY_STAGE1_MAX_ATTEMPTS": "1",
+      "PERPLEXITY_STAGE1_SECOND_PASS_ENABLED": "false"
+    }
+  }
+]

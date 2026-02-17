@@ -1,0 +1,420 @@
+# Announcement Summaries
+
+- generated_at_utc: 2026-02-17T08:32:34.947226+00:00
+- worker_model: openai/gpt-4o-mini
+- dump_dir: /Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_080343_asx_wwi
+- total_processed: 4
+- kept_for_injection: 4
+- dropped_as_unimportant: 0
+
+## Kept Documents (JSON Elements)
+
+### 01_2026-02-13_west_wits_mining_limited_asx_wwi_intelligent_investor.md
+```json
+{
+  "doc_id": "01_2026-02-13_west_wits_mining_limited_asx_wwi_intelligent_investor.md",
+  "price_sensitive": {
+    "is_price_sensitive": true,
+    "confidence": 0.85,
+    "reason": "Contains updates on resource estimates and production timelines."
+  },
+  "importance": {
+    "is_important": true,
+    "importance_score": 85,
+    "tier": "high",
+    "keep_for_injection": true,
+    "reason": "Includes significant updates on resource estimates, production targets, and financial projections."
+  },
+  "summary": {
+    "one_line": "West Wits Mining updates shareholders on project developments and resource estimates at RIU Explorers Conference.",
+    "key_points": [
+      "Witwatersrand Basin Project updated JORC MRE: 7.24Moz @ 4.0g/t.",
+      "First ore production commenced October 2025; first gold pour targeted for March 2026.",
+      "Cash balance: AUD 50.7M as of February 2, 2026.",
+      "Secured financing: USD 12.5M Nebari Loan and executed senior debt facility of up to ZAR875 million.",
+      "Updated DFS shows post-tax NPV of USD 500 million and IRR of 81%.",
+      "Immediate production target: 70,000 oz/year for 12 years.",
+      "Project 200 aims for production expansion to 200,000 oz/year.",
+      "Institutional support secured with A$10M placement from Tribeca.",
+      "Geological expertise indicates significant potential for resource growth.",
+      "Mining operations focused on Qala Shallows, with ongoing drilling for resource conversion."
+    ],
+    "numeric_facts": [
+      {
+        "metric": "Mineral Resource Estimate",
+        "value": "7.24",
+        "unit": "Moz",
+        "context": "Gold",
+        "source_snippet": "Global JORC MRE to 7.24Moz @ 4.0g/t."
+      },
+      {
+        "metric": "Cash Balance",
+        "value": "50.7",
+        "unit": "M AUD",
+        "context": "Cash as of 02/02/2026",
+        "source_snippet": "AUD50.7M Cash Balance at 02/02/2026."
+      },
+      {
+        "metric": "NPV",
+        "value": "500",
+        "unit": "M USD",
+        "context": "Post-Tax NPV",
+        "source_snippet": "US$500M Post-Tax NPV7.5."
+      },
+      {
+        "metric": "IRR",
+        "value": "81",
+        "unit": "%",
+        "context": "Post-Tax IRR",
+        "source_snippet": "IRR (Post-Tax): 81%."
+      },
+      {
+        "metric": "Production Target",
+        "value": "70,000",
+        "unit": "oz",
+        "context": "Yearly production goal",
+        "source_snippet": "Steady-state production: 70,000/oz pa for 12 years."
+      }
+    ],
+    "timeline_milestones": [
+      {
+        "milestone": "First Gold Pour",
+        "target_window": "March 2026",
+        "direction": "new",
+        "source_snippet": "first gold targeted for March 2026."
+      },
+      {
+        "milestone": "Completion of Project 200 Scoping Study",
+        "target_window": "June 2026",
+        "direction": "new",
+        "source_snippet": "Completion targeted June 2026."
+      }
+    ],
+    "capital_structure": [
+      "Cash: AUD 50.7M",
+      "Senior debt facility up to ZAR875M (~USD 50M)",
+      "Funding secured through A$10M placement."
+    ],
+    "catalysts_next_12m": [
+      "First gold production planned for March 2026.",
+      "Completion of Project 200 scoping study by June 2026."
+    ],
+    "risks_headwinds": [
+      "Potential delays in production ramp-up.",
+      "Fluctuations in gold prices affecting project economics."
+    ],
+    "market_impact_assessment": "The updates on resource estimates and production timelines can significantly influence investor sentiment and stock price due to high resource potential and planned production milestones."
+  },
+  "extraction_quality": {
+    "text_truncated_for_model": false,
+    "signal_quality": "high",
+    "notes": []
+  },
+  "source_meta": {
+    "file_name": "01_2026-02-13_west_wits_mining_limited_asx_wwi_intelligent_investor.md",
+    "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_080343_asx_wwi/01_2026-02-13_west_wits_mining_limited_asx_wwi_intelligent_investor.md",
+    "title": "West Wits Mining Limited (ASX:WWI) - Intelligent Investor",
+    "source_url": "https://www.intelligentinvestor.com.au/shares/asx-wwi/west-wits-mining-limited",
+    "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260217/pdf/03057252.pdf",
+    "domain": "www.intelligentinvestor.com.au",
+    "published_at": "2026-02-13",
+    "decoded_chars_in_file": 35468
+  }
+}
+```
+
+### 02_2025-09-11_asx_announcement_pdf_2025_09_11.md
+```json
+{
+  "doc_id": "02_2025-09-11_asx_announcement_pdf_2025_09_11.md",
+  "price_sensitive": {
+    "is_price_sensitive": true,
+    "confidence": 0.9,
+    "reason": "The request for a trading halt is related to a proposed capital raising, which is price sensitive."
+  },
+  "importance": {
+    "is_important": true,
+    "importance_score": 85,
+    "tier": "high",
+    "keep_for_injection": true,
+    "reason": "The announcement pertains to a trading halt pending a capital raising, affecting liquidity and potentially share price."
+  },
+  "summary": {
+    "one_line": "West Wits Mining Limited requests a trading halt pending announcement of a capital raising.",
+    "key_points": [
+      "Trading halt requested by West Wits Mining Limited (ASX: WWI).",
+      "Halts trading until 15 September 2025 or announcement release.",
+      "Purpose of the halt is to manage continuous disclosure obligations.",
+      "Specific announcement regarding capital raising expected before normal trading resumes.",
+      "Company is not aware of any information affecting the halt decision."
+    ],
+    "numeric_facts": [
+      {
+        "metric": "trading halt end date",
+        "value": "15 September 2025",
+        "unit": "",
+        "context": "end of trading halt",
+        "source_snippet": "the commencement of normal trading on Monday, 15 September 2025"
+      }
+    ],
+    "timeline_milestones": [
+      {
+        "milestone": "Announcement of capital raising",
+        "target_window": "on or before 15 September 2025",
+        "direction": "new",
+        "source_snippet": "the Company expects to make the announcement"
+      }
+    ],
+    "capital_structure": [
+      "Pending capital raising announcement may impact equity structure."
+    ],
+    "catalysts_next_12m": [
+      "Completion of planned capital raising."
+    ],
+    "risks_headwinds": [
+      "Market reaction to the capital raising announcement."
+    ],
+    "market_impact_assessment": "The trading halt indicates that West Wits Mining Limited expects a significant announcement that may affect its share price. Depending on the terms of the capital raising, this could lead to dilution or increased liquidity."
+  },
+  "extraction_quality": {
+    "text_truncated_for_model": false,
+    "signal_quality": "high",
+    "notes": [
+      "Document contains clear details about the trading halt and upcoming capital raising."
+    ]
+  },
+  "source_meta": {
+    "file_name": "02_2025-09-11_asx_announcement_pdf_2025_09_11.md",
+    "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_080343_asx_wwi/02_2025-09-11_asx_announcement_pdf_2025_09_11.md",
+    "title": "ASX announcement PDF (2025-09-11)",
+    "source_url": "https://announcements.asx.com.au/asxpdf/20250911/pdf/06p2y3c5x8rw7c.pdf",
+    "pdf_url": "https://announcements.asx.com.au/asxpdf/20250911/pdf/06p2y3c5x8rw7c.pdf",
+    "domain": "announcements.asx.com.au",
+    "published_at": "2025-09-11",
+    "decoded_chars_in_file": 2436
+  }
+}
+```
+
+### 03_2025-06-25_pdf_west_wits_mining_asx.md
+```json
+{
+  "doc_id": "03_2025-06-25_pdf_west_wits_mining_asx.md",
+  "price_sensitive": {
+    "is_price_sensitive": true,
+    "confidence": 1.0,
+    "reason": "Announcement includes significant updates on resource estimates, financing, and production timelines."
+  },
+  "importance": {
+    "is_important": true,
+    "importance_score": 85,
+    "tier": "high",
+    "keep_for_injection": true,
+    "reason": "The document provides critical updates on project financing, resource estimates, production schedules, and management strategies affecting the company's operational and financial outlook."
+  },
+  "summary": {
+    "one_line": "West Wits Mining announces significant updates on the Qala Shallows Gold Project.",
+    "key_points": [
+      "5Moz total gold resource at the Witwatersrand Basin Project (WBP), with 65% in measured and indicated categories.",
+      "Definitive Feasibility Study (DFS) confirms 924,000oz gold production over a 17-year life of mine.",
+      "First quartile AISC of US$977/oz, with a steady-state production of 70,000oz annually for 9 years.",
+      "Funding secured: ZAR 902.5M (~USD 50M) senior debt facility finalized.",
+      "Project to commence production with initial ore stockpile delivered to Sibanye-Stillwater.",
+      "First gold pour targeted for Q4 2025.",
+      "Critical project milestones include completion of underground access and mobilization of mining contractors.",
+      "Up to US$54M peak funding requirement highlighted in DFS, reduced under prevailing gold prices ($2,200/oz).",
+      "Post-tax NPV at US$255M and IRR of 53% based on base case gold price of $1,850/oz.",
+      "Operating under a cost-effective toll treatment agreement with Ezulwini Mining.",
+      "Management team consists of industry veterans with extensive mining experience.",
+      "Confirmed financial model under review for optimization at current gold prices.",
+      "First mining activities commenced, with mobilization of key personnel completed."
+    ],
+    "numeric_facts": [
+      {
+        "metric": "Total Resource Estimate",
+        "value": "5",
+        "unit": "Moz",
+        "context": "Total gold resource in WBP",
+        "source_snippet": "5Moz Gold (65% measured & indicated categories)"
+      },
+      {
+        "metric": "Life of Mine Production",
+        "value": "924,000",
+        "unit": "oz",
+        "context": "Total gold produced over 17 years",
+        "source_snippet": "Qala Shallows (Stage 1) – Robust DFS 17yr Life-of-mine for 924,000oz"
+      },
+      {
+        "metric": "Annual Production",
+        "value": "70,000",
+        "unit": "oz",
+        "context": "Steady-state gold production per year",
+        "source_snippet": "70,000oz p/a steady-state production for 9 years"
+      },
+      {
+        "metric": "AISC",
+        "value": "977",
+        "unit": "USD/oz",
+        "context": "Life of Mine average cost",
+        "source_snippet": "first quartile cost producer with AISC $977/oz"
+      }
+    ],
+    "timeline_milestones": [
+      {
+        "milestone": "Target first gold production",
+        "target_window": "Q4 2025",
+        "direction": "new",
+        "source_snippet": "Targeting first gold pour Q4 2025"
+      }
+    ],
+    "capital_structure": [
+      "US$50M senior debt facility secured",
+      "Current share capital totaling 3.27 billion shares",
+      "Proposed convertible notes and performance rights pending approval."
+    ],
+    "catalysts_next_12m": [
+      "Completion of project finance package.",
+      "First ore production and deliveries to processing plant by Q3 2025.",
+      "Continued updates on mineral resources and feasibilities based on market conditions."
+    ],
+    "risks_headwinds": [
+      "Fluctuations in gold prices impacting financing and economic assumptions.",
+      "Regulatory changes affecting mining operations in South Africa.",
+      "Execution risks tied to commissioning and production timeline."
+    ],
+    "market_impact_assessment": "The announcement is likely to generate positive investor sentiment due to the secured funding and clear timeline for production. The robust resource estimate positions West Wits Mining as a potentially significant player in the gold market."
+  },
+  "extraction_quality": {
+    "text_truncated_for_model": false,
+    "signal_quality": "high",
+    "notes": []
+  },
+  "source_meta": {
+    "file_name": "03_2025-06-25_pdf_west_wits_mining_asx.md",
+    "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_080343_asx_wwi/03_2025-06-25_pdf_west_wits_mining_asx.md",
+    "title": "[PDF] WEST WITS MINING - ASX",
+    "source_url": "https://announcements.asx.com.au/asxpdf/20250625/pdf/06l2smlcsq3b20.pdf",
+    "pdf_url": "https://announcements.asx.com.au/asxpdf/20250625/pdf/06l2smlcsq3b20.pdf",
+    "domain": "announcements.asx.com.au",
+    "published_at": "2025-06-25",
+    "decoded_chars_in_file": 36009
+  }
+}
+```
+
+### 04_2025-03-12_pdf_interim_report_asx.md
+```json
+{
+  "doc_id": "04_2025-03-12_pdf_interim_report_asx.md",
+  "price_sensitive": {
+    "is_price_sensitive": true,
+    "confidence": 0.9,
+    "reason": "Contains material information on funding, project resources, and management changes."
+  },
+  "importance": {
+    "is_important": true,
+    "importance_score": 85,
+    "tier": "high",
+    "keep_for_injection": true,
+    "reason": "Includes critical updates on funding arrangements, resource estimates, and management changes, impacting investment decisions."
+  },
+  "summary": {
+    "one_line": "West Wits Mining announces significant operational and financial updates for the half-year ended December 31, 2024.",
+    "key_points": [
+      "Secured ZAR 902.5 million (~USD 50 million) loan facility for Qala Shallows project.",
+      "Facility by Industrial Development Corporation and Absa Bank covers approx. 55% of project funding.",
+      "New Prospecting Right (PR10730) granted, boosting total Mineral Resource Estimate by 749,000 oz (+17.5%) to 5.025 Moz.",
+      "CEO Rudi Deysel appointed, effective December 1, 2024.",
+      "Definitive Feasibility Study projects production target of 924,000 oz over 17.7 years.",
+      "Mine Reserve estimated at 4.03 million tonnes @ 2.71 g/t for 351,400 oz of gold.",
+      "Substantial increase in JORC resource supports longer mine life.",
+      "Company reported a loss of $1.725 million for the half-year, compared to $0.916 million the previous year.",
+      "Net cash as of December 31, 2024, was $980,000, with current liabilities at $4.158 million.",
+      "Convertible notes issued totaling $1.5 million to sophisticated investors.",
+      "Options have been issued as part of the convertible note arrangement, exercise price $0.023.",
+      "Company engaged with industry through Minerals Council South Africa membership.",
+      "Successful stakeholder engagement for additional prospecting rights."
+    ],
+    "numeric_facts": [
+      {
+        "metric": "Total Mineral Resource Estimate",
+        "value": "5.025",
+        "unit": "Moz",
+        "context": "Updated post new Prospecting Right",
+        "source_snippet": "increasing the Mineral Resource Estimate by 749,000oz"
+      },
+      {
+        "metric": "Loan Facility Amount",
+        "value": "902.5",
+        "unit": "million ZAR",
+        "context": "Funding for Qala Shallows Project",
+        "source_snippet": "senior debt syndicated loan facility of up to ZAR 902.5 million"
+      },
+      {
+        "metric": "Production Target",
+        "value": "924,000",
+        "unit": "oz",
+        "context": "Over Life-of-Mine",
+        "source_snippet": "Production target: 924,000 oz over a 17.7-year Life-of-Mine"
+      },
+      {
+        "metric": "Loss for Half-Year",
+        "value": "1.725",
+        "unit": "million USD",
+        "context": "Financial performance",
+        "source_snippet": "loss after income tax expense for the half-year"
+      }
+    ],
+    "timeline_milestones": [
+      {
+        "milestone": "Credit approval for loan facility",
+        "target_window": "February 2025",
+        "direction": "new",
+        "source_snippet": "Final credit approval was secured in February 2025, post-period."
+      },
+      {
+        "milestone": "CEO appointment",
+        "target_window": "December 1, 2024",
+        "direction": "new",
+        "source_snippet": "Mr Rudi Deysel appointed as Chief Executive Officer."
+      },
+      {
+        "milestone": "Issuance of convertible notes",
+        "target_window": "October 2024",
+        "direction": "new",
+        "source_snippet": "issued 60 notes with a face value and issue price of $25,000"
+      }
+    ],
+    "capital_structure": [
+      "Issued 12,295,080 shares at $0.0122 per share raising $150,000 upon conversion of convertible notes.",
+      "Cancelled or expired 87,790,426 options during the period."
+    ],
+    "catalysts_next_12m": [
+      "Completion of loan documentation for the ZAR 902.5 million loan.",
+      "Start of Qala Shallows Project development pending equity fund sourcing."
+    ],
+    "risks_headwinds": [
+      "Material uncertainty regarding the Company's ability to continue as a going concern due to reported losses.",
+      "Potential delays in further securing funding."
+    ],
+    "market_impact_assessment": "The announced funding and resource updates potentially strengthen investor confidence in West Wits Mining, positively influencing share price and market perception of project viability."
+  },
+  "extraction_quality": {
+    "text_truncated_for_model": false,
+    "signal_quality": "high",
+    "notes": []
+  },
+  "source_meta": {
+    "file_name": "04_2025-03-12_pdf_interim_report_asx.md",
+    "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_080343_asx_wwi/04_2025-03-12_pdf_interim_report_asx.md",
+    "title": "[PDF] INTERIM REPORT - ASX",
+    "source_url": "https://announcements.asx.com.au/asxpdf/20250312/pdf/06gjrt82gkvhbc.pdf",
+    "pdf_url": "https://announcements.asx.com.au/asxpdf/20250312/pdf/06gjrt82gkvhbc.pdf",
+    "domain": "announcements.asx.com.au",
+    "published_at": "2025-03-12",
+    "decoded_chars_in_file": 51584
+  }
+}
+```
+
+## Dropped Documents (Classification Only)

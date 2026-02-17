@@ -290,6 +290,7 @@ async def _run(args: argparse.Namespace):
         ticker=args.ticker,
         attachment_context="",
         research_brief=stage1_effective_research_brief,
+        template_id=selected_template_id,
     )
 
     per_model_runs = metadata.get("per_model_research_runs", [])

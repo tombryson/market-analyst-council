@@ -26,3 +26,5 @@ class EvidencePack(TypedDict, total=False):
     sources: List[EvidenceSource]
     key_facts: List[str]
     missing_data: List[str]
+    claim_ledger: dict
+    deterministic_finance_lane: dict

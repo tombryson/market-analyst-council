@@ -1,21 +1,43 @@
 """3-stage LLM Council orchestration."""
 
+import asyncio
 import copy
 import json
 import re
+import httpx
+from html import unescape
 from typing import List, Dict, Any, Tuple, Optional
 from datetime import datetime
 from time import perf_counter
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse, parse_qs
 from .openrouter import query_models_parallel, query_model
 from .config import (
+    OPENROUTER_API_KEY,
     COUNCIL_MODELS,
     CHAIRMAN_MODEL,
     PERPLEXITY_COUNCIL_MODELS,
+    PERPLEXITY_STAGE1_MIXED_MODE_ENABLED,
+    PERPLEXITY_STAGE1_OPENROUTER_MODELS,
+    PERPLEXITY_STAGE1_MODEL_PREFLIGHT_ENABLED,
+    PERPLEXITY_STAGE1_MODEL_PREFLIGHT_TIMEOUT_SECONDS,
+    PERPLEXITY_STAGE1_MODEL_PREFLIGHT_FAIL_OPEN,
     RESEARCH_DEPTH,
     MAX_SOURCES,
+    ASX_DETERMINISTIC_ANNOUNCEMENTS_ENABLED,
+    ASX_DETERMINISTIC_TARGET_ANNOUNCEMENTS,
+    ASX_DETERMINISTIC_LOOKBACK_YEARS,
+    ASX_DETERMINISTIC_PRICE_SENSITIVE_ONLY,
+    ASX_DETERMINISTIC_INCLUDE_NON_SENSITIVE_FILL,
+    ASX_DETERMINISTIC_MAX_DECODE,
+    ASX_DETERMINISTIC_FETCH_TIMEOUT_SECONDS,
+    PERPLEXITY_API_KEY,
+    PERPLEXITY_API_URL,
     PERPLEXITY_STAGE1_EXECUTION_MODE,
     PERPLEXITY_STAGE1_STAGGER_SECONDS,
+    PERPLEXITY_STAGE1_MULTI_WAVE_ENABLED,
+    PERPLEXITY_STAGE1_MULTI_WAVE_MAX_WAVES,
+    PERPLEXITY_STAGE1_MULTI_WAVE_GAP_QUERY_LIMIT,
+    PERPLEXITY_STAGE1_MULTI_WAVE_MIN_NEW_PRIMARY_SOURCES,
     PERPLEXITY_STAGE1_MAX_ATTEMPTS,
     PERPLEXITY_STAGE1_MAX_RETRIES,
     PERPLEXITY_STAGE1_RETRY_BACKOFF_SECONDS,
@@ -26,11 +48,45 @@ from .config import (
     PERPLEXITY_STAGE1_SECOND_PASS_RETRY_BACKOFF_SECONDS,
     PERPLEXITY_STAGE1_SECOND_PASS_MAX_SOURCES,
     PERPLEXITY_STAGE1_SECOND_PASS_MAX_CHARS_PER_SOURCE,
+    PERPLEXITY_STAGE1_SECOND_PASS_MAX_OUTPUT_TOKENS,
+    PERPLEXITY_STAGE1_SECOND_PASS_REASONING_EFFORT,
+    PERPLEXITY_STAGE1_SECOND_PASS_APPENDIX_MAX_SOURCES,
+    PERPLEXITY_STAGE1_SECOND_PASS_PROMPT_COMPRESSION_ENABLED,
+    PERPLEXITY_STAGE1_SECOND_PASS_PROMPT_TARGET_CHARS,
+    PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_PER_SOURCE,
+    PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_WORDS_PER_SOURCE,
+    PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_FACT_CHARS,
+    PERPLEXITY_STAGE1_TIMELINE_GUARD_ENABLED,
+    PERPLEXITY_STAGE1_TIMELINE_GUARD_HARD_FAIL,
+    PERPLEXITY_STAGE1_TIMELINE_DIGEST_MAX_ITEMS,
+    PERPLEXITY_STAGE1_FACT_DIGEST_V2_ENABLED,
+    PERPLEXITY_STAGE1_FACT_DIGEST_V2_MAX_FACTS_PER_SECTION,
+    PERPLEXITY_STAGE1_FACT_DIGEST_V2_MAX_SUMMARY_BULLETS,
+    PERPLEXITY_STAGE1_FACT_DIGEST_V2_MAX_NARRATIVE_WORDS,
+    PERPLEXITY_STAGE1_SECOND_PASS_CITATION_GATE_ENABLED,
+    PERPLEXITY_STAGE1_SECOND_PASS_CITATION_MIN_COUNT,
+    PERPLEXITY_STAGE1_SECOND_PASS_CITATION_MAX_UNCITED_NUMERIC_LINES,
+    PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_MIN_SCORE,
+    PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_MIN_RUBRIC_COVERAGE_PCT,
+    PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_MIN_NUMERIC_CITATION_PCT,
+    PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_CATASTROPHIC_SCORE,
+    PERPLEXITY_STAGE1_SHARED_RETRIEVAL_ENABLED,
+    PERPLEXITY_STAGE1_SHARED_RETRIEVAL_MODEL,
     PERPLEXITY_STAGE1_OPENAI_BASE_GUARDRAILS_ENABLED,
     PERPLEXITY_STAGE1_OPENAI_BASE_MAX_SOURCES,
     PERPLEXITY_STAGE1_OPENAI_BASE_MAX_STEPS,
     PERPLEXITY_STAGE1_OPENAI_BASE_REASONING_EFFORT,
+    PERPLEXITY_STAGE1_OPENAI_BASE_DOWNGRADE_HIGH_REASONING,
+    PERPLEXITY_PRESET_STRATEGY,
+    PERPLEXITY_PRESET_DEEP,
+    PERPLEXITY_PRESET_ADVANCED,
+    PERPLEXITY_STREAM_ENABLED,
+    PERPLEXITY_STAGE1_SONAR_MULTISTEP_REQUIRED,
+    DETERMINISTIC_FINANCE_LANE_ENABLED,
     PROGRESS_LOGGING,
+    SYSTEM_ENABLED,
+    SYSTEM_SHUTDOWN_REASON,
+    SYSTEM_ALLOW_DIAGNOSTICS_WHEN_DISABLED,
 )
 
 
@@ -40,6 +96,16 @@ def _progress_log(message: str) -> None:
         return
     ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{ts}][council] {message}", flush=True)
+
+
+def _ensure_system_enabled(*, diagnostic_mode: bool = False) -> None:
+    """Block execution when global shutdown is active."""
+    if SYSTEM_ENABLED:
+        return
+    if diagnostic_mode and SYSTEM_ALLOW_DIAGNOSTICS_WHEN_DISABLED:
+        return
+    reason = SYSTEM_SHUTDOWN_REASON or "maintenance mode active"
+    raise RuntimeError(f"System disabled: {reason}")
 
 
 def _extract_status_code(error_text: str) -> Optional[int]:
@@ -69,6 +135,8 @@ def _is_retryable_stage1_error(error_text: str) -> bool:
 def _build_stage1_attempt_profile(
     model: str,
     attempt: int,
+    depth: str,
+    base_preset: str,
     base_max_sources: int,
     base_max_steps: int,
     base_max_output_tokens: int,
@@ -80,11 +148,22 @@ def _build_stage1_attempt_profile(
     For OpenAI-routed Stage 1 calls, retries progressively reduce workload while
     keeping the same analysis prompt/rubric.
     """
+    requested_output_tokens = int(base_max_output_tokens)
     profile: Dict[str, Any] = {
         "name": "default",
+        "preset": _resolve_stage1_preset_for_attempt(
+            attempt=attempt,
+            depth=depth,
+            base_preset=base_preset,
+        ),
         "max_sources": max(1, int(base_max_sources)),
         "max_steps": max(1, int(base_max_steps)),
-        "max_output_tokens": max(512, int(base_max_output_tokens)),
+        # 0 means "do not send max_output_tokens; let provider-side limits apply".
+        "max_output_tokens": (
+            max(512, requested_output_tokens)
+            if requested_output_tokens > 0
+            else 0
+        ),
         "reasoning_effort": (base_reasoning_effort or "").strip().lower(),
     }
 
@@ -104,7 +183,10 @@ def _build_stage1_attempt_profile(
             forced_effort = str(PERPLEXITY_STAGE1_OPENAI_BASE_REASONING_EFFORT or "").strip().lower()
             if forced_effort in {"low", "medium", "high"}:
                 profile["reasoning_effort"] = forced_effort
-            elif profile["reasoning_effort"] == "high":
+            elif (
+                PERPLEXITY_STAGE1_OPENAI_BASE_DOWNGRADE_HIGH_REASONING
+                and profile["reasoning_effort"] == "high"
+            ):
                 profile["reasoning_effort"] = "medium"
         return profile
 
@@ -114,7 +196,6 @@ def _build_stage1_attempt_profile(
         profile["name"] = "openai_retry_2"
         profile["max_sources"] = max(4, int(profile["max_sources"]) - 1)
         profile["max_steps"] = max(2, int(profile["max_steps"]) - 1)
-        profile["max_output_tokens"] = max(3072, int(profile["max_output_tokens"] * 0.80))
         # Step down one level first: high -> medium -> low.
         if base_effort == "high":
             profile["reasoning_effort"] = "medium"
@@ -127,9 +208,40 @@ def _build_stage1_attempt_profile(
     profile["name"] = "openai_retry_3plus"
     profile["max_sources"] = max(3, int(profile["max_sources"]) - 2)
     profile["max_steps"] = max(1, int(profile["max_steps"]) - 2)
-    profile["max_output_tokens"] = max(2048, int(profile["max_output_tokens"] * 0.65))
     profile["reasoning_effort"] = "low"
     return profile
+
+
+def _resolve_stage1_preset_for_attempt(
+    *,
+    attempt: int,
+    depth: str,
+    base_preset: str,
+) -> str:
+    """Resolve Stage 1 retrieval preset with optional dual-preset strategy."""
+    strategy = str(PERPLEXITY_PRESET_STRATEGY or "single").strip().lower()
+    deep_preset = str(PERPLEXITY_PRESET_DEEP or "deep-research").strip() or "deep-research"
+    advanced_preset = (
+        str(PERPLEXITY_PRESET_ADVANCED or "advanced-deep-research").strip()
+        or "advanced-deep-research"
+    )
+    effective_base = str(base_preset or "").strip() or deep_preset
+    normalized_depth = str(depth or "").strip().lower()
+
+    if normalized_depth != "deep":
+        if effective_base == "deep-research":
+            return "search"
+        return effective_base
+
+    if strategy in {"adaptive", "dual_retry"}:
+        return deep_preset if int(attempt) <= 1 else advanced_preset
+    if strategy in {"advanced", "advanced_only"}:
+        return advanced_preset
+    if strategy in {"deep", "deep_only"}:
+        return deep_preset
+
+    # Legacy/default behavior: fixed single preset.
+    return effective_base
 
 
 def _extract_synthesis_block(summary_text: str) -> str:
@@ -166,6 +278,8 @@ def _evaluate_stage1_template_compliance(
     summary_text: str,
     user_query: str,
     research_brief: str,
+    *,
+    section_markers: Optional[List[Tuple[str, List[str]]]] = None,
 ) -> Dict[str, Any]:
     """
     Evaluate whether Stage 1 output is analysis-grade vs a shallow source log.
@@ -174,33 +288,18 @@ def _evaluate_stage1_template_compliance(
     synthesis = _extract_synthesis_block(summary_text)
     synthesis_lower = synthesis.lower()
 
-    primary_markers = [
-        "quality score",
-        "quality_score",
-        "value score",
-        "value_score",
-        "npv",
-        "price target",
-        "price_targets",
-    ]
-    secondary_markers = [
-        "certainty",
-        "certainty_pct",
-        "headwind",
-        "tailwind",
-        "headwinds_tailwinds",
-        "timeline",
-        "milestone",
-        "development stage",
-        "development_timeline",
-        "catalyst",
-        "next_major_catalysts",
-        "sensitivity",
-        "sensitivity_analysis",
-    ]
-    primary_hit_count = sum(1 for marker in primary_markers if marker in synthesis_lower)
-    secondary_hit_count = sum(1 for marker in secondary_markers if marker in synthesis_lower)
-    hit_count = primary_hit_count + secondary_hit_count
+    markers_spec = section_markers or _STAGE1_RUBRIC_SECTION_MARKERS
+    section_hits = {
+        section_id: any(marker in synthesis_lower for marker in markers)
+        for section_id, markers in markers_spec
+    }
+    hit_count = sum(1 for hit in section_hits.values() if hit)
+    primary_hit_count = sum(
+        1
+        for section_id in _STAGE1_RUBRIC_CRITICAL_SECTIONS
+        if section_hits.get(section_id)
+    )
+    secondary_hit_count = max(0, hit_count - primary_hit_count)
     minimum_chars = 220
     is_substantive = len(synthesis) >= minimum_chars
     compliant = (not requires) or (
@@ -303,6 +402,460 @@ def _has_expected_source_domain(results: List[Dict[str, Any]], expected_domains:
         if any(domain in host for domain in expected):
             return True
     return False
+
+
+def _dedupe_model_ids(models: List[str]) -> List[str]:
+    """Preserve-order dedupe for model-id lists."""
+    deduped: List[str] = []
+    for item in models or []:
+        cleaned = str(item or "").strip()
+        if cleaned and cleaned not in deduped:
+            deduped.append(cleaned)
+    return deduped
+
+
+_PERPLEXITY_MODEL_ID_ALIASES: Dict[str, str] = {
+    # Perplexity model IDs use hyphenated semantic versions.
+    "anthropic/claude-sonnet-4.5": "anthropic/claude-sonnet-4-5",
+    "anthropic/claude-opus-4.5": "anthropic/claude-opus-4-5",
+}
+
+
+def _normalize_perplexity_model_id(model: str) -> str:
+    """Normalize known Perplexity model-id aliases to canonical IDs."""
+    raw = str(model or "").strip()
+    if not raw:
+        return ""
+    normalized = _PERPLEXITY_MODEL_ID_ALIASES.get(raw, raw)
+    if normalized != raw:
+        _progress_log(f"Perplexity model alias normalized: {raw} -> {normalized}")
+    return normalized
+
+
+def _is_perplexity_model_unsupported_error(status_code: int, body: str) -> bool:
+    text = str(body or "").lower()
+    if status_code != 400:
+        return False
+    return (
+        "not supported" in text
+        or "unsupported" in text
+        or "model" in text and "validation failed" in text
+    )
+
+
+async def _probe_perplexity_model_support(
+    *,
+    model: str,
+    timeout_seconds: float,
+) -> Dict[str, Any]:
+    """Probe whether Perplexity accepts a model ID with a minimal request."""
+    raw_model = str(model or "").strip()
+    resolved_model = _normalize_perplexity_model_id(raw_model)
+    if not PERPLEXITY_API_KEY:
+        return {
+            "requested_model": raw_model,
+            "resolved_model": resolved_model,
+            "supported": False,
+            "status_code": 0,
+            "reason": "missing_api_key",
+            "error_type": "config",
+        }
+
+    payload: Dict[str, Any] = {
+        "model": resolved_model,
+        "input": "Reply with exactly OK.",
+        "max_output_tokens": 24,
+    }
+    headers = {
+        "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=max(5.0, float(timeout_seconds))) as client:
+            response = await client.post(
+                PERPLEXITY_API_URL,
+                headers=headers,
+                json=payload,
+            )
+        status_code = int(response.status_code)
+        body = (response.text or "")[:400]
+        if status_code == 200:
+            return {
+                "requested_model": raw_model,
+                "resolved_model": resolved_model,
+                "supported": True,
+                "status_code": status_code,
+                "reason": "ok",
+                "error_type": "",
+            }
+        if _is_perplexity_model_unsupported_error(status_code, body):
+            return {
+                "requested_model": raw_model,
+                "resolved_model": resolved_model,
+                "supported": False,
+                "status_code": status_code,
+                "reason": "unsupported_model",
+                "error_type": "unsupported",
+                "body_preview": body,
+            }
+        return {
+            "requested_model": raw_model,
+            "resolved_model": resolved_model,
+            "supported": False,
+            "status_code": status_code,
+            "reason": "probe_request_failed",
+            "error_type": "transient",
+            "body_preview": body,
+        }
+    except Exception as exc:
+        return {
+            "requested_model": raw_model,
+            "resolved_model": resolved_model,
+            "supported": False,
+            "status_code": 0,
+            "reason": f"{type(exc).__name__}: {exc}",
+            "error_type": "transient",
+        }
+
+
+def _extract_perplexity_finish_reason(data: Dict[str, Any]) -> str:
+    """Best-effort finish/status extraction from Responses API payload."""
+    output = data.get("output")
+    if isinstance(output, list):
+        for item in output:
+            if not isinstance(item, dict):
+                continue
+            finish = item.get("finish_reason")
+            if finish:
+                return str(finish)
+            status = item.get("status")
+            if status:
+                return str(status)
+    for key in ("finish_reason", "status"):
+        value = data.get(key)
+        if value:
+            return str(value)
+    return ""
+
+
+def _supports_perplexity_reasoning_payload(model: str) -> bool:
+    """Perplexity reasoning payload is only used for OpenAI-routed models."""
+    key = str(model or "").strip().lower()
+    return bool(key.startswith("openai/"))
+
+
+async def _query_model_via_perplexity(
+    *,
+    model: str,
+    prompt: str,
+    timeout: float,
+    max_tokens: Optional[int],
+    reasoning_effort: str,
+) -> Optional[Dict[str, Any]]:
+    """
+    Query one model via Perplexity Responses API for Stage 1 second-pass analysis.
+
+    This call intentionally disables web-search tools and uses only injected prompt context.
+    """
+    if not PERPLEXITY_API_KEY:
+        _progress_log(f"Perplexity second-pass skipped model={model}: missing_api_key")
+        return None
+
+    resolved_model = _normalize_perplexity_model_id(model)
+    headers = {
+        "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload: Dict[str, Any] = {
+        "model": resolved_model or model,
+        "input": prompt,
+    }
+    stream_requested = bool(PERPLEXITY_STREAM_ENABLED)
+    if stream_requested:
+        payload["stream"] = True
+    if isinstance(max_tokens, int) and max_tokens > 0:
+        payload["max_output_tokens"] = int(max_tokens)
+    effort = str(reasoning_effort or "").strip().lower()
+    reasoning_payload_sent = False
+    reasoning_effort_effective = ""
+    if effort in {"low", "medium", "high"} and _supports_perplexity_reasoning_payload(
+        resolved_model or model
+    ):
+        payload["reasoning"] = {"effort": effort}
+        reasoning_payload_sent = True
+        reasoning_effort_effective = effort
+
+    def _is_invalid_request_400(exc: httpx.HTTPStatusError) -> bool:
+        if exc.response is None or exc.response.status_code != 400:
+            return False
+        body = (exc.response.text or "").strip().lower()
+        return "invalid request" in body
+
+    async def _post_once(
+        client: httpx.AsyncClient,
+        req_payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        response = await client.post(
+            PERPLEXITY_API_URL,
+            headers=headers,
+            json=req_payload,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def _post_stream(
+        client: httpx.AsyncClient,
+        req_payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        text_deltas: List[str] = []
+        final_response: Dict[str, Any] = {}
+        async with client.stream(
+            "POST",
+            PERPLEXITY_API_URL,
+            headers=headers,
+            json=req_payload,
+        ) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if not line:
+                    continue
+                chunk = line.strip()
+                if not chunk or chunk.startswith(":"):
+                    continue
+                if chunk.startswith("event:"):
+                    continue
+                if chunk.startswith("data:"):
+                    chunk = chunk[5:].strip()
+                if not chunk or chunk == "[DONE]":
+                    continue
+                try:
+                    event = json.loads(chunk)
+                except Exception:
+                    continue
+                event_type = str(event.get("type", "")).strip().lower()
+                if event_type in {"response.output_text.delta", "output_text.delta"}:
+                    delta = event.get("delta")
+                    if isinstance(delta, str) and delta:
+                        text_deltas.append(delta)
+                if event_type in {"response.completed", "completed"}:
+                    response_obj = event.get("response")
+                    if isinstance(response_obj, dict):
+                        final_response = response_obj
+                elif event_type in {"response", "output"} and isinstance(event, dict):
+                    final_response = event
+
+        merged_text = "".join(text_deltas).strip()
+        if final_response:
+            if merged_text:
+                final_response["output_text"] = merged_text
+            return final_response
+        if merged_text:
+            return {
+                "output_text": merged_text,
+                "output": [{"type": "output_text", "text": merged_text}],
+            }
+        raise RuntimeError("perplexity_stream_empty_payload")
+
+    async def _perform_request(
+        client: httpx.AsyncClient,
+        req_payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        use_stream = bool(req_payload.get("stream"))
+        if use_stream:
+            try:
+                return await _post_stream(client, req_payload)
+            except RuntimeError as exc:
+                if "perplexity_stream_empty_payload" not in str(exc):
+                    raise
+                retry_payload = dict(req_payload)
+                retry_payload.pop("stream", None)
+                _progress_log(
+                    f"Perplexity second-pass stream fallback model={model}: using non-stream"
+                )
+                return await _post_once(client, retry_payload)
+        return await _post_once(client, req_payload)
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            try:
+                data = await _perform_request(client, payload)
+            except httpx.HTTPStatusError as exc:
+                # Some routed models reject specific reasoning-effort values
+                # with a generic 400 "invalid request". Retry once without
+                # reasoning so the model can still run.
+                if _is_invalid_request_400(exc) and "reasoning" in payload:
+                    retry_payload = dict(payload)
+                    retry_payload.pop("reasoning", None)
+                    reasoning_payload_sent = False
+                    reasoning_effort_effective = ""
+                    _progress_log(
+                        f"Perplexity second-pass retry without reasoning model={model} "
+                        f"after 400 invalid_request"
+                    )
+                    data = await _perform_request(client, retry_payload)
+                else:
+                    raise
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code if exc.response is not None else "unknown"
+        body = (exc.response.text or "")[:500] if exc.response is not None else ""
+        _progress_log(
+            f"Perplexity second-pass HTTP error model={model} status={status} body={body}"
+        )
+        return None
+    except Exception as exc:
+        _progress_log(
+            f"Perplexity second-pass error model={model}: {type(exc).__name__}: {exc}"
+        )
+        return None
+
+    content = ""
+    try:
+        from .research.providers.perplexity import PerplexityResearchProvider
+        parser = PerplexityResearchProvider()
+        content = parser._extract_content(data).strip()
+    except Exception:
+        content = ""
+
+    if not content:
+        output_text = data.get("output_text")
+        if isinstance(output_text, str):
+            content = output_text.strip()
+        elif isinstance(output_text, list):
+            content = "\n".join([str(item) for item in output_text if isinstance(item, str)]).strip()
+
+    return {
+        "content": content,
+        "finish_reason": _extract_perplexity_finish_reason(data),
+        "usage": data.get("usage"),
+        "id": data.get("id"),
+        "provider": data.get("provider") or "perplexity",
+        "reasoning_payload_sent": bool(reasoning_payload_sent),
+        "reasoning_effort_effective": str(reasoning_effort_effective or ""),
+    }
+
+
+def _select_shared_retrieval_model(models: List[str]) -> str:
+    """
+    Pick the model used for shared retrieval/decode.
+
+    Priority:
+    1) explicit env override when present in configured model list
+    2) first non-openai model (typically more stable for retrieval latency)
+    3) first configured model
+    """
+    if not models:
+        return ""
+
+    preferred = str(PERPLEXITY_STAGE1_SHARED_RETRIEVAL_MODEL or "").strip()
+    if preferred:
+        for model in models:
+            if model == preferred:
+                return model
+        preferred_lower = preferred.lower()
+        for model in models:
+            if model.lower() == preferred_lower:
+                return model
+
+    for model in models:
+        if not str(model).strip().lower().startswith("openai/"):
+            return model
+
+    return models[0]
+
+
+def _is_openrouter_compatible_model(model: str) -> bool:
+    """
+    Return True when model id is expected to route through OpenRouter.
+
+    Perplexity-native families like Sonar should not be sent to OpenRouter
+    for Stage 1 second-pass or Stage 2 judging.
+    """
+    key = str(model or "").strip().lower()
+    if not key:
+        return False
+    if "sonar" in key:
+        return False
+    if key.startswith("pplx/") or key.startswith("perplexity/"):
+        return False
+    return True
+
+
+def _is_sonar_model(model: str) -> bool:
+    """Return True when model id appears to be a Perplexity Sonar family model."""
+    key = str(model or "").strip().lower()
+    if not key:
+        return False
+    return "sonar" in key or key.startswith("pplx/") or key.startswith("perplexity/")
+
+
+def _evaluate_stage1_sonar_telemetry(
+    *,
+    model: str,
+    provider_meta: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Validate Sonar multistep telemetry per run.
+
+    We treat this as a run-quality gate for Sonar family models when enabled.
+    """
+    if not _is_sonar_model(model):
+        return {
+            "required": False,
+            "passed": True,
+            "reason": "not_sonar_model",
+            "is_sonar_model": False,
+        }
+
+    stream_requested = bool(provider_meta.get("stream_requested", False))
+    stream_used = bool(provider_meta.get("stream_used", False))
+    stream_event_count = int(provider_meta.get("stream_event_count", 0) or 0)
+    stream_completed = bool(provider_meta.get("stream_completed_event_seen", False))
+    search_mode = str(provider_meta.get("search_mode", "") or "").strip().lower()
+    search_type = str(provider_meta.get("search_type", "") or "").strip().lower()
+
+    required = bool(PERPLEXITY_STAGE1_SONAR_MULTISTEP_REQUIRED)
+    if not required:
+        return {
+            "required": False,
+            "passed": True,
+            "reason": "sonar_multistep_not_required",
+            "is_sonar_model": True,
+            "stream_requested": stream_requested,
+            "stream_used": stream_used,
+            "stream_event_count": stream_event_count,
+            "stream_completed_event_seen": stream_completed,
+            "search_mode": search_mode,
+            "search_type": search_type,
+        }
+
+    stream_ok = bool(stream_used and stream_event_count >= 3 and stream_completed)
+    pro_mode_ok = (search_mode != "pro") or (search_type == "pro")
+    passed = bool(stream_ok and pro_mode_ok)
+
+    reasons: List[str] = []
+    if not stream_requested:
+        reasons.append("stream_not_requested")
+    if not stream_used:
+        reasons.append("stream_not_used")
+    if stream_event_count < 3:
+        reasons.append("insufficient_stream_events")
+    if not stream_completed:
+        reasons.append("stream_completion_event_missing")
+    if search_mode == "pro" and search_type != "pro":
+        reasons.append("search_type_not_pro_for_pro_mode")
+
+    return {
+        "required": True,
+        "passed": passed,
+        "reason": ",".join(reasons) if reasons else "ok",
+        "is_sonar_model": True,
+        "stream_requested": stream_requested,
+        "stream_used": stream_used,
+        "stream_event_count": stream_event_count,
+        "stream_completed_event_seen": stream_completed,
+        "search_mode": search_mode,
+        "search_type": search_type,
+    }
 
 
 _FACT_PACK_SECTIONS = [
@@ -419,6 +972,1647 @@ _FACT_PACK_KEYWORDS = {
     ],
 }
 
+_FACT_DIGEST_V2_SECTIONS = [
+    "timelines_deadlines",
+    "financing_deals",
+    "project_economics",
+    "market_share_structure",
+    "operational_objectives",
+    "risks_constraints",
+    "catalysts_tailwinds",
+    "other_material_facts",
+]
+
+_FACT_DIGEST_V2_KEYWORDS = {
+    "timelines_deadlines": [
+        "first gold",
+        "gold pour",
+        "milestone",
+        "q1",
+        "q2",
+        "q3",
+        "q4",
+        "march",
+        "april",
+        "deadline",
+        "target",
+        "on track",
+    ],
+    "financing_deals": [
+        "facility",
+        "loan",
+        "debt",
+        "capital raise",
+        "placement",
+        "financing",
+        "offtake",
+        "agreement",
+        "deal",
+        "funded",
+        "cash",
+    ],
+    "project_economics": [
+        "npv",
+        "irr",
+        "aisc",
+        "capex",
+        "opex",
+        "free cash flow",
+        "payback",
+        "mine life",
+        "production",
+        "gold price",
+        "resource",
+        "reserve",
+        "grade",
+    ],
+    "market_share_structure": [
+        "market cap",
+        "enterprise value",
+        "shares",
+        "price",
+        "valuation",
+        "ev/oz",
+        "multiple",
+    ],
+    "operational_objectives": [
+        "objective",
+        "guidance",
+        "commissioning",
+        "ramp-up",
+        "development",
+        "stockpiling",
+        "processing",
+        "production",
+    ],
+    "risks_constraints": [
+        "risk",
+        "headwind",
+        "delay",
+        "dilution",
+        "permit",
+        "regulatory",
+        "inflation",
+        "power",
+        "labor",
+        "geopolitical",
+        "uncertain",
+    ],
+    "catalysts_tailwinds": [
+        "catalyst",
+        "tailwind",
+        "upside",
+        "drilling",
+        "resource growth",
+        "expansion",
+        "strategic",
+        "improved",
+    ],
+}
+
+_FACT_DIGEST_V2_NARRATIVE_ORDER = [
+    "timelines_deadlines",
+    "financing_deals",
+    "project_economics",
+    "market_share_structure",
+    "operational_objectives",
+    "risks_constraints",
+    "catalysts_tailwinds",
+]
+
+_STAGE1_DEFAULT_TIMELINE_TERMS = [
+    "first gold",
+    "gold pour",
+    "first ore",
+    "stockpile",
+    "processing",
+    "on track",
+    "targeting",
+    "milestone",
+    "timeline",
+    "guidance",
+    "launch",
+    "approval",
+    "commissioning",
+    "ramp-up",
+    "production",
+    "q1",
+    "q2",
+    "q3",
+    "q4",
+    "march",
+    "april",
+    "may",
+    "june",
+]
+
+_STAGE1_DEFAULT_TIMELINE_FOCUS_TERMS = [
+    "milestone",
+    "timeline",
+    "commissioning",
+    "production",
+    "ramp-up",
+    "target",
+]
+_STAGE1_SECOND_PASS_MIN_RESPONSE_CHARS = 300
+
+
+def _normalize_terms_list(raw_terms: Any) -> List[str]:
+    out: List[str] = []
+    for item in (raw_terms or []):
+        value = str(item or "").strip().lower()
+        if value and value not in out:
+            out.append(value)
+    return out
+
+
+def _markers_for_field_name(field_name: str) -> List[str]:
+    key = str(field_name or "").strip().lower()
+    if not key:
+        return []
+    variants = [
+        key,
+        key.replace("_", " "),
+        key.replace("_", "-"),
+    ]
+    if key.endswith("_pct"):
+        base = key[: -len("_pct")]
+        variants.extend(
+            [
+                base,
+                f"{base} %",
+                f"{base.replace('_', ' ')} %",
+            ]
+        )
+    if key.endswith("_score"):
+        base = key[: -len("_score")]
+        variants.extend(
+            [
+                f"{base} score",
+                f"{base.replace('_', ' ')} score",
+            ]
+        )
+    deduped: List[str] = []
+    for item in variants:
+        cleaned = re.sub(r"\s+", " ", item).strip()
+        if cleaned and cleaned not in deduped:
+            deduped.append(cleaned)
+    return deduped
+
+
+def _default_stage1_verification_profile() -> Dict[str, Any]:
+    return {
+        "template_id": "",
+        "fact_digest_keywords": copy.deepcopy(_FACT_DIGEST_V2_KEYWORDS),
+        "fact_digest_narrative_order": list(_FACT_DIGEST_V2_NARRATIVE_ORDER),
+        "timeline_terms": list(_STAGE1_DEFAULT_TIMELINE_TERMS),
+        "timeline_focus_terms": list(_STAGE1_DEFAULT_TIMELINE_FOCUS_TERMS),
+        "timeline_conflict_field": "timeline_window",
+        "timeline_conflict_resolution_rule": "prefer newest dated primary-source timeline evidence",
+        "timeline_conflict_max_shift_quarters": 3,
+        "compliance_section_markers": list(_STAGE1_RUBRIC_SECTION_MARKERS),
+        "compliance_critical_sections": set(_STAGE1_RUBRIC_CRITICAL_SECTIONS),
+    }
+
+
+def _build_stage1_verification_profile(template_id: Optional[str]) -> Dict[str, Any]:
+    profile = _default_stage1_verification_profile()
+    if not template_id:
+        return profile
+
+    from .template_loader import get_template_loader
+
+    loader = get_template_loader()
+    template_data = loader.get_template(template_id) or {}
+    verification = loader.get_verification_schema(template_id)
+    profile["template_id"] = str(template_id)
+
+    fact_digest_cfg = verification.get("fact_digest", {}) if isinstance(verification, dict) else {}
+    sections_cfg = fact_digest_cfg.get("sections", {})
+    normalized_sections: Dict[str, List[str]] = {}
+    if isinstance(sections_cfg, dict):
+        for section_name, section_payload in sections_cfg.items():
+            sid = str(section_name or "").strip().lower()
+            if not sid:
+                continue
+            keywords: List[str] = []
+            if isinstance(section_payload, dict):
+                keywords = _normalize_terms_list(section_payload.get("keywords", []))
+            elif isinstance(section_payload, list):
+                keywords = _normalize_terms_list(section_payload)
+            if keywords:
+                normalized_sections[sid] = keywords
+    if normalized_sections:
+        profile["fact_digest_keywords"] = normalized_sections
+
+    narrative_order = [
+        str(item or "").strip().lower()
+        for item in (fact_digest_cfg.get("narrative_order", []) or [])
+        if str(item or "").strip()
+    ]
+    if narrative_order:
+        profile["fact_digest_narrative_order"] = narrative_order
+
+    timeline_terms = _normalize_terms_list(fact_digest_cfg.get("timeline_terms", []))
+    if timeline_terms:
+        profile["timeline_terms"] = timeline_terms
+    timeline_focus_terms = _normalize_terms_list(fact_digest_cfg.get("timeline_focus_terms", []))
+    if timeline_focus_terms:
+        profile["timeline_focus_terms"] = timeline_focus_terms
+
+    conflict_cfg = fact_digest_cfg.get("conflict", {})
+    if isinstance(conflict_cfg, dict):
+        field_name = str(conflict_cfg.get("field", "")).strip()
+        if field_name:
+            profile["timeline_conflict_field"] = field_name
+        max_shift = conflict_cfg.get("max_shift_quarters")
+        if isinstance(max_shift, (int, float)):
+            profile["timeline_conflict_max_shift_quarters"] = max(1, int(max_shift))
+        resolution = str(conflict_cfg.get("resolution_rule", "")).strip()
+        if resolution:
+            profile["timeline_conflict_resolution_rule"] = resolution
+        conflict_terms = _normalize_terms_list(conflict_cfg.get("terms", []))
+        if conflict_terms:
+            profile["timeline_focus_terms"] = conflict_terms
+
+    compliance_cfg = verification.get("compliance", {}) if isinstance(verification, dict) else {}
+    markers_cfg = compliance_cfg.get("section_markers", {})
+    normalized_markers: List[Tuple[str, List[str]]] = []
+    normalized_critical: set[str] = set()
+
+    if isinstance(markers_cfg, dict):
+        for section_id, marker_payload in markers_cfg.items():
+            sid = str(section_id or "").strip().lower()
+            if not sid:
+                continue
+            markers: List[str] = []
+            critical = False
+            if isinstance(marker_payload, dict):
+                markers = _normalize_terms_list(marker_payload.get("markers", []))
+                critical = bool(marker_payload.get("critical", False))
+            elif isinstance(marker_payload, list):
+                markers = _normalize_terms_list(marker_payload)
+            if not markers:
+                markers = _markers_for_field_name(sid)
+            if not markers:
+                continue
+            normalized_markers.append((sid, markers))
+            if critical:
+                normalized_critical.add(sid)
+
+    required_sections = _normalize_terms_list(compliance_cfg.get("required_sections", []))
+    normalized_critical.update(required_sections)
+    normalized_critical.update(
+        _normalize_terms_list(compliance_cfg.get("critical_sections", []))
+    )
+
+    if not normalized_markers:
+        required_fields = (
+            ((template_data.get("output_schema") or {}).get("required_fields") or [])
+            if isinstance(template_data, dict)
+            else []
+        )
+        for field in required_fields:
+            sid = str(field or "").strip().lower()
+            if not sid:
+                continue
+            markers = _markers_for_field_name(sid)
+            if not markers:
+                continue
+            normalized_markers.append((sid, markers))
+        # Keep the scoring/timeline-related fields as critical by default.
+        for sid in ("quality_score", "value_score", "price_targets", "development_timeline"):
+            if any(item[0] == sid for item in normalized_markers):
+                normalized_critical.add(sid)
+
+    if normalized_markers:
+        profile["compliance_section_markers"] = normalized_markers
+    if normalized_critical:
+        profile["compliance_critical_sections"] = normalized_critical
+
+    return profile
+
+
+def _keywords_for_gap_section(section_id: str, verification_profile: Dict[str, Any]) -> List[str]:
+    """Resolve keyword hints for a compliance section id."""
+    sid = str(section_id or "").strip().lower()
+    digest_keywords = verification_profile.get("fact_digest_keywords", {}) or {}
+    if isinstance(digest_keywords, dict):
+        direct = _normalize_terms_list(digest_keywords.get(sid, []))
+        if direct:
+            return direct
+
+    fallback: Dict[str, List[str]] = {
+        "quality_score": ["quality score", "jurisdiction", "management", "funding", "esg"],
+        "value_score": ["value score", "npv", "market cap", "ev/resource", "aisc"],
+        "price_targets": ["12-month target", "24-month target", "upside scenario"],
+        "development_timeline": ["timeline", "milestone", "first gold", "production target"],
+        "certainty": ["certainty", "probability", "risk to milestones"],
+        "headwinds_tailwinds": ["headwind", "tailwind", "sensitivity", "threshold"],
+        "npv_assessment": ["npv", "irr", "capex", "aisc", "mine life"],
+    }
+    return fallback.get(sid, _markers_for_field_name(sid))
+
+
+def _build_stage1_research_planner(
+    *,
+    user_query: str,
+    research_brief: str,
+    ticker: Optional[str],
+    verification_profile: Dict[str, Any],
+    max_waves: int,
+    gap_query_limit: int,
+) -> Dict[str, Any]:
+    """Create deterministic planner payload for multi-wave retrieval."""
+    section_markers = verification_profile.get("compliance_section_markers", []) or []
+    critical_sections = set(verification_profile.get("compliance_critical_sections", set()) or set())
+    objectives: List[Dict[str, Any]] = []
+    ordered_sections: List[str] = []
+
+    for section_id, markers in section_markers:
+        sid = str(section_id or "").strip().lower()
+        if not sid:
+            continue
+        if sid in ordered_sections:
+            continue
+        ordered_sections.append(sid)
+        objectives.append(
+            {
+                "section": sid,
+                "critical": sid in critical_sections,
+                "markers": list(markers or [])[:6],
+                "keywords": _keywords_for_gap_section(sid, verification_profile)[:8],
+            }
+        )
+
+    if not objectives:
+        for sid, keywords in (verification_profile.get("fact_digest_keywords", {}) or {}).items():
+            sid_norm = str(sid or "").strip().lower()
+            if not sid_norm:
+                continue
+            objectives.append(
+                {
+                    "section": sid_norm,
+                    "critical": False,
+                    "markers": _markers_for_field_name(sid_norm)[:4],
+                    "keywords": _normalize_terms_list(keywords)[:8],
+                }
+            )
+            ordered_sections.append(sid_norm)
+
+    wave_plan: List[Dict[str, Any]] = [
+        {
+            "wave": 1,
+            "type": "broad_primary",
+            "focus_sections": ordered_sections[: max(2, min(5, len(ordered_sections)))],
+            "query_intent": "broad primary-source coverage",
+        }
+    ]
+
+    safe_gap_limit = max(1, int(gap_query_limit))
+    safe_max_waves = max(1, int(max_waves))
+    for wave in range(2, safe_max_waves + 1):
+        wave_plan.append(
+            {
+                "wave": wave,
+                "type": "gap_fill",
+                "focus_sections": [],
+                "query_intent": f"target unresolved sections (top {safe_gap_limit})",
+            }
+        )
+
+    return {
+        "planner_version": "stage1_multi_wave_v1",
+        "ticker": str(ticker or "").strip(),
+        "query_preview": (user_query or "").strip()[:260],
+        "brief_preview": (research_brief or "").strip()[:260],
+        "max_waves": safe_max_waves,
+        "gap_query_limit": safe_gap_limit,
+        "objectives": objectives,
+        "wave_plan": wave_plan,
+    }
+
+
+def _evaluate_stage1_section_coverage(
+    run: Dict[str, Any],
+    verification_profile: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Estimate which rubric sections are currently evidenced by retrieved output."""
+    summary_text = str(run.get("research_summary", ""))
+    filtered_summary_lines: List[str] = []
+    for line in summary_text.splitlines():
+        clean_line = re.sub(r"\s+", " ", str(line or "")).strip()
+        if not clean_line:
+            continue
+        if _is_low_signal_legal_boilerplate(clean_line):
+            continue
+        filtered_summary_lines.append(clean_line)
+    text_parts: List[str] = ["\n".join(filtered_summary_lines)]
+    for update in (run.get("latest_updates", []) or [])[:8]:
+        text_parts.append(str(update.get("update", "")))
+        text_parts.append(str(update.get("why_it_matters", "")))
+    raw_results = list((run.get("results", []) or [])[:12])
+    non_low_results = [row for row in raw_results if not _is_low_signal_notice_source_item(row)]
+    coverage_results = non_low_results if non_low_results else raw_results[:4]
+
+    for result in coverage_results[:10]:
+        text_parts.append(str(result.get("title", "")))
+        text_parts.append(str(result.get("content", ""))[:900])
+    corpus = "\n".join(text_parts).lower()
+
+    section_markers = verification_profile.get("compliance_section_markers", []) or []
+    critical_sections = set(verification_profile.get("compliance_critical_sections", set()) or set())
+    coverage: Dict[str, bool] = {}
+    marker_hits: Dict[str, int] = {}
+    for section_id, markers in section_markers:
+        sid = str(section_id or "").strip().lower()
+        if not sid:
+            continue
+        hit_count = sum(1 for marker in (markers or []) if str(marker).lower() in corpus)
+        coverage[sid] = hit_count > 0
+        marker_hits[sid] = int(hit_count)
+
+    missing_sections = [sid for sid, covered in coverage.items() if not covered]
+    missing_critical = [sid for sid in missing_sections if sid in critical_sections]
+    return {
+        "coverage": coverage,
+        "marker_hits": marker_hits,
+        "missing_sections": missing_sections,
+        "missing_critical_sections": missing_critical,
+        "covered_sections": [sid for sid, covered in coverage.items() if covered],
+        "critical_sections_total": len(critical_sections),
+        "critical_sections_covered": sum(
+            1 for sid in critical_sections if coverage.get(sid, False)
+        ),
+    }
+
+
+def _build_stage1_gap_query_block(
+    *,
+    missing_sections: List[str],
+    verification_profile: Dict[str, Any],
+    ticker: Optional[str],
+    gap_query_limit: int,
+) -> str:
+    """Create targeted gap-fill query hints for follow-up retrieval waves."""
+    if not missing_sections:
+        return ""
+    lines = ["GAP-FILL OBJECTIVES FOR THIS WAVE:"]
+    safe_limit = max(1, int(gap_query_limit))
+    ticker_prefix = str(ticker or "").strip()
+    for section_id in missing_sections[:safe_limit]:
+        keywords = _keywords_for_gap_section(section_id, verification_profile)
+        focus = ", ".join(keywords[:5]) if keywords else section_id.replace("_", " ")
+        if ticker_prefix:
+            query_hint = f"{ticker_prefix} {focus}"
+        else:
+            query_hint = focus
+        lines.append(f"- {section_id}: {query_hint}")
+    lines.append("Use primary filings/official investor materials first; then fill with secondary sources if needed.")
+    return "\n".join(lines)
+
+
+def _count_new_primary_sources(run: Dict[str, Any], seen_primary_urls: set[str]) -> int:
+    """Count newly discovered primary/high-authority sources in a wave run."""
+    new_primary = 0
+    for result in (run.get("results", []) or []):
+        url = str(result.get("url", "")).strip()
+        if not url:
+            continue
+        authority = _source_authority_rank(url)
+        if authority < 2:
+            continue
+        if url in seen_primary_urls:
+            continue
+        seen_primary_urls.add(url)
+        new_primary += 1
+    return new_primary
+
+
+def _merge_stage1_wave_runs(
+    *,
+    wave_runs: List[Dict[str, Any]],
+    original_query: str,
+    max_sources: int,
+    planner: Dict[str, Any],
+    wave_reports: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Merge multi-wave retrieval outputs into a single Stage 1 run payload."""
+    if not wave_runs:
+        return {
+            "query": original_query,
+            "results": [],
+            "result_count": 0,
+            "provider": "perplexity",
+            "error": "No successful wave runs",
+        }
+
+    merged_by_url: Dict[str, Dict[str, Any]] = {}
+    for run in wave_runs:
+        for item in (run.get("results", []) or []):
+            url = str(item.get("url", "")).strip()
+            if not url:
+                continue
+            existing = merged_by_url.get(url)
+            if existing is None:
+                merged_by_url[url] = dict(item)
+                continue
+            if float(item.get("score", 0.0)) > float(existing.get("score", 0.0)):
+                existing["score"] = float(item.get("score", 0.0))
+            if len(str(item.get("content", ""))) > len(str(existing.get("content", ""))):
+                existing["content"] = item.get("content", "")
+            if not str(existing.get("published_at", "")).strip() and str(
+                item.get("published_at", "")
+            ).strip():
+                existing["published_at"] = item.get("published_at")
+            existing_title = str(existing.get("title", "")).strip()
+            if existing_title.lower().startswith("asx announcement pdf") and str(
+                item.get("title", "")
+            ).strip():
+                existing["title"] = item.get("title", "")
+
+    merged_results = list(merged_by_url.values())
+    merged_results.sort(
+        key=lambda row: (
+            float(row.get("score", 0.0)),
+            str(row.get("published_at", "")),
+            _source_authority_rank(str(row.get("url", ""))),
+        ),
+        reverse=True,
+    )
+
+    low_signal_total = sum(1 for row in merged_results if _is_low_signal_notice_source_item(row))
+    limit = max(1, int(max_sources))
+
+    filtered_results: List[Dict[str, Any]] = []
+    low_signal_used = 0
+    for row in merged_results:
+        if len(filtered_results) >= limit:
+            break
+        is_low_signal = _is_low_signal_notice_source_item(row)
+        if is_low_signal:
+            continue
+        filtered_results.append(row)
+
+    merged_results = filtered_results[:limit]
+
+    updates_by_key: Dict[str, Dict[str, Any]] = {}
+    for run in wave_runs:
+        for update in (run.get("latest_updates", []) or []):
+            key = (
+                str(update.get("date", "")).strip(),
+                str(update.get("update", "")).strip(),
+                str(update.get("source_url", "")).strip(),
+            )
+            if key in updates_by_key:
+                continue
+            updates_by_key[key] = dict(update)
+    merged_updates = list(updates_by_key.values())[:8]
+
+    summary_parts: List[str] = []
+    for idx, run in enumerate(wave_runs, start=1):
+        summary = str(run.get("research_summary", "")).strip()
+        if not summary:
+            continue
+        first_line = summary.splitlines()[0].strip()
+        if first_line:
+            summary_parts.append(f"Wave {idx}: {first_line}")
+    merged_summary = str(wave_runs[-1].get("research_summary", "")).strip()
+    if summary_parts:
+        merged_summary = (
+            f"{merged_summary}\n\n### Retrieval Waves\n" + "\n".join(f"- {part}" for part in summary_parts)
+        ).strip()
+
+    decode_attempted = 0
+    decode_decoded = 0
+    decode_failed = 0
+    decode_sources: List[Dict[str, Any]] = []
+    for run in wave_runs:
+        decode_meta = (run.get("provider_metadata", {}) or {}).get("source_decoding", {}) or {}
+        decode_attempted += int(decode_meta.get("attempted", 0))
+        decode_decoded += int(decode_meta.get("decoded", 0))
+        decode_failed += int(decode_meta.get("failed", 0))
+        for row in (decode_meta.get("sources", []) or [])[:12]:
+            decode_sources.append(dict(row))
+
+    merged = copy.deepcopy(wave_runs[-1])
+    merged["query"] = original_query
+    merged["results"] = merged_results
+    merged["result_count"] = len(merged_results)
+    merged["latest_updates"] = merged_updates
+    merged["research_summary"] = merged_summary
+
+    provider_meta = merged.setdefault("provider_metadata", {})
+    if not isinstance(provider_meta, dict):
+        provider_meta = {}
+        merged["provider_metadata"] = provider_meta
+    provider_meta["source_decoding"] = {
+        "enabled": True,
+        "attempted": decode_attempted,
+        "decoded": decode_decoded,
+        "failed": decode_failed,
+        "sources": decode_sources[:60],
+    }
+    provider_meta["stage1_multi_wave"] = {
+        "enabled": True,
+        "planner": planner,
+        "waves_requested": int(planner.get("max_waves", len(wave_runs))),
+        "waves_completed": len(wave_runs),
+        "low_signal_sources_total": int(low_signal_total),
+        "low_signal_sources_kept": int(low_signal_used),
+        "low_signal_sources_dropped": int(max(0, low_signal_total - low_signal_used)),
+        "wave_reports": wave_reports,
+    }
+    return merged
+
+
+def _normalize_fact_key(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").strip().lower())
+
+
+def _truncate_to_word_limit(text: str, max_words: int) -> str:
+    words = (text or "").split()
+    safe_limit = max(40, int(max_words))
+    if len(words) <= safe_limit:
+        return (text or "").strip()
+    return " ".join(words[:safe_limit]).strip() + " ..."
+
+
+def _classify_fact_digest_v2_section(
+    sentence: str,
+    section_keywords: Dict[str, List[str]],
+) -> str:
+    text = (sentence or "").lower()
+    best_section = "other_material_facts"
+    best_score = 0
+    for section, keywords in (section_keywords or {}).items():
+        score = sum(1 for token in keywords if token in text)
+        if score > best_score:
+            best_score = score
+            best_section = section
+    return best_section
+
+
+def _extract_fact_digest_number_tokens(sentence: str, max_tokens: int = 4) -> List[str]:
+    tokens: List[str] = []
+    for match in re.findall(
+        r"(?:A\$|AU\$|US\$|\$)?\s*\d[\d,]*(?:\.\d+)?\s*(?:%|moz|koz|oz|g/t|Mt|M|B|bn|million|billion)?",
+        sentence or "",
+        flags=re.IGNORECASE,
+    ):
+        token = re.sub(r"\s+", " ", match).strip()
+        if token and token not in tokens:
+            tokens.append(token)
+        if len(tokens) >= max(1, int(max_tokens)):
+            break
+    return tokens
+
+
+def _score_fact_digest_sentence(sentence: str, published_at: str, authority_rank: int) -> int:
+    low = (sentence or "").lower()
+    score = max(0, int(authority_rank)) * 3
+    if re.search(r"\d", low):
+        score += 2
+    if any(token in low for token in ("first gold", "gold pour", "launch", "approval", "first production")):
+        score += 6
+    if any(token in low for token in ("funded", "facility", "placement", "capital raise", "loan")):
+        score += 4
+    if any(token in low for token in ("npv", "irr", "aisc", "capex", "free cash flow", "payback")):
+        score += 4
+    if published_at.startswith("2026-"):
+        score += 3
+    elif published_at.startswith("2025-"):
+        score += 2
+    elif published_at.startswith("2024-"):
+        score += 1
+    return score
+
+
+def _build_stage1_fact_digest_v2(
+    source_rows: List[Dict[str, Any]],
+    timeline_rows: List[Dict[str, Any]],
+    *,
+    section_keywords: Optional[Dict[str, List[str]]] = None,
+    narrative_order: Optional[List[str]] = None,
+    conflict_terms: Optional[List[str]] = None,
+    conflict_field: str = "timeline_window",
+    conflict_resolution_rule: str = "prefer newest dated primary-source timeline evidence",
+) -> Dict[str, Any]:
+    """
+    Build de-noised, rubric-adjacent fact digest to accompany source injection.
+
+    This is a deterministic extraction pass: compact, source-referenced, and conflict-aware.
+    """
+    safe_max_facts_per_section = max(2, int(PERPLEXITY_STAGE1_FACT_DIGEST_V2_MAX_FACTS_PER_SECTION))
+    safe_max_summary_bullets = max(4, int(PERPLEXITY_STAGE1_FACT_DIGEST_V2_MAX_SUMMARY_BULLETS))
+    safe_max_narrative_words = max(120, int(PERPLEXITY_STAGE1_FACT_DIGEST_V2_MAX_NARRATIVE_WORDS))
+    effective_keywords = section_keywords or _FACT_DIGEST_V2_KEYWORDS
+    section_names = list(effective_keywords.keys()) or list(_FACT_DIGEST_V2_SECTIONS)
+    if "other_material_facts" not in section_names:
+        section_names.append("other_material_facts")
+    effective_narrative_order = [
+        str(item or "").strip().lower()
+        for item in (narrative_order or _FACT_DIGEST_V2_NARRATIVE_ORDER)
+        if str(item or "").strip()
+    ]
+    effective_conflict_terms = _normalize_terms_list(conflict_terms or _STAGE1_DEFAULT_TIMELINE_FOCUS_TERMS)
+
+    sections: Dict[str, List[Dict[str, Any]]] = {
+        key: []
+        for key in section_names
+    }
+    seen = set()
+    scored_facts: List[Tuple[int, str, Dict[str, Any]]] = []
+    material_tokens = (
+        "first gold",
+        "gold pour",
+        "funded",
+        "facility",
+        "loan",
+        "placement",
+        "capital",
+        "npv",
+        "irr",
+        "aisc",
+        "capex",
+        "resource",
+        "reserve",
+        "grade",
+        "production",
+        "market cap",
+        "shares",
+        "enterprise value",
+        "cash",
+        "debt",
+        "timeline",
+        "milestone",
+        "target",
+        "on track",
+        "risk",
+        "delay",
+        "catalyst",
+        "tailwind",
+        "headwind",
+    )
+
+    for source in source_rows:
+        source_id = str(source.get("source_id", "S?")).strip() or "S?"
+        published = str(source.get("published_at", "")).strip()
+        authority_rank = _source_authority_rank(str(source.get("url", "")))
+        excerpt = str(source.get("excerpt", ""))
+        for sentence in _extract_source_sentences(excerpt):
+            low = sentence.lower()
+            if not re.search(r"\d", low) and not any(token in low for token in material_tokens):
+                continue
+            normalized = _normalize_fact_key(sentence)
+            if not normalized or normalized in seen:
+                continue
+
+            section = _classify_fact_digest_v2_section(sentence, effective_keywords)
+            bucket = sections.get(section, [])
+            if len(bucket) >= safe_max_facts_per_section:
+                continue
+
+            item = {
+                "source_id": source_id,
+                "published_at": published,
+                "fact": sentence,
+                "windows": _extract_timeline_windows(sentence),
+                "number_tokens": _extract_fact_digest_number_tokens(sentence),
+            }
+            bucket.append(item)
+            seen.add(normalized)
+            scored_facts.append(
+                (
+                    _score_fact_digest_sentence(sentence, published, authority_rank),
+                    section,
+                    item,
+                )
+            )
+
+    # Ensure critical timeline facts from dedicated timeline extractor are included.
+    for row in timeline_rows:
+        sentence = str(row.get("fact", "")).strip()
+        if not sentence:
+            continue
+        normalized = _normalize_fact_key(sentence)
+        if normalized in seen:
+            continue
+        bucket = sections.setdefault("timelines_deadlines", [])
+        if len(bucket) >= safe_max_facts_per_section:
+            break
+        item = {
+            "source_id": str(row.get("source_id", "S?")).strip() or "S?",
+            "published_at": str(row.get("published_at", "")).strip(),
+            "fact": sentence,
+            "windows": list(row.get("windows", []) or []),
+            "number_tokens": _extract_fact_digest_number_tokens(sentence),
+        }
+        bucket.append(item)
+        seen.add(normalized)
+        scored_facts.append(
+            (
+                _score_fact_digest_sentence(
+                    sentence,
+                    str(row.get("published_at", "")).strip(),
+                    int(row.get("authority_rank", 0)),
+                ),
+                "timelines_deadlines",
+                item,
+            )
+        )
+
+    compact_sections = {name: rows for name, rows in sections.items() if rows}
+    total_facts = sum(len(rows) for rows in compact_sections.values())
+    sections_with_facts = list(compact_sections.keys())
+
+    # Minimal conflict table: timeline disagreements across extracted milestone facts.
+    timeline_candidates: List[Dict[str, Any]] = []
+    for row in compact_sections.get("timelines_deadlines", []):
+        low = str(row.get("fact", "")).lower()
+        if effective_conflict_terms and not any(token in low for token in effective_conflict_terms):
+            continue
+        windows = list(row.get("windows", []) or [])
+        if not windows:
+            windows = _extract_timeline_windows(str(row.get("fact", "")))
+        for window in windows:
+            timeline_candidates.append(
+                {
+                    "window": str(window),
+                    "source_id": str(row.get("source_id", "S?")),
+                    "published_at": str(row.get("published_at", "")),
+                }
+            )
+
+    conflicts: List[Dict[str, Any]] = []
+    unique_windows = []
+    for item in timeline_candidates:
+        window = item.get("window", "")
+        if window and window not in unique_windows:
+            unique_windows.append(window)
+    if len(unique_windows) > 1:
+        ranked = sorted(
+            timeline_candidates,
+            key=lambda item: (
+                str(item.get("published_at", "")),
+                int(_window_to_quarter_index(str(item.get("window", ""))) or -1),
+            ),
+            reverse=True,
+        )
+        canonical = ranked[0] if ranked else {}
+        conflicts.append(
+            {
+                "field": conflict_field,
+                "values": timeline_candidates[:8],
+                "canonical": canonical,
+                "resolution_rule": conflict_resolution_rule,
+            }
+        )
+
+    # High-signal bullets used as a de-noised digest for downstream reasoning.
+    scored_facts.sort(key=lambda item: item[0], reverse=True)
+    summary_bullets: List[str] = []
+    for _, _, item in scored_facts:
+        source_id = str(item.get("source_id", "S?"))
+        published = str(item.get("published_at", "")).strip()
+        fact = str(item.get("fact", "")).strip()
+        if not fact:
+            continue
+        line = f"[{source_id}] {published}: {fact}" if published else f"[{source_id}] {fact}"
+        if line in summary_bullets:
+            continue
+        summary_bullets.append(line)
+        if len(summary_bullets) >= safe_max_summary_bullets:
+            break
+
+    narrative_parts: List[str] = []
+    for section in effective_narrative_order:
+        rows = compact_sections.get(section, [])
+        if not rows:
+            continue
+        top_facts = "; ".join(str(row.get("fact", "")).strip() for row in rows[:2] if row.get("fact"))
+        if not top_facts:
+            continue
+        narrative_parts.append(f"{section.replace('_', ' ').title()}: {top_facts}")
+    narrative_summary = _truncate_to_word_limit(
+        " ".join(narrative_parts).strip(),
+        safe_max_narrative_words,
+    )
+
+    source_index = [
+        {
+            "source_id": row.get("source_id", ""),
+            "title": row.get("title", ""),
+            "url": row.get("url", ""),
+            "published_at": row.get("published_at", ""),
+            "decoded": bool(row.get("decoded")),
+        }
+        for row in source_rows
+    ]
+
+    return {
+        "schema": "fact_digest_v2",
+        "source_index": source_index,
+        "sections": compact_sections,
+        "summary_bullets": summary_bullets,
+        "narrative_summary": narrative_summary,
+        "conflicts": conflicts,
+        "counts": {
+            "source_count": len(source_rows),
+            "decoded_source_count": sum(1 for row in source_rows if row.get("decoded")),
+            "total_facts": total_facts,
+            "sections_with_facts": len(sections_with_facts),
+            "summary_bullets": len(summary_bullets),
+            "conflicts": len(conflicts),
+        },
+    }
+
+
+_ASX_ANNOUNCEMENT_SEARCH_URL = "https://www.asx.com.au/asx/v2/statistics/announcements.do"
+_ASX_DETERMINISTIC_CACHE: Dict[str, Dict[str, Any]] = {}
+
+
+def _extract_asx_symbol_from_context(user_query: str, run: Dict[str, Any]) -> str:
+    """Infer ASX code from user query/run context."""
+    def _normalize_symbol(raw_value: str) -> str:
+        text = str(raw_value or "").strip().upper()
+        if not text:
+            return ""
+        if ":" in text:
+            text = text.split(":")[-1].strip()
+        if "." in text:
+            text = text.split(".")[0].strip()
+        if not re.fullmatch(r"[A-Z0-9]{2,6}", text):
+            return ""
+        if sum(1 for ch in text if ch.isalpha()) < 2:
+            return ""
+        return text
+
+    # Direct run hints, if available.
+    for key in ("ticker", "symbol", "asx_code", "asx_symbol"):
+        symbol = _normalize_symbol(str(run.get(key, "")))
+        if symbol:
+            return symbol
+
+    texts = [
+        str(user_query or ""),
+        str(run.get("query", "") or ""),
+        str(run.get("research_prompt", "") or ""),
+        str(run.get("research_summary", "") or ""),
+    ]
+    for text in texts:
+        match = re.search(r"\bASX\s*:\s*([A-Z0-9]{2,6})\b", text, flags=re.IGNORECASE)
+        if match:
+            symbol = _normalize_symbol(match.group(1))
+            if symbol:
+                return symbol
+        match = re.search(r"\bASX\s+([A-Z0-9]{2,6})\b", text, flags=re.IGNORECASE)
+        if match:
+            symbol = _normalize_symbol(match.group(1))
+            if symbol:
+                return symbol
+        # Stage-1 research briefs often carry ticker as "Ticker focus: WWI".
+        match = re.search(
+            r"\b(?:ticker(?:\s+focus)?|symbol)\s*[:=]\s*(?:ASX\s*[:\-]\s*)?([A-Z0-9]{2,6})\b",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if match:
+            symbol = _normalize_symbol(match.group(1))
+            if symbol:
+                return symbol
+        suffix_match = re.search(r"\b([A-Z][A-Z0-9]{1,5})\.AX\b", text, flags=re.IGNORECASE)
+        if suffix_match:
+            return suffix_match.group(1).upper()
+
+    for source in (run.get("results") or []):
+        if not isinstance(source, dict):
+            continue
+        url = str(source.get("url", "")).strip()
+        if not url:
+            continue
+        try:
+            parsed = urlparse(url)
+            qs = parse_qs(parsed.query or "")
+        except Exception:
+            continue
+        for key in ("asxCode", "asxcode"):
+            values = qs.get(key) or []
+            for value in values:
+                code = _normalize_symbol(str(value or ""))
+                if code:
+                    return code
+        # Common secondary URL shape: /shares/asx-wwi/...
+        path = (parsed.path or "").lower()
+        path_match = re.search(r"/shares/asx-([a-z0-9]{2,6})\b", path)
+        if path_match:
+            code = _normalize_symbol(path_match.group(1))
+            if code:
+                return code
+    return ""
+
+
+def _extract_normalized_facts_from_query_text(query_text: str) -> Dict[str, Any]:
+    """
+    Parse injected normalized_facts JSON block from a prefixed user query string.
+
+    Expected format:
+      { "normalized_facts": { ... } }
+      <template query text...>
+    """
+    raw = str(query_text or "")
+    if not raw.strip():
+        return {}
+    match = re.search(r"\{\s*\"normalized_facts\"\s*:", raw)
+    if not match:
+        return {}
+    try:
+        parsed, _ = json.JSONDecoder().raw_decode(raw[match.start():].lstrip())
+    except Exception:
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    facts = parsed.get("normalized_facts", {})
+    if not isinstance(facts, dict):
+        return {}
+    return dict(facts)
+
+
+def _clean_html_fragment(text: str) -> str:
+    """Remove HTML tags/entities from a title fragment."""
+    value = re.sub(r"(?is)<[^>]+>", " ", str(text or ""))
+    value = unescape(value)
+    value = re.sub(r"\s+", " ", value).strip()
+    return value
+
+
+def _parse_asx_datetime(date_ddmmyyyy: str, time_text: str) -> Optional[datetime]:
+    """Parse ASX row date/time into datetime."""
+    date_value = str(date_ddmmyyyy or "").strip()
+    if not date_value:
+        return None
+    time_value = re.sub(r"\s+", " ", str(time_text or "").strip()).lower()
+    if not time_value:
+        time_value = "12:00 pm"
+    for fmt in ("%d/%m/%Y %I:%M %p", "%d/%m/%Y %I:%M%p", "%d/%m/%Y"):
+        try:
+            if fmt == "%d/%m/%Y":
+                return datetime.strptime(date_value, fmt)
+            return datetime.strptime(f"{date_value} {time_value.upper()}", fmt)
+        except Exception:
+            continue
+    return None
+
+
+def _parse_asx_ids_id(url: str) -> str:
+    """Extract ASX idsId token from display URL."""
+    raw = str(url or "")
+    if not raw:
+        return ""
+    try:
+        parsed = urlparse(raw)
+        ids_values = parse_qs(parsed.query or "").get("idsId", [])
+        if ids_values:
+            return str(ids_values[0] or "").strip()
+    except Exception:
+        pass
+    match = re.search(r"idsId=(\d+)", raw, flags=re.IGNORECASE)
+    if match:
+        return match.group(1)
+    return ""
+
+
+def _is_low_signal_asx_title(title: str) -> bool:
+    """Title-level filter for routine legal/admin ASX notices."""
+    low = str(title or "").lower()
+    if not low:
+        return True
+    low_tokens = (
+        "cleansing notice",
+        "appendix 2a",
+        "appendix 3b",
+        "appendix 3c",
+        "appendix 3y",
+        "notification regarding unquoted securities",
+        "quotation of securities",
+        "notice for quotation of securities",
+        "notice of quotation of securities",
+        "proposed issue of securities",
+        "proposed issue of quoted securities",
+        "proposed issue of unquoted securities",
+        "trading halt",
+        "pause in trading",
+        "voluntary suspension",
+        "suspension from quotation",
+        "request for trading halt",
+        "request for voluntary suspension",
+        "change of director",
+        "director interest",
+        "becoming a substantial holder",
+        "ceasing to be substantial holder",
+        "notice of annual general meeting",
+        "s708a",
+        "section 708a",
+        "application for quotation",
+    )
+    return any(token in low for token in low_tokens)
+
+
+def _asx_title_signal_rank(title: str, price_sensitive: bool) -> int:
+    """Heuristic rank for valuation-relevant ASX announcements."""
+    low = str(title or "").lower()
+    if not low:
+        return -10
+    if _is_low_signal_asx_title(low):
+        return -5
+    score = 0
+    if price_sensitive:
+        score += 3
+    critical_tokens = (
+        "investor presentation",
+        "corporate presentation",
+        "quarterly",
+        "activities report",
+        "annual report",
+        "financial report",
+        "resource",
+        "reserve",
+        "jorc",
+        "dfs",
+        "definitive feasibility",
+        "pfs",
+        "feasibility",
+        "funding",
+        "facility",
+        "placement",
+        "production",
+        "first gold",
+        "gold pour",
+        "npv",
+        "irr",
+    )
+    score += min(8, sum(1 for token in critical_tokens if token in low))
+    return score
+
+
+def _parse_asx_announcement_rows(html_text: str) -> List[Dict[str, Any]]:
+    """Parse ASX announcement search page into row records."""
+    rows: List[Dict[str, Any]] = []
+    if not html_text:
+        return rows
+
+    row_chunks = re.findall(r"(?is)<tr>(.*?)</tr>", html_text)
+    for chunk in row_chunks:
+        if "displayannouncement.do" not in chunk.lower():
+            continue
+        date_match = re.search(
+            r"(?is)(\d{2}/\d{2}/\d{4})\s*<br>\s*(?:<span[^>]*>([^<]+)</span>)?",
+            chunk,
+        )
+        if not date_match:
+            continue
+        date_text = str(date_match.group(1) or "").strip()
+        time_text = str(date_match.group(2) or "").strip()
+
+        link_match = re.search(
+            r'(?is)<a[^>]+href="([^"]*displayAnnouncement\.do[^"]+)"[^>]*>',
+            chunk,
+        )
+        if not link_match:
+            continue
+        display_url = urljoin("https://www.asx.com.au", unescape(link_match.group(1)))
+
+        title_match = re.search(
+            r'(?is)<a[^>]+href="[^"]*displayAnnouncement\.do[^"]+"[^>]*>\s*(.*?)<br',
+            chunk,
+        )
+        title = _clean_html_fragment(title_match.group(1) if title_match else "")
+        if not title:
+            title = "ASX Announcement"
+
+        price_sensitive = (
+            "icon-price-sensitive" in chunk.lower()
+            or "title=\"price sensitive\"" in chunk.lower()
+            or "title='price sensitive'" in chunk.lower()
+        )
+        published_dt = _parse_asx_datetime(date_text, time_text)
+        published_iso = published_dt.strftime("%Y-%m-%d") if published_dt else ""
+        rows.append(
+            {
+                "display_url": display_url,
+                "ids_id": _parse_asx_ids_id(display_url),
+                "title": title,
+                "price_sensitive": bool(price_sensitive),
+                "published_dt": published_dt,
+                "published_at": published_iso,
+                "signal_rank": _asx_title_signal_rank(title, bool(price_sensitive)),
+            }
+        )
+    return rows
+
+
+async def _resolve_asx_display_to_pdf_url(
+    client: httpx.AsyncClient,
+    display_url: str,
+) -> Tuple[str, str]:
+    """Resolve ASX displayAnnouncement URL to direct announcements PDF URL."""
+    last_err = "resolve_unknown"
+    for attempt in range(1, 4):
+        try:
+            response = await client.get(display_url)
+        except Exception as exc:
+            last_err = f"resolve_fetch_failed:{type(exc).__name__}:{str(exc)[:180]}"
+            if attempt < 3:
+                await asyncio.sleep(0.25 * attempt)
+                continue
+            return "", last_err
+
+        if response.status_code >= 400:
+            last_err = f"resolve_http_{response.status_code}"
+            if response.status_code in {403, 425, 429, 500, 502, 503, 504} and attempt < 3:
+                await asyncio.sleep(0.35 * attempt)
+                continue
+            return "", last_err
+
+        html_text = str(response.text or "")
+        hidden = re.search(r'(?is)name="pdfURL"\s+value="([^"]+)"', html_text)
+        if hidden:
+            return unescape(hidden.group(1)).strip(), ""
+
+        direct = re.search(
+            r"(https://announcements\.asx\.com\.au/asxpdf/[^\s\"']+\.pdf)",
+            html_text,
+            flags=re.IGNORECASE,
+        )
+        if direct:
+            return unescape(direct.group(1)).strip(), ""
+
+        last_err = "resolve_pdf_url_not_found"
+        if attempt < 3:
+            await asyncio.sleep(0.2 * attempt)
+            continue
+    return "", last_err
+
+
+def _asx_doc_key(url: str) -> str:
+    """Build coarse de-duplication key for ASX announcement URLs."""
+    raw = str(url or "").strip()
+    if not raw:
+        return ""
+    ids = _parse_asx_ids_id(raw)
+    if ids:
+        return f"ids:{ids}"
+    parsed = urlparse(raw)
+    host = parsed.netloc.lower()
+    path = parsed.path or ""
+    if "announcements.asx.com.au" in host:
+        filename = path.rsplit("/", 1)[-1]
+        if filename:
+            return f"asxpdf:{filename.lower()}"
+    return raw.lower()
+
+
+def _asx_cache_key(symbol: str, user_query: str, research_brief: str) -> str:
+    """Stable cache key for per-run deterministic ASX ingest."""
+    query_seed = re.sub(r"\s+", " ", f"{user_query} {research_brief}").strip().lower()
+    query_seed = query_seed[:240]
+    return (
+        f"{symbol.upper()}|{int(ASX_DETERMINISTIC_TARGET_ANNOUNCEMENTS)}|"
+        f"{int(ASX_DETERMINISTIC_LOOKBACK_YEARS)}|"
+        f"{int(ASX_DETERMINISTIC_MAX_DECODE)}|"
+        f"{bool(ASX_DETERMINISTIC_PRICE_SENSITIVE_ONLY)}|"
+        f"{bool(ASX_DETERMINISTIC_INCLUDE_NON_SENSITIVE_FILL)}|{query_seed}"
+    )
+
+
+async def _collect_deterministic_asx_sources(
+    *,
+    user_query: str,
+    research_brief: str,
+    run: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Fetch and decode latest material ASX announcements for injection."""
+    report: Dict[str, Any] = {
+        "enabled": bool(ASX_DETERMINISTIC_ANNOUNCEMENTS_ENABLED),
+        "used": False,
+        "symbol": "",
+        "reason": "",
+        "cache_hit": False,
+        "fetched_rows": 0,
+        "selected_rows": 0,
+        "decoded_rows": 0,
+        "target_rows": int(max(1, int(ASX_DETERMINISTIC_TARGET_ANNOUNCEMENTS))),
+        "price_sensitive_only": bool(ASX_DETERMINISTIC_PRICE_SENSITIVE_ONLY),
+        "include_non_sensitive_fill": bool(ASX_DETERMINISTIC_INCLUDE_NON_SENSITIVE_FILL),
+        "years_queried": [],
+        "sources": [],
+        "errors": [],
+    }
+    if not ASX_DETERMINISTIC_ANNOUNCEMENTS_ENABLED:
+        report["reason"] = "disabled"
+        return report
+
+    symbol = _extract_asx_symbol_from_context(user_query, run)
+    report["symbol"] = symbol
+    if not symbol:
+        report["reason"] = "symbol_not_detected"
+        return report
+
+    cache_key = _asx_cache_key(symbol, user_query, research_brief)
+    cached = _ASX_DETERMINISTIC_CACHE.get(cache_key)
+    if cached:
+        clone = copy.deepcopy(cached)
+        clone["cache_hit"] = True
+        return clone
+
+    lookback_years = max(1, int(ASX_DETERMINISTIC_LOOKBACK_YEARS))
+    target_rows = max(1, int(ASX_DETERMINISTIC_TARGET_ANNOUNCEMENTS))
+    decode_limit = max(0, int(ASX_DETERMINISTIC_MAX_DECODE))
+    timeout = max(8.0, float(ASX_DETERMINISTIC_FETCH_TIMEOUT_SECONDS))
+    years = [datetime.utcnow().year - idx for idx in range(lookback_years)]
+    report["years_queried"] = list(years)
+
+    user_agent = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/126.0.0.0 Safari/537.36"
+    )
+    all_rows: List[Dict[str, Any]] = []
+
+    async with httpx.AsyncClient(
+        timeout=timeout,
+        follow_redirects=True,
+        headers={"User-Agent": user_agent},
+    ) as client:
+        for year in years:
+            params = {
+                "by": "asxCode",
+                "asxCode": symbol,
+                "timeframe": "Y",
+                "year": str(year),
+            }
+            try:
+                response = await client.get(_ASX_ANNOUNCEMENT_SEARCH_URL, params=params)
+            except Exception as exc:
+                report["errors"].append(f"year_{year}:fetch_failed:{type(exc).__name__}")
+                continue
+            if response.status_code >= 400:
+                report["errors"].append(f"year_{year}:http_{response.status_code}")
+                continue
+            parsed = _parse_asx_announcement_rows(str(response.text or ""))
+            all_rows.extend(parsed)
+
+    deduped_rows: List[Dict[str, Any]] = []
+    seen_row_keys = set()
+    for row in all_rows:
+        key = str(row.get("ids_id", "")).strip() or str(row.get("display_url", "")).strip()
+        if not key or key in seen_row_keys:
+            continue
+        seen_row_keys.add(key)
+        deduped_rows.append(row)
+
+    deduped_rows.sort(
+        key=lambda item: (
+            item.get("published_dt") or datetime.min,
+            int(item.get("signal_rank", -10)),
+        ),
+        reverse=True,
+    )
+    report["fetched_rows"] = len(deduped_rows)
+
+    selected: List[Dict[str, Any]] = []
+    for row in deduped_rows:
+        if int(row.get("signal_rank", -10)) < 0:
+            continue
+        if ASX_DETERMINISTIC_PRICE_SENSITIVE_ONLY and not bool(row.get("price_sensitive")):
+            continue
+        selected.append(row)
+        if len(selected) >= target_rows:
+            break
+
+    if (
+        ASX_DETERMINISTIC_PRICE_SENSITIVE_ONLY
+        and ASX_DETERMINISTIC_INCLUDE_NON_SENSITIVE_FILL
+        and len(selected) < target_rows
+    ):
+        for row in deduped_rows:
+            if row in selected:
+                continue
+            if int(row.get("signal_rank", -10)) < 3:
+                continue
+            selected.append(row)
+            if len(selected) >= target_rows:
+                break
+
+    if not selected:
+        report["reason"] = "no_material_rows"
+        _ASX_DETERMINISTIC_CACHE[cache_key] = copy.deepcopy(report)
+        return report
+
+    sem = asyncio.Semaphore(2)
+    async with httpx.AsyncClient(
+        timeout=timeout,
+        follow_redirects=True,
+        headers={"User-Agent": user_agent},
+    ) as resolve_client:
+        async def _resolve_row(row: Dict[str, Any]) -> Dict[str, Any]:
+            async with sem:
+                display_url = str(row.get("display_url", "")).strip()
+                pdf_url, err = await _resolve_asx_display_to_pdf_url(resolve_client, display_url)
+                out = dict(row)
+                out["pdf_url"] = pdf_url or display_url
+                if err:
+                    out["resolve_error"] = err
+                return out
+
+        resolved_rows = await asyncio.gather(
+            *[_resolve_row(row) for row in selected],
+            return_exceptions=False,
+        )
+
+    from .research.providers.perplexity import PerplexityResearchProvider
+
+    decoder = PerplexityResearchProvider()
+    decode_targets = resolved_rows[: min(len(resolved_rows), decode_limit)]
+    query_context = f"ASX:{symbol}\n{user_query}\n{research_brief}".strip()
+
+    async def _decode_row(row: Dict[str, Any]) -> Dict[str, Any]:
+        url = str(row.get("pdf_url", "")).strip()
+        title = str(row.get("title", "")).strip()
+        if not url:
+            return {"status": "failed", "error": "missing_url", "decoded_chars": 0}
+        return await decoder._decode_one_source(url=url, title=title, query_context=query_context)
+
+    decoded_outputs = await asyncio.gather(
+        *[_decode_row(row) for row in decode_targets],
+        return_exceptions=True,
+    )
+    decode_by_doc_key: Dict[str, Dict[str, Any]] = {}
+    for row, output in zip(decode_targets, decoded_outputs):
+        doc_key = _asx_doc_key(str(row.get("pdf_url", "")))
+        if isinstance(output, Exception):
+            decode_by_doc_key[doc_key] = {
+                "status": "failed",
+                "error": f"{type(output).__name__}",
+                "decoded_chars": 0,
+            }
+            continue
+        decode_by_doc_key[doc_key] = output if isinstance(output, dict) else {}
+
+    sources: List[Dict[str, Any]] = []
+    decoded_rows = 0
+    for row in resolved_rows:
+        pdf_url = str(row.get("pdf_url", "")).strip()
+        doc_key = _asx_doc_key(pdf_url)
+        decoded = decode_by_doc_key.get(doc_key, {})
+        excerpt = str(decoded.get("excerpt", "")).strip()
+        status = str(decoded.get("status", "")).strip() or "pending"
+        if status == "decoded" and excerpt:
+            decoded_rows += 1
+        title = str(row.get("title", "")).strip() or "ASX Announcement"
+        published_at = str(row.get("published_at", "")).strip()
+        signal_rank = int(row.get("signal_rank", 0))
+        source_snippet = (
+            f"ASX announcement title: {title}. "
+            f"{'Price sensitive announcement.' if row.get('price_sensitive') else 'Announcement.'}"
+        )
+        source_item: Dict[str, Any] = {
+            "title": title,
+            "url": pdf_url or str(row.get("display_url", "")).strip(),
+            "published_at": published_at,
+            "content": excerpt or source_snippet,
+            "source_snippet": source_snippet,
+            "decode_status": status,
+            "decoded_excerpt": excerpt,
+            "decoded_chars": int(decoded.get("decoded_chars", 0) or 0),
+            "asx_deterministic": True,
+            "asx_price_sensitive": bool(row.get("price_sensitive")),
+            "asx_ids_id": str(row.get("ids_id", "")),
+            "material_signal_score": max(signal_rank, _excerpt_material_signal_score(excerpt or source_snippet)),
+            "score": 1.0,
+        }
+        if decoded.get("error"):
+            source_item["decode_error"] = str(decoded.get("error"))
+        if row.get("resolve_error"):
+            source_item["resolve_error"] = str(row.get("resolve_error"))
+        sources.append(source_item)
+
+    report["used"] = bool(sources)
+    report["reason"] = "ok" if sources else "decode_or_selection_empty"
+    report["selected_rows"] = len(sources)
+    report["decoded_rows"] = decoded_rows
+    report["sources"] = sources
+    _ASX_DETERMINISTIC_CACHE[cache_key] = copy.deepcopy(report)
+    return report
+
+
+def _merge_deterministic_sources_into_results(
+    existing_results: List[Dict[str, Any]],
+    deterministic_sources: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Place deterministic sources first and dedupe overlap with existing rows."""
+    if not deterministic_sources:
+        return list(existing_results or [])
+
+    existing = [dict(item) for item in (existing_results or []) if isinstance(item, dict)]
+    existing_by_key: Dict[str, Dict[str, Any]] = {}
+    for row in existing:
+        key = _asx_doc_key(str(row.get("url", "")))
+        if key and key not in existing_by_key:
+            existing_by_key[key] = row
+
+    merged: List[Dict[str, Any]] = []
+    seen_keys = set()
+    for source in deterministic_sources:
+        if not isinstance(source, dict):
+            continue
+        row = dict(source)
+        key = _asx_doc_key(str(row.get("url", "")))
+        if key and key in existing_by_key:
+            existing_row = existing_by_key[key]
+            existing_excerpt = str(
+                existing_row.get("decoded_excerpt")
+                or existing_row.get("content")
+                or existing_row.get("source_snippet")
+                or ""
+            ).strip()
+            new_excerpt = str(
+                row.get("decoded_excerpt")
+                or row.get("content")
+                or row.get("source_snippet")
+                or ""
+            ).strip()
+            if len(existing_excerpt) > len(new_excerpt):
+                row["content"] = existing_excerpt
+                row["decoded_excerpt"] = str(existing_row.get("decoded_excerpt", "")).strip()
+                row["decode_status"] = str(existing_row.get("decode_status", row.get("decode_status", "")))
+        merged.append(row)
+        if key:
+            seen_keys.add(key)
+
+    for row in existing:
+        key = _asx_doc_key(str(row.get("url", "")))
+        if key and key in seen_keys:
+            continue
+        merged.append(row)
+    return merged
+
+
+async def _augment_run_with_deterministic_asx_sources(
+    *,
+    user_query: str,
+    research_brief: str,
+    run: Dict[str, Any],
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Inject deterministic ASX sources into run results for Stage 1 evidence prep."""
+    ingestion = await _collect_deterministic_asx_sources(
+        user_query=user_query,
+        research_brief=research_brief,
+        run=run,
+    )
+    ingestion_summary = {
+        "enabled": bool(ingestion.get("enabled", False)),
+        "used": bool(ingestion.get("used", False)),
+        "symbol": str(ingestion.get("symbol", "")),
+        "reason": str(ingestion.get("reason", "")),
+        "cache_hit": bool(ingestion.get("cache_hit", False)),
+        "fetched_rows": int(ingestion.get("fetched_rows", 0)),
+        "selected_rows": int(ingestion.get("selected_rows", 0)),
+        "decoded_rows": int(ingestion.get("decoded_rows", 0)),
+        "target_rows": int(ingestion.get("target_rows", 0)),
+        "price_sensitive_only": bool(ingestion.get("price_sensitive_only", False)),
+        "include_non_sensitive_fill": bool(
+            ingestion.get("include_non_sensitive_fill", False)
+        ),
+        "years_queried": list(ingestion.get("years_queried", []) or []),
+        "errors": list(ingestion.get("errors", []) or [])[:8],
+    }
+    provider_meta = run.setdefault("provider_metadata", {})
+    if not isinstance(provider_meta, dict):
+        provider_meta = {}
+        run["provider_metadata"] = provider_meta
+    provider_meta["asx_deterministic_ingestion"] = ingestion_summary
+
+    sources = ingestion.get("sources", []) or []
+    if not sources:
+        return run, ingestion_summary
+
+    merged_results = _merge_deterministic_sources_into_results(
+        existing_results=list(run.get("results") or []),
+        deterministic_sources=sources,
+    )
+    run["results"] = merged_results
+    run["result_count"] = len(merged_results)
+    run["asx_deterministic_sources"] = sources
+    _progress_log(
+        "Stage1 deterministic ASX injection: "
+        f"symbol={ingestion_summary.get('symbol')}, "
+        f"selected={ingestion_summary.get('selected_rows')}, "
+        f"decoded={ingestion_summary.get('decoded_rows')}, "
+        f"cache_hit={ingestion_summary.get('cache_hit')}"
+    )
+    return run, ingestion_summary
+
 
 def _prepare_stage1_source_rows(
     run: Dict[str, Any],
@@ -430,7 +2624,16 @@ def _prepare_stage1_source_rows(
     safe_max_chars = max(300, int(max_chars_per_source))
     rows: List[Dict[str, Any]] = []
 
-    for source in (run.get("results") or []):
+    all_sources = list(run.get("results") or [])
+    preferred_sources = [
+        source
+        for source in all_sources
+        if not _is_low_signal_notice_source_item(source)
+    ]
+    ordered_sources = preferred_sources
+    current_year = datetime.utcnow().year
+
+    for source in ordered_sources:
         if len(rows) >= safe_max_sources:
             break
 
@@ -438,6 +2641,7 @@ def _prepare_stage1_source_rows(
         title = str(source.get("title", "Untitled")).strip() or "Untitled"
         url = str(source.get("url", "")).strip()
         published = str(source.get("published_at", "")).strip()
+        source_year = _infer_source_year(published, title, url)
         decode_status = str(source.get("decode_status", "")).strip()
         decoded = bool(decode_status == "decoded" or source.get("decoded_excerpt"))
 
@@ -447,6 +2651,56 @@ def _prepare_stage1_source_rows(
             or source.get("source_snippet")
             or ""
         ).strip()
+        if not excerpt:
+            continue
+
+        # Hard gate: avoid link-only/title-only source rows. Stage 1 models need
+        # quote-bearing evidence text, not URL metadata.
+        extracted_sentences = _extract_source_sentences(excerpt)
+        if not extracted_sentences:
+            normalized_excerpt = re.sub(r"\s+", " ", excerpt).strip()
+            low_excerpt = normalized_excerpt.lower()
+            strong_tokens = (
+                "npv",
+                "irr",
+                "aisc",
+                "capex",
+                "resource",
+                "reserve",
+                "production",
+                "funding",
+                "facility",
+                "cash",
+                "debt",
+                "market cap",
+                "shares",
+                "enterprise value",
+                "timeline",
+                "milestone",
+                "commissioning",
+                "ramp-up",
+            )
+            has_min_signal = bool(
+                len(normalized_excerpt) >= 180
+                and re.search(r"\d", low_excerpt)
+                and any(token in low_excerpt for token in strong_tokens)
+            )
+            if not has_min_signal:
+                continue
+        material_signal_score = _excerpt_material_signal_score(excerpt)
+        source_is_low_signal = _is_low_signal_notice_source_item(source)
+        if source_is_low_signal and material_signal_score < 2:
+            continue
+        if material_signal_score < 0 and len(rows) >= max(2, safe_max_sources - 2):
+            continue
+        if material_signal_score < 2 and len(rows) >= max(3, safe_max_sources - 3):
+            continue
+        if (
+            source_year is not None
+            and source_year <= (current_year - 3)
+            and len(rows) >= max(3, safe_max_sources - 3)
+        ):
+            continue
         if len(excerpt) > safe_max_chars:
             excerpt = excerpt[: safe_max_chars - 3].rstrip() + "..."
 
@@ -459,10 +2713,66 @@ def _prepare_stage1_source_rows(
                 "decode_status": decode_status,
                 "decoded": decoded,
                 "excerpt": excerpt,
+                "material_signal_score": material_signal_score,
             }
         )
 
     return rows
+
+
+def _infer_source_year(published: str, title: str, url: str) -> Optional[int]:
+    """Infer best year for staleness filtering from metadata/title/url."""
+    candidates = [str(published or ""), str(title or ""), str(url or "")]
+    for text in candidates:
+        for match in re.findall(r"(20\d{2})", text):
+            try:
+                year = int(match)
+            except Exception:
+                continue
+            if 2000 <= year <= datetime.utcnow().year:
+                return year
+    return None
+
+
+def _excerpt_material_signal_score(excerpt: str) -> int:
+    """Rough materiality score for a decoded excerpt."""
+    text = re.sub(r"\s+", " ", str(excerpt or "")).strip()
+    if not text:
+        return -5
+    low = text.lower()
+    score = 0
+    if re.search(r"\d", low):
+        score += 1
+    signal_tokens = (
+        "npv",
+        "irr",
+        "aisc",
+        "capex",
+        "resource",
+        "reserve",
+        "production",
+        "first gold",
+        "gold pour",
+        "funding",
+        "facility",
+        "loan",
+        "cash",
+        "debt",
+        "market cap",
+        "shares",
+        "enterprise value",
+        "ev/oz",
+        "milestone",
+        "timeline",
+    )
+    score += min(8, sum(1 for token in signal_tokens if token in low))
+    if _is_low_signal_legal_boilerplate(text):
+        score -= 6
+    if _is_heading_like_sentence(text):
+        score -= 3
+    if len(text) < 120:
+        score -= 1
+    return score
 
 
 def _classify_fact_pack_section(sentence: str) -> str:
@@ -490,10 +2800,150 @@ def _extract_source_sentences(excerpt: str) -> List[str]:
         sentence = re.sub(r"\s+", " ", part).strip(" \t-")
         if len(sentence) < 40:
             continue
-        if len(sentence) > 220:
-            sentence = sentence[:217].rstrip() + "..."
+        if re.match(r"^[a-z]{3,}[,;:]\s", sentence):
+            low_sentence = sentence.lower()
+            if not any(
+                token in low_sentence
+                for token in (
+                    "npv",
+                    "irr",
+                    "aisc",
+                    "capex",
+                    "resource",
+                    "reserve",
+                    "production",
+                    "first gold",
+                    "gold pour",
+                    "funding",
+                    "facility",
+                    "cash",
+                    "debt",
+                    "market cap",
+                    "shares",
+                    "enterprise value",
+                )
+            ):
+                continue
+        if _is_low_signal_legal_boilerplate(sentence):
+            continue
+        if _is_heading_like_sentence(sentence):
+            continue
+        if len(sentence) > 420:
+            sentence = sentence[:417].rstrip() + "..."
         out.append(sentence)
     return out
+
+
+def _is_heading_like_sentence(sentence: str) -> bool:
+    """Drop short heading/table-style lines that are not evidence-bearing facts."""
+    text = re.sub(r"\s+", " ", str(sentence or "")).strip()
+    if not text:
+        return True
+    low = text.lower()
+
+    if low in {
+        "contents",
+        "table of contents",
+        "for personal use only",
+        "announcements",
+        "presentations",
+        "project highlights",
+    }:
+        return True
+
+    # Keep compact heading-like strings only if they include strong signal.
+    strong_tokens = (
+        "npv",
+        "irr",
+        "aisc",
+        "capex",
+        "resource",
+        "reserve",
+        "production",
+        "first gold",
+        "gold pour",
+        "funding",
+        "facility",
+        "cash",
+        "debt",
+        "market cap",
+        "shares",
+        "enterprise value",
+    )
+    if any(token in low for token in strong_tokens):
+        return False
+
+    words = [token for token in re.split(r"\s+", text) if token]
+    if len(words) <= 12 and len(text) <= 95:
+        if not re.search(r"[\.!?;:]", text):
+            alpha = [c for c in text if c.isalpha()]
+            if alpha:
+                upper_ratio = sum(1 for c in alpha if c.isupper()) / float(len(alpha))
+                if upper_ratio >= 0.72:
+                    return True
+            # Short title-style strings with no punctuation are often headings.
+            if not re.search(r"\d", text):
+                return True
+    return False
+
+
+def _is_low_signal_legal_boilerplate(sentence: str) -> bool:
+    """Filter legal/admin boilerplate that adds minimal valuation signal."""
+    low = str(sentence or "").lower()
+    if not low:
+        return True
+
+    legal_patterns = (
+        "708a cleansing notice",
+        "cleansing notice",
+        "application for quotation of securities",
+        "notice for quotation of securities",
+        "notice of quotation of securities",
+        "proposed issue of securities",
+        "proposed issue of quoted securities",
+        "proposed issue of unquoted securities",
+        "appendix 2a",
+        "appendix 3b",
+        "appendix 3c",
+        "part 6d.2",
+        "chapter 2m",
+        "sections 674 and 674a",
+        "corporations act 2001",
+        "without disclosure to investors",
+        "this notice is given under paragraph 5(e)",
+        "for personal use only",
+        "announcement summary entity name",
+        "trading halt",
+        "pause in trading",
+        "voluntary suspension",
+        "suspension from quotation",
+        "request for trading halt",
+        "request for voluntary suspension",
+    )
+    if any(token in low for token in legal_patterns):
+        # Keep if the same sentence also carries unusually strong valuation signal.
+        override_tokens = (
+            "npv",
+            "irr",
+            "aisc",
+            "capex",
+            "resource",
+            "reserve",
+            "production",
+            "first gold",
+            "gold pour",
+            "market cap",
+            "shares outstanding",
+            "enterprise value",
+            "cash",
+            "debt",
+            "funding",
+            "loan facility",
+        )
+        if any(token in low for token in override_tokens):
+            return False
+        return True
+    return False
 
 
 def _build_stage1_rubric_fact_pack(
@@ -625,6 +3075,516 @@ def _build_stage1_rubric_fact_pack(
     }
 
 
+def _map_to_compact_fact_category(section_name: str) -> str:
+    """Map dense fact-pack/fact-digest section ids into compact categories."""
+    key = str(section_name or "").strip().lower()
+    if any(token in key for token in ("timeline", "milestone", "deadline")):
+        return "timeline_milestones"
+    if any(token in key for token in ("market", "share", "valuation")):
+        return "market_share_structure"
+    if any(token in key for token in ("economics", "npv", "cost", "resource", "reserve")):
+        return "project_economics_resource"
+    if any(token in key for token in ("funding", "financing", "balance", "debt", "cash")):
+        return "funding_and_balance_sheet"
+    if any(token in key for token in ("risk", "constraint", "headwind")):
+        return "risks_and_constraints"
+    if any(token in key for token in ("tailwind", "catalyst", "upside")):
+        return "catalysts_and_tailwinds"
+    if any(token in key for token in ("management", "governance")):
+        return "management_and_governance"
+    return "other_material_facts"
+
+
+def _build_stage1_compact_fact_bundle(
+    *,
+    source_rows: List[Dict[str, Any]],
+    fact_digest: Dict[str, Any],
+    fact_pack: Dict[str, Any],
+    timeline_rows: List[Dict[str, Any]],
+    max_facts_per_category: int = 3,
+) -> Dict[str, Any]:
+    """
+    Build compact denoised fact bundle injected before Stage 1 model analysis.
+
+    Keeps only high-signal claim rows with source ids and dates so prompt size
+    stays bounded while preserving evidence traceability.
+    """
+    safe_limit = max(1, int(max_facts_per_category))
+    categories: Dict[str, List[Dict[str, str]]] = {
+        "timeline_milestones": [],
+        "project_economics_resource": [],
+        "funding_and_balance_sheet": [],
+        "market_share_structure": [],
+        "risks_and_constraints": [],
+        "catalysts_and_tailwinds": [],
+        "management_and_governance": [],
+        "other_material_facts": [],
+    }
+    seen = set()
+
+    def _timeline_priority(text: str) -> int:
+        low = str(text or "").lower()
+        if any(token in low for token in ("first gold", "gold pour")):
+            return 4
+        if any(token in low for token in ("commercial production", "ramp-up", "ramp up")):
+            return 3
+        if re.search(r"\bq[1-4]\b", low) or re.search(r"\b20\d{2}\b", low):
+            return 2
+        if "timeline" in low or "milestone" in low:
+            return 1
+        return 0
+
+    def _add_row(category: str, source_id: str, fact: str, published_at: str = "") -> None:
+        bucket = categories.setdefault(category, [])
+        clean_fact = re.sub(r"\s+", " ", str(fact or "")).strip()
+        if not clean_fact:
+            return
+        if _is_low_signal_legal_boilerplate(clean_fact):
+            return
+        if _is_heading_like_sentence(clean_fact):
+            return
+        if len(clean_fact) > 420:
+            clean_fact = clean_fact[:417].rstrip() + "..."
+        key = f"{category}|{source_id}|{clean_fact.lower()}"
+        if key in seen:
+            return
+        row = {
+            "source_id": str(source_id or "").strip() or "S?",
+            "fact": clean_fact,
+        }
+        date_value = str(published_at or "").strip()
+        if date_value:
+            row["published_at"] = date_value
+
+        if len(bucket) >= safe_limit:
+            if category != "timeline_milestones":
+                return
+            new_priority = _timeline_priority(clean_fact)
+            if new_priority <= 0:
+                return
+            worst_idx = -1
+            worst_priority = 10
+            for idx, existing in enumerate(bucket):
+                existing_priority = _timeline_priority(str(existing.get("fact", "")))
+                if existing_priority < worst_priority:
+                    worst_priority = existing_priority
+                    worst_idx = idx
+            if worst_idx < 0 or new_priority <= worst_priority:
+                return
+            # Replace low-priority timeline line with higher-priority milestone.
+            bucket[worst_idx] = row
+            seen.add(key)
+            return
+
+        seen.add(key)
+        bucket.append(row)
+
+    pack_sections = (fact_pack.get("sections", {}) or {}) if isinstance(fact_pack, dict) else {}
+    if isinstance(pack_sections, dict):
+        for section_name, rows in pack_sections.items():
+            category = _map_to_compact_fact_category(section_name)
+            for row in (rows or []):
+                if not isinstance(row, dict):
+                    continue
+                _add_row(
+                    category,
+                    str(row.get("source_id", "S?")),
+                    str(row.get("fact", "")),
+                    str(row.get("published_at", "")),
+                )
+
+    digest_sections = (fact_digest.get("sections", {}) or {}) if isinstance(fact_digest, dict) else {}
+    if isinstance(digest_sections, dict):
+        for section_name, rows in digest_sections.items():
+            category = _map_to_compact_fact_category(section_name)
+            for row in (rows or []):
+                if not isinstance(row, dict):
+                    continue
+                _add_row(
+                    category,
+                    str(row.get("source_id", "S?")),
+                    str(row.get("fact", "")),
+                    str(row.get("published_at", "")),
+                )
+
+    for row in timeline_rows[: max(3, safe_limit + 1)]:
+        if not isinstance(row, dict):
+            continue
+        _add_row(
+            "timeline_milestones",
+            str(row.get("source_id", "S?")),
+            str(row.get("fact", "")),
+            str(row.get("published_at", "")),
+        )
+
+    # Starvation fallback: if upstream extraction is sparse, pull compact
+    # summary bullets and one high-signal sentence per source so Stage 1
+    # never receives an empty/near-empty denoised bundle.
+    current_total = sum(len(rows) for rows in categories.values())
+    if current_total < 5:
+        for bullet in (fact_digest.get("summary_bullets", []) or [])[:8]:
+            text = re.sub(r"\s+", " ", str(bullet or "")).strip()
+            if not text:
+                continue
+            source_id = "S?"
+            source_match = re.match(r"^\[(S\d+)\]\s*(.*)$", text)
+            if source_match:
+                source_id = source_match.group(1)
+                text = source_match.group(2).strip()
+            category = _map_to_compact_fact_category(text)
+            _add_row(category, source_id, text, "")
+
+    current_total = sum(len(rows) for rows in categories.values())
+    if current_total < 5:
+        for row in source_rows:
+            source_id = str(row.get("source_id", "S?"))
+            published = str(row.get("published_at", ""))
+            excerpt = str(row.get("excerpt", ""))
+            for sentence in _extract_source_sentences(excerpt)[:1]:
+                category = _map_to_compact_fact_category(sentence)
+                _add_row(category, source_id, sentence, published)
+            if sum(len(rows) for rows in categories.values()) >= 6:
+                break
+
+    compact_categories = {
+        key: rows
+        for key, rows in categories.items()
+        if rows
+    }
+    total_facts = sum(len(rows) for rows in compact_categories.values())
+
+    source_index = []
+    for row in source_rows:
+        source_index.append(
+            {
+                "source_id": str(row.get("source_id", "")),
+                "title": str(row.get("title", "")),
+                "url": str(row.get("url", "")),
+                "published_at": str(row.get("published_at", "")),
+            }
+        )
+
+    critical_gaps = []
+    if isinstance(fact_pack, dict):
+        critical_gaps = list(fact_pack.get("critical_gaps", []) or [])
+
+    return {
+        "schema": "compact_fact_bundle_v1",
+        "source_index": source_index,
+        "categories": compact_categories,
+        "critical_gaps": critical_gaps,
+        "counts": {
+            "source_count": len(source_rows),
+            "decoded_source_count": sum(1 for row in source_rows if row.get("decoded")),
+            "categories_with_facts": len(compact_categories),
+            "total_facts": total_facts,
+        },
+    }
+
+
+def _truncate_text_for_prompt(text: str, max_chars: int) -> str:
+    """Trim text for prompt payloads while preserving sentence readability."""
+    value = re.sub(r"\s+", " ", str(text or "")).strip()
+    safe_max = max(60, int(max_chars))
+    if len(value) <= safe_max:
+        return value
+    clipped = value[:safe_max].rstrip()
+    # Try to avoid chopping at mid-token when possible.
+    boundary = max(clipped.rfind("."), clipped.rfind(";"), clipped.rfind(","), clipped.rfind(" "))
+    if boundary >= max(40, safe_max // 2):
+        clipped = clipped[:boundary].rstrip()
+    return clipped + "..."
+
+
+def _count_words(text: str) -> int:
+    """Approximate word count for prompt budget controls."""
+    return len(re.findall(r"\b[\w\-]+\b", str(text or "")))
+
+
+def _compact_prompt_fact_row(item: Dict[str, Any], max_fact_chars: int) -> Dict[str, Any]:
+    """Keep only high-signal fields from a fact row for prompt payloads."""
+    if not isinstance(item, dict):
+        return {}
+    out: Dict[str, Any] = {}
+    source_id = str(item.get("source_id", "")).strip()
+    if source_id:
+        out["source_id"] = source_id
+    published = str(item.get("published_at", "")).strip()
+    if published:
+        out["published_at"] = published
+    fact = _truncate_text_for_prompt(str(item.get("fact", "")), max_fact_chars)
+    if fact:
+        out["fact"] = fact
+    windows = item.get("windows")
+    if isinstance(windows, list) and windows:
+        normalized = []
+        for raw in windows:
+            token = str(raw or "").strip()
+            if token and token not in normalized:
+                normalized.append(token)
+        if normalized:
+            out["windows"] = normalized[:2]
+    return out
+
+
+def _build_stage1_prompt_fact_digest(
+    fact_digest: Dict[str, Any],
+    *,
+    max_rows_per_section: int,
+    max_fact_chars: int,
+    max_summary_bullets: int,
+) -> Dict[str, Any]:
+    """Compact fact digest payload for Stage 1 prompt injection."""
+    if not isinstance(fact_digest, dict):
+        return {}
+    sections: Dict[str, List[Dict[str, Any]]] = {}
+    for section_name, rows in (fact_digest.get("sections", {}) or {}).items():
+        if not isinstance(rows, list):
+            continue
+        compact_rows: List[Dict[str, Any]] = []
+        for row in rows[: max(1, int(max_rows_per_section))]:
+            compact_row = _compact_prompt_fact_row(row, max_fact_chars)
+            if compact_row:
+                compact_rows.append(compact_row)
+        if compact_rows:
+            sections[str(section_name)] = compact_rows
+    summary_bullets = [
+        _truncate_text_for_prompt(str(item or ""), max_fact_chars)
+        for item in (fact_digest.get("summary_bullets", []) or [])[: max(1, int(max_summary_bullets))]
+        if str(item or "").strip()
+    ]
+    return {
+        "schema": str(fact_digest.get("schema", "fact_digest_v2")),
+        "counts": fact_digest.get("counts", {}) or {},
+        "sections": sections,
+        "summary_bullets": summary_bullets,
+        "conflicts": list((fact_digest.get("conflicts", []) or [])[:4]),
+    }
+
+
+def _build_stage1_prompt_fact_pack(
+    fact_pack: Dict[str, Any],
+    *,
+    max_rows_per_section: int,
+    max_fact_chars: int,
+) -> Dict[str, Any]:
+    """Compact rubric fact-pack payload for Stage 1 prompt injection."""
+    if not isinstance(fact_pack, dict):
+        return {}
+    sections: Dict[str, List[Dict[str, Any]]] = {}
+    for section_name, rows in (fact_pack.get("sections", {}) or {}).items():
+        if not isinstance(rows, list):
+            continue
+        compact_rows: List[Dict[str, Any]] = []
+        for row in rows[: max(1, int(max_rows_per_section))]:
+            compact_row = _compact_prompt_fact_row(row, max_fact_chars)
+            if compact_row:
+                compact_rows.append(compact_row)
+        if compact_rows:
+            sections[str(section_name)] = compact_rows
+    return {
+        "schema": str(fact_pack.get("schema", "rubric_fact_pack_v1")),
+        "counts": fact_pack.get("counts", {}) or {},
+        "critical_gaps": list((fact_pack.get("critical_gaps", []) or [])[:8]),
+        "sections": sections,
+    }
+
+
+def _build_stage1_prompt_compact_fact_bundle(
+    compact_fact_bundle: Dict[str, Any],
+    *,
+    max_rows_per_category: int,
+    max_fact_chars: int,
+) -> Dict[str, Any]:
+    """Compact denoised bundle payload for Stage 1 prompt injection."""
+    if not isinstance(compact_fact_bundle, dict):
+        return {}
+    source_index = []
+    for row in (compact_fact_bundle.get("source_index", []) or []):
+        if not isinstance(row, dict):
+            continue
+        source_index.append(
+            {
+                "source_id": str(row.get("source_id", "")),
+                "title": _truncate_text_for_prompt(str(row.get("title", "")), 120),
+                "published_at": str(row.get("published_at", "")),
+                "url": str(row.get("url", "")),
+            }
+        )
+    categories: Dict[str, List[Dict[str, Any]]] = {}
+    for category_name, rows in (compact_fact_bundle.get("categories", {}) or {}).items():
+        if not isinstance(rows, list):
+            continue
+        compact_rows: List[Dict[str, Any]] = []
+        for row in rows[: max(1, int(max_rows_per_category))]:
+            compact_row = _compact_prompt_fact_row(row, max_fact_chars)
+            if compact_row:
+                compact_rows.append(compact_row)
+        if compact_rows:
+            categories[str(category_name)] = compact_rows
+    return {
+        "schema": str(compact_fact_bundle.get("schema", "compact_fact_bundle_v1")),
+        "source_index": source_index,
+        "categories": categories,
+        "critical_gaps": list((compact_fact_bundle.get("critical_gaps", []) or [])[:8]),
+        "counts": compact_fact_bundle.get("counts", {}) or {},
+    }
+
+
+def _build_stage1_doc_key_points_bundle(
+    source_rows: List[Dict[str, Any]],
+    *,
+    max_points_per_source: int,
+    max_words_per_source: int,
+    max_fact_chars: int,
+) -> Dict[str, Any]:
+    """Derive concise source key points for prompt-budget-safe evidence injection."""
+    safe_points = max(2, int(max_points_per_source))
+    safe_words = max(80, int(max_words_per_source))
+    safe_chars = max(80, int(max_fact_chars))
+    section_tags = {
+        "market_data": "market",
+        "project_economics_npv_inputs": "economics",
+        "resource_and_reserve": "resource",
+        "funding_and_balance_sheet": "funding",
+        "development_timeline_and_milestones": "timeline",
+        "headwinds_and_risks": "risk",
+        "other_material_facts": "other",
+    }
+    sources: List[Dict[str, Any]] = []
+    total_points = 0
+    total_words = 0
+
+    for row in source_rows:
+        source_id = str(row.get("source_id", "")).strip() or "S?"
+        excerpt = str(row.get("excerpt", "")).strip()
+        sentences = _extract_source_sentences(excerpt)
+        candidates: List[Tuple[int, str, str]] = []
+        for sentence in sentences:
+            section = _classify_fact_pack_section(sentence)
+            score = _excerpt_material_signal_score(sentence)
+            if _extract_timeline_windows(sentence):
+                score += 3
+            if re.search(r"\d", sentence):
+                score += 1
+            if section in {"project_economics_npv_inputs", "funding_and_balance_sheet"}:
+                score += 1
+            candidates.append((score, section, sentence))
+
+        candidates.sort(key=lambda item: (item[0], len(item[2])), reverse=True)
+        selected: List[Tuple[str, str]] = []
+        used_sentences = set()
+        used_sections = set()
+        used_words = 0
+
+        # Pass 1: section diversity.
+        for score, section, sentence in candidates:
+            if len(selected) >= safe_points:
+                break
+            if sentence in used_sentences or section in used_sections:
+                continue
+            sentence_words = _count_words(sentence)
+            if used_words + sentence_words > safe_words and selected:
+                continue
+            selected.append((section, sentence))
+            used_sentences.add(sentence)
+            used_sections.add(section)
+            used_words += sentence_words
+
+        # Pass 2: fill remaining slots by score.
+        for score, section, sentence in candidates:
+            if len(selected) >= safe_points:
+                break
+            if sentence in used_sentences:
+                continue
+            sentence_words = _count_words(sentence)
+            if used_words + sentence_words > safe_words and selected:
+                continue
+            selected.append((section, sentence))
+            used_sentences.add(sentence)
+            used_words += sentence_words
+
+        if not selected and excerpt:
+            fallback = _truncate_text_for_prompt(excerpt, safe_chars)
+            if fallback:
+                selected.append(("other_material_facts", fallback))
+                used_words += _count_words(fallback)
+
+        key_points: List[Dict[str, str]] = []
+        for section, sentence in selected:
+            key_points.append(
+                {
+                    "tag": section_tags.get(section, "other"),
+                    "fact": _truncate_text_for_prompt(sentence, safe_chars),
+                }
+            )
+
+        total_points += len(key_points)
+        total_words += used_words
+        sources.append(
+            {
+                "source_id": source_id,
+                "title": _truncate_text_for_prompt(str(row.get("title", "")), 120),
+                "published_at": str(row.get("published_at", "")),
+                "url": str(row.get("url", "")),
+                "key_points": key_points,
+            }
+        )
+
+    return {
+        "schema": "source_key_points_v1",
+        "sources": sources,
+        "counts": {
+            "source_count": len(source_rows),
+            "sources_with_points": sum(1 for item in sources if item.get("key_points")),
+            "total_points": total_points,
+            "total_words": total_words,
+            "max_points_per_source": safe_points,
+            "max_words_per_source": safe_words,
+        },
+    }
+
+
+def _apply_doc_key_points_to_source_rows(
+    source_rows: List[Dict[str, Any]],
+    key_points_bundle: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """Replace long excerpts with deterministic key-point bullets for appendix rendering."""
+    points_by_source: Dict[str, List[Dict[str, str]]] = {}
+    for item in (key_points_bundle.get("sources", []) or []):
+        if not isinstance(item, dict):
+            continue
+        source_id = str(item.get("source_id", "")).strip()
+        points = item.get("key_points", []) or []
+        if source_id and isinstance(points, list):
+            points_by_source[source_id] = points
+
+    rewritten: List[Dict[str, Any]] = []
+    for row in source_rows:
+        source_id = str(row.get("source_id", "")).strip()
+        points = points_by_source.get(source_id, [])
+        if not points:
+            rewritten.append(dict(row))
+            continue
+        lines = []
+        for point in points:
+            if not isinstance(point, dict):
+                continue
+            tag = str(point.get("tag", "")).strip()
+            fact = str(point.get("fact", "")).strip()
+            if not fact:
+                continue
+            prefix = f"[{tag}] " if tag else ""
+            lines.append(f"- {prefix}{fact}")
+        compact_excerpt = "\n".join(lines).strip()
+        updated = dict(row)
+        if compact_excerpt:
+            updated["excerpt"] = compact_excerpt
+            updated["excerpt_doc_key_points"] = True
+        rewritten.append(updated)
+    return rewritten
+
+
 def _build_stage1_decoded_evidence_block(
     source_rows: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -663,46 +3623,1395 @@ def _build_stage1_decoded_evidence_block(
     }
 
 
+def _is_low_signal_notice_source_item(source: Dict[str, Any]) -> bool:
+    """Detect legal/admin notice docs with low valuation signal."""
+    title = str(source.get("title", "")).lower()
+    content = str(
+        source.get("decoded_excerpt")
+        or source.get("content")
+        or source.get("source_snippet")
+        or ""
+    ).lower()
+    url = str(source.get("url", "")).lower()
+    text = f"{title} {content} {url}"
+
+    hard_block_patterns = (
+        "trading halt",
+        "pause in trading",
+        "voluntary suspension",
+        "suspension from quotation",
+        "request for trading halt",
+        "request for voluntary suspension",
+        "application for quotation of securities",
+        "notice for quotation of securities",
+        "notice of quotation of securities",
+        "proposed issue of securities",
+        "proposed issue of quoted securities",
+        "proposed issue of unquoted securities",
+        "quotation of securities",
+        "appendix 2a",
+        "appendix 3b",
+        "appendix 3c",
+        "cleansing notice",
+        "708a cleansing notice",
+    )
+    if any(token in text for token in hard_block_patterns):
+        return True
+
+    # Historical index/listing pages are usually retrieval scaffolding, not
+    # evidence-bearing documents, unless they carry strong valuation terms.
+    index_patterns = (
+        "quarterly reports - 2017 to 2022",
+        "presentations and interviews",
+        "announcements and media releases",
+        "investor centre",
+    )
+    if any(token in title for token in index_patterns):
+        override_tokens = (
+            "npv",
+            "irr",
+            "aisc",
+            "capex",
+            "resource",
+            "reserve",
+            "production",
+            "first gold",
+            "gold pour",
+            "funding",
+            "facility",
+            "cash",
+            "debt",
+            "market cap",
+            "shares",
+            "enterprise value",
+        )
+        if not any(token in text for token in override_tokens):
+            return True
+    if (
+        re.search(r"\b20\d{2}\s*(?:to|\-)\s*20\d{2}\b", title)
+        and any(token in title for token in ("quarterly reports", "annual reports", "presentations"))
+    ):
+        if not any(token in text for token in ("npv", "irr", "aisc", "resource", "production", "first gold", "gold pour")):
+            return True
+
+    low_patterns = (
+        "part 6d.2",
+        "chapter 2m",
+        "sections 674 and 674a",
+        "corporations act 2001",
+    )
+    if not any(token in text for token in low_patterns):
+        return False
+
+    # Keep if there is clear valuation/timeline signal in the same source.
+    override_tokens = (
+        "npv",
+        "irr",
+        "aisc",
+        "capex",
+        "resource",
+        "reserve",
+        "production",
+        "first gold",
+        "gold pour",
+        "funding",
+        "loan facility",
+        "cash",
+        "debt",
+        "market cap",
+        "shares outstanding",
+        "enterprise value",
+    )
+    return not any(token in text for token in override_tokens)
+
+
+def _source_authority_rank(url: str) -> int:
+    """Rough source-authority rank for timeline evidence ordering."""
+    domain = ""
+    try:
+        domain = urlparse(url or "").netloc.lower()
+    except Exception:
+        domain = ""
+    if domain.endswith("asx.com.au") or domain.endswith("sec.gov"):
+        return 4
+    if domain.endswith("wcsecure.weblink.com.au"):
+        return 3
+    if "investor" in domain or "announcements" in domain:
+        return 2
+    return 1
+
+
+def _parse_claim_number(raw_value: str) -> Optional[float]:
+    """Parse claim numeric token with comma separators."""
+    text = str(raw_value or "").strip().replace(",", "")
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _claim_value_conflicts(a: Any, b: Any) -> bool:
+    """Determine whether two claim values are materially different."""
+    a_num = _parse_claim_number(str(a))
+    b_num = _parse_claim_number(str(b))
+    if a_num is not None and b_num is not None:
+        tolerance = max(0.5, abs(a_num) * 0.08)
+        return abs(a_num - b_num) > tolerance
+    return str(a).strip().lower() != str(b).strip().lower()
+
+
+def _claim_recency_score(published_at: str) -> float:
+    """Simple recency score for reconciliation ranking."""
+    value = str(published_at or "").strip()
+    if len(value) < 10:
+        return 0.0
+    try:
+        year = int(value[:4])
+        current_year = datetime.utcnow().year
+        if year >= current_year:
+            return 2.0
+        if year == current_year - 1:
+            return 1.2
+        if year == current_year - 2:
+            return 0.5
+    except Exception:
+        return 0.0
+    return -0.2
+
+
+def _claim_row_score(row: Dict[str, Any]) -> float:
+    """Rank claim rows by confidence + authority + recency."""
+    confidence = float(row.get("confidence", 0.0))
+    authority = int(row.get("authority_rank", 1))
+    recency = _claim_recency_score(str(row.get("published_at", "")))
+    return (confidence * 10.0) + (authority * 1.8) + recency
+
+
+def _extract_claims_from_text_block(
+    *,
+    text: str,
+    source_id: str,
+    url: str,
+    published_at: str,
+    model: str,
+    authority_rank: int,
+) -> List[Dict[str, Any]]:
+    """Extract claim candidates from a text block using deterministic regex rules."""
+    raw = str(text or "").strip()
+    if not raw:
+        return []
+    compact = re.sub(r"\s+", " ", raw)
+    claims: List[Dict[str, Any]] = []
+
+    patterns: List[Tuple[str, str, str]] = [
+        (
+            "post_tax_npv_usd_m",
+            r"post[-\s]*tax[^\.]{0,60}npv[^0-9]{0,25}(?:us\$|usd)?\s*([0-9][0-9,]*(?:\.\d+)?)\s*m",
+            "usd_m",
+        ),
+        (
+            "post_tax_npv_aud_m",
+            r"post[-\s]*tax[^\.]{0,60}npv[^0-9]{0,25}(?:a\$|aud)?\s*([0-9][0-9,]*(?:\.\d+)?)\s*m",
+            "aud_m",
+        ),
+        ("irr_pct", r"\birr[^0-9]{0,20}([0-9]{1,3}(?:\.\d+)?)\s*%", "pct"),
+        (
+            "aisc_usd_per_oz",
+            r"\baisc[^0-9]{0,25}(?:us\$|usd)?\s*([0-9][0-9,]*(?:\.\d+)?)\s*(?:/|per)?\s*oz",
+            "usd_per_oz",
+        ),
+        (
+            "capex_usd_m",
+            r"\bcapex[^0-9]{0,25}(?:us\$|usd)?\s*([0-9][0-9,]*(?:\.\d+)?)\s*m",
+            "usd_m",
+        ),
+        (
+            "resource_moz",
+            r"\b(?:jorc[^\.]{0,30})?(?:resource|mre)[^0-9]{0,25}([0-9][0-9,]*(?:\.\d+)?)\s*moz",
+            "moz",
+        ),
+        (
+            "production_koz_pa",
+            r"\b([0-9][0-9,]*(?:\.\d+)?)\s*koz\s*(?:pa|p\.a\.|per annum|/yr|year)",
+            "koz_pa",
+        ),
+        (
+            "mine_life_years",
+            r"\b(?:lom|mine life|life of mine)[^0-9]{0,25}([0-9]{1,2}(?:\.\d+)?)\s*(?:years|year|yrs|yr)\b",
+            "years",
+        ),
+        (
+            "market_cap_aud_m",
+            r"\bmarket cap(?:italisation)?[^0-9]{0,20}(?:a\$|aud)?\s*([0-9][0-9,]*(?:\.\d+)?)\s*m",
+            "aud_m",
+        ),
+        (
+            "shares_outstanding_b",
+            r"\bshares(?:\s+outstanding)?[^0-9]{0,20}([0-9](?:\.\d+)?)\s*b(?:illion)?\b",
+            "billions",
+        ),
+    ]
+
+    for field, pattern, unit in patterns:
+        for match in re.finditer(pattern, compact, flags=re.IGNORECASE):
+            raw_value = match.group(1)
+            value_num = _parse_claim_number(raw_value)
+            if value_num is None:
+                continue
+            confidence = 0.58 + (0.04 * max(1, authority_rank))
+            claims.append(
+                {
+                    "field": field,
+                    "value": value_num,
+                    "raw_value": raw_value,
+                    "unit": unit,
+                    "source_id": source_id,
+                    "url": url,
+                    "published_at": published_at,
+                    "model": model,
+                    "authority_rank": authority_rank,
+                    "confidence": min(0.98, confidence),
+                    "evidence": compact[max(0, match.start() - 80): match.end() + 80].strip(),
+                }
+            )
+
+    stage_map = [
+        ("peak production", 1.0),
+        ("ramp-up", 0.9),
+        ("ramp up", 0.9),
+        ("first gold pour", 0.8),
+        ("first gold", 0.8),
+        ("development", 0.6),
+        ("definitive feasibility study", 0.4),
+        ("dfs", 0.4),
+        ("pre-feasibility study", 0.25),
+        ("pre feasibility study", 0.25),
+        ("pfs", 0.25),
+        ("scoping", 0.15),
+    ]
+    low_compact = compact.lower()
+    stage_claim_added = False
+    # If text explicitly frames first-gold as a future target, treat as development.
+    if re.search(
+        r"(target(?:ed|ing)?|expected|planned|on track|scheduled|schedule)[^\.]{0,120}(first gold|gold pour)",
+        low_compact,
+        flags=re.IGNORECASE,
+    ):
+        claims.append(
+            {
+                "field": "project_stage",
+                "value": "development",
+                "raw_value": "development",
+                "unit": "categorical",
+                "source_id": source_id,
+                "url": url,
+                "published_at": published_at,
+                "model": model,
+                "authority_rank": authority_rank,
+                "confidence": min(0.94, 0.62 + (0.04 * max(1, authority_rank))),
+                "evidence": compact[:320],
+            }
+        )
+        claims.append(
+            {
+                "field": "stage_multiplier",
+                "value": 0.6,
+                "raw_value": "0.6",
+                "unit": "multiplier",
+                "source_id": source_id,
+                "url": url,
+                "published_at": published_at,
+                "model": model,
+                "authority_rank": authority_rank,
+                "confidence": min(0.92, 0.60 + (0.04 * max(1, authority_rank))),
+                "evidence": compact[:320],
+            }
+        )
+        stage_claim_added = True
+
+    if not stage_claim_added:
+        for stage_label, multiplier in stage_map:
+            if stage_label not in low_compact:
+                continue
+            claims.append(
+                {
+                    "field": "project_stage",
+                    "value": stage_label,
+                    "raw_value": stage_label,
+                    "unit": "categorical",
+                    "source_id": source_id,
+                    "url": url,
+                    "published_at": published_at,
+                    "model": model,
+                    "authority_rank": authority_rank,
+                    "confidence": min(0.92, 0.56 + (0.04 * max(1, authority_rank))),
+                    "evidence": compact[:320],
+                }
+            )
+            claims.append(
+                {
+                    "field": "stage_multiplier",
+                    "value": multiplier,
+                    "raw_value": str(multiplier),
+                    "unit": "multiplier",
+                    "source_id": source_id,
+                    "url": url,
+                    "published_at": published_at,
+                    "model": model,
+                    "authority_rank": authority_rank,
+                    "confidence": min(0.90, 0.55 + (0.04 * max(1, authority_rank))),
+                    "evidence": compact[:320],
+                }
+            )
+            break
+
+    if re.search(r"\bfully funded\b|\bfunded to first gold\b|\bsecured funding\b", compact, flags=re.IGNORECASE):
+        claims.append(
+            {
+                "field": "funding_status",
+                "value": "funded",
+                "raw_value": "funded",
+                "unit": "categorical",
+                "source_id": source_id,
+                "url": url,
+                "published_at": published_at,
+                "model": model,
+                "authority_rank": authority_rank,
+                "confidence": min(0.96, 0.65 + (0.04 * max(1, authority_rank))),
+                "evidence": compact[:260],
+            }
+        )
+
+    return claims
+
+
+def _build_claim_ledger_from_model_runs(
+    model_runs: List[Dict[str, Any]],
+    verification_profile: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Build and reconcile a cross-model claim ledger before Stage 2.
+
+    The ledger is deterministic and source-referenced, so Stage 2/3 can consume
+    corrected field values rather than only prose summaries.
+    """
+    claims: List[Dict[str, Any]] = []
+
+    for model_run in model_runs:
+        model = str(model_run.get("model", "")).strip()
+        run = model_run.get("result") or {}
+        if not model or not isinstance(run, dict) or run.get("error"):
+            continue
+
+        # Include top source excerpts.
+        for idx, source in enumerate((run.get("results") or [])[:12], start=1):
+            if _is_low_signal_notice_source_item(source):
+                continue
+            source_id = f"{model}:S{idx}"
+            url = str(source.get("url", "")).strip()
+            published_at = str(source.get("published_at", "")).strip()
+            authority_rank = _source_authority_rank(url)
+            content = str(
+                source.get("decoded_excerpt")
+                or source.get("content")
+                or source.get("source_snippet")
+                or ""
+            ).strip()
+            claims.extend(
+                _extract_claims_from_text_block(
+                    text=content,
+                    source_id=source_id,
+                    url=url,
+                    published_at=published_at,
+                    model=model,
+                    authority_rank=authority_rank,
+                )
+            )
+
+        # Intentionally do not extract deterministic claims from generated
+        # summaries/update prose. Those fields are too prone to model-induced
+        # drift versus primary-source excerpts already included above.
+
+    by_field: Dict[str, List[Dict[str, Any]]] = {}
+    for claim in claims:
+        field = str(claim.get("field", "")).strip()
+        if not field:
+            continue
+        by_field.setdefault(field, []).append(claim)
+
+    resolved_claims: Dict[str, Dict[str, Any]] = {}
+    conflicts: List[Dict[str, Any]] = []
+    for field, rows in by_field.items():
+        ranked = sorted(rows, key=_claim_row_score, reverse=True)
+        selected = ranked[0]
+        resolved_claims[field] = {
+            "field": field,
+            "value": selected.get("value"),
+            "unit": selected.get("unit", ""),
+            "source_id": selected.get("source_id", ""),
+            "url": selected.get("url", ""),
+            "published_at": selected.get("published_at", ""),
+            "model": selected.get("model", ""),
+            "confidence": selected.get("confidence", 0.0),
+            "authority_rank": selected.get("authority_rank", 1),
+            "resolution_rule": "highest confidence + authority + recency",
+        }
+
+        conflict_candidates = [
+            row
+            for row in ranked[1:6]
+            if _claim_value_conflicts(row.get("value"), selected.get("value"))
+        ]
+        if conflict_candidates:
+            conflicts.append(
+                {
+                    "field": field,
+                    "selected_value": selected.get("value"),
+                    "selected_source_id": selected.get("source_id", ""),
+                    "selected_url": selected.get("url", ""),
+                    "selected_published_at": selected.get("published_at", ""),
+                    "candidates": [
+                        {
+                            "value": row.get("value"),
+                            "source_id": row.get("source_id", ""),
+                            "url": row.get("url", ""),
+                            "published_at": row.get("published_at", ""),
+                            "confidence": row.get("confidence", 0.0),
+                        }
+                        for row in conflict_candidates
+                    ],
+                    "resolution_rule": "highest confidence + authority + recency",
+                }
+            )
+
+    # Coverage proxy from verification markers.
+    section_markers = verification_profile.get("compliance_section_markers", []) or []
+    critical_sections = set(verification_profile.get("compliance_critical_sections", set()) or set())
+    resolved_text = " ".join(
+        [
+            f"{field} {resolved.get('value')} {resolved.get('unit')}"
+            for field, resolved in resolved_claims.items()
+        ]
+    ).lower()
+    section_coverage: Dict[str, bool] = {}
+    for section_id, markers in section_markers:
+        sid = str(section_id or "").strip().lower()
+        if not sid:
+            continue
+        section_coverage[sid] = any(str(marker).lower() in resolved_text for marker in (markers or []))
+
+    coverage = {
+        "sections_total": len(section_coverage),
+        "sections_covered": sum(1 for covered in section_coverage.values() if covered),
+        "critical_sections_total": len(critical_sections),
+        "critical_sections_covered": sum(
+            1 for sid in critical_sections if section_coverage.get(sid, False)
+        ),
+        "missing_sections": [sid for sid, covered in section_coverage.items() if not covered],
+        "missing_critical_sections": [
+            sid for sid in critical_sections if not section_coverage.get(sid, False)
+        ],
+    }
+
+    return {
+        "schema": "claim_ledger_v1",
+        "generated_at": datetime.utcnow().isoformat(),
+        "claims": claims[:400],
+        "resolved_claims": resolved_claims,
+        "conflicts": conflicts,
+        "coverage": coverage,
+        "counts": {
+            "raw_claims": len(claims),
+            "resolved_fields": len(resolved_claims),
+            "conflicts": len(conflicts),
+        },
+    }
+
+
+def _build_deterministic_finance_lane_from_claim_ledger(
+    claim_ledger: Dict[str, Any],
+    baseline_market_facts: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Build deterministic finance/scoring lane from reconciled claim fields.
+
+    This lane is intentionally compact and strictly source-referenced.
+    """
+    resolved = claim_ledger.get("resolved_claims", {}) if isinstance(claim_ledger, dict) else {}
+    if not isinstance(resolved, dict):
+        resolved = {}
+
+    def _resolved(field: str) -> Dict[str, Any]:
+        item = resolved.get(field, {})
+        if isinstance(item, dict):
+            return item
+        return {}
+
+    def _as_float(field: str) -> Optional[float]:
+        value = _resolved(field).get("value")
+        return _parse_claim_number(str(value))
+
+    baseline = baseline_market_facts if isinstance(baseline_market_facts, dict) else {}
+
+    def _baseline_float(field: str) -> Optional[float]:
+        value = baseline.get(field)
+        if value is None:
+            return None
+        return _parse_claim_number(str(value))
+
+    def _baseline_market_cap_aud_m() -> Optional[float]:
+        # Prefer pre-normalized market_cap_m. Fallback to raw market_cap if needed.
+        direct_m = _baseline_float("market_cap_m")
+        if direct_m is not None and direct_m > 0:
+            return direct_m
+        raw_cap = _baseline_float("market_cap")
+        if raw_cap is None or raw_cap <= 0:
+            return None
+        # Raw market cap in absolute units -> convert to millions.
+        return raw_cap / 1_000_000.0 if raw_cap > 10_000 else raw_cap
+
+    stage_multiplier = _as_float("stage_multiplier")
+    project_stage = str(_resolved("project_stage").get("value", "")).strip()
+    post_tax_npv_aud_m = _as_float("post_tax_npv_aud_m")
+    post_tax_npv_usd_m = _as_float("post_tax_npv_usd_m")
+    market_cap_aud_m = _as_float("market_cap_aud_m")
+    aisc_usd_per_oz = _as_float("aisc_usd_per_oz")
+    baseline_market_cap_m = _baseline_market_cap_aud_m()
+    baseline_market_cap_used = False
+
+    # Deterministic lane should honor injected market-facts baseline first.
+    if baseline_market_cap_m is not None and baseline_market_cap_m > 0:
+        market_cap_aud_m = baseline_market_cap_m
+        baseline_market_cap_used = True
+
+    risked_npv_aud_m: Optional[float] = None
+    risked_npv_usd_m: Optional[float] = None
+    if stage_multiplier is not None:
+        if post_tax_npv_aud_m is not None:
+            risked_npv_aud_m = post_tax_npv_aud_m * stage_multiplier
+        if post_tax_npv_usd_m is not None:
+            risked_npv_usd_m = post_tax_npv_usd_m * stage_multiplier
+
+    npv_market_cap_ratio: Optional[float] = None
+    ratio_basis = ""
+    if market_cap_aud_m and market_cap_aud_m > 0 and risked_npv_aud_m is not None:
+        npv_market_cap_ratio = risked_npv_aud_m / market_cap_aud_m
+        ratio_basis = "risked_npv_aud_m/market_cap_aud_m"
+
+    npv_ratio_score: Optional[float] = None
+    if npv_market_cap_ratio is not None:
+        if npv_market_cap_ratio > 3.0:
+            npv_ratio_score = 100.0
+        elif npv_market_cap_ratio >= 2.0:
+            npv_ratio_score = 80.0
+        elif npv_market_cap_ratio >= 1.0:
+            npv_ratio_score = 60.0
+        else:
+            npv_ratio_score = 40.0
+
+    cost_competitiveness_score: Optional[float] = None
+    if aisc_usd_per_oz is not None:
+        # USD proxy thresholds used when only USD AISC is verified.
+        if aisc_usd_per_oz < 1500:
+            cost_competitiveness_score = 100.0
+        elif aisc_usd_per_oz < 2000:
+            cost_competitiveness_score = 80.0
+        elif aisc_usd_per_oz < 2500:
+            cost_competitiveness_score = 60.0
+        else:
+            cost_competitiveness_score = 40.0
+
+    stage_score_component: Optional[float] = None
+    if stage_multiplier is not None:
+        stage_score_component = max(0.0, min(100.0, stage_multiplier * 100.0))
+
+    funding_status = str(_resolved("funding_status").get("value", "")).strip().lower()
+    funding_score_component: Optional[float] = None
+    if funding_status:
+        funding_score_component = 95.0 if "funded" in funding_status else 60.0
+
+    verified_fields = {}
+    for field_name in (
+        "project_stage",
+        "stage_multiplier",
+        "post_tax_npv_aud_m",
+        "post_tax_npv_usd_m",
+        "irr_pct",
+        "aisc_usd_per_oz",
+        "capex_usd_m",
+        "resource_moz",
+        "production_koz_pa",
+        "mine_life_years",
+        "market_cap_aud_m",
+        "shares_outstanding_b",
+        "funding_status",
+    ):
+        row = _resolved(field_name)
+        if not row:
+            continue
+        verified_fields[field_name] = {
+            "value": row.get("value"),
+            "unit": row.get("unit", ""),
+            "source_id": row.get("source_id", ""),
+            "url": row.get("url", ""),
+            "published_at": row.get("published_at", ""),
+            "confidence": row.get("confidence", 0.0),
+            "model": row.get("model", ""),
+        }
+
+    if baseline_market_cap_used:
+        verified_fields["market_cap_aud_m"] = {
+            "value": market_cap_aud_m,
+            "unit": "aud_m",
+            "source_id": "normalized_facts_prepass",
+            "url": "",
+            "published_at": "",
+            "confidence": 0.99,
+            "model": "system",
+        }
+
+    missing_critical_fields = []
+    for field in ("stage_multiplier", "post_tax_npv_aud_m", "market_cap_aud_m"):
+        if field not in verified_fields:
+            missing_critical_fields.append(field)
+
+    status = "ready" if not missing_critical_fields else "partial"
+
+    return {
+        "schema": "deterministic_finance_lane_v1",
+        "generated_at": datetime.utcnow().isoformat(),
+        "status": status,
+        "project_stage": project_stage,
+        "verified_fields": verified_fields,
+        "derived_metrics": {
+            "risked_npv_aud_m": risked_npv_aud_m,
+            "risked_npv_usd_m": risked_npv_usd_m,
+            "npv_market_cap_ratio": npv_market_cap_ratio,
+            "npv_market_cap_ratio_basis": ratio_basis,
+        },
+        "score_components": {
+            "value_npv_vs_market_cap_score": npv_ratio_score,
+            "value_cost_competitiveness_score_proxy": cost_competitiveness_score,
+            "quality_stage_score_component": stage_score_component,
+            "quality_funding_score_component": funding_score_component,
+        },
+        "market_facts_baseline": {
+            "used": baseline_market_cap_used,
+            "market_cap_aud_m": market_cap_aud_m if baseline_market_cap_used else None,
+            "currency": str(baseline.get("currency", "")),
+        },
+        "calculation_trace": [
+            "risked_npv = post_tax_npv * stage_multiplier",
+            "npv_market_cap_ratio = risked_npv_aud_m / market_cap_aud_m",
+            "npv_vs_market_cap_score thresholds: >3x=100, 2-3x=80, 1-2x=60, <1x=40",
+        ],
+        "missing_critical_fields": missing_critical_fields,
+    }
+
+
+def _extract_timeline_windows(text: str) -> List[str]:
+    """Extract quarter/month window tokens (e.g., Q1 2026, March 2026)."""
+    raw = text or ""
+    windows: List[str] = []
+
+    quarter_matches = re.findall(r"\bq([1-4])\s*[\|/\-]?\s*(20\d{2})\b", raw, flags=re.IGNORECASE)
+    for q, year in quarter_matches:
+        windows.append(f"Q{int(q)} {int(year)}")
+
+    month_matches = re.findall(
+        r"\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(20\d{2})\b",
+        raw,
+        flags=re.IGNORECASE,
+    )
+    for month, year in month_matches:
+        windows.append(f"{month.title()} {int(year)}")
+
+    deduped: List[str] = []
+    seen = set()
+    for token in windows:
+        norm = token.lower()
+        if norm in seen:
+            continue
+        seen.add(norm)
+        deduped.append(token)
+    return deduped
+
+
+def _window_to_quarter_index(token: str) -> Optional[int]:
+    """Map timeline token into sortable quarter index."""
+    value = (token or "").strip()
+    q_match = re.match(r"^Q([1-4])\s+(20\d{2})$", value, flags=re.IGNORECASE)
+    if q_match:
+        q = int(q_match.group(1))
+        year = int(q_match.group(2))
+        return (year * 4) + (q - 1)
+
+    m_match = re.match(
+        r"^(January|February|March|April|May|June|July|August|September|October|November|December)\s+(20\d{2})$",
+        value,
+        flags=re.IGNORECASE,
+    )
+    if not m_match:
+        return None
+    month_name = m_match.group(1).lower()
+    year = int(m_match.group(2))
+    month_to_q = {
+        "january": 1,
+        "february": 1,
+        "march": 1,
+        "april": 2,
+        "may": 2,
+        "june": 2,
+        "july": 3,
+        "august": 3,
+        "september": 3,
+        "october": 4,
+        "november": 4,
+        "december": 4,
+    }
+    q = month_to_q.get(month_name)
+    if q is None:
+        return None
+    return (year * 4) + (q - 1)
+
+
+def _extract_stage1_timeline_evidence(
+    source_rows: List[Dict[str, Any]],
+    max_items: int,
+    *,
+    timeline_terms: Optional[List[str]] = None,
+    timeline_focus_terms: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    """Build a prioritized timeline digest from decoded evidence rows."""
+    safe_limit = max(2, int(max_items))
+    rows: List[Dict[str, Any]] = []
+    seen = set()
+    effective_timeline_terms = _normalize_terms_list(timeline_terms or _STAGE1_DEFAULT_TIMELINE_TERMS)
+    effective_focus_terms = _normalize_terms_list(
+        timeline_focus_terms or _STAGE1_DEFAULT_TIMELINE_FOCUS_TERMS
+    )
+
+    for source in source_rows:
+        if _is_low_signal_notice_source_item(source):
+            continue
+        source_id = str(source.get("source_id", "")).strip() or "S?"
+        title = str(source.get("title", "")).strip()
+        url = str(source.get("url", "")).strip()
+        published = str(source.get("published_at", "")).strip()
+        authority = _source_authority_rank(url)
+
+        for sentence in _extract_source_sentences(str(source.get("excerpt", ""))):
+            low = sentence.lower()
+            if effective_timeline_terms and not any(token in low for token in effective_timeline_terms):
+                continue
+            if not _extract_timeline_windows(sentence) and (
+                effective_focus_terms and not any(token in low for token in effective_focus_terms)
+            ):
+                continue
+
+            key = re.sub(r"\s+", " ", low).strip()
+            if key in seen:
+                continue
+            seen.add(key)
+
+            score = 0
+            if effective_focus_terms and any(token in low for token in effective_focus_terms):
+                score += 4
+            if "first ore" in low or "launch" in low or "approval" in low:
+                score += 3
+            if "stockpile" in low or "processing" in low:
+                score += 2
+            if "on track" in low or "targeting" in low:
+                score += 1
+            score += authority * 2
+            if published.startswith("2026-"):
+                score += 2
+            elif published.startswith("2025-"):
+                score += 1
+
+            rows.append(
+                {
+                    "source_id": source_id,
+                    "title": title,
+                    "url": url,
+                    "published_at": published,
+                    "authority_rank": authority,
+                    "score": score,
+                    "fact": sentence,
+                    "windows": _extract_timeline_windows(sentence),
+                }
+            )
+
+    def _published_to_quarter_idx(value: str) -> Optional[int]:
+        raw = str(value or "").strip()
+        if len(raw) < 7:
+            return None
+        match = re.match(r"^(\d{4})-(\d{2})", raw)
+        if not match:
+            return None
+        try:
+            year = int(match.group(1))
+            month = int(match.group(2))
+            quarter = ((month - 1) // 3) + 1
+            return (year * 4) + (quarter - 1)
+        except Exception:
+            return None
+
+    # Drop stale timeline rows when fresher windows are available.
+    row_latest_idx: List[Tuple[Dict[str, Any], Optional[int]]] = []
+    all_row_indices: List[int] = []
+    for row in rows:
+        indices: List[int] = []
+        pub_idx = _published_to_quarter_idx(str(row.get("published_at", "")))
+        if pub_idx is not None:
+            indices.append(pub_idx)
+        for token in (row.get("windows") or []):
+            idx = _window_to_quarter_index(str(token))
+            if idx is not None:
+                indices.append(idx)
+        row_idx = max(indices) if indices else None
+        row_latest_idx.append((row, row_idx))
+        if row_idx is not None:
+            all_row_indices.append(row_idx)
+
+    if all_row_indices:
+        newest_idx = max(all_row_indices)
+        filtered_rows: List[Dict[str, Any]] = []
+        for row, row_idx in row_latest_idx:
+            if row_idx is None:
+                # Keep undated rows only when not enough dated evidence exists.
+                if len(all_row_indices) >= safe_limit:
+                    continue
+                filtered_rows.append(row)
+                continue
+            # If fresh evidence exists, drop rows older than ~2 years (8 quarters).
+            if newest_idx - row_idx > 8:
+                continue
+            filtered_rows.append(row)
+        if filtered_rows:
+            rows = filtered_rows
+
+    rows.sort(
+        key=lambda item: (
+            int(item.get("score", 0)),
+            str(item.get("published_at", "")),
+            int(item.get("authority_rank", 0)),
+        ),
+        reverse=True,
+    )
+    return rows[:safe_limit]
+
+
+def _build_stage1_timeline_digest_block(timeline_rows: List[Dict[str, Any]]) -> str:
+    """Format timeline evidence digest for second-pass prompt injection."""
+    lines: List[str] = []
+    for row in timeline_rows:
+        source_id = str(row.get("source_id", "S?"))
+        published = str(row.get("published_at", "")).strip() or "Unknown date"
+        fact = str(row.get("fact", "")).strip()
+        windows = row.get("windows") or []
+        window_text = f" windows={', '.join(windows)}" if windows else ""
+        lines.append(f"- [{source_id}] {published}:{window_text} {fact}")
+    return "\n".join(lines).strip()
+
+
+def _evaluate_stage1_timeline_guard(
+    response_text: str,
+    timeline_rows: List[Dict[str, Any]],
+    *,
+    focus_terms: Optional[List[str]] = None,
+    conflict_field: str = "timeline_window",
+    max_shift_quarters: int = 3,
+) -> Dict[str, Any]:
+    """
+    Compare timeline windows between evidence and model output.
+
+    This check is observational-only and never blocks model acceptance.
+    """
+    if not PERPLEXITY_STAGE1_TIMELINE_GUARD_ENABLED:
+        return {
+            "enabled": False,
+            "passed": True,
+            "reason": "timeline_guard_disabled",
+            "evidence_windows": [],
+            "response_windows": [],
+        }
+
+    effective_focus_terms = _normalize_terms_list(focus_terms or _STAGE1_DEFAULT_TIMELINE_FOCUS_TERMS)
+
+    evidence_facts = [
+        str(row.get("fact", ""))
+        for row in timeline_rows
+        if (
+            not effective_focus_terms
+            or any(token in str(row.get("fact", "")).lower() for token in effective_focus_terms)
+        )
+    ]
+    if not evidence_facts:
+        evidence_facts = [str(row.get("fact", "")) for row in timeline_rows]
+    evidence_text = "\n".join(evidence_facts).strip()
+    evidence_windows = _extract_timeline_windows(evidence_text)
+
+    response_lines = [
+        line
+        for line in (response_text or "").splitlines()
+        if (
+            not effective_focus_terms
+            or any(token in line.lower() for token in effective_focus_terms)
+        )
+    ]
+    response_focus = "\n".join(response_lines).strip() or (response_text or "")
+    response_windows = _extract_timeline_windows(response_focus)
+
+    if not evidence_windows or not response_windows:
+        return {
+            "enabled": True,
+            "passed": True,
+            "reason": "timeline_windows_not_comparable",
+            "evidence_windows": evidence_windows,
+            "response_windows": response_windows,
+        }
+
+    evidence_idx = [idx for idx in (_window_to_quarter_index(token) for token in evidence_windows) if idx is not None]
+    response_idx = [idx for idx in (_window_to_quarter_index(token) for token in response_windows) if idx is not None]
+    if not evidence_idx or not response_idx:
+        return {
+            "enabled": True,
+            "passed": True,
+            "reason": "timeline_index_parse_failed",
+            "evidence_windows": evidence_windows,
+            "response_windows": response_windows,
+        }
+
+    evidence_latest = max(evidence_idx)
+    response_earliest = min(response_idx)
+    shifted_quarters = response_earliest - evidence_latest
+    # Observational shift (positive means response timeline is later than evidence).
+    threshold = max(1, int(max_shift_quarters))
+    reason = "timeline_observation_ok"
+    if shifted_quarters >= threshold:
+        reason = f"timeline_observation_later_by_{shifted_quarters}_quarters_non_blocking"
+    elif shifted_quarters <= -threshold:
+        reason = f"timeline_observation_earlier_by_{abs(shifted_quarters)}_quarters_non_blocking"
+    return {
+        "enabled": True,
+        "passed": True,
+        "reason": reason,
+        "evidence_windows": evidence_windows,
+        "response_windows": response_windows,
+        "shifted_quarters": shifted_quarters,
+    }
+
+
 def _build_stage1_second_pass_prompt(
     *,
     user_query: str,
     research_brief: str,
     run: Dict[str, Any],
+    compact_fact_bundle_json: str,
+    fact_digest_json: str,
     fact_pack_json: str,
     evidence_appendix: str,
+    timeline_digest: str,
+    source_key_points_json: str = "",
 ) -> str:
-    """Build second-pass analysis prompt with rubric-aligned fact pack."""
-    summary = str(run.get("research_summary", "")).strip()
-    updates = run.get("latest_updates", []) or []
-    updates_lines: List[str] = []
-    for item in updates[:5]:
-        date_value = str(item.get("date", "Unknown")).strip()
-        update_text = str(item.get("update", "Update")).strip()
-        source_url = str(item.get("source_url", "")).strip()
-        updates_lines.append(f"- {date_value}: {update_text} ({source_url})")
-    updates_block = "\n".join(updates_lines).strip()
+    """Build minimal second-pass prompt: only user task payload."""
+    _ = (
+        research_brief,
+        run,
+        compact_fact_bundle_json,
+        fact_digest_json,
+        fact_pack_json,
+        evidence_appendix,
+        timeline_digest,
+        source_key_points_json,
+    )
+    return f"{(user_query or '').strip()}".strip()
 
+
+def _extract_source_citations(text: str) -> List[str]:
+    """Return all citation markers like [S1], [S2] in appearance order."""
+    if not text:
+        return []
+    return re.findall(r"\[(S\d+)\]", text)
+
+
+def _count_uncited_numeric_lines(text: str) -> Dict[str, int]:
+    """
+    Count lines containing numeric claims that do not include source citations.
+
+    Excludes URL-only lines and trivial short lines.
+    """
+    numeric_lines = 0
+    uncited_numeric_lines = 0
+    claim_tokens = (
+        "market cap",
+        "shares",
+        "enterprise value",
+        "current price",
+        "npv",
+        "irr",
+        "aisc",
+        "capex",
+        "opex",
+        "resource",
+        "reserve",
+        "grade",
+        "mine life",
+        "production",
+        "cash",
+        "debt",
+        "funding",
+        "price target",
+        "valuation",
+        "ev/oz",
+        "quality score",
+        "value score",
+        "certainty",
+        "timeline",
+        "milestone",
+        "headwind",
+        "tailwind",
+    )
+    # Evaluate by paragraph block first so structured JSON/markdown sections are not
+    # over-penalized when citation appears adjacent to (not on) numeric lines.
+    blocks = re.split(r"\n\s*\n", text or "")
+    for raw_block in blocks:
+        block = (raw_block or "").strip()
+        if not block:
+            continue
+        block_lower = block.lower()
+        block_has_source = bool(re.search(r"\[S\d+\]", block))
+        block_has_estimate = "estimate" in block_lower
+        block_lines = [line.strip() for line in block.splitlines() if line.strip()]
+        for line in block_lines:
+            if len(line) < 12:
+                continue
+            line_lower = line.lower()
+            if line_lower.startswith(("http://", "https://", "url:")):
+                continue
+            if not re.search(r"\d", line_lower):
+                continue
+            # Ignore template boilerplate and formula scaffolding copied into output.
+            if (
+                line_lower.startswith(("step ", "quality score formula", "value score formula"))
+                or "weighted framework" in line_lower
+                or "core formulas" in line_lower
+                or "npv template" in line_lower
+            ):
+                continue
+            looks_claim = any(token in line_lower for token in claim_tokens) or bool(
+                re.search(r"(a\$|us\$|aud|usd|%|moz|koz|g/t|oz\b)", line_lower)
+            )
+            if not looks_claim:
+                continue
+            numeric_lines += 1
+            line_has_source = bool(re.search(r"\[S\d+\]", line))
+            # Allow ESTIMATE-tagged blocks when they include explicit estimate rationale.
+            if not (line_has_source or block_has_source or block_has_estimate):
+                uncited_numeric_lines += 1
+    return {
+        "numeric_lines": numeric_lines,
+        "uncited_numeric_lines": uncited_numeric_lines,
+    }
+
+
+def _stage1_response_looks_truncated(text: str) -> bool:
+    """Heuristic detector for cut-off second-pass outputs."""
+    body = (text or "").strip()
+    if len(body) < 200:
+        return False
+    if body.count("```") % 2 == 1:
+        return True
+    if body[0] == "{":
+        # Most JSON outputs should close cleanly.
+        if not body.endswith("}"):
+            return True
+        try:
+            json.loads(body)
+        except Exception:
+            # Treat malformed JSON-like payload as truncated/corrupted for retry.
+            return True
+    if body[-1] in {":", ",", "/", "(", "[", "{", '"'}:
+        return True
+    return False
+
+
+_STAGE1_RUBRIC_SECTION_MARKERS = [
+    ("quality_score", ["quality score", "quality_score"]),
+    ("value_score", ["value score", "value_score"]),
+    (
+        "price_targets",
+        ["12-month", "24-month", "12/24", "price target", "price_targets"],
+    ),
+    ("development_timeline", ["development timeline", "timeline", "milestone"]),
+    ("certainty", ["certainty", "certainty %", "certainty_pct"]),
+    ("headwinds_tailwinds", ["headwind", "tailwind", "headwinds", "tailwinds"]),
+    ("npv_assessment", ["npv", "risked npv", "dcf"]),
+]
+
+_STAGE1_RUBRIC_CRITICAL_SECTIONS = {
+    "quality_score",
+    "value_score",
+    "price_targets",
+    "development_timeline",
+}
+
+
+def _evaluate_stage1_rubric_coverage(
+    response_text: str,
+    user_query: str,
+    research_brief: str,
+    *,
+    section_markers: Optional[List[Tuple[str, List[str]]]] = None,
+    critical_sections: Optional[set[str]] = None,
+) -> Dict[str, Any]:
+    """Estimate rubric conformance coverage from required output sections."""
+    requires_template = _stage1_requires_template_compliance(user_query, research_brief)
+    if not requires_template:
+        return {
+            "required": False,
+            "sections_total": 0,
+            "sections_covered": 0,
+            "coverage_pct": 1.0,
+            "missing_sections": [],
+            "critical_missing_sections": [],
+        }
+
+    text = (response_text or "").lower()
+    markers_spec = section_markers or _STAGE1_RUBRIC_SECTION_MARKERS
+    critical_spec = critical_sections or _STAGE1_RUBRIC_CRITICAL_SECTIONS
+    section_hits: Dict[str, bool] = {}
+    for section_id, markers in markers_spec:
+        section_hits[section_id] = any(marker in text for marker in markers)
+
+    sections_total = len(markers_spec)
+    sections_covered = sum(1 for hit in section_hits.values() if hit)
+    coverage_pct = (sections_covered / sections_total) if sections_total else 1.0
+    missing_sections = [section for section, hit in section_hits.items() if not hit]
+    critical_missing_sections = [
+        section
+        for section in missing_sections
+        if section in critical_spec
+    ]
+
+    return {
+        "required": True,
+        "sections_total": sections_total,
+        "sections_covered": sections_covered,
+        "coverage_pct": coverage_pct,
+        "missing_sections": missing_sections,
+        "critical_missing_sections": critical_missing_sections,
+    }
+
+
+def _evaluate_stage1_citation_gate(
+    response_text: str,
+    valid_source_ids: List[str],
+    *,
+    user_query: str,
+    research_brief: str,
+    section_markers: Optional[List[Tuple[str, List[str]]]] = None,
+    critical_sections: Optional[set[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Lightweight conformance gate using percentages (not hard line-count cutoffs).
+
+    Score = 0.6 * rubric_coverage_pct + 0.4 * numeric_citation_pct
+    Retry is recommended only for catastrophic failures.
+    """
+    valid_ids = {item.strip() for item in valid_source_ids if item}
+    citations = _extract_source_citations(response_text)
+    unique_citations = sorted(set(citations))
+    invalid_citations = sorted([item for item in unique_citations if item not in valid_ids])
+    numeric_stats = _count_uncited_numeric_lines(response_text)
+    citation_count = len(citations)
+    numeric_lines = int(numeric_stats["numeric_lines"])
+    uncited_numeric_lines = int(numeric_stats["uncited_numeric_lines"])
+    cited_numeric_lines = max(0, numeric_lines - uncited_numeric_lines)
+    numeric_citation_pct = (
+        (cited_numeric_lines / numeric_lines)
+        if numeric_lines > 0
+        else 1.0
+    )
+
+    rubric = _evaluate_stage1_rubric_coverage(
+        response_text=response_text,
+        user_query=user_query,
+        research_brief=research_brief,
+        section_markers=section_markers,
+        critical_sections=critical_sections,
+    )
+    rubric_required = bool(rubric.get("required", False))
+    rubric_coverage_pct = float(rubric.get("coverage_pct", 1.0))
+    sections_total = int(rubric.get("sections_total", 0))
+    sections_covered = int(rubric.get("sections_covered", 0))
+    missing_sections = list(rubric.get("missing_sections", []) or [])
+    critical_missing_sections = list(rubric.get("critical_missing_sections", []) or [])
+
+    min_score = max(0.0, min(1.0, float(PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_MIN_SCORE)))
+    min_rubric = max(
+        0.0,
+        min(1.0, float(PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_MIN_RUBRIC_COVERAGE_PCT)),
+    )
+    min_numeric = max(
+        0.0,
+        min(1.0, float(PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_MIN_NUMERIC_CITATION_PCT)),
+    )
+    catastrophic_score = max(
+        0.0,
+        min(1.0, float(PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_CATASTROPHIC_SCORE)),
+    )
+    min_count = max(0, int(PERPLEXITY_STAGE1_SECOND_PASS_CITATION_MIN_COUNT))
+    max_uncited = max(0, int(PERPLEXITY_STAGE1_SECOND_PASS_CITATION_MAX_UNCITED_NUMERIC_LINES))
+
+    compliance_score = (0.6 * rubric_coverage_pct) + (0.4 * numeric_citation_pct)
+    catastrophic_failure = bool(
+        compliance_score < catastrophic_score
+        or len(critical_missing_sections) >= 3
+        or (rubric_required and rubric_coverage_pct < max(0.30, min_rubric * 0.50))
+        or (
+            len(critical_missing_sections) >= 2
+            and numeric_citation_pct < max(0.30, min_numeric * 0.60)
+        )
+    )
+
+    if not PERPLEXITY_STAGE1_SECOND_PASS_CITATION_GATE_ENABLED:
+        return {
+            "enabled": False,
+            "passed": True,
+            "reason": "citation_gate_disabled",
+            "citation_count": citation_count,
+            "unique_citation_count": len(unique_citations),
+            "invalid_citations": invalid_citations,
+            "numeric_lines": numeric_lines,
+            "uncited_numeric_lines": uncited_numeric_lines,
+            "cited_numeric_lines": cited_numeric_lines,
+            "numeric_citation_pct": numeric_citation_pct,
+            "rubric_required": rubric_required,
+            "rubric_sections_total": sections_total,
+            "rubric_sections_covered": sections_covered,
+            "rubric_coverage_pct": rubric_coverage_pct,
+            "rubric_missing_sections": missing_sections,
+            "rubric_critical_missing_sections": critical_missing_sections,
+            "compliance_score": compliance_score,
+            "compliance_rating": "green",
+            "retry_recommended": False,
+            "catastrophic_failure": False,
+        }
+
+    if not valid_ids:
+        return {
+            "enabled": True,
+            "passed": True,
+            "reason": "no_source_ids_available",
+            "citation_count": citation_count,
+            "unique_citation_count": len(unique_citations),
+            "invalid_citations": invalid_citations,
+            "numeric_lines": numeric_lines,
+            "uncited_numeric_lines": uncited_numeric_lines,
+            "cited_numeric_lines": cited_numeric_lines,
+            "numeric_citation_pct": numeric_citation_pct,
+            "rubric_required": rubric_required,
+            "rubric_sections_total": sections_total,
+            "rubric_sections_covered": sections_covered,
+            "rubric_coverage_pct": rubric_coverage_pct,
+            "rubric_missing_sections": missing_sections,
+            "rubric_critical_missing_sections": critical_missing_sections,
+            "compliance_score": compliance_score,
+            "compliance_rating": "green",
+            "retry_recommended": False,
+            "catastrophic_failure": False,
+        }
+
+    fail_reasons: List[str] = []
+    warning_reasons: List[str] = []
+
+    if rubric_coverage_pct < min_rubric:
+        fail_reasons.append(f"rubric_coverage_pct<{min_rubric:.2f}")
+    if numeric_citation_pct < min_numeric:
+        fail_reasons.append(f"numeric_citation_pct<{min_numeric:.2f}")
+    if compliance_score < min_score:
+        fail_reasons.append(f"compliance_score<{min_score:.2f}")
+    if citation_count < min_count:
+        fail_reasons.append(f"citation_count<{min_count}")
+    if invalid_citations:
+        fail_reasons.append(f"invalid_source_refs={len(invalid_citations)}")
+    if critical_missing_sections:
+        fail_reasons.append(f"critical_sections_missing={len(critical_missing_sections)}")
+    if uncited_numeric_lines > max_uncited:
+        warning_reasons.append(f"uncited_numeric_lines>{max_uncited}")
+
+    passed = len(fail_reasons) == 0
+    compliance_rating = "green" if passed else ("red" if catastrophic_failure else "amber")
+    retry_recommended = bool((not passed) and catastrophic_failure)
+    reason = "ok"
+    if not passed:
+        reason = "|".join(fail_reasons + warning_reasons)
+    elif warning_reasons:
+        reason = "ok_warn:" + "|".join(warning_reasons)
+
+    return {
+        "enabled": True,
+        "passed": passed,
+        "reason": reason,
+        "citation_count": citation_count,
+        "unique_citation_count": len(unique_citations),
+        "invalid_citations": invalid_citations,
+        "numeric_lines": numeric_lines,
+        "uncited_numeric_lines": uncited_numeric_lines,
+        "cited_numeric_lines": cited_numeric_lines,
+        "numeric_citation_pct": numeric_citation_pct,
+        "rubric_required": rubric_required,
+        "rubric_sections_total": sections_total,
+        "rubric_sections_covered": sections_covered,
+        "rubric_coverage_pct": rubric_coverage_pct,
+        "rubric_missing_sections": missing_sections,
+        "rubric_critical_missing_sections": critical_missing_sections,
+        "compliance_score": compliance_score,
+        "compliance_rating": compliance_rating,
+        "retry_recommended": retry_recommended,
+        "catastrophic_failure": catastrophic_failure,
+    }
+
+
+def _build_stage1_citation_repair_prompt(base_prompt: str, gate: Dict[str, Any]) -> str:
+    """Append concise retry guidance when citation gate fails."""
+    reason = str(gate.get("reason", "citation_gate_failed")).strip()
+    min_score = max(0.0, min(1.0, float(PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_MIN_SCORE)))
+    min_rubric = max(
+        0.0,
+        min(1.0, float(PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_MIN_RUBRIC_COVERAGE_PCT)),
+    )
+    min_numeric = max(
+        0.0,
+        min(1.0, float(PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_MIN_NUMERIC_CITATION_PCT)),
+    )
+    missing_sections = ", ".join(list(gate.get("rubric_missing_sections", []) or [])[:6]) or "none"
     return (
-        "You are producing a Stage 1 model analysis for an investment council.\n"
-        "The user task below is the primary instruction and must be followed exactly.\n\n"
-        "USER TASK:\n"
-        f"{(user_query or '').strip()}\n\n"
-        "ANALYSIS BRIEF:\n"
-        f"{(research_brief or '').strip()}\n\n"
-        "RESEARCH SUMMARY FROM RETRIEVAL PASS:\n"
-        f"{summary or '(none)'}\n\n"
-        "LATEST UPDATES (from retrieval):\n"
-        f"{updates_block or '(none)'}\n\n"
-        "RUBRIC-ALIGNED FACT PACK (primary evidence; use this first):\n"
-        f"{fact_pack_json or '(none)'}\n\n"
-        "SOURCE EXCERPT APPENDIX (for quote-level validation only):\n"
-        f"{evidence_appendix or '(none)'}\n\n"
-        "OUTPUT REQUIREMENTS:\n"
-        "- Deliver a full investment analysis that answers the user task directly.\n"
-        "- Use fact-pack evidence and cite sources with [S#] markers for key numeric claims.\n"
-        "- Include explicit assumptions and mark inferred values as ESTIMATE.\n"
-        "- If required rubric fields are unsupported by evidence, say UNKNOWN and explain the gap.\n"
-        "- Do not return only a source list or research log.\n"
+        f"{base_prompt}\n\n"
+        "CONFORMANCE REPAIR RETRY (mandatory):\n"
+        f"- Prior attempt failed conformance checks: {reason}.\n"
+        f"- Raise rubric coverage to >= {int(min_rubric * 100)}% (missing: {missing_sections}).\n"
+        f"- Raise numeric citation coverage to >= {int(min_numeric * 100)}% for numeric claims.\n"
+        f"- Raise combined compliance score to >= {int(min_score * 100)}%.\n"
+        "- Every key numeric claim must carry [S#] or ESTIMATE with one-line justification.\n"
+        "- Avoid dumping rubric boilerplate; provide analysis outputs directly.\n"
+    ).strip()
+
+
+def _build_stage1_truncation_repair_prompt(base_prompt: str) -> str:
+    """Append compactness guidance when prior response appears cut off."""
+    return (
+        f"{base_prompt}\n\n"
+        "TRUNCATION REPAIR RETRY (mandatory):\n"
+        "- Prior attempt appears truncated or capped.\n"
+        "- Keep output <= 1,800 words and avoid repeating rubric/formula text.\n"
+        "- Prioritize final outputs: scores, price targets, timeline, certainty, catalysts, risks.\n"
+        "- Keep numeric claims source-backed with [S#] or ESTIMATE with one-line justification.\n"
+        "- Ensure the response ends cleanly and completely (no partial JSON/partial sentence).\n"
     ).strip()
 
 
@@ -712,39 +5021,400 @@ async def _run_stage1_second_pass_analysis(
     user_query: str,
     research_brief: str,
     run: Dict[str, Any],
+    verification_profile: Optional[Dict[str, Any]] = None,
+    analysis_provider: str = "openrouter",
 ) -> Dict[str, Any]:
     """
     Run a second-pass model analysis on decoded evidence.
 
-    This pass uses the same model id through OpenRouter so the model can reason
-    over the locally decoded source excerpts.
+    This pass reasons over locally decoded source excerpts and can route through
+    either OpenRouter or Perplexity depending on stage-1 mixed-mode configuration.
     """
+    available_sources = len(run.get("results") or [])
+    configured_sources = max(1, int(PERPLEXITY_STAGE1_SECOND_PASS_MAX_SOURCES))
+    source_budget = max(configured_sources, min(max(1, int(MAX_SOURCES)), available_sources))
+    profile = verification_profile or _default_stage1_verification_profile()
+    profile_fact_keywords = profile.get("fact_digest_keywords") or _FACT_DIGEST_V2_KEYWORDS
+    profile_narrative_order = profile.get("fact_digest_narrative_order") or _FACT_DIGEST_V2_NARRATIVE_ORDER
+    profile_timeline_terms = profile.get("timeline_terms") or _STAGE1_DEFAULT_TIMELINE_TERMS
+    profile_timeline_focus_terms = (
+        profile.get("timeline_focus_terms") or _STAGE1_DEFAULT_TIMELINE_FOCUS_TERMS
+    )
+    profile_conflict_field = str(
+        profile.get("timeline_conflict_field", "timeline_window")
+    )
+    profile_conflict_resolution_rule = str(
+        profile.get(
+            "timeline_conflict_resolution_rule",
+            "prefer newest dated primary-source timeline evidence",
+        )
+    )
+    profile_conflict_max_shift_quarters = max(
+        1,
+        int(profile.get("timeline_conflict_max_shift_quarters", 3)),
+    )
+    profile_section_markers = profile.get("compliance_section_markers") or _STAGE1_RUBRIC_SECTION_MARKERS
+    profile_critical_sections_raw = (
+        profile.get("compliance_critical_sections") or _STAGE1_RUBRIC_CRITICAL_SECTIONS
+    )
+    profile_critical_sections = set(profile_critical_sections_raw)
+    asx_deterministic_ingestion_summary: Dict[str, Any] = {}
+
+    run, asx_deterministic_ingestion_summary = await _augment_run_with_deterministic_asx_sources(
+        user_query=user_query,
+        research_brief=research_brief,
+        run=run,
+    )
+
     source_rows = _prepare_stage1_source_rows(
         run=run,
-        max_sources=PERPLEXITY_STAGE1_SECOND_PASS_MAX_SOURCES,
+        max_sources=source_budget,
         max_chars_per_source=PERPLEXITY_STAGE1_SECOND_PASS_MAX_CHARS_PER_SOURCE,
     )
+    timeline_rows = _extract_stage1_timeline_evidence(
+        source_rows,
+        max_items=PERPLEXITY_STAGE1_TIMELINE_DIGEST_MAX_ITEMS,
+        timeline_terms=profile_timeline_terms,
+        timeline_focus_terms=profile_timeline_focus_terms,
+    )
+    fact_digest: Dict[str, Any] = {}
+    if PERPLEXITY_STAGE1_FACT_DIGEST_V2_ENABLED:
+        fact_digest = _build_stage1_fact_digest_v2(
+            source_rows,
+            timeline_rows,
+            section_keywords=profile_fact_keywords,
+            narrative_order=profile_narrative_order,
+            conflict_terms=profile_timeline_focus_terms,
+            conflict_field=profile_conflict_field,
+            conflict_resolution_rule=profile_conflict_resolution_rule,
+        )
+
     fact_pack = _build_stage1_rubric_fact_pack(source_rows)
-    fact_pack_json = json.dumps(fact_pack, ensure_ascii=True, separators=(",", ":"))
+    compact_fact_bundle = _build_stage1_compact_fact_bundle(
+        source_rows=source_rows,
+        fact_digest=fact_digest,
+        fact_pack=fact_pack,
+        timeline_rows=timeline_rows,
+        max_facts_per_category=5,
+    )
+    prompt_fact_chars = max(
+        100,
+        int(PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_FACT_CHARS),
+    )
+    fact_digest_prompt = _build_stage1_prompt_fact_digest(
+        fact_digest,
+        max_rows_per_section=2,
+        max_fact_chars=prompt_fact_chars,
+        max_summary_bullets=8,
+    )
+    fact_pack_prompt = _build_stage1_prompt_fact_pack(
+        fact_pack,
+        max_rows_per_section=2,
+        max_fact_chars=prompt_fact_chars,
+    )
+    compact_fact_bundle_prompt = _build_stage1_prompt_compact_fact_bundle(
+        compact_fact_bundle,
+        max_rows_per_category=3,
+        max_fact_chars=prompt_fact_chars,
+    )
+    fact_digest_json = json.dumps(
+        fact_digest_prompt or fact_digest,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+    fact_pack_json = json.dumps(
+        fact_pack_prompt or fact_pack,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+    compact_fact_bundle_json = json.dumps(
+        compact_fact_bundle_prompt or compact_fact_bundle,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+    timeline_digest_block = _build_stage1_timeline_digest_block(timeline_rows)
+    appendix_source_count = max(
+        1,
+        min(
+            int(PERPLEXITY_STAGE1_SECOND_PASS_APPENDIX_MAX_SOURCES),
+            max(1, len(source_rows)),
+        ),
+    )
     appendix_rows = _prepare_stage1_source_rows(
         run=run,
-        max_sources=1,
+        max_sources=appendix_source_count,
         max_chars_per_source=min(450, PERPLEXITY_STAGE1_SECOND_PASS_MAX_CHARS_PER_SOURCE),
     )
     evidence = _build_stage1_decoded_evidence_block(appendix_rows)
+    source_key_points_bundle = _build_stage1_doc_key_points_bundle(
+        source_rows,
+        max_points_per_source=PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_PER_SOURCE,
+        max_words_per_source=PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_WORDS_PER_SOURCE,
+        max_fact_chars=prompt_fact_chars,
+    )
+    source_key_points_prompt = {
+        "schema": "source_key_points_v1",
+        "sources": [],
+        "counts": source_key_points_bundle.get("counts", {}) or {},
+    }
+    for item in (source_key_points_bundle.get("sources", []) or [])[:10]:
+        if not isinstance(item, dict):
+            continue
+        key_points = []
+        for point in (item.get("key_points", []) or [])[:4]:
+            if not isinstance(point, dict):
+                continue
+            fact = _truncate_text_for_prompt(str(point.get("fact", "")), prompt_fact_chars)
+            if not fact:
+                continue
+            key_points.append(
+                {
+                    "tag": str(point.get("tag", "")),
+                    "fact": fact,
+                }
+            )
+        source_key_points_prompt["sources"].append(
+            {
+                "source_id": str(item.get("source_id", "")),
+                "title": _truncate_text_for_prompt(str(item.get("title", "")), 100),
+                "published_at": str(item.get("published_at", "")),
+                "key_points": key_points,
+            }
+        )
+    source_key_points_json = json.dumps(
+        source_key_points_prompt,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+    prompt_target_chars = max(10000, int(PERPLEXITY_STAGE1_SECOND_PASS_PROMPT_TARGET_CHARS))
+    prompt_compression_enabled = bool(PERPLEXITY_STAGE1_SECOND_PASS_PROMPT_COMPRESSION_ENABLED)
+    prompt_compression_applied = False
+    prompt_compression_appendix_omitted = False
+
     prompt = _build_stage1_second_pass_prompt(
         user_query=user_query,
         research_brief=research_brief,
         run=run,
+        source_key_points_json=source_key_points_json,
+        compact_fact_bundle_json=compact_fact_bundle_json,
+        fact_digest_json=fact_digest_json,
         fact_pack_json=fact_pack_json,
         evidence_appendix=evidence.get("block", ""),
+        timeline_digest=timeline_digest_block,
+    )
+    prompt_chars_before_compression = len(prompt)
+
+    if prompt_compression_enabled and prompt_chars_before_compression > prompt_target_chars:
+        fact_digest_slim = {
+            "schema": str(fact_digest_prompt.get("schema", "fact_digest_v2")),
+            "counts": fact_digest_prompt.get("counts", {}) or {},
+            "conflicts": list((fact_digest_prompt.get("conflicts", []) or [])[:4]),
+        }
+        fact_pack_slim = {
+            "schema": str(fact_pack_prompt.get("schema", "rubric_fact_pack_v1")),
+            "counts": fact_pack_prompt.get("counts", {}) or {},
+            "critical_gaps": list((fact_pack_prompt.get("critical_gaps", []) or [])[:8]),
+        }
+        compact_categories_slim = {}
+        for category_name, rows in (compact_fact_bundle_prompt.get("categories", {}) or {}).items():
+            if not isinstance(rows, list) or not rows:
+                continue
+            first = rows[0] if isinstance(rows[0], dict) else {}
+            compact_row = _compact_prompt_fact_row(first, prompt_fact_chars)
+            if compact_row:
+                compact_categories_slim[str(category_name)] = [compact_row]
+        compact_fact_bundle_slim = {
+            "schema": str(compact_fact_bundle_prompt.get("schema", "compact_fact_bundle_v1")),
+            "source_index": list((compact_fact_bundle_prompt.get("source_index", []) or [])[:10]),
+            "categories": compact_categories_slim,
+            "critical_gaps": list((compact_fact_bundle_prompt.get("critical_gaps", []) or [])[:8]),
+            "counts": compact_fact_bundle_prompt.get("counts", {}) or {},
+        }
+        prompt = _build_stage1_second_pass_prompt(
+            user_query=user_query,
+            research_brief=research_brief,
+            run=run,
+            source_key_points_json=source_key_points_json,
+            compact_fact_bundle_json=json.dumps(
+                compact_fact_bundle_slim,
+                ensure_ascii=True,
+                separators=(",", ":"),
+            ),
+            fact_digest_json=json.dumps(
+                fact_digest_slim,
+                ensure_ascii=True,
+                separators=(",", ":"),
+            ),
+            fact_pack_json=json.dumps(
+                fact_pack_slim,
+                ensure_ascii=True,
+                separators=(",", ":"),
+            ),
+            evidence_appendix="(omitted due to prompt budget; represented in Source Key Points)",
+            timeline_digest=timeline_digest_block,
+        )
+        if len(prompt) > prompt_target_chars:
+            source_key_points_tiny = {
+                "schema": "source_key_points_v1",
+                "counts": source_key_points_prompt.get("counts", {}) or {},
+                "sources": [],
+            }
+            for item in (source_key_points_prompt.get("sources", []) or [])[:8]:
+                if not isinstance(item, dict):
+                    continue
+                tiny_points = []
+                for point in (item.get("key_points", []) or [])[:1]:
+                    if not isinstance(point, dict):
+                        continue
+                    tiny_fact = _truncate_text_for_prompt(
+                        str(point.get("fact", "")),
+                        max(120, prompt_fact_chars // 2),
+                    )
+                    if tiny_fact:
+                        tiny_points.append(
+                            {
+                                "tag": str(point.get("tag", "")),
+                                "fact": tiny_fact,
+                            }
+                        )
+                source_key_points_tiny["sources"].append(
+                    {
+                        "source_id": str(item.get("source_id", "")),
+                        "published_at": str(item.get("published_at", "")),
+                        "key_points": tiny_points,
+                    }
+                )
+            prompt = _build_stage1_second_pass_prompt(
+                user_query=user_query,
+                research_brief=research_brief,
+                run=run,
+                source_key_points_json=json.dumps(
+                    source_key_points_tiny,
+                    ensure_ascii=True,
+                    separators=(",", ":"),
+                ),
+                compact_fact_bundle_json=json.dumps(
+                    compact_fact_bundle_slim,
+                    ensure_ascii=True,
+                    separators=(",", ":"),
+                ),
+                fact_digest_json=json.dumps(
+                    fact_digest_slim,
+                    ensure_ascii=True,
+                    separators=(",", ":"),
+                ),
+                fact_pack_json=json.dumps(
+                    fact_pack_slim,
+                    ensure_ascii=True,
+                    separators=(",", ":"),
+                ),
+                evidence_appendix="(omitted due to prompt budget; represented in Source Key Points)",
+                timeline_digest=timeline_digest_block,
+            )
+        prompt_compression_applied = True
+        prompt_compression_appendix_omitted = True
+
+    prompt_chars_after_compression = len(prompt)
+    source_rows_preview = [
+        {
+            "source_id": str(row.get("source_id", "")),
+            "published_at": str(row.get("published_at", "")),
+            "title": str(row.get("title", ""))[:180],
+            "is_low_signal_notice": bool(_is_low_signal_notice_source_item(row)),
+            "asx_deterministic": bool(row.get("asx_deterministic", False)),
+            "asx_price_sensitive": bool(row.get("asx_price_sensitive", False)),
+        }
+        for row in source_rows[:10]
+    ]
+    compact_categories = (compact_fact_bundle.get("categories", {}) or {})
+    compact_category_preview = {
+        key: [
+            {
+                "source_id": str(item.get("source_id", "")),
+                "fact": str(item.get("fact", ""))[:220],
+            }
+            for item in (rows or [])[:2]
+            if isinstance(item, dict)
+        ]
+        for key, rows in compact_categories.items()
+    }
+    injection_audit = {
+        "template_id": str(profile.get("template_id", "")),
+        "source_rows_preview": source_rows_preview,
+        "compact_fact_bundle_preview": compact_category_preview,
+        "fact_digest_counts": (fact_digest.get("counts", {}) or {}),
+        "fact_pack_counts": (fact_pack.get("counts", {}) or {}),
+        "timeline_evidence_count": len(timeline_rows),
+        "asx_deterministic_ingestion": asx_deterministic_ingestion_summary,
+        "source_key_points_counts": (source_key_points_bundle.get("counts", {}) or {}),
+        "prompt_compression_enabled": prompt_compression_enabled,
+        "prompt_compression_applied": prompt_compression_applied,
+        "prompt_compression_appendix_omitted": prompt_compression_appendix_omitted,
+        "prompt_target_chars": prompt_target_chars,
+        "prompt_chars_before_compression": prompt_chars_before_compression,
+        "prompt_chars_after_compression": prompt_chars_after_compression,
+        "prompt_chars_saved": max(
+            0,
+            int(prompt_chars_before_compression - prompt_chars_after_compression),
+        ),
+        "prompt_chars": len(prompt),
+    }
+    _progress_log(
+        f"Stage1 injection audit model={model} "
+        f"sources={len(source_rows_preview)} "
+        f"compact_categories={len(compact_category_preview)} "
+        f"prompt_chars={len(prompt)} "
+        f"compressed={prompt_compression_applied}"
     )
 
     max_attempts = max(1, int(PERPLEXITY_STAGE1_SECOND_PASS_MAX_ATTEMPTS))
     backoff = max(0.0, float(PERPLEXITY_STAGE1_SECOND_PASS_RETRY_BACKOFF_SECONDS))
     timeout = max(30.0, float(PERPLEXITY_STAGE1_SECOND_PASS_TIMEOUT_SECONDS))
+    configured_reasoning_effort = str(
+        PERPLEXITY_STAGE1_SECOND_PASS_REASONING_EFFORT or ""
+    ).strip().lower()
     attempts_used = 0
     last_error = ""
+    last_warning = ""
+    last_response_finish_reason = ""
+    last_response_id = ""
+    last_response_usage: Dict[str, Any] = {}
+    last_response_provider = ""
+    last_response_had_content = False
+    last_output_tokens_used = 0
+    last_reasoning_effort_applied = configured_reasoning_effort
+    last_timeline_guard: Dict[str, Any] = {
+        "enabled": bool(PERPLEXITY_STAGE1_TIMELINE_GUARD_ENABLED),
+        "passed": True,
+        "reason": "not_evaluated",
+        "evidence_windows": [],
+        "response_windows": [],
+        "shifted_quarters": 0,
+    }
+    last_gate: Dict[str, Any] = {
+        "enabled": bool(PERPLEXITY_STAGE1_SECOND_PASS_CITATION_GATE_ENABLED),
+        "passed": True,
+        "reason": "not_evaluated",
+        "citation_count": 0,
+        "unique_citation_count": 0,
+        "invalid_citations": [],
+        "numeric_lines": 0,
+        "uncited_numeric_lines": 0,
+        "cited_numeric_lines": 0,
+        "numeric_citation_pct": 0.0,
+        "rubric_required": False,
+        "rubric_sections_total": 0,
+        "rubric_sections_covered": 0,
+        "rubric_coverage_pct": 0.0,
+        "rubric_missing_sections": [],
+        "rubric_critical_missing_sections": [],
+        "compliance_score": 0.0,
+        "compliance_rating": "unknown",
+        "retry_recommended": False,
+        "catastrophic_failure": False,
+    }
+    prompt_used = prompt
+    valid_source_ids = [str(row.get("source_id", "")).strip() for row in source_rows]
 
     for attempt in range(1, max_attempts + 1):
         attempts_used = attempt
@@ -757,22 +5427,170 @@ async def _run_stage1_second_pass_analysis(
             import asyncio
             await asyncio.sleep(sleep_seconds)
 
+        prompt_for_attempt = prompt
+        if (
+            attempt > 1
+            and PERPLEXITY_STAGE1_SECOND_PASS_CITATION_GATE_ENABLED
+            and not bool(last_gate.get("passed", True))
+        ):
+            prompt_for_attempt = _build_stage1_citation_repair_prompt(prompt, last_gate)
+        prompt_used = prompt_for_attempt
+        attempt_reasoning_effort = configured_reasoning_effort
+        if (
+            str(analysis_provider).strip().lower() == "perplexity"
+            and str(model or "").strip().lower().startswith("openai/")
+        ):
+            # OpenAI-via-Perplexity on long second-pass prompts often consumes
+            # output budget in reasoning and returns empty/partial visible text.
+            attempt_reasoning_effort = "none"
+        if attempt > 1:
+            if attempt_reasoning_effort == "high":
+                attempt_reasoning_effort = "medium"
+            elif attempt_reasoning_effort == "medium":
+                attempt_reasoning_effort = "low"
+        if (
+            attempt > 1
+            and not last_response_had_content
+            and str(last_response_finish_reason).strip().lower() == "length"
+            and attempt_reasoning_effort in {"high", "medium"}
+        ):
+            attempt_reasoning_effort = "low"
+        if (
+            attempt > 1
+            and str(analysis_provider).strip().lower() == "perplexity"
+            and str(model or "").strip().lower().startswith("openai/")
+            and last_output_tokens_used >= 4096
+        ):
+            # GPT routed via Perplexity can consume output budget on reasoning.
+            # Drop reasoning payload on retries to recover full visible output.
+            attempt_reasoning_effort = "none"
+        effective_reasoning_for_attempt = attempt_reasoning_effort
+        if (
+            str(analysis_provider).strip().lower() == "perplexity"
+            and not _supports_perplexity_reasoning_payload(model)
+        ):
+            effective_reasoning_for_attempt = "none"
+        last_reasoning_effort_applied = effective_reasoning_for_attempt
+
         _progress_log(
             f"Stage1 second-pass start model={model} attempt={attempt}/{max_attempts} "
             f"sources={len(source_rows)} "
             f"decoded_sources={fact_pack.get('counts', {}).get('decoded_source_count', 0)} "
-            f"prompt_chars={len(prompt)}"
+            f"digest_facts={(fact_digest.get('counts', {}) or {}).get('total_facts', 0)} "
+            f"prompt_chars={len(prompt_for_attempt)} "
+            f"reasoning_effort={effective_reasoning_for_attempt or 'default'} "
+            f"analysis_provider={analysis_provider}"
         )
-        response = await query_model(
-            model,
-            [{"role": "user", "content": prompt}],
-            timeout=timeout,
-        )
+        if str(analysis_provider).strip().lower() == "perplexity":
+            response = await _query_model_via_perplexity(
+                model=model,
+                prompt=prompt_for_attempt,
+                timeout=timeout,
+                max_tokens=int(PERPLEXITY_STAGE1_SECOND_PASS_MAX_OUTPUT_TOKENS),
+                reasoning_effort=attempt_reasoning_effort,
+            )
+        else:
+            response = await query_model(
+                model,
+                [{"role": "user", "content": prompt_for_attempt}],
+                timeout=timeout,
+                max_tokens=int(PERPLEXITY_STAGE1_SECOND_PASS_MAX_OUTPUT_TOKENS),
+                reasoning_effort=attempt_reasoning_effort,
+            )
+        if response:
+            last_response_finish_reason = str(response.get("finish_reason", "") or "")
+            last_response_id = str(response.get("id", "") or "")
+            usage_obj = response.get("usage")
+            last_response_usage = usage_obj if isinstance(usage_obj, dict) else {}
+            last_output_tokens_used = int(last_response_usage.get("output_tokens", 0) or 0)
+            last_response_provider = str(response.get("provider", "") or "")
+            response_reasoning_effort = str(
+                response.get("reasoning_effort_effective", "") or ""
+            ).strip().lower()
+            if response_reasoning_effort in {"low", "medium", "high"}:
+                last_reasoning_effort_applied = response_reasoning_effort
+            elif str(analysis_provider).strip().lower() == "perplexity":
+                # Explicitly record when reasoning payload is intentionally omitted.
+                if response.get("reasoning_payload_sent") is False:
+                    last_reasoning_effort_applied = "none"
         content = ""
         if response and response.get("content"):
             content = str(response.get("content", "")).strip()
+            last_response_had_content = bool(content)
+        elif response:
+            last_response_had_content = False
+            _progress_log(
+                f"Stage1 second-pass non-text response model={model} "
+                f"attempt={attempt}/{max_attempts} "
+                f"finish_reason={response.get('finish_reason')} "
+                f"usage={response.get('usage')} "
+                f"response_id={response.get('id')}"
+            )
+        else:
+            last_response_had_content = False
 
         if content:
+            output_tokens_used = int(
+                ((response or {}).get("usage", {}) or {}).get("output_tokens", 0) or 0
+            )
+            output_cap_suspected = bool(output_tokens_used >= 8192 and len(content) >= 1000)
+            truncated_suspected = _stage1_response_looks_truncated(content)
+            if (output_cap_suspected or truncated_suspected) and attempt < max_attempts:
+                reason = "output_cap_suspected" if output_cap_suspected else "truncated_response"
+                _progress_log(
+                    f"Stage1 second-pass retry trigger model={model} "
+                    f"attempt={attempt}/{max_attempts} reason={reason} "
+                    f"output_tokens={output_tokens_used} response_chars={len(content)}"
+                )
+                prompt = _build_stage1_truncation_repair_prompt(prompt)
+                continue
+            if len(content) < int(_STAGE1_SECOND_PASS_MIN_RESPONSE_CHARS):
+                _progress_log(
+                    f"Stage1 second-pass retry trigger model={model} "
+                    f"attempt={attempt}/{max_attempts} reason=response_too_short "
+                    f"response_chars={len(content)} min_required={_STAGE1_SECOND_PASS_MIN_RESPONSE_CHARS}"
+                )
+                last_error = "response_too_short"
+                if attempt < max_attempts:
+                    continue
+                # Final attempt returned unusable short output.
+                last_warning = "response_too_short_unusable"
+                break
+
+            gate = _evaluate_stage1_citation_gate(
+                response_text=content,
+                valid_source_ids=valid_source_ids,
+                user_query=user_query,
+                research_brief=research_brief,
+                section_markers=profile_section_markers,
+                critical_sections=profile_critical_sections,
+            )
+            timeline_guard = _evaluate_stage1_timeline_guard(
+                content,
+                timeline_rows,
+                focus_terms=profile_timeline_focus_terms,
+                conflict_field=profile_conflict_field,
+                max_shift_quarters=profile_conflict_max_shift_quarters,
+            )
+            last_timeline_guard = timeline_guard
+            last_gate = gate
+
+            gate_failed = bool(gate.get("enabled")) and not bool(gate.get("passed"))
+            retry_recommended = bool(gate.get("retry_recommended", False))
+            if gate_failed:
+                last_warning = f"conformance_gate_failed:{gate.get('reason', 'unknown')}"
+                _progress_log(
+                    f"Stage1 second-pass conformance gate failed model={model} "
+                    f"attempt={attempt}/{max_attempts} reason={gate.get('reason')} "
+                    f"score={float(gate.get('compliance_score', 0.0)):.2f} "
+                    f"rating={gate.get('compliance_rating', 'unknown')} "
+                    f"retry_recommended={retry_recommended}"
+                )
+                if retry_recommended and attempt < max_attempts:
+                    continue
+            else:
+                last_warning = ""
+
             _progress_log(
                 f"Stage1 second-pass success model={model} "
                 f"attempt={attempt}/{max_attempts} response_chars={len(content)}"
@@ -782,9 +5600,28 @@ async def _run_stage1_second_pass_analysis(
                 "response": content,
                 "attempts": attempts_used,
                 "error": "",
-                "prompt": prompt,
-                "prompt_chars": len(prompt),
+                "warning": last_warning,
+                "prompt": prompt_used,
+                "prompt_chars": len(prompt_used),
+                "prompt_chars_before_compression": int(prompt_chars_before_compression),
+                "prompt_chars_after_compression": int(prompt_chars_after_compression),
+                "prompt_chars_saved": max(
+                    0,
+                    int(prompt_chars_before_compression - prompt_chars_after_compression),
+                ),
+                "prompt_target_chars": int(prompt_target_chars),
+                "prompt_compression_enabled": bool(prompt_compression_enabled),
+                "prompt_compression_applied": bool(prompt_compression_applied),
+                "prompt_compression_appendix_omitted": bool(
+                    prompt_compression_appendix_omitted
+                ),
                 "response_chars": len(content),
+                "last_model_finish_reason": last_response_finish_reason,
+                "last_model_response_id": last_response_id,
+                "last_model_usage": last_response_usage,
+                "last_model_provider": last_response_provider,
+                "last_model_reasoning_effort": last_reasoning_effort_applied,
+                "source_rows": source_rows,
                 "evidence_source_count": int(fact_pack.get("counts", {}).get("source_count", 0)),
                 "decoded_source_count": int(
                     fact_pack.get("counts", {}).get("decoded_source_count", 0)
@@ -792,15 +5629,112 @@ async def _run_stage1_second_pass_analysis(
                 "evidence_total_excerpt_chars": int(
                     sum(len(str(row.get("excerpt", ""))) for row in source_rows)
                 ),
+                "source_key_points_counts": (source_key_points_bundle.get("counts", {}) or {}),
+                "fact_digest_v2": fact_digest,
+                "fact_digest_v2_chars": len(fact_digest_json),
+                "fact_digest_v2_total_facts": int(
+                    (fact_digest.get("counts", {}) or {}).get("total_facts", 0)
+                ),
+                "fact_digest_v2_sections_with_facts": int(
+                    (fact_digest.get("counts", {}) or {}).get("sections_with_facts", 0)
+                ),
+                "fact_digest_v2_summary_bullets": int(
+                    (fact_digest.get("counts", {}) or {}).get("summary_bullets", 0)
+                ),
+                "fact_digest_v2_conflicts": int(
+                    (fact_digest.get("counts", {}) or {}).get("conflicts", 0)
+                ),
+                "compact_fact_bundle": compact_fact_bundle,
+                "compact_fact_bundle_chars": len(compact_fact_bundle_json),
+                "compact_fact_bundle_total_facts": int(
+                    (compact_fact_bundle.get("counts", {}) or {}).get("total_facts", 0)
+                ),
+                "compact_fact_bundle_categories_with_facts": int(
+                    (compact_fact_bundle.get("counts", {}) or {}).get(
+                        "categories_with_facts",
+                        0,
+                    )
+                ),
                 "fact_pack": fact_pack,
                 "fact_pack_chars": len(fact_pack_json),
+                "timeline_evidence": timeline_rows,
+                "timeline_digest_chars": len(timeline_digest_block),
+                "timeline_guard_enabled": bool(timeline_guard.get("enabled", False)),
+                "timeline_guard_passed": bool(timeline_guard.get("passed", True)),
+                "timeline_guard_reason": str(timeline_guard.get("reason", "")),
+                "timeline_guard_evidence_windows": list(
+                    timeline_guard.get("evidence_windows", []) or []
+                ),
+                "timeline_guard_response_windows": list(
+                    timeline_guard.get("response_windows", []) or []
+                ),
+                "timeline_guard_shifted_quarters": int(
+                    timeline_guard.get("shifted_quarters", 0) or 0
+                ),
+                "verification_profile_template_id": str(profile.get("template_id", "")),
+                "verification_profile_digest_sections": int(
+                    len((profile_fact_keywords or {}).keys())
+                ),
+                "verification_profile_compliance_markers": int(
+                    len(profile_section_markers or [])
+                ),
+                "verification_profile_critical_sections": int(
+                    len(profile_critical_sections or set())
+                ),
+                "injection_audit": injection_audit,
+                "asx_deterministic_ingestion": asx_deterministic_ingestion_summary,
                 "fact_pack_total_facts": int(fact_pack.get("counts", {}).get("total_facts", 0)),
                 "fact_pack_sections_with_facts": int(
                     fact_pack.get("counts", {}).get("sections_with_facts", 0)
                 ),
+                "citation_gate_enabled": bool(gate.get("enabled", False)),
+                "citation_gate_passed": bool(gate.get("passed", True)),
+                "citation_gate_reason": str(gate.get("reason", "")),
+                "citation_count": int(gate.get("citation_count", 0)),
+                "citation_unique_count": int(gate.get("unique_citation_count", 0)),
+                "citation_invalid_source_refs": list(gate.get("invalid_citations", []) or []),
+                "citation_numeric_lines": int(gate.get("numeric_lines", 0)),
+                "citation_uncited_numeric_lines": int(gate.get("uncited_numeric_lines", 0)),
+                "citation_cited_numeric_lines": int(gate.get("cited_numeric_lines", 0)),
+                "citation_numeric_citation_pct": float(gate.get("numeric_citation_pct", 0.0)),
+                "rubric_required": bool(gate.get("rubric_required", False)),
+                "rubric_sections_total": int(gate.get("rubric_sections_total", 0)),
+                "rubric_sections_covered": int(gate.get("rubric_sections_covered", 0)),
+                "rubric_coverage_pct": float(gate.get("rubric_coverage_pct", 0.0)),
+                "rubric_missing_sections": list(gate.get("rubric_missing_sections", []) or []),
+                "rubric_critical_missing_sections": list(
+                    gate.get("rubric_critical_missing_sections", []) or []
+                ),
+                "compliance_score": float(gate.get("compliance_score", 0.0)),
+                "compliance_rating": str(gate.get("compliance_rating", "")),
+                "compliance_retry_recommended": bool(gate.get("retry_recommended", False)),
+                "compliance_catastrophic_failure": bool(gate.get("catastrophic_failure", False)),
             }
 
         last_error = "empty_response"
+        last_warning = ""
+        last_gate = {
+            "enabled": bool(PERPLEXITY_STAGE1_SECOND_PASS_CITATION_GATE_ENABLED),
+            "passed": False,
+            "reason": "empty_response",
+            "citation_count": 0,
+            "unique_citation_count": 0,
+            "invalid_citations": [],
+            "numeric_lines": 0,
+            "uncited_numeric_lines": 0,
+            "cited_numeric_lines": 0,
+            "numeric_citation_pct": 0.0,
+            "rubric_required": False,
+            "rubric_sections_total": 0,
+            "rubric_sections_covered": 0,
+            "rubric_coverage_pct": 0.0,
+            "rubric_missing_sections": [],
+            "rubric_critical_missing_sections": [],
+            "compliance_score": 0.0,
+            "compliance_rating": "red",
+            "retry_recommended": True,
+            "catastrophic_failure": True,
+        }
         _progress_log(
             f"Stage1 second-pass empty response model={model} "
             f"attempt={attempt}/{max_attempts}"
@@ -811,9 +5745,26 @@ async def _run_stage1_second_pass_analysis(
         "response": "",
         "attempts": attempts_used,
         "error": last_error or "second_pass_failed",
-        "prompt": prompt,
-        "prompt_chars": len(prompt),
+        "warning": last_warning,
+        "prompt": prompt_used,
+        "prompt_chars": len(prompt_used),
+        "prompt_chars_before_compression": int(prompt_chars_before_compression),
+        "prompt_chars_after_compression": int(prompt_chars_after_compression),
+        "prompt_chars_saved": max(
+            0,
+            int(prompt_chars_before_compression - prompt_chars_after_compression),
+        ),
+        "prompt_target_chars": int(prompt_target_chars),
+        "prompt_compression_enabled": bool(prompt_compression_enabled),
+        "prompt_compression_applied": bool(prompt_compression_applied),
+        "prompt_compression_appendix_omitted": bool(prompt_compression_appendix_omitted),
         "response_chars": 0,
+        "last_model_finish_reason": last_response_finish_reason,
+        "last_model_response_id": last_response_id,
+        "last_model_usage": last_response_usage,
+        "last_model_provider": last_response_provider,
+        "last_model_reasoning_effort": last_reasoning_effort_applied,
+        "source_rows": source_rows,
         "evidence_source_count": int(fact_pack.get("counts", {}).get("source_count", 0)),
         "decoded_source_count": int(
             fact_pack.get("counts", {}).get("decoded_source_count", 0)
@@ -821,13 +5772,417 @@ async def _run_stage1_second_pass_analysis(
         "evidence_total_excerpt_chars": int(
             sum(len(str(row.get("excerpt", ""))) for row in source_rows)
         ),
+        "source_key_points_counts": (source_key_points_bundle.get("counts", {}) or {}),
+        "fact_digest_v2": fact_digest,
+        "fact_digest_v2_chars": len(fact_digest_json),
+        "fact_digest_v2_total_facts": int(
+            (fact_digest.get("counts", {}) or {}).get("total_facts", 0)
+        ),
+        "fact_digest_v2_sections_with_facts": int(
+            (fact_digest.get("counts", {}) or {}).get("sections_with_facts", 0)
+        ),
+        "fact_digest_v2_summary_bullets": int(
+            (fact_digest.get("counts", {}) or {}).get("summary_bullets", 0)
+        ),
+        "fact_digest_v2_conflicts": int(
+            (fact_digest.get("counts", {}) or {}).get("conflicts", 0)
+        ),
+        "compact_fact_bundle": compact_fact_bundle,
+        "compact_fact_bundle_chars": len(compact_fact_bundle_json),
+        "compact_fact_bundle_total_facts": int(
+            (compact_fact_bundle.get("counts", {}) or {}).get("total_facts", 0)
+        ),
+        "compact_fact_bundle_categories_with_facts": int(
+            (compact_fact_bundle.get("counts", {}) or {}).get(
+                "categories_with_facts",
+                0,
+            )
+        ),
         "fact_pack": fact_pack,
         "fact_pack_chars": len(fact_pack_json),
+        "timeline_evidence": timeline_rows,
+        "timeline_digest_chars": len(timeline_digest_block),
+        "timeline_guard_enabled": bool(last_timeline_guard.get("enabled", False)),
+        "timeline_guard_passed": bool(last_timeline_guard.get("passed", False)),
+        "timeline_guard_reason": str(last_timeline_guard.get("reason", "")),
+        "timeline_guard_evidence_windows": list(
+            last_timeline_guard.get("evidence_windows", []) or []
+        ),
+        "timeline_guard_response_windows": list(
+            last_timeline_guard.get("response_windows", []) or []
+        ),
+        "timeline_guard_shifted_quarters": int(
+            last_timeline_guard.get("shifted_quarters", 0) or 0
+        ),
+        "verification_profile_template_id": str(profile.get("template_id", "")),
+        "verification_profile_digest_sections": int(
+            len((profile_fact_keywords or {}).keys())
+        ),
+        "verification_profile_compliance_markers": int(
+            len(profile_section_markers or [])
+        ),
+        "verification_profile_critical_sections": int(
+            len(profile_critical_sections or set())
+        ),
+        "injection_audit": injection_audit,
+        "asx_deterministic_ingestion": asx_deterministic_ingestion_summary,
         "fact_pack_total_facts": int(fact_pack.get("counts", {}).get("total_facts", 0)),
         "fact_pack_sections_with_facts": int(
             fact_pack.get("counts", {}).get("sections_with_facts", 0)
         ),
+        "citation_gate_enabled": bool(last_gate.get("enabled", False)),
+        "citation_gate_passed": bool(last_gate.get("passed", False)),
+        "citation_gate_reason": str(last_gate.get("reason", "")),
+        "citation_count": int(last_gate.get("citation_count", 0)),
+        "citation_unique_count": int(last_gate.get("unique_citation_count", 0)),
+        "citation_invalid_source_refs": list(last_gate.get("invalid_citations", []) or []),
+        "citation_numeric_lines": int(last_gate.get("numeric_lines", 0)),
+        "citation_uncited_numeric_lines": int(last_gate.get("uncited_numeric_lines", 0)),
+        "citation_cited_numeric_lines": int(last_gate.get("cited_numeric_lines", 0)),
+        "citation_numeric_citation_pct": float(last_gate.get("numeric_citation_pct", 0.0)),
+        "rubric_required": bool(last_gate.get("rubric_required", False)),
+        "rubric_sections_total": int(last_gate.get("rubric_sections_total", 0)),
+        "rubric_sections_covered": int(last_gate.get("rubric_sections_covered", 0)),
+        "rubric_coverage_pct": float(last_gate.get("rubric_coverage_pct", 0.0)),
+        "rubric_missing_sections": list(last_gate.get("rubric_missing_sections", []) or []),
+        "rubric_critical_missing_sections": list(
+            last_gate.get("rubric_critical_missing_sections", []) or []
+        ),
+        "compliance_score": float(last_gate.get("compliance_score", 0.0)),
+        "compliance_rating": str(last_gate.get("compliance_rating", "")),
+        "compliance_retry_recommended": bool(last_gate.get("retry_recommended", False)),
+        "compliance_catastrophic_failure": bool(last_gate.get("catastrophic_failure", False)),
     }
+
+
+async def _apply_stage1_second_pass(
+    *,
+    model: str,
+    user_query: str,
+    research_brief: str,
+    run: Dict[str, Any],
+    verification_profile: Optional[Dict[str, Any]] = None,
+    analysis_provider: str = "openrouter",
+) -> Dict[str, Any]:
+    """Attach second-pass analysis/metadata to an existing Stage 1 retrieval run."""
+    provider_meta = run.setdefault("provider_metadata", {})
+    if not isinstance(provider_meta, dict):
+        provider_meta = {}
+        run["provider_metadata"] = provider_meta
+
+    if not PERPLEXITY_STAGE1_SECOND_PASS_ENABLED:
+        provider_meta["stage1_second_pass_enabled"] = False
+        return run
+
+    second_pass_result = await _run_stage1_second_pass_analysis(
+        model=model,
+        user_query=user_query,
+        research_brief=research_brief,
+        run=run,
+        verification_profile=verification_profile,
+        analysis_provider=analysis_provider,
+    )
+    run["stage1_second_pass"] = second_pass_result
+    provider_meta["stage1_second_pass_enabled"] = True
+    provider_meta["stage1_second_pass_success"] = bool(second_pass_result.get("success"))
+    provider_meta["stage1_second_pass_attempts"] = int(second_pass_result.get("attempts", 0))
+    provider_meta["stage1_second_pass_error"] = str(second_pass_result.get("error", ""))
+    provider_meta["stage1_second_pass_warning"] = str(second_pass_result.get("warning", ""))
+    provider_meta["stage1_second_pass_prompt_chars"] = int(
+        second_pass_result.get("prompt_chars", 0)
+    )
+    provider_meta["stage1_second_pass_prompt_chars_before_compression"] = int(
+        second_pass_result.get("prompt_chars_before_compression", 0)
+    )
+    provider_meta["stage1_second_pass_prompt_chars_after_compression"] = int(
+        second_pass_result.get("prompt_chars_after_compression", 0)
+    )
+    provider_meta["stage1_second_pass_prompt_chars_saved"] = int(
+        second_pass_result.get("prompt_chars_saved", 0)
+    )
+    provider_meta["stage1_second_pass_prompt_target_chars"] = int(
+        second_pass_result.get("prompt_target_chars", 0)
+    )
+    provider_meta["stage1_second_pass_prompt_compression_enabled"] = bool(
+        second_pass_result.get("prompt_compression_enabled", False)
+    )
+    provider_meta["stage1_second_pass_prompt_compression_applied"] = bool(
+        second_pass_result.get("prompt_compression_applied", False)
+    )
+    provider_meta["stage1_second_pass_prompt_compression_appendix_omitted"] = bool(
+        second_pass_result.get("prompt_compression_appendix_omitted", False)
+    )
+    provider_meta["stage1_second_pass_response_chars"] = int(
+        second_pass_result.get("response_chars", 0)
+    )
+    provider_meta["stage1_second_pass_last_finish_reason"] = str(
+        second_pass_result.get("last_model_finish_reason", "")
+    )
+    provider_meta["stage1_second_pass_last_response_id"] = str(
+        second_pass_result.get("last_model_response_id", "")
+    )
+    provider_meta["stage1_second_pass_last_provider"] = str(
+        second_pass_result.get("last_model_provider", "")
+    )
+    provider_meta["stage1_second_pass_analysis_provider"] = str(analysis_provider or "")
+    provider_meta["stage1_second_pass_last_reasoning_effort"] = str(
+        second_pass_result.get("last_model_reasoning_effort", "")
+    )
+    provider_meta["stage1_second_pass_last_usage"] = (
+        second_pass_result.get("last_model_usage", {})
+        if isinstance(second_pass_result.get("last_model_usage", {}), dict)
+        else {}
+    )
+    provider_meta["stage1_second_pass_evidence_source_count"] = int(
+        second_pass_result.get("evidence_source_count", 0)
+    )
+    provider_meta["stage1_second_pass_decoded_source_count"] = int(
+        second_pass_result.get("decoded_source_count", 0)
+    )
+    provider_meta["stage1_second_pass_evidence_total_excerpt_chars"] = int(
+        second_pass_result.get("evidence_total_excerpt_chars", 0)
+    )
+    source_key_points_counts = second_pass_result.get("source_key_points_counts", {}) or {}
+    if isinstance(source_key_points_counts, dict):
+        provider_meta["stage1_second_pass_source_key_points_sources_with_points"] = int(
+            source_key_points_counts.get("sources_with_points", 0)
+        )
+        provider_meta["stage1_second_pass_source_key_points_total_points"] = int(
+            source_key_points_counts.get("total_points", 0)
+        )
+        provider_meta["stage1_second_pass_source_key_points_total_words"] = int(
+            source_key_points_counts.get("total_words", 0)
+        )
+    provider_meta["stage1_second_pass_fact_pack_chars"] = int(
+        second_pass_result.get("fact_pack_chars", 0)
+    )
+    provider_meta["stage1_second_pass_fact_pack_total_facts"] = int(
+        second_pass_result.get("fact_pack_total_facts", 0)
+    )
+    provider_meta["stage1_second_pass_fact_pack_sections_with_facts"] = int(
+        second_pass_result.get("fact_pack_sections_with_facts", 0)
+    )
+    provider_meta["stage1_second_pass_fact_digest_v2_enabled"] = bool(
+        PERPLEXITY_STAGE1_FACT_DIGEST_V2_ENABLED
+    )
+    provider_meta["stage1_second_pass_fact_digest_v2_chars"] = int(
+        second_pass_result.get("fact_digest_v2_chars", 0)
+    )
+    provider_meta["stage1_second_pass_fact_digest_v2_total_facts"] = int(
+        second_pass_result.get("fact_digest_v2_total_facts", 0)
+    )
+    provider_meta["stage1_second_pass_fact_digest_v2_sections_with_facts"] = int(
+        second_pass_result.get("fact_digest_v2_sections_with_facts", 0)
+    )
+    provider_meta["stage1_second_pass_fact_digest_v2_summary_bullets"] = int(
+        second_pass_result.get("fact_digest_v2_summary_bullets", 0)
+    )
+    provider_meta["stage1_second_pass_fact_digest_v2_conflicts"] = int(
+        second_pass_result.get("fact_digest_v2_conflicts", 0)
+    )
+    provider_meta["stage1_second_pass_compact_fact_bundle_chars"] = int(
+        second_pass_result.get("compact_fact_bundle_chars", 0)
+    )
+    provider_meta["stage1_second_pass_compact_fact_bundle_total_facts"] = int(
+        second_pass_result.get("compact_fact_bundle_total_facts", 0)
+    )
+    provider_meta["stage1_second_pass_compact_fact_bundle_categories_with_facts"] = int(
+        second_pass_result.get("compact_fact_bundle_categories_with_facts", 0)
+    )
+    asx_ingestion = second_pass_result.get("asx_deterministic_ingestion", {}) or {}
+    if isinstance(asx_ingestion, dict):
+        provider_meta["stage1_second_pass_asx_deterministic_enabled"] = bool(
+            asx_ingestion.get("enabled", False)
+        )
+        provider_meta["stage1_second_pass_asx_deterministic_used"] = bool(
+            asx_ingestion.get("used", False)
+        )
+        provider_meta["stage1_second_pass_asx_deterministic_symbol"] = str(
+            asx_ingestion.get("symbol", "")
+        )
+        provider_meta["stage1_second_pass_asx_deterministic_reason"] = str(
+            asx_ingestion.get("reason", "")
+        )
+        provider_meta["stage1_second_pass_asx_deterministic_cache_hit"] = bool(
+            asx_ingestion.get("cache_hit", False)
+        )
+        provider_meta["stage1_second_pass_asx_deterministic_selected_rows"] = int(
+            asx_ingestion.get("selected_rows", 0)
+        )
+        provider_meta["stage1_second_pass_asx_deterministic_decoded_rows"] = int(
+            asx_ingestion.get("decoded_rows", 0)
+        )
+    provider_meta["stage1_second_pass_source_rows_count"] = int(
+        len(second_pass_result.get("source_rows", []) or [])
+    )
+    provider_meta["stage1_second_pass_timeline_evidence_count"] = int(
+        len(second_pass_result.get("timeline_evidence", []) or [])
+    )
+    provider_meta["stage1_second_pass_timeline_digest_chars"] = int(
+        second_pass_result.get("timeline_digest_chars", 0)
+    )
+    provider_meta["stage1_second_pass_timeline_guard_enabled"] = bool(
+        second_pass_result.get("timeline_guard_enabled", False)
+    )
+    provider_meta["stage1_second_pass_timeline_guard_passed"] = bool(
+        second_pass_result.get("timeline_guard_passed", True)
+    )
+    provider_meta["stage1_second_pass_timeline_guard_reason"] = str(
+        second_pass_result.get("timeline_guard_reason", "")
+    )
+    provider_meta["stage1_second_pass_timeline_guard_evidence_windows"] = list(
+        second_pass_result.get("timeline_guard_evidence_windows", []) or []
+    )
+    provider_meta["stage1_second_pass_timeline_guard_response_windows"] = list(
+        second_pass_result.get("timeline_guard_response_windows", []) or []
+    )
+    provider_meta["stage1_second_pass_timeline_guard_shifted_quarters"] = int(
+        second_pass_result.get("timeline_guard_shifted_quarters", 0)
+    )
+    provider_meta["stage1_second_pass_verification_template_id"] = str(
+        second_pass_result.get("verification_profile_template_id", "")
+    )
+    provider_meta["stage1_second_pass_verification_digest_sections"] = int(
+        second_pass_result.get("verification_profile_digest_sections", 0)
+    )
+    provider_meta["stage1_second_pass_verification_compliance_markers"] = int(
+        second_pass_result.get("verification_profile_compliance_markers", 0)
+    )
+    provider_meta["stage1_second_pass_verification_critical_sections"] = int(
+        second_pass_result.get("verification_profile_critical_sections", 0)
+    )
+    provider_meta["stage1_second_pass_citation_gate_enabled"] = bool(
+        second_pass_result.get("citation_gate_enabled", False)
+    )
+    provider_meta["stage1_second_pass_citation_gate_passed"] = bool(
+        second_pass_result.get("citation_gate_passed", False)
+    )
+    provider_meta["stage1_second_pass_citation_gate_reason"] = str(
+        second_pass_result.get("citation_gate_reason", "")
+    )
+    provider_meta["stage1_second_pass_citation_count"] = int(
+        second_pass_result.get("citation_count", 0)
+    )
+    provider_meta["stage1_second_pass_citation_unique_count"] = int(
+        second_pass_result.get("citation_unique_count", 0)
+    )
+    provider_meta["stage1_second_pass_citation_invalid_source_refs"] = list(
+        second_pass_result.get("citation_invalid_source_refs", []) or []
+    )
+    provider_meta["stage1_second_pass_citation_numeric_lines"] = int(
+        second_pass_result.get("citation_numeric_lines", 0)
+    )
+    provider_meta["stage1_second_pass_citation_uncited_numeric_lines"] = int(
+        second_pass_result.get("citation_uncited_numeric_lines", 0)
+    )
+    provider_meta["stage1_second_pass_citation_cited_numeric_lines"] = int(
+        second_pass_result.get("citation_cited_numeric_lines", 0)
+    )
+    provider_meta["stage1_second_pass_citation_numeric_citation_pct"] = float(
+        second_pass_result.get("citation_numeric_citation_pct", 0.0)
+    )
+    provider_meta["stage1_second_pass_rubric_required"] = bool(
+        second_pass_result.get("rubric_required", False)
+    )
+    provider_meta["stage1_second_pass_rubric_sections_total"] = int(
+        second_pass_result.get("rubric_sections_total", 0)
+    )
+    provider_meta["stage1_second_pass_rubric_sections_covered"] = int(
+        second_pass_result.get("rubric_sections_covered", 0)
+    )
+    provider_meta["stage1_second_pass_rubric_coverage_pct"] = float(
+        second_pass_result.get("rubric_coverage_pct", 0.0)
+    )
+    provider_meta["stage1_second_pass_rubric_missing_sections"] = list(
+        second_pass_result.get("rubric_missing_sections", []) or []
+    )
+    provider_meta["stage1_second_pass_rubric_critical_missing_sections"] = list(
+        second_pass_result.get("rubric_critical_missing_sections", []) or []
+    )
+    provider_meta["stage1_second_pass_compliance_score"] = float(
+        second_pass_result.get("compliance_score", 0.0)
+    )
+    provider_meta["stage1_second_pass_compliance_rating"] = str(
+        second_pass_result.get("compliance_rating", "")
+    )
+    provider_meta["stage1_second_pass_compliance_retry_recommended"] = bool(
+        second_pass_result.get("compliance_retry_recommended", False)
+    )
+    provider_meta["stage1_second_pass_compliance_catastrophic_failure"] = bool(
+        second_pass_result.get("compliance_catastrophic_failure", False)
+    )
+
+    if second_pass_result.get("prompt"):
+        run["stage1_second_pass_prompt"] = second_pass_result["prompt"]
+    if second_pass_result.get("fact_digest_v2"):
+        run["stage1_second_pass_fact_digest_v2"] = second_pass_result["fact_digest_v2"]
+    if second_pass_result.get("fact_pack"):
+        run["stage1_second_pass_fact_pack"] = second_pass_result["fact_pack"]
+    if "compact_fact_bundle" in second_pass_result:
+        run["stage1_second_pass_compact_fact_bundle"] = (
+            second_pass_result.get("compact_fact_bundle") or {}
+        )
+    if second_pass_result.get("injection_audit"):
+        run["stage1_second_pass_injection_audit"] = (
+            second_pass_result.get("injection_audit") or {}
+        )
+        provider_meta["stage1_second_pass_injection_sources"] = int(
+            len(
+                (
+                    (second_pass_result.get("injection_audit") or {}).get("source_rows_preview", [])
+                    or []
+                )
+            )
+        )
+        provider_meta["stage1_second_pass_injection_categories"] = int(
+            len(
+                (
+                    (second_pass_result.get("injection_audit") or {}).get(
+                        "compact_fact_bundle_preview",
+                        {},
+                    )
+                    or {}
+                ).keys()
+            )
+        )
+    if isinstance(asx_ingestion, dict):
+        run["stage1_second_pass_asx_deterministic_ingestion"] = asx_ingestion
+    if second_pass_result.get("source_rows"):
+        run["stage1_second_pass_source_rows"] = second_pass_result.get("source_rows", [])
+    if second_pass_result.get("timeline_evidence"):
+        run["stage1_second_pass_timeline_evidence"] = second_pass_result.get(
+            "timeline_evidence",
+            [],
+        )
+    if second_pass_result.get("success") and second_pass_result.get("response"):
+        run["stage1_analysis_response"] = str(second_pass_result["response"]).strip()
+        final_compliance = _evaluate_stage1_template_compliance(
+            summary_text=run["stage1_analysis_response"],
+            user_query=user_query,
+            research_brief=research_brief,
+            section_markers=(
+                (verification_profile or {}).get("compliance_section_markers")
+                if verification_profile
+                else None
+            ),
+        )
+        provider_meta["stage1_final_template_compliant"] = bool(
+            final_compliance["compliant"]
+        )
+        provider_meta["stage1_final_template_reason"] = str(
+            final_compliance["reason"]
+        )
+        provider_meta["stage1_final_template_marker_hits"] = int(
+            final_compliance.get("marker_hits", 0)
+        )
+        provider_meta["stage1_final_template_primary_marker_hits"] = int(
+            final_compliance.get("primary_marker_hits", 0)
+        )
+        provider_meta["stage1_final_template_secondary_marker_hits"] = int(
+            final_compliance.get("secondary_marker_hits", 0)
+        )
+
+    return run
 
 
 async def stage1_collect_responses(enhanced_context: str) -> List[Dict[str, Any]]:
@@ -863,6 +6218,8 @@ async def stage1_collect_perplexity_research_responses(
     attachment_context: str = "",
     depth: str = "deep",
     research_brief: str = "",
+    template_id: Optional[str] = None,
+    diagnostic_mode: bool = False,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
     Stage 1 (emulated): run one Perplexity deep-research call per configured model.
@@ -873,24 +6230,141 @@ async def stage1_collect_perplexity_research_responses(
         attachment_context: Optional attached-document context
         depth: basic|deep research depth
         research_brief: Optional template/company-type framing to steer retrieval
+        template_id: Optional selected template id for verification profile
+        diagnostic_mode: Allow execution during global shutdown for audit scripts
 
     Returns:
         Tuple of:
         - stage1_results: List[{"model": ..., "response": ...}]
         - metadata: {"per_model_research_runs": [...], "aggregated_search_results": {...}}
     """
+    _ensure_system_enabled(diagnostic_mode=diagnostic_mode)
     import asyncio
     from .research.providers.perplexity import PerplexityResearchProvider
 
     total_start = perf_counter()
-    models = PERPLEXITY_COUNCIL_MODELS or COUNCIL_MODELS
+    perplexity_models_requested = _dedupe_model_ids(
+        [
+            _normalize_perplexity_model_id(model)
+            for model in (PERPLEXITY_COUNCIL_MODELS or COUNCIL_MODELS)
+        ]
+    )
+    perplexity_models = list(perplexity_models_requested)
+    preflight_results: List[Dict[str, Any]] = []
+    preflight_removed_models: List[str] = []
+    preflight_skipped_reason = ""
+    if PERPLEXITY_STAGE1_MODEL_PREFLIGHT_ENABLED:
+        if not PERPLEXITY_API_KEY:
+            preflight_skipped_reason = "missing_api_key"
+        elif not perplexity_models_requested:
+            preflight_skipped_reason = "no_perplexity_models_requested"
+        else:
+            _progress_log(
+                "Stage1 Perplexity model preflight start: "
+                f"requested_models={perplexity_models_requested}, "
+                f"timeout={float(PERPLEXITY_STAGE1_MODEL_PREFLIGHT_TIMEOUT_SECONDS):.1f}s, "
+                f"fail_open={bool(PERPLEXITY_STAGE1_MODEL_PREFLIGHT_FAIL_OPEN)}"
+            )
+            probe_tasks = [
+                _probe_perplexity_model_support(
+                    model=model,
+                    timeout_seconds=float(PERPLEXITY_STAGE1_MODEL_PREFLIGHT_TIMEOUT_SECONDS),
+                )
+                for model in perplexity_models_requested
+            ]
+            preflight_results = await asyncio.gather(*probe_tasks)
+            supported_models: List[str] = []
+            transient_models: List[str] = []
+            unsupported_models: List[str] = []
+            for row in preflight_results:
+                resolved_model = str(
+                    row.get("resolved_model")
+                    or row.get("requested_model")
+                    or ""
+                ).strip()
+                if not resolved_model:
+                    continue
+                if bool(row.get("supported", False)):
+                    supported_models.append(resolved_model)
+                    continue
+                error_type = str(row.get("error_type", "")).strip().lower()
+                if error_type == "unsupported":
+                    unsupported_models.append(resolved_model)
+                else:
+                    transient_models.append(resolved_model)
+
+            supported_models = _dedupe_model_ids(supported_models)
+            transient_models = _dedupe_model_ids(transient_models)
+            unsupported_models = _dedupe_model_ids(unsupported_models)
+            if PERPLEXITY_STAGE1_MODEL_PREFLIGHT_FAIL_OPEN:
+                effective_models = _dedupe_model_ids(supported_models + transient_models)
+            else:
+                effective_models = list(supported_models)
+
+            if effective_models:
+                perplexity_models = effective_models
+                preflight_removed_models = [
+                    model
+                    for model in perplexity_models_requested
+                    if model not in effective_models
+                ]
+            else:
+                # No supported results; keep original list in fail-open mode.
+                if PERPLEXITY_STAGE1_MODEL_PREFLIGHT_FAIL_OPEN:
+                    perplexity_models = list(perplexity_models_requested)
+                    preflight_skipped_reason = "all_models_probe_failed_fail_open"
+                else:
+                    perplexity_models = []
+                    preflight_skipped_reason = "all_models_unsupported"
+            _progress_log(
+                "Stage1 Perplexity model preflight done: "
+                f"effective_models={perplexity_models}, "
+                f"removed={preflight_removed_models}"
+            )
+    if (
+        PERPLEXITY_STAGE1_MODEL_PREFLIGHT_ENABLED
+        and preflight_skipped_reason
+        and not preflight_results
+    ):
+        _progress_log(f"Stage1 Perplexity model preflight skipped: {preflight_skipped_reason}")
+    mixed_mode_enabled = bool(PERPLEXITY_STAGE1_MIXED_MODE_ENABLED)
+    openrouter_pool_models: List[str] = []
+    if mixed_mode_enabled:
+        openrouter_pool_models = _dedupe_model_ids(
+            PERPLEXITY_STAGE1_OPENROUTER_MODELS or COUNCIL_MODELS
+        )
+        openrouter_pool_models = [
+            model
+            for model in openrouter_pool_models
+            if _is_openrouter_compatible_model(model)
+        ]
+    models = _dedupe_model_ids(perplexity_models + openrouter_pool_models) if mixed_mode_enabled else list(perplexity_models)
+    if not models:
+        models = _dedupe_model_ids(COUNCIL_MODELS)
+    perplexity_model_set = set(perplexity_models)
+    openrouter_model_set = set(openrouter_pool_models)
     provider = PerplexityResearchProvider()
     _progress_log(
         "Stage1 perplexity emulation start: "
         f"models={models}, depth={depth}, max_sources={MAX_SOURCES}, "
+        f"mixed_mode_enabled={mixed_mode_enabled}, "
+        f"perplexity_pool={perplexity_models}, "
+        f"openrouter_pool={openrouter_pool_models}, "
         f"execution_mode={PERPLEXITY_STAGE1_EXECUTION_MODE}, "
-        f"second_pass_enabled={PERPLEXITY_STAGE1_SECOND_PASS_ENABLED}"
+        f"second_pass_enabled={PERPLEXITY_STAGE1_SECOND_PASS_ENABLED}, "
+        f"shared_retrieval_enabled={PERPLEXITY_STAGE1_SHARED_RETRIEVAL_ENABLED}"
     )
+    verification_profile = _build_stage1_verification_profile(template_id)
+    if PROGRESS_LOGGING:
+        marker_count = len(verification_profile.get("compliance_section_markers", []) or [])
+        critical_count = len(verification_profile.get("compliance_critical_sections", set()) or [])
+        _progress_log(
+            "Stage1 verification profile: "
+            f"template_id={template_id or 'none'}, "
+            f"digest_sections={len((verification_profile.get('fact_digest_keywords') or {}).keys())}, "
+            f"timeline_focus_terms={len(verification_profile.get('timeline_focus_terms', []) or [])}, "
+            f"compliance_markers={marker_count}, critical_sections={critical_count}"
+        )
 
     # Keep attachment context bounded to avoid runaway token growth.
     bounded_attachment_context = attachment_context[:12000] if attachment_context else ""
@@ -914,8 +6388,198 @@ async def stage1_collect_perplexity_research_responses(
     else:
         max_attempts = max(1, int(PERPLEXITY_STAGE1_MAX_RETRIES) + 1)
     base_backoff = max(0.0, float(PERPLEXITY_STAGE1_RETRY_BACKOFF_SECONDS))
+    multi_wave_enabled = bool(PERPLEXITY_STAGE1_MULTI_WAVE_ENABLED and depth == "deep")
+    max_waves = max(1, int(PERPLEXITY_STAGE1_MULTI_WAVE_MAX_WAVES))
+    gap_query_limit = max(1, int(PERPLEXITY_STAGE1_MULTI_WAVE_GAP_QUERY_LIMIT))
+    min_new_primary_sources = max(0, int(PERPLEXITY_STAGE1_MULTI_WAVE_MIN_NEW_PRIMARY_SOURCES))
 
-    async def _gather_model_with_retries(model: str) -> Dict[str, Any]:
+    def _analysis_provider_for_model(model: str) -> str:
+        """
+        Select second-pass API lane per model in mixed mode.
+
+        - perplexity pool models -> Perplexity API
+        - openrouter pool models -> OpenRouter API
+        """
+        model_key = str(model or "").strip()
+        if not mixed_mode_enabled:
+            # In non-mixed Perplexity execution, keep retrieval on Perplexity but
+            # route Gemini second-pass analysis through OpenRouter by default.
+            # Perplexity non-search Responses for Gemini are currently prone to
+            # partial payloads on large prompts.
+            if (
+                OPENROUTER_API_KEY
+                and model_key.lower().startswith("google/")
+                and _is_openrouter_compatible_model(model_key)
+            ):
+                return "openrouter"
+            return "perplexity"
+        if model_key in perplexity_model_set:
+            return "perplexity"
+        if model_key in openrouter_model_set:
+            return "openrouter"
+        # Default unknowns to Perplexity lane in mixed mode for safer attribution.
+        return "perplexity"
+
+    async def _run_retrieval_with_planner(
+        *,
+        model: str,
+        attempt_profile: Dict[str, Any],
+        active_research_brief: str,
+    ) -> Dict[str, Any]:
+        """
+        Execute retrieval with planner + wave gap-filling when enabled.
+
+        Wave 1 performs broad retrieval; wave 2/3 target unresolved rubric sections.
+        """
+        preset_value = str(attempt_profile.get("preset", "")).strip() or None
+        if not multi_wave_enabled or max_waves <= 1:
+            return await provider.gather(
+                research_query,
+                ticker=ticker,
+                depth=depth,
+                max_sources=int(attempt_profile["max_sources"]),
+                model_override=model,
+                research_brief=active_research_brief,
+                max_steps_override=int(attempt_profile["max_steps"]),
+                max_output_tokens_override=int(attempt_profile["max_output_tokens"]),
+                reasoning_effort_override=str(attempt_profile["reasoning_effort"]),
+                preset_override=preset_value,
+            ) or {}
+
+        planner = _build_stage1_research_planner(
+            user_query=user_query,
+            research_brief=active_research_brief,
+            ticker=ticker,
+            verification_profile=verification_profile,
+            max_waves=max_waves,
+            gap_query_limit=gap_query_limit,
+        )
+        _progress_log(
+            "Stage1 planner created: "
+            f"model={model}, objectives={len(planner.get('objectives', []))}, "
+            f"max_waves={planner.get('max_waves')}"
+        )
+
+        seen_primary_urls: set[str] = set()
+        wave_runs: List[Dict[str, Any]] = []
+        wave_reports: List[Dict[str, Any]] = []
+        missing_sections: List[str] = []
+        missing_critical_sections: List[str] = []
+
+        for wave_idx in range(1, max_waves + 1):
+            wave_query = research_query
+            wave_type = "broad_primary" if wave_idx == 1 else "gap_fill"
+
+            if wave_idx > 1:
+                if not missing_sections:
+                    _progress_log(
+                        f"Stage1 planner stop model={model} wave={wave_idx} reason=no_missing_sections"
+                    )
+                    break
+                gap_block = _build_stage1_gap_query_block(
+                    missing_sections=missing_sections,
+                    verification_profile=verification_profile,
+                    ticker=ticker,
+                    gap_query_limit=gap_query_limit,
+                )
+                if gap_block:
+                    wave_query = (
+                        f"{research_query}\n\n"
+                        f"Gap-Fill Retrieval Wave {wave_idx}:\n"
+                        f"{gap_block}"
+                    )
+
+            _progress_log(
+                "Stage1 planner wave start: "
+                f"model={model}, wave={wave_idx}/{max_waves}, type={wave_type}, "
+                f"missing_sections={len(missing_sections)}, missing_critical={len(missing_critical_sections)}"
+            )
+            wave_run = await provider.gather(
+                wave_query,
+                ticker=ticker,
+                depth=depth,
+                max_sources=int(attempt_profile["max_sources"]),
+                model_override=model,
+                research_brief=active_research_brief,
+                max_steps_override=int(attempt_profile["max_steps"]),
+                max_output_tokens_override=int(attempt_profile["max_output_tokens"]),
+                reasoning_effort_override=str(attempt_profile["reasoning_effort"]),
+                preset_override=preset_value,
+            ) or {}
+
+            if wave_run.get("error"):
+                wave_reports.append(
+                    {
+                        "wave": wave_idx,
+                        "type": wave_type,
+                        "status": "error",
+                        "error": str(wave_run.get("error", "")),
+                    }
+                )
+                # First wave failure is hard-fail for attempt. Later waves are optional.
+                if wave_idx == 1:
+                    return wave_run
+                _progress_log(
+                    f"Stage1 planner wave error model={model} wave={wave_idx}: "
+                    f"{str(wave_run.get('error', ''))[:220]}"
+                )
+                break
+
+            coverage = _evaluate_stage1_section_coverage(
+                wave_run,
+                verification_profile=verification_profile,
+            )
+            missing_sections = list(coverage.get("missing_sections", []))
+            missing_critical_sections = list(coverage.get("missing_critical_sections", []))
+            new_primary = _count_new_primary_sources(wave_run, seen_primary_urls)
+
+            wave_reports.append(
+                {
+                    "wave": wave_idx,
+                    "type": wave_type,
+                    "status": "ok",
+                    "result_count": int(wave_run.get("result_count", 0)),
+                    "new_primary_sources": int(new_primary),
+                    "missing_sections": missing_sections[:8],
+                    "missing_critical_sections": missing_critical_sections[:8],
+                    "critical_sections_covered": int(coverage.get("critical_sections_covered", 0)),
+                    "critical_sections_total": int(coverage.get("critical_sections_total", 0)),
+                }
+            )
+            wave_runs.append(wave_run)
+
+            _progress_log(
+                "Stage1 planner wave done: "
+                f"model={model}, wave={wave_idx}, results={wave_run.get('result_count', 0)}, "
+                f"new_primary={new_primary}, missing={len(missing_sections)}, "
+                f"missing_critical={len(missing_critical_sections)}"
+            )
+
+            if not missing_sections:
+                break
+            if wave_idx >= max_waves:
+                break
+            if (
+                wave_idx >= 2
+                and not missing_critical_sections
+                and new_primary < min_new_primary_sources
+            ):
+                _progress_log(
+                    "Stage1 planner stop: "
+                    f"model={model} reason=insufficient_new_primary_sources({new_primary})"
+                )
+                break
+
+        merged = _merge_stage1_wave_runs(
+            wave_runs=wave_runs,
+            original_query=research_query,
+            max_sources=int(attempt_profile["max_sources"]),
+            planner=planner,
+            wave_reports=wave_reports,
+        )
+        return merged
+
+    async def _gather_model_with_retries(model: str, run_second_pass: bool = True) -> Dict[str, Any]:
         run: Dict[str, Any] = {}
         last_successful_run: Optional[Dict[str, Any]] = None
         active_research_brief = bounded_research_brief
@@ -927,6 +6591,8 @@ async def stage1_collect_perplexity_research_responses(
             attempt_profile = _build_stage1_attempt_profile(
                 model=model,
                 attempt=attempt,
+                depth=depth,
+                base_preset=str(provider.preset),
                 base_max_sources=MAX_SOURCES,
                 base_max_steps=int(provider.max_steps),
                 base_max_output_tokens=int(provider.max_output_tokens),
@@ -943,22 +6609,17 @@ async def stage1_collect_perplexity_research_responses(
                 _progress_log(f"Stage1 retry attempt {attempt}/{max_attempts} for {model}")
             _progress_log(
                 f"Stage1 attempt profile {attempt}/{max_attempts} for {model}: "
-                f"profile={attempt_profile['name']}, max_sources={attempt_profile['max_sources']}, "
+                f"profile={attempt_profile['name']}, preset={attempt_profile['preset']}, "
+                f"max_sources={attempt_profile['max_sources']}, "
                 f"max_steps={attempt_profile['max_steps']}, "
                 f"max_output_tokens={attempt_profile['max_output_tokens']}, "
                 f"reasoning_effort={attempt_profile['reasoning_effort'] or 'none'}"
             )
 
-            run = await provider.gather(
-                research_query,
-                ticker=ticker,
-                depth=depth,
-                max_sources=int(attempt_profile["max_sources"]),
-                model_override=model,
-                research_brief=active_research_brief,
-                max_steps_override=int(attempt_profile["max_steps"]),
-                max_output_tokens_override=int(attempt_profile["max_output_tokens"]),
-                reasoning_effort_override=str(attempt_profile["reasoning_effort"]),
+            run = await _run_retrieval_with_planner(
+                model=model,
+                attempt_profile=attempt_profile,
+                active_research_brief=active_research_brief,
             ) or {}
 
             if not run.get("error"):
@@ -972,6 +6633,7 @@ async def stage1_collect_perplexity_research_responses(
                     summary_text=str(run.get("research_summary", "")),
                     user_query=user_query,
                     research_brief=bounded_research_brief,
+                    section_markers=verification_profile.get("compliance_section_markers"),
                 )
                 provider_meta["template_compliance_required"] = bool(compliance["required"])
                 provider_meta["template_compliant"] = bool(compliance["compliant"])
@@ -1003,6 +6665,48 @@ async def stage1_collect_perplexity_research_responses(
                         ),
                     }
                 )
+
+                sonar_telemetry = _evaluate_stage1_sonar_telemetry(
+                    model=model,
+                    provider_meta=provider_meta,
+                )
+                provider_meta["sonar_multistep_required"] = bool(
+                    sonar_telemetry.get("required", False)
+                )
+                provider_meta["sonar_multistep_passed"] = bool(
+                    sonar_telemetry.get("passed", True)
+                )
+                provider_meta["sonar_multistep_reason"] = str(
+                    sonar_telemetry.get("reason", "")
+                )
+                provider_meta["is_sonar_model"] = bool(
+                    sonar_telemetry.get("is_sonar_model", False)
+                )
+
+                if (
+                    bool(sonar_telemetry.get("required", False))
+                    and not bool(sonar_telemetry.get("passed", True))
+                ):
+                    sonar_reason = str(sonar_telemetry.get("reason", "unknown"))
+                    attempt_history.append(
+                        {
+                            "attempt": attempt,
+                            "status": "sonar_telemetry_failed",
+                            "profile": attempt_profile,
+                            "reason": sonar_reason,
+                            "retryable": attempt < max_attempts,
+                        }
+                    )
+                    if attempt < max_attempts:
+                        _progress_log(
+                            f"Stage1 sonar telemetry retry for {model}: "
+                            f"{sonar_reason} (attempt {attempt}/{max_attempts})"
+                        )
+                        continue
+                    _progress_log(
+                        f"Stage1 sonar telemetry warning for {model}: "
+                        f"{sonar_reason} (no retry attempts left)"
+                    )
 
                 if compliance["required"] and not compliance["compliant"] and attempt < max_attempts:
                     template_retry_allowed = (
@@ -1063,78 +6767,40 @@ async def stage1_collect_perplexity_research_responses(
                 f"after final error: {final_retry_error[:220]}"
             )
 
-        second_pass_result: Dict[str, Any] = {}
         if run and not run.get("error"):
+            analysis_provider = _analysis_provider_for_model(model)
             provider_meta = run.setdefault("provider_metadata", {})
             if not isinstance(provider_meta, dict):
                 provider_meta = {}
                 run["provider_metadata"] = provider_meta
-
-            if PERPLEXITY_STAGE1_SECOND_PASS_ENABLED:
-                second_pass_result = await _run_stage1_second_pass_analysis(
-                    model=model,
-                    user_query=user_query,
-                    research_brief=bounded_research_brief,
-                    run=run,
-                )
-                run["stage1_second_pass"] = second_pass_result
-                provider_meta["stage1_second_pass_enabled"] = True
-                provider_meta["stage1_second_pass_success"] = bool(second_pass_result.get("success"))
-                provider_meta["stage1_second_pass_attempts"] = int(second_pass_result.get("attempts", 0))
-                provider_meta["stage1_second_pass_error"] = str(second_pass_result.get("error", ""))
-                provider_meta["stage1_second_pass_prompt_chars"] = int(
-                    second_pass_result.get("prompt_chars", 0)
-                )
-                provider_meta["stage1_second_pass_response_chars"] = int(
-                    second_pass_result.get("response_chars", 0)
-                )
-                provider_meta["stage1_second_pass_evidence_source_count"] = int(
-                    second_pass_result.get("evidence_source_count", 0)
-                )
-                provider_meta["stage1_second_pass_decoded_source_count"] = int(
-                    second_pass_result.get("decoded_source_count", 0)
-                )
-                provider_meta["stage1_second_pass_evidence_total_excerpt_chars"] = int(
-                    second_pass_result.get("evidence_total_excerpt_chars", 0)
-                )
-                provider_meta["stage1_second_pass_fact_pack_chars"] = int(
-                    second_pass_result.get("fact_pack_chars", 0)
-                )
-                provider_meta["stage1_second_pass_fact_pack_total_facts"] = int(
-                    second_pass_result.get("fact_pack_total_facts", 0)
-                )
-                provider_meta["stage1_second_pass_fact_pack_sections_with_facts"] = int(
-                    second_pass_result.get("fact_pack_sections_with_facts", 0)
-                )
-
-                if second_pass_result.get("prompt"):
-                    run["stage1_second_pass_prompt"] = second_pass_result["prompt"]
-                if second_pass_result.get("fact_pack"):
-                    run["stage1_second_pass_fact_pack"] = second_pass_result["fact_pack"]
-                if second_pass_result.get("success") and second_pass_result.get("response"):
-                    run["stage1_analysis_response"] = str(second_pass_result["response"]).strip()
-                    final_compliance = _evaluate_stage1_template_compliance(
-                        summary_text=run["stage1_analysis_response"],
+            provider_meta["stage1_analysis_provider"] = analysis_provider
+            if run_second_pass:
+                if analysis_provider == "perplexity":
+                    run = await _apply_stage1_second_pass(
+                        model=model,
                         user_query=user_query,
                         research_brief=bounded_research_brief,
+                        run=run,
+                        verification_profile=verification_profile,
+                        analysis_provider="perplexity",
                     )
-                    provider_meta["stage1_final_template_compliant"] = bool(
-                        final_compliance["compliant"]
+                elif _is_openrouter_compatible_model(model):
+                    run = await _apply_stage1_second_pass(
+                        model=model,
+                        user_query=user_query,
+                        research_brief=bounded_research_brief,
+                        run=run,
+                        verification_profile=verification_profile,
+                        analysis_provider="openrouter",
                     )
-                    provider_meta["stage1_final_template_reason"] = str(
-                        final_compliance["reason"]
-                    )
-                    provider_meta["stage1_final_template_marker_hits"] = int(
-                        final_compliance.get("marker_hits", 0)
-                    )
-                    provider_meta["stage1_final_template_primary_marker_hits"] = int(
-                        final_compliance.get("primary_marker_hits", 0)
-                    )
-                    provider_meta["stage1_final_template_secondary_marker_hits"] = int(
-                        final_compliance.get("secondary_marker_hits", 0)
+                else:
+                    provider_meta["stage1_second_pass_enabled"] = False
+                    provider_meta["stage1_second_pass_skipped_reason"] = (
+                        "model_not_openrouter_compatible"
                     )
             else:
                 provider_meta["stage1_second_pass_enabled"] = False
+                provider_meta["stage1_second_pass_skipped_reason"] = "shared_retrieval_mode"
 
         provider_meta = run.setdefault("provider_metadata", {})
         if not isinstance(provider_meta, dict):
@@ -1145,91 +6811,256 @@ async def stage1_collect_perplexity_research_responses(
         provider_meta["stage1_template_retry_triggered"] = template_retry_triggered
         provider_meta["stage1_template_retry_fallback_used"] = template_retry_fallback_used
         provider_meta["stage1_attempt_history"] = attempt_history
+        provider_meta.setdefault(
+            "stage1_shared_retrieval_enabled",
+            bool(PERPLEXITY_STAGE1_SHARED_RETRIEVAL_ENABLED),
+        )
+        provider_meta.setdefault("stage1_shared_retrieval_used", False)
         if final_retry_error:
             provider_meta["stage1_final_retry_error"] = final_retry_error
         return run
 
-    if execution_mode == "staggered":
-        stagger_seconds = max(0.0, float(PERPLEXITY_STAGE1_STAGGER_SECONDS))
-        for index, model in enumerate(models):
-            if index > 0 and stagger_seconds > 0:
-                _progress_log(
-                    f"Stage1 waiting {stagger_seconds:.1f}s before next model: {model}"
-                )
-                await asyncio.sleep(stagger_seconds)
-            model_start = perf_counter()
-            _progress_log(f"Stage1 model start: {model}")
-            run = await _gather_model_with_retries(model)
-            elapsed = perf_counter() - model_start
-            if run and not run.get("error"):
-                decode_meta = (run.get("provider_metadata", {}) or {}).get("source_decoding", {}) or {}
-                provider_meta = (run.get("provider_metadata", {}) or {})
-                stage1_attempts = int(provider_meta.get("stage1_attempts", 1))
+    def _log_stage1_model_result(model: str, run: Dict[str, Any], elapsed: float) -> None:
+        if run and not run.get("error"):
+            decode_meta = (run.get("provider_metadata", {}) or {}).get("source_decoding", {}) or {}
+            provider_meta = (run.get("provider_metadata", {}) or {})
+            stage1_attempts = int(provider_meta.get("stage1_attempts", 1))
+            template_compliant = provider_meta.get("stage1_final_template_compliant")
+            if template_compliant is None:
                 template_compliant = provider_meta.get("template_compliant")
-                second_pass_success = provider_meta.get("stage1_second_pass_success")
-                template_flag = (
-                    f", template_compliant={template_compliant}"
-                    if template_compliant is not None
-                    else ""
-                )
-                second_pass_flag = (
-                    f", second_pass_success={second_pass_success}"
-                    if second_pass_success is not None
-                    else ""
-                )
-                _progress_log(
-                    f"Stage1 model done: {model} "
-                    f"(elapsed={elapsed:.1f}s, result_count={run.get('result_count', 0)}, "
-                    f"decoded={decode_meta.get('decoded', 0)}/{decode_meta.get('attempted', 0)}, "
-                    f"attempts={stage1_attempts}{template_flag}{second_pass_flag})"
-                )
-            else:
-                stage1_attempts = int((run.get("provider_metadata", {}) or {}).get("stage1_attempts", 1))
-                _progress_log(
-                    f"Stage1 model failed: {model} "
-                    f"(elapsed={elapsed:.1f}s, attempts={stage1_attempts}, "
-                    f"error={run.get('error') if run else 'unknown'})"
-                )
-            raw_runs.append(run)
-    else:
-        async def _run_one(model: str) -> Dict[str, Any]:
-            model_start = perf_counter()
-            _progress_log(f"Stage1 model start: {model}")
-            run = await _gather_model_with_retries(model)
-            elapsed = perf_counter() - model_start
-            if run and not run.get("error"):
-                decode_meta = (run.get("provider_metadata", {}) or {}).get("source_decoding", {}) or {}
-                provider_meta = (run.get("provider_metadata", {}) or {})
-                stage1_attempts = int(provider_meta.get("stage1_attempts", 1))
-                template_compliant = provider_meta.get("template_compliant")
-                second_pass_success = provider_meta.get("stage1_second_pass_success")
-                template_flag = (
-                    f", template_compliant={template_compliant}"
-                    if template_compliant is not None
-                    else ""
-                )
-                second_pass_flag = (
-                    f", second_pass_success={second_pass_success}"
-                    if second_pass_success is not None
-                    else ""
-                )
-                _progress_log(
-                    f"Stage1 model done: {model} "
-                    f"(elapsed={elapsed:.1f}s, result_count={run.get('result_count', 0)}, "
-                    f"decoded={decode_meta.get('decoded', 0)}/{decode_meta.get('attempted', 0)}, "
-                    f"attempts={stage1_attempts}{template_flag}{second_pass_flag})"
-                )
-            else:
-                stage1_attempts = int((run.get("provider_metadata", {}) or {}).get("stage1_attempts", 1))
-                _progress_log(
-                    f"Stage1 model failed: {model} "
-                    f"(elapsed={elapsed:.1f}s, attempts={stage1_attempts}, "
-                    f"error={run.get('error') if run else 'unknown'})"
-                )
-            return run
+            second_pass_success = provider_meta.get("stage1_second_pass_success")
+            citation_gate_passed = provider_meta.get("stage1_second_pass_citation_gate_passed")
+            timeline_guard_passed = provider_meta.get("stage1_second_pass_timeline_guard_passed")
+            timeline_guard_reason = provider_meta.get("stage1_second_pass_timeline_guard_reason")
+            source_rows_count = provider_meta.get("stage1_second_pass_source_rows_count")
+            timeline_evidence_count = provider_meta.get("stage1_second_pass_timeline_evidence_count")
+            digest_facts = provider_meta.get("stage1_second_pass_fact_digest_v2_total_facts")
+            digest_conflicts = provider_meta.get("stage1_second_pass_fact_digest_v2_conflicts")
+            verification_template = provider_meta.get("stage1_second_pass_verification_template_id")
+            injection_sources = provider_meta.get("stage1_second_pass_injection_sources")
+            injection_categories = provider_meta.get("stage1_second_pass_injection_categories")
+            shared_used = provider_meta.get("stage1_shared_retrieval_used")
+            sonar_passed = provider_meta.get("sonar_multistep_passed")
+            sonar_reason = provider_meta.get("sonar_multistep_reason")
+            template_flag = (
+                f", template_compliant={template_compliant}"
+                if template_compliant is not None
+                else ""
+            )
+            second_pass_flag = (
+                f", second_pass_success={second_pass_success}"
+                if second_pass_success is not None
+                else ""
+            )
+            citation_flag = (
+                f", citation_gate_passed={citation_gate_passed}"
+                if citation_gate_passed is not None
+                else ""
+            )
+            timeline_flag = (
+                f", timeline_guard_passed={timeline_guard_passed}"
+                if timeline_guard_passed is not None
+                else ""
+            )
+            timeline_reason_flag = (
+                f", timeline_guard_reason={timeline_guard_reason}"
+                if timeline_guard_reason
+                else ""
+            )
+            evidence_flag = (
+                f", second_pass_sources={source_rows_count}, timeline_evidence={timeline_evidence_count}"
+                if source_rows_count is not None or timeline_evidence_count is not None
+                else ""
+            )
+            digest_flag = (
+                f", digest_facts={digest_facts}, digest_conflicts={digest_conflicts}"
+                if digest_facts is not None or digest_conflicts is not None
+                else ""
+            )
+            verification_flag = (
+                f", verification_template={verification_template}"
+                if verification_template
+                else ""
+            )
+            injection_flag = (
+                f", injection_sources={injection_sources}, injection_categories={injection_categories}"
+                if injection_sources is not None or injection_categories is not None
+                else ""
+            )
+            shared_flag = (
+                f", shared_retrieval_used={shared_used}"
+                if shared_used is not None
+                else ""
+            )
+            sonar_flag = (
+                f", sonar_multistep_passed={sonar_passed}"
+                if sonar_passed is not None
+                else ""
+            )
+            sonar_reason_flag = (
+                f", sonar_multistep_reason={sonar_reason}"
+                if sonar_reason
+                else ""
+            )
+            _progress_log(
+                f"Stage1 model done: {model} "
+                f"(elapsed={elapsed:.1f}s, result_count={run.get('result_count', 0)}, "
+                f"decoded={decode_meta.get('decoded', 0)}/{decode_meta.get('attempted', 0)}, "
+                f"attempts={stage1_attempts}{template_flag}{second_pass_flag}{citation_flag}"
+                f"{timeline_flag}{timeline_reason_flag}{evidence_flag}{digest_flag}"
+                f"{verification_flag}{injection_flag}{shared_flag}{sonar_flag}{sonar_reason_flag})"
+            )
+        else:
+            stage1_attempts = int((run.get("provider_metadata", {}) or {}).get("stage1_attempts", 1))
+            _progress_log(
+                f"Stage1 model failed: {model} "
+                f"(elapsed={elapsed:.1f}s, attempts={stage1_attempts}, "
+                f"error={run.get('error') if run else 'unknown'})"
+            )
 
-        tasks = [_run_one(model) for model in models]
-        raw_runs = await asyncio.gather(*tasks)
+    shared_retrieval_requested = bool(PERPLEXITY_STAGE1_SHARED_RETRIEVAL_ENABLED and len(models) > 1)
+    if mixed_mode_enabled and len(models) > 1 and not shared_retrieval_requested:
+        # Mixed provider fanout is only coherent when retrieval/decode is shared.
+        shared_retrieval_requested = True
+        _progress_log("Stage1 mixed mode forcing shared retrieval: shared_retrieval_enabled=false -> true")
+    shared_retrieval_used = False
+    shared_retrieval_model = ""
+    shared_retrieval_error = ""
+    stagger_seconds = max(0.0, float(PERPLEXITY_STAGE1_STAGGER_SECONDS))
+
+    if shared_retrieval_requested:
+        retrieval_candidates = perplexity_models if perplexity_models else models
+        shared_retrieval_model = _select_shared_retrieval_model(retrieval_candidates)
+        _progress_log(
+            "Stage1 shared retrieval mode: "
+            f"retrieval_model={shared_retrieval_model}, fanout_models={models}, "
+            f"execution_mode={execution_mode}"
+        )
+        shared_start = perf_counter()
+        shared_seed_run = await _gather_model_with_retries(
+            shared_retrieval_model,
+            run_second_pass=False,
+        )
+        shared_elapsed = perf_counter() - shared_start
+
+        if shared_seed_run and not shared_seed_run.get("error"):
+            shared_retrieval_used = True
+            _progress_log(
+                "Stage1 shared retrieval complete: "
+                f"model={shared_retrieval_model}, elapsed={shared_elapsed:.1f}s, "
+                f"result_count={shared_seed_run.get('result_count', 0)}"
+            )
+        else:
+            shared_retrieval_error = (
+                str(shared_seed_run.get("error", "unknown"))
+                if isinstance(shared_seed_run, dict)
+                else "unknown"
+            )
+            _progress_log(
+                "Stage1 shared retrieval failed; falling back to per-model retrieval: "
+                f"model={shared_retrieval_model}, elapsed={shared_elapsed:.1f}s, "
+                f"error={shared_retrieval_error}"
+            )
+
+        if shared_retrieval_used:
+            async def _run_shared_one(model: str) -> Dict[str, Any]:
+                model_start = perf_counter()
+                _progress_log(f"Stage1 model start (shared fanout): {model}")
+                run = copy.deepcopy(shared_seed_run)
+                provider_meta = run.setdefault("provider_metadata", {})
+                if not isinstance(provider_meta, dict):
+                    provider_meta = {}
+                    run["provider_metadata"] = provider_meta
+                provider_meta["stage1_shared_retrieval_enabled"] = True
+                provider_meta["stage1_shared_retrieval_used"] = True
+                provider_meta["stage1_shared_retrieval_model"] = shared_retrieval_model
+                provider_meta["stage1_analysis_model"] = model
+                # In shared mode, retrieval is performed once by the seed model.
+                # Override per-run analysis model attribution to avoid mislabeling.
+                provider_meta["model"] = model
+                provider_meta["stage1_shared_retrieval_result_count"] = int(
+                    shared_seed_run.get("result_count", 0)
+                )
+                provider_meta["stage1_shared_retrieval_reused_for_model"] = model
+                analysis_provider = _analysis_provider_for_model(model)
+                provider_meta["stage1_analysis_provider"] = analysis_provider
+
+                if PERPLEXITY_STAGE1_SECOND_PASS_ENABLED:
+                    if analysis_provider == "perplexity":
+                        run = await _apply_stage1_second_pass(
+                            model=model,
+                            user_query=user_query,
+                            research_brief=bounded_research_brief,
+                            run=run,
+                            verification_profile=verification_profile,
+                            analysis_provider="perplexity",
+                        )
+                    elif _is_openrouter_compatible_model(model):
+                        run = await _apply_stage1_second_pass(
+                            model=model,
+                            user_query=user_query,
+                            research_brief=bounded_research_brief,
+                            run=run,
+                            verification_profile=verification_profile,
+                            analysis_provider="openrouter",
+                        )
+                    else:
+                        provider_meta["stage1_second_pass_enabled"] = False
+                        provider_meta["stage1_second_pass_skipped_reason"] = (
+                            "model_not_openrouter_compatible"
+                        )
+                else:
+                    provider_meta["stage1_second_pass_enabled"] = False
+                    provider_meta["stage1_second_pass_skipped_reason"] = "second_pass_disabled"
+
+                elapsed = perf_counter() - model_start
+                _log_stage1_model_result(model, run, elapsed)
+                return run
+
+            if execution_mode == "staggered":
+                for index, model in enumerate(models):
+                    if index > 0 and stagger_seconds > 0:
+                        _progress_log(
+                            f"Stage1 waiting {stagger_seconds:.1f}s before next model: {model}"
+                        )
+                        await asyncio.sleep(stagger_seconds)
+                    raw_runs.append(await _run_shared_one(model))
+            else:
+                shared_tasks = [_run_shared_one(model) for model in models]
+                raw_runs = await asyncio.gather(*shared_tasks)
+
+    if mixed_mode_enabled and not shared_retrieval_used and openrouter_pool_models:
+        _progress_log(
+            "Stage1 mixed-mode fallback: shared retrieval unavailable; "
+            f"running Perplexity pool only ({perplexity_models})"
+        )
+        models = list(perplexity_models) if perplexity_models else list(models)
+
+    if not shared_retrieval_used:
+        if execution_mode == "staggered":
+            for index, model in enumerate(models):
+                if index > 0 and stagger_seconds > 0:
+                    _progress_log(
+                        f"Stage1 waiting {stagger_seconds:.1f}s before next model: {model}"
+                    )
+                    await asyncio.sleep(stagger_seconds)
+                model_start = perf_counter()
+                _progress_log(f"Stage1 model start: {model}")
+                run = await _gather_model_with_retries(model, run_second_pass=True)
+                elapsed = perf_counter() - model_start
+                _log_stage1_model_result(model, run, elapsed)
+                raw_runs.append(run)
+        else:
+            async def _run_one(model: str) -> Dict[str, Any]:
+                model_start = perf_counter()
+                _progress_log(f"Stage1 model start: {model}")
+                run = await _gather_model_with_retries(model, run_second_pass=True)
+                elapsed = perf_counter() - model_start
+                _log_stage1_model_result(model, run, elapsed)
+                return run
+
+            tasks = [_run_one(model) for model in models]
+            raw_runs = await asyncio.gather(*tasks)
 
     stage1_results: List[Dict[str, Any]] = []
     per_model_research_runs: List[Dict[str, Any]] = []
@@ -1248,25 +7079,183 @@ async def stage1_collect_perplexity_research_responses(
             }
         )
 
+    claim_ledger = _build_claim_ledger_from_model_runs(
+        per_model_research_runs,
+        verification_profile=verification_profile,
+    )
+    baseline_market_facts = _extract_normalized_facts_from_query_text(user_query)
+    deterministic_finance_lane = (
+        _build_deterministic_finance_lane_from_claim_ledger(
+            claim_ledger,
+            baseline_market_facts=baseline_market_facts,
+        )
+        if DETERMINISTIC_FINANCE_LANE_ENABLED
+        else {}
+    )
+
     aggregated_search_results = _aggregate_perplexity_research_runs(
         user_query=user_query,
         ticker=ticker,
         model_runs=per_model_research_runs,
         depth=depth,
+        claim_ledger=claim_ledger,
+        deterministic_finance_lane=deterministic_finance_lane,
     )
+
+    sonar_models_total = 0
+    sonar_models_passed = 0
+    sonar_failed_models: List[str] = []
+    for model_run in per_model_research_runs:
+        model = str(model_run.get("model", ""))
+        result = model_run.get("result") or {}
+        if not isinstance(result, dict):
+            continue
+        provider_meta = result.get("provider_metadata", {}) or {}
+        if not isinstance(provider_meta, dict):
+            provider_meta = {}
+        is_sonar = bool(provider_meta.get("is_sonar_model", False)) or _is_sonar_model(model)
+        if not is_sonar:
+            continue
+        sonar_models_total += 1
+        passed = bool(provider_meta.get("sonar_multistep_passed", False))
+        if passed:
+            sonar_models_passed += 1
+        else:
+            sonar_failed_models.append(model)
 
     metadata = {
         "per_model_research_runs": per_model_research_runs,
         "aggregated_search_results": aggregated_search_results,
+        "claim_ledger": claim_ledger,
+        "deterministic_finance_lane": deterministic_finance_lane,
         "models_attempted": models,
         "models_succeeded": [item["model"] for item in stage1_results],
+        "stage1_verification_template_id": str(template_id or ""),
+        "stage1_verification_digest_sections": int(
+            len((verification_profile.get("fact_digest_keywords") or {}).keys())
+        ),
+        "stage1_verification_timeline_focus_terms": list(
+            verification_profile.get("timeline_focus_terms", []) or []
+        ),
+        "stage1_verification_compliance_markers": int(
+            len(verification_profile.get("compliance_section_markers", []) or [])
+        ),
+        "stage1_verification_critical_sections": list(
+            sorted(verification_profile.get("compliance_critical_sections", set()) or [])
+        ),
+        "stage1_perplexity_model_preflight_enabled": bool(
+            PERPLEXITY_STAGE1_MODEL_PREFLIGHT_ENABLED
+        ),
+        "stage1_perplexity_model_preflight_timeout_seconds": float(
+            PERPLEXITY_STAGE1_MODEL_PREFLIGHT_TIMEOUT_SECONDS
+        ),
+        "stage1_perplexity_model_preflight_fail_open": bool(
+            PERPLEXITY_STAGE1_MODEL_PREFLIGHT_FAIL_OPEN
+        ),
+        "stage1_perplexity_model_preflight_skipped_reason": str(preflight_skipped_reason),
+        "stage1_perplexity_model_preflight_requested_models": list(perplexity_models_requested),
+        "stage1_perplexity_model_preflight_effective_models": list(perplexity_models),
+        "stage1_perplexity_model_preflight_removed_models": list(preflight_removed_models),
+        "stage1_perplexity_model_preflight_results": list(preflight_results),
+        "stage1_mixed_mode_enabled": bool(mixed_mode_enabled),
+        "stage1_mixed_mode_perplexity_pool": list(perplexity_models),
+        "stage1_mixed_mode_openrouter_pool": list(openrouter_pool_models),
         "stage1_execution_mode": execution_mode,
         "stage1_stagger_seconds": float(PERPLEXITY_STAGE1_STAGGER_SECONDS),
+        "stage1_max_attempts": int(max_attempts),
+        "stage1_retry_backoff_seconds": float(base_backoff),
         "stage1_second_pass_enabled": bool(PERPLEXITY_STAGE1_SECOND_PASS_ENABLED),
+        "stage1_second_pass_timeout_seconds": float(PERPLEXITY_STAGE1_SECOND_PASS_TIMEOUT_SECONDS),
+        "stage1_second_pass_max_attempts": int(PERPLEXITY_STAGE1_SECOND_PASS_MAX_ATTEMPTS),
+        "stage1_second_pass_retry_backoff_seconds": float(
+            PERPLEXITY_STAGE1_SECOND_PASS_RETRY_BACKOFF_SECONDS
+        ),
         "stage1_second_pass_max_sources": int(PERPLEXITY_STAGE1_SECOND_PASS_MAX_SOURCES),
         "stage1_second_pass_max_chars_per_source": int(
             PERPLEXITY_STAGE1_SECOND_PASS_MAX_CHARS_PER_SOURCE
         ),
+        "stage1_second_pass_appendix_max_sources": int(
+            PERPLEXITY_STAGE1_SECOND_PASS_APPENDIX_MAX_SOURCES
+        ),
+        "stage1_second_pass_max_output_tokens": int(
+            PERPLEXITY_STAGE1_SECOND_PASS_MAX_OUTPUT_TOKENS
+        ),
+        "stage1_second_pass_reasoning_effort": str(
+            PERPLEXITY_STAGE1_SECOND_PASS_REASONING_EFFORT
+        ),
+        "stage1_second_pass_prompt_compression_enabled": bool(
+            PERPLEXITY_STAGE1_SECOND_PASS_PROMPT_COMPRESSION_ENABLED
+        ),
+        "stage1_second_pass_prompt_target_chars": int(
+            PERPLEXITY_STAGE1_SECOND_PASS_PROMPT_TARGET_CHARS
+        ),
+        "stage1_second_pass_doc_keypoints_max_per_source": int(
+            PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_PER_SOURCE
+        ),
+        "stage1_second_pass_doc_keypoints_max_words_per_source": int(
+            PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_WORDS_PER_SOURCE
+        ),
+        "stage1_second_pass_doc_keypoints_max_fact_chars": int(
+            PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_FACT_CHARS
+        ),
+        "stage1_asx_deterministic_announcements_enabled": bool(
+            ASX_DETERMINISTIC_ANNOUNCEMENTS_ENABLED
+        ),
+        "stage1_asx_deterministic_target_announcements": int(
+            ASX_DETERMINISTIC_TARGET_ANNOUNCEMENTS
+        ),
+        "stage1_asx_deterministic_lookback_years": int(
+            ASX_DETERMINISTIC_LOOKBACK_YEARS
+        ),
+        "stage1_asx_deterministic_price_sensitive_only": bool(
+            ASX_DETERMINISTIC_PRICE_SENSITIVE_ONLY
+        ),
+        "stage1_asx_deterministic_include_non_sensitive_fill": bool(
+            ASX_DETERMINISTIC_INCLUDE_NON_SENSITIVE_FILL
+        ),
+        "stage1_asx_deterministic_max_decode": int(ASX_DETERMINISTIC_MAX_DECODE),
+        "stage1_asx_deterministic_fetch_timeout_seconds": float(
+            ASX_DETERMINISTIC_FETCH_TIMEOUT_SECONDS
+        ),
+        "stage1_timeline_guard_enabled": bool(PERPLEXITY_STAGE1_TIMELINE_GUARD_ENABLED),
+        "stage1_timeline_guard_hard_fail": bool(PERPLEXITY_STAGE1_TIMELINE_GUARD_HARD_FAIL),
+        "stage1_timeline_digest_max_items": int(PERPLEXITY_STAGE1_TIMELINE_DIGEST_MAX_ITEMS),
+        "stage1_fact_digest_v2_enabled": bool(PERPLEXITY_STAGE1_FACT_DIGEST_V2_ENABLED),
+        "stage1_fact_digest_v2_max_facts_per_section": int(
+            PERPLEXITY_STAGE1_FACT_DIGEST_V2_MAX_FACTS_PER_SECTION
+        ),
+        "stage1_fact_digest_v2_max_summary_bullets": int(
+            PERPLEXITY_STAGE1_FACT_DIGEST_V2_MAX_SUMMARY_BULLETS
+        ),
+        "stage1_fact_digest_v2_max_narrative_words": int(
+            PERPLEXITY_STAGE1_FACT_DIGEST_V2_MAX_NARRATIVE_WORDS
+        ),
+        "stage1_second_pass_citation_gate_enabled": bool(
+            PERPLEXITY_STAGE1_SECOND_PASS_CITATION_GATE_ENABLED
+        ),
+        "stage1_second_pass_citation_min_count": int(
+            PERPLEXITY_STAGE1_SECOND_PASS_CITATION_MIN_COUNT
+        ),
+        "stage1_second_pass_citation_max_uncited_numeric_lines": int(
+            PERPLEXITY_STAGE1_SECOND_PASS_CITATION_MAX_UNCITED_NUMERIC_LINES
+        ),
+        "stage1_second_pass_compliance_min_score": float(
+            PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_MIN_SCORE
+        ),
+        "stage1_second_pass_compliance_min_rubric_coverage_pct": float(
+            PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_MIN_RUBRIC_COVERAGE_PCT
+        ),
+        "stage1_second_pass_compliance_min_numeric_citation_pct": float(
+            PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_MIN_NUMERIC_CITATION_PCT
+        ),
+        "stage1_second_pass_compliance_catastrophic_score": float(
+            PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_CATASTROPHIC_SCORE
+        ),
+        "stage1_shared_retrieval_enabled": bool(PERPLEXITY_STAGE1_SHARED_RETRIEVAL_ENABLED),
+        "stage1_shared_retrieval_requested": bool(shared_retrieval_requested),
+        "stage1_shared_retrieval_used": bool(shared_retrieval_used),
+        "stage1_shared_retrieval_model": str(shared_retrieval_model),
+        "stage1_shared_retrieval_error": str(shared_retrieval_error),
         "stage1_openai_guardrails_enabled": bool(
             PERPLEXITY_STAGE1_OPENAI_BASE_GUARDRAILS_ENABLED
         ),
@@ -1274,6 +7263,29 @@ async def stage1_collect_perplexity_research_responses(
         "stage1_openai_base_max_steps": int(PERPLEXITY_STAGE1_OPENAI_BASE_MAX_STEPS),
         "stage1_openai_base_reasoning_effort": str(
             PERPLEXITY_STAGE1_OPENAI_BASE_REASONING_EFFORT
+        ),
+        "stage1_preset_strategy": str(PERPLEXITY_PRESET_STRATEGY),
+        "stage1_preset_deep": str(PERPLEXITY_PRESET_DEEP),
+        "stage1_preset_advanced": str(PERPLEXITY_PRESET_ADVANCED),
+        "stage1_multi_wave_enabled": bool(multi_wave_enabled),
+        "stage1_multi_wave_max_waves": int(max_waves),
+        "stage1_multi_wave_gap_query_limit": int(gap_query_limit),
+        "stage1_multi_wave_min_new_primary_sources": int(min_new_primary_sources),
+        "stage1_sonar_multistep_required": bool(PERPLEXITY_STAGE1_SONAR_MULTISTEP_REQUIRED),
+        "deterministic_finance_lane_enabled": bool(DETERMINISTIC_FINANCE_LANE_ENABLED),
+        "stage1_sonar_models_total": int(sonar_models_total),
+        "stage1_sonar_models_passed": int(sonar_models_passed),
+        "stage1_sonar_models_failed": sonar_failed_models,
+        "claim_ledger_raw_claims": int((claim_ledger.get("counts", {}) or {}).get("raw_claims", 0)),
+        "claim_ledger_resolved_fields": int(
+            (claim_ledger.get("counts", {}) or {}).get("resolved_fields", 0)
+        ),
+        "claim_ledger_conflicts": int((claim_ledger.get("counts", {}) or {}).get("conflicts", 0)),
+        "deterministic_finance_lane_status": str(
+            (deterministic_finance_lane or {}).get("status", "")
+        ),
+        "market_facts_baseline_fields_detected": int(
+            len([key for key, value in (baseline_market_facts or {}).items() if value is not None])
         ),
     }
 
@@ -1355,6 +7367,8 @@ def _aggregate_perplexity_research_runs(
     ticker: Optional[str],
     model_runs: List[Dict[str, Any]],
     depth: str,
+    claim_ledger: Optional[Dict[str, Any]] = None,
+    deterministic_finance_lane: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Aggregate per-model Perplexity runs into one search/evidence payload."""
     merged_by_url: Dict[str, Dict[str, Any]] = {}
@@ -1413,18 +7427,16 @@ def _aggregate_perplexity_research_runs(
 
     formatted_results = []
     for item in merged_results[:MAX_SOURCES]:
-        model_tags = ", ".join(item["models"])
         content = item.get("content", "").strip()
-        if content:
-            content = f"[Models: {model_tags}] {content}"
-        else:
-            content = f"Referenced by models: {model_tags}"
+        if not content:
+            content = "Referenced by council models."
 
         result_item = {
             "title": item.get("title", "Untitled"),
             "url": item.get("url", ""),
             "content": content,
             "score": item.get("score", 0.0),
+            "referenced_by_models": list(item.get("models", []) or []),
         }
         if item.get("published_at"):
             result_item["published_at"] = item["published_at"]
@@ -1466,6 +7478,8 @@ def _aggregate_perplexity_research_runs(
         "sources": evidence_pack_sources,
         "key_facts": key_facts[:12],
         "missing_data": missing_data,
+        "claim_ledger": claim_ledger or {},
+        "deterministic_finance_lane": deterministic_finance_lane or {},
     }
 
     return {
@@ -1476,6 +7490,16 @@ def _aggregate_perplexity_research_runs(
         "search_type": "perplexity_emulated_council",
         "provider": "perplexity",
         "evidence_pack": evidence_pack,
+        "metadata": {
+            "claim_ledger_counts": (
+                (claim_ledger or {}).get("counts", {})
+                if isinstance(claim_ledger, dict)
+                else {}
+            ),
+            "deterministic_finance_lane_status": str(
+                (deterministic_finance_lane or {}).get("status", "")
+            ),
+        },
     }
 
 
@@ -1574,6 +7598,7 @@ async def stage3_synthesize_final(
     exchange: str = None,
     chairman_model: Optional[str] = None,
     market_facts: Optional[Dict[str, Any]] = None,
+    evidence_pack: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Stage 3: Chairman synthesizes final response.
@@ -1589,6 +7614,7 @@ async def stage3_synthesize_final(
         company_name: Optional explicit company name
         exchange: Optional exchange id/name
         chairman_model: Optional chairman model override for this run
+        evidence_pack: Optional normalized evidence pack (claim ledger + deterministic lane)
 
     Returns:
         Dict with 'model' and 'response' keys (and 'structured_data' if applicable)
@@ -1609,6 +7635,7 @@ async def stage3_synthesize_final(
             exchange=exchange,
             chairman_model=selected_chairman_model,
             market_facts=market_facts,
+            evidence_pack=evidence_pack,
         )
 
     # Otherwise use standard synthesis
@@ -1800,6 +7827,7 @@ async def run_full_council(
     Returns:
         Tuple of (stage1_results, stage2_results, stage3_result, metadata)
     """
+    _ensure_system_enabled(diagnostic_mode=False)
     # Stage 1: Collect individual responses
     stage1_results = await stage1_collect_responses(enhanced_context)
 
@@ -1827,6 +7855,7 @@ async def run_full_council(
         ticker=ticker,
         company_name=company_name,
         exchange=exchange,
+        evidence_pack=None,
     )
 
     # Prepare metadata

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "gpt51_deep_medium",
+    "profile": "current_env",
+    "cost_rank": 1,
+    "description": "gpt-5.1 deep-research, medium reasoning.",
+    "env_overrides": {
+      "PERPLEXITY_COUNCIL_MODELS": "openai/gpt-5.1",
+      "PERPLEXITY_PRESET_STRATEGY": "deep_only",
+      "PERPLEXITY_STREAM_ENABLED": "false",
+      "PERPLEXITY_TIMEOUT_SECONDS": "420",
+      "PERPLEXITY_MAX_STEPS": "2",
+      "PERPLEXITY_REASONING_EFFORT": "medium",
+      "MAX_SOURCES": "5",
+      "PERPLEXITY_MAX_RESULTS_PER_QUERY": "5",
+      "PERPLEXITY_STAGE1_MAX_ATTEMPTS": "1",
+      "PERPLEXITY_STAGE1_SECOND_PASS_ENABLED": "false"
+    }
+  },
+  {
+    "id": "gpt51_deep_high",
+    "profile": "current_env",
+    "cost_rank": 2,
+    "description": "gpt-5.1 deep-research, high reasoning.",
+    "env_overrides": {
+      "PERPLEXITY_COUNCIL_MODELS": "openai/gpt-5.1",
+      "PERPLEXITY_PRESET_STRATEGY": "deep_only",
+      "PERPLEXITY_STREAM_ENABLED": "false",
+      "PERPLEXITY_TIMEOUT_SECONDS": "420",
+      "PERPLEXITY_MAX_STEPS": "2",
+      "PERPLEXITY_REASONING_EFFORT": "high",
+      "MAX_SOURCES": "5",
+      "PERPLEXITY_MAX_RESULTS_PER_QUERY": "5",
+      "PERPLEXITY_STAGE1_MAX_ATTEMPTS": "1",
+      "PERPLEXITY_STAGE1_SECOND_PASS_ENABLED": "false"
+    }
+  },
+  {
+    "id": "gpt51_advanced_medium",
+    "profile": "current_env",
+    "cost_rank": 3,
+    "description": "gpt-5.1 advanced-deep-research, medium reasoning.",
+    "env_overrides": {
+      "PERPLEXITY_COUNCIL_MODELS": "openai/gpt-5.1",
+      "PERPLEXITY_PRESET_STRATEGY": "advanced_only",
+      "PERPLEXITY_STREAM_ENABLED": "false",
+      "PERPLEXITY_TIMEOUT_SECONDS": "420",
+      "PERPLEXITY_MAX_STEPS": "2",
+      "PERPLEXITY_REASONING_EFFORT": "medium",
+      "MAX_SOURCES": "5",
+      "PERPLEXITY_MAX_RESULTS_PER_QUERY": "5",
+      "PERPLEXITY_STAGE1_MAX_ATTEMPTS": "1",
+      "PERPLEXITY_STAGE1_SECOND_PASS_ENABLED": "false"
+    }
+  },
+  {
+    "id": "gpt51_advanced_high",
+    "profile": "current_env",
+    "cost_rank": 4,
+    "description": "gpt-5.1 advanced-deep-research, high reasoning.",
+    "env_overrides": {
+      "PERPLEXITY_COUNCIL_MODELS": "openai/gpt-5.1",
+      "PERPLEXITY_PRESET_STRATEGY": "advanced_only",
+      "PERPLEXITY_STREAM_ENABLED": "false",
+      "PERPLEXITY_TIMEOUT_SECONDS": "420",
+      "PERPLEXITY_MAX_STEPS": "2",
+      "PERPLEXITY_REASONING_EFFORT": "high",
+      "MAX_SOURCES": "5",
+      "PERPLEXITY_MAX_RESULTS_PER_QUERY": "5",
+      "PERPLEXITY_STAGE1_MAX_ATTEMPTS": "1",
+      "PERPLEXITY_STAGE1_SECOND_PASS_ENABLED": "false"
+    }
+  }
+]

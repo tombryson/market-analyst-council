@@ -1,0 +1,138 @@
+{
+  "query": "ASX:Theta Gold Mines Limited latest announcements, investor presentations and quarterly reports",
+  "ticker": "ASX:TGM",
+  "depth": "deep",
+  "lookback_days": 365,
+  "generated_at_utc": "2026-02-17T08:13:10.727021+00:00",
+  "allowed_domains": [
+    "asx.com.au",
+    "marketindex.com.au",
+    "intelligentinvestor.com.au"
+  ],
+  "retrieved_sources": 40,
+  "target_files": 10,
+  "candidate_sources_considered": 11,
+  "candidate_pdfs_in_window": 28,
+  "selected_pdf_candidates": 28,
+  "written_files": [
+    {
+      "index": 1,
+      "file": "outputs/pdf_dump/20260217_081307_asx_tgm/01_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260216/pdf/03056918.pdf",
+      "published_at": "2026-02-16",
+      "score": 6.3500000000000005,
+      "decoded_chars": 5394,
+      "page_count": 0
+    },
+    {
+      "index": 2,
+      "file": "outputs/pdf_dump/20260217_081307_asx_tgm/02_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260213/pdf/03056355.pdf",
+      "published_at": "2026-02-16",
+      "score": 6.3500000000000005,
+      "decoded_chars": 2407,
+      "page_count": 0
+    },
+    {
+      "index": 3,
+      "file": "outputs/pdf_dump/20260217_081307_asx_tgm/03_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260213/pdf/03056334.pdf",
+      "published_at": "2026-02-16",
+      "score": 6.3500000000000005,
+      "decoded_chars": 7203,
+      "page_count": 0
+    },
+    {
+      "index": 4,
+      "file": "outputs/pdf_dump/20260217_081307_asx_tgm/04_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260213/pdf/03056332.pdf",
+      "published_at": "2026-02-16",
+      "score": 6.3500000000000005,
+      "decoded_chars": 5405,
+      "page_count": 0
+    },
+    {
+      "index": 5,
+      "file": "outputs/pdf_dump/20260217_081307_asx_tgm/05_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260213/pdf/03056329.pdf",
+      "published_at": "2026-02-16",
+      "score": 6.3500000000000005,
+      "decoded_chars": 4043,
+      "page_count": 0
+    },
+    {
+      "index": 6,
+      "file": "outputs/pdf_dump/20260217_081307_asx_tgm/06_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260209/pdf/03054177.pdf",
+      "published_at": "2026-02-16",
+      "score": 6.3500000000000005,
+      "decoded_chars": 52562,
+      "page_count": 0
+    },
+    {
+      "index": 7,
+      "file": "outputs/pdf_dump/20260217_081307_asx_tgm/07_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053862.pdf",
+      "published_at": "2026-02-16",
+      "score": 6.3500000000000005,
+      "decoded_chars": 2168,
+      "page_count": 0
+    },
+    {
+      "index": 8,
+      "file": "outputs/pdf_dump/20260217_081307_asx_tgm/08_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053861.pdf",
+      "published_at": "2026-02-16",
+      "score": 6.3500000000000005,
+      "decoded_chars": 7428,
+      "page_count": 0
+    },
+    {
+      "index": 9,
+      "file": "outputs/pdf_dump/20260217_081307_asx_tgm/09_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053860.pdf",
+      "published_at": "2026-02-16",
+      "score": 6.3500000000000005,
+      "decoded_chars": 5701,
+      "page_count": 0
+    },
+    {
+      "index": 10,
+      "file": "outputs/pdf_dump/20260217_081307_asx_tgm/10_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053856.pdf",
+      "published_at": "2026-02-16",
+      "score": 6.3500000000000005,
+      "decoded_chars": 2483,
+      "page_count": 0
+    }
+  ],
+  "failed_files": [
+    {
+      "index": 7,
+      "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260209/pdf/03054146.pdf",
+      "error": "empty_decoded_text"
+    }
+  ]
+}

@@ -1,0 +1,412 @@
+{
+  "url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+  "total_rows_with_pdf": 25,
+  "flagged_price_sensitive_rows": 4,
+  "sample_flagged": [
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251209/pdf/03035031.pdf",
+      "title": "TGME Project - Long-Lead Processing Plant & Equipment",
+      "published_at_raw": "9 Dec 2025 9:26AM",
+      "summary_popover_id": "60677",
+      "has_summary_popover": true,
+      "ii_price_sensitive_marker": true,
+      "ii_key_points": [
+        "Major procurement milestone achieved for the TGME Gold Project.",
+        "Orders placed with leading metallurgical engineering firms Kemix and MIP Industries.",
+        "Equipment includes agitators, electrowinning circuits, and thickeners.",
+        "Project remains on track for end-2026 commissioning.",
+        "The project is set to create over 500 jobs and support community programs.",
+        "Theta Gold Mines Limited is committed to regional economic development."
+      ]
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260130/pdf/03051246.pdf",
+      "title": "Quarterly Activities & Cashflow Report - 31 Dec'25",
+      "published_at_raw": "30 Jan 2026 3:10PM",
+      "summary_popover_id": "63689",
+      "has_summary_popover": true,
+      "ii_price_sensitive_marker": true,
+      "ii_key_points": [
+        "Theta Gold Mines Limited (TGM) is advancing its TGME Gold Project in South Africa with significant construction progress.",
+        "The company secured A$60.71 million in funding for the project, composed of equity and debt.",
+        "The project is on schedule with the gold plant build expected to be commissioned by the end of Q4 2026.",
+        "TGM has reached a non-binding funding agreement for US$80 million with Nebari Partners LLC.",
+        "Over 70% of non-specialist personnel for the project are sourced from local communities, with over 500 jobs expected at full production.",
+        "TGM reported a cash position of US$12.5 million as of 31 December 2025.",
+        "The estimated market capitalization of TGM was A$183 million as of 31 December 2025."
+      ]
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260203/pdf/03052340.pdf",
+      "title": "Revised Feasibility Study Confirms A$1.4B Free Cash Flow",
+      "published_at_raw": "3 Feb 2026 9:45AM",
+      "summary_popover_id": "64684",
+      "has_summary_popover": true,
+      "ii_price_sensitive_marker": true,
+      "ii_key_points": [
+        "Revised Feasibility Study confirms A$1.4 billion free cash flow.",
+        "13.1-year Life of Mine with high-margin operations.",
+        "Post-tax NPV10% of A$689 million, IRR of 77%.",
+        "Projected average gold price of US$2,884/oz.",
+        "1.01 million ounces of gold production targeted.",
+        "Significant leverage to gold price movements.",
+        "Initial phase involves production from four historic mines.",
+        "Further upside potential from additional mines in the region."
+      ]
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251216/pdf/03037876.pdf",
+      "title": "TGM enters into Non-Binding Funding Agreement for US$80M",
+      "published_at_raw": "16 Dec 2025 9:21AM",
+      "summary_popover_id": "61169",
+      "has_summary_popover": true,
+      "ii_price_sensitive_marker": true,
+      "ii_key_points": [
+        "Theta Gold Mines Limited secured a non-binding funding agreement for US$80 million.",
+        "The funding is from Nebari Partners, LLC in the form of a senior secured loan.",
+        "The agreement supports the TGME Gold Mine project in South Africa.",
+        "Funding structure includes two tranches: US$45 million at closing and up to US$35 million afterward.",
+        "The interest rate is set at 3-month SOFR with a 3.75% floor plus 10% per annum.",
+        "Includes a 12-month interest capitalization and an 18-month principal repayment moratorium.",
+        "The loan term is 60 months.",
+        "Provides funding flexibility for co-lending and debt syndication.",
+        "Proceeds will be used for plant construction and achieving the first gold pour by Q1 2027."
+      ]
+    }
+  ],
+  "sample_unflagged": [
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260209/pdf/03054177.pdf",
+      "title": "TGM Presentation - 121 Mining Investment Conference",
+      "published_at_raw": "9 Feb 2026 8:23AM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260209/pdf/03054146.pdf",
+      "title": "Becoming a substantial holder",
+      "published_at_raw": "9 Feb 2026 8:16AM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053862.pdf",
+      "title": "Cleansing Notice",
+      "published_at_raw": "6 Feb 2026 1:15PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053861.pdf",
+      "title": "Notification regarding unquoted securities - TGM",
+      "published_at_raw": "6 Feb 2026 1:12PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053860.pdf",
+      "title": "Application for quotation of securities - TGM",
+      "published_at_raw": "6 Feb 2026 1:07PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053856.pdf",
+      "title": "Issue of Convertible Lender Shares and Options",
+      "published_at_raw": "6 Feb 2026 12:59PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251203/pdf/03032664.pdf",
+      "title": "Change in Director's Interest Notice - B Dumpleton",
+      "published_at_raw": "3 Dec 2025 1:17PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260216/pdf/03056918.pdf",
+      "title": "Change of Director's Interest Notice - B Tang",
+      "published_at_raw": "16 Feb 2026 2:32PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    }
+  ],
+  "rows": [
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251209/pdf/03035031.pdf",
+      "title": "TGME Project - Long-Lead Processing Plant & Equipment",
+      "published_at_raw": "9 Dec 2025 9:26AM",
+      "summary_popover_id": "60677",
+      "has_summary_popover": true,
+      "ii_price_sensitive_marker": true,
+      "ii_key_points": [
+        "Major procurement milestone achieved for the TGME Gold Project.",
+        "Orders placed with leading metallurgical engineering firms Kemix and MIP Industries.",
+        "Equipment includes agitators, electrowinning circuits, and thickeners.",
+        "Project remains on track for end-2026 commissioning.",
+        "The project is set to create over 500 jobs and support community programs.",
+        "Theta Gold Mines Limited is committed to regional economic development."
+      ]
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260130/pdf/03051246.pdf",
+      "title": "Quarterly Activities & Cashflow Report - 31 Dec'25",
+      "published_at_raw": "30 Jan 2026 3:10PM",
+      "summary_popover_id": "63689",
+      "has_summary_popover": true,
+      "ii_price_sensitive_marker": true,
+      "ii_key_points": [
+        "Theta Gold Mines Limited (TGM) is advancing its TGME Gold Project in South Africa with significant construction progress.",
+        "The company secured A$60.71 million in funding for the project, composed of equity and debt.",
+        "The project is on schedule with the gold plant build expected to be commissioned by the end of Q4 2026.",
+        "TGM has reached a non-binding funding agreement for US$80 million with Nebari Partners LLC.",
+        "Over 70% of non-specialist personnel for the project are sourced from local communities, with over 500 jobs expected at full production.",
+        "TGM reported a cash position of US$12.5 million as of 31 December 2025.",
+        "The estimated market capitalization of TGM was A$183 million as of 31 December 2025."
+      ]
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260203/pdf/03052340.pdf",
+      "title": "Revised Feasibility Study Confirms A$1.4B Free Cash Flow",
+      "published_at_raw": "3 Feb 2026 9:45AM",
+      "summary_popover_id": "64684",
+      "has_summary_popover": true,
+      "ii_price_sensitive_marker": true,
+      "ii_key_points": [
+        "Revised Feasibility Study confirms A$1.4 billion free cash flow.",
+        "13.1-year Life of Mine with high-margin operations.",
+        "Post-tax NPV10% of A$689 million, IRR of 77%.",
+        "Projected average gold price of US$2,884/oz.",
+        "1.01 million ounces of gold production targeted.",
+        "Significant leverage to gold price movements.",
+        "Initial phase involves production from four historic mines.",
+        "Further upside potential from additional mines in the region."
+      ]
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251216/pdf/03037876.pdf",
+      "title": "TGM enters into Non-Binding Funding Agreement for US$80M",
+      "published_at_raw": "16 Dec 2025 9:21AM",
+      "summary_popover_id": "61169",
+      "has_summary_popover": true,
+      "ii_price_sensitive_marker": true,
+      "ii_key_points": [
+        "Theta Gold Mines Limited secured a non-binding funding agreement for US$80 million.",
+        "The funding is from Nebari Partners, LLC in the form of a senior secured loan.",
+        "The agreement supports the TGME Gold Mine project in South Africa.",
+        "Funding structure includes two tranches: US$45 million at closing and up to US$35 million afterward.",
+        "The interest rate is set at 3-month SOFR with a 3.75% floor plus 10% per annum.",
+        "Includes a 12-month interest capitalization and an 18-month principal repayment moratorium.",
+        "The loan term is 60 months.",
+        "Provides funding flexibility for co-lending and debt syndication.",
+        "Proceeds will be used for plant construction and achieving the first gold pour by Q1 2027."
+      ]
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260209/pdf/03054177.pdf",
+      "title": "TGM Presentation - 121 Mining Investment Conference",
+      "published_at_raw": "9 Feb 2026 8:23AM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260209/pdf/03054146.pdf",
+      "title": "Becoming a substantial holder",
+      "published_at_raw": "9 Feb 2026 8:16AM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053862.pdf",
+      "title": "Cleansing Notice",
+      "published_at_raw": "6 Feb 2026 1:15PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053861.pdf",
+      "title": "Notification regarding unquoted securities - TGM",
+      "published_at_raw": "6 Feb 2026 1:12PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053860.pdf",
+      "title": "Application for quotation of securities - TGM",
+      "published_at_raw": "6 Feb 2026 1:07PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260206/pdf/03053856.pdf",
+      "title": "Issue of Convertible Lender Shares and Options",
+      "published_at_raw": "6 Feb 2026 12:59PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251203/pdf/03032664.pdf",
+      "title": "Change in Director's Interest Notice - B Dumpleton",
+      "published_at_raw": "3 Dec 2025 1:17PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260216/pdf/03056918.pdf",
+      "title": "Change of Director's Interest Notice - B Tang",
+      "published_at_raw": "16 Feb 2026 2:32PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260213/pdf/03056355.pdf",
+      "title": "Cleansing Notice",
+      "published_at_raw": "13 Feb 2026 4:20PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260213/pdf/03056334.pdf",
+      "title": "Notification regarding unquoted securities - TGM",
+      "published_at_raw": "13 Feb 2026 3:39PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260213/pdf/03056332.pdf",
+      "title": "Application for quotation of securities - TGM",
+      "published_at_raw": "13 Feb 2026 3:34PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260213/pdf/03056329.pdf",
+      "title": "Completion of Tranche Three and Director Participation",
+      "published_at_raw": "13 Feb 2026 3:32PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251212/pdf/03036847.pdf",
+      "title": "Change of Director's Interest Notice - B Tang",
+      "published_at_raw": "12 Dec 2025 1:55PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251212/pdf/03036837.pdf",
+      "title": "Change of Director's Interest Notice - B Guy",
+      "published_at_raw": "12 Dec 2025 1:39PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251212/pdf/03036835.pdf",
+      "title": "Change of Director's Interest Notice - B Yang",
+      "published_at_raw": "12 Dec 2025 1:37PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251212/pdf/03036827.pdf",
+      "title": "Change of Director's Interest Notice - Hansjoerg Plaggemars",
+      "published_at_raw": "12 Dec 2025 1:31PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251212/pdf/03036822.pdf",
+      "title": "Change of Director's Interest Notice - B Dumpleton",
+      "published_at_raw": "12 Dec 2025 1:28PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251211/pdf/03036275.pdf",
+      "title": "Results of General Meeting",
+      "published_at_raw": "11 Dec 2025 1:05PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251210/pdf/03035776.pdf",
+      "title": "Notification regarding unquoted securities - TGM",
+      "published_at_raw": "10 Dec 2025 3:33PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251210/pdf/03035771.pdf",
+      "title": "Issue of Options and Performance Rights",
+      "published_at_raw": "10 Dec 2025 3:26PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    },
+    {
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251201/pdf/03031324.pdf",
+      "title": "Listed Options - Distribution Schedule & Top 20 Holders",
+      "published_at_raw": "1 Dec 2025 5:06PM",
+      "summary_popover_id": "",
+      "has_summary_popover": false,
+      "ii_price_sensitive_marker": false,
+      "ii_key_points": []
+    }
+  ]
+}

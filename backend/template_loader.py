@@ -248,6 +248,26 @@ PREALLOCATED_COMPANY_TYPE_ASSIGNMENTS: List[Dict[str, Any]] = [
         "tickers": ["ASX:WWI", "WWI"],
         "company_names": ["West Wits Mining Limited", "West Wits Mining"],
     },
+    {
+        "company_type": "gold_miner",
+        "tickers": ["ASX:BTR", "BTR", "BTR.AX"],
+        "company_names": ["Brightstar Resources Limited", "Brightstar Resources"],
+    },
+]
+
+
+# Optional direct company-to-exchange assignments for bare tickers and fuzzy names.
+PREALLOCATED_EXCHANGE_ASSIGNMENTS: List[Dict[str, Any]] = [
+    {
+        "exchange": "asx",
+        "tickers": ["ASX:WWI", "WWI", "WWI.AX"],
+        "company_names": ["West Wits Mining Limited", "West Wits Mining"],
+    },
+    {
+        "exchange": "asx",
+        "tickers": ["ASX:BTR", "BTR", "BTR.AX"],
+        "company_names": ["Brightstar Resources Limited", "Brightstar Resources"],
+    },
 ]
 
 
@@ -524,6 +544,10 @@ class TemplateLoader:
         if from_ticker:
             return from_ticker
 
+        from_assignment = self._detect_assigned_exchange(user_query, ticker=ticker)
+        if from_assignment:
+            return from_assignment
+
         text = f"{user_query or ''} {ticker or ''}".lower()
         best_exchange: Optional[str] = None
         best_score = 0
@@ -544,6 +568,40 @@ class TemplateLoader:
             return best_exchange
 
         return "unknown"
+
+    def _detect_assigned_exchange(
+        self,
+        user_query: str,
+        ticker: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Resolve exchange from curated assignments before keyword heuristics.
+        """
+        ticker_key = self._ticker_match_keys(ticker)
+        inferred_name = self.infer_company_name(user_query or "", ticker=ticker).strip().lower()
+
+        for assignment in PREALLOCATED_EXCHANGE_ASSIGNMENTS:
+            exchange_id = self.normalize_exchange(assignment.get("exchange"))
+            if not exchange_id or exchange_id == "unknown":
+                continue
+
+            for raw_ticker in assignment.get("tickers", []):
+                normalized_ticker = str(raw_ticker or "").strip().upper()
+                if not normalized_ticker:
+                    continue
+                if normalized_ticker in ticker_key:
+                    return exchange_id
+                if ":" in normalized_ticker:
+                    bare = normalized_ticker.split(":", 1)[1]
+                    if bare and bare in ticker_key:
+                        return exchange_id
+
+            for raw_name in assignment.get("company_names", []):
+                normalized_name = str(raw_name or "").strip().lower()
+                if normalized_name and normalized_name in inferred_name:
+                    return exchange_id
+
+        return None
 
     def infer_company_name(self, user_query: str, ticker: str = None) -> str:
         """
@@ -1020,6 +1078,19 @@ class TemplateLoader:
             return template.get('output_schema')
         return None
 
+    def get_verification_schema(self, template_id: str) -> Dict[str, Any]:
+        """
+        Get optional verification schema for Stage 1 digest/compliance checks.
+
+        The schema is expected under `verification_schema` in template YAML.
+        Returns an empty dict when absent or invalid.
+        """
+        template = self.get_template(template_id) or {}
+        schema = template.get("verification_schema")
+        if isinstance(schema, dict):
+            return schema
+        return {}
+
     def is_structured_template(self, template_id: str) -> bool:
         """
         Check if a template requires structured JSON output.
@@ -1068,6 +1139,11 @@ def load_template(template_id: str) -> Optional[dict]:
 def get_rubric_text(template_id: str) -> Optional[str]:
     """Convenience function to get rubric text."""
     return get_template_loader().get_rubric(template_id)
+
+
+def get_verification_schema(template_id: str) -> Dict[str, Any]:
+    """Convenience function to get optional verification schema."""
+    return get_template_loader().get_verification_schema(template_id)
 
 
 def auto_detect_template(user_query: str, ticker: str = None) -> str:

@@ -364,6 +364,74 @@ def _market_facts_prompt_block(market_facts: Optional[Dict[str, Any]]) -> str:
     )
 
 
+def _deterministic_finance_prompt_block(evidence_pack: Optional[Dict[str, Any]]) -> str:
+    """Inject verified claim-ledger + deterministic lane baseline for chairman."""
+    if not isinstance(evidence_pack, dict):
+        return ""
+    claim_ledger = evidence_pack.get("claim_ledger", {}) or {}
+    deterministic_lane = evidence_pack.get("deterministic_finance_lane", {}) or {}
+    if not isinstance(claim_ledger, dict) or not isinstance(deterministic_lane, dict):
+        return ""
+
+    resolved = claim_ledger.get("resolved_claims", {}) or {}
+    preferred = [
+        "project_stage",
+        "stage_multiplier",
+        "post_tax_npv_aud_m",
+        "post_tax_npv_usd_m",
+        "aisc_usd_per_oz",
+        "market_cap_aud_m",
+        "shares_outstanding_b",
+        "funding_status",
+    ]
+    field_lines: List[str] = []
+    for key in preferred:
+        row = resolved.get(key)
+        if not isinstance(row, dict):
+            continue
+        value = row.get("value")
+        unit = str(row.get("unit", "")).strip()
+        source_id = str(row.get("source_id", "")).strip()
+        published = str(row.get("published_at", "")).strip()
+        suffix = f" {unit}" if unit else ""
+        ref = f" [{source_id}]" if source_id else ""
+        date = f" ({published})" if published else ""
+        field_lines.append(f"- {key}: {value}{suffix}{ref}{date}")
+
+    derived = deterministic_lane.get("derived_metrics", {}) or {}
+    score_components = deterministic_lane.get("score_components", {}) or {}
+    missing_critical = deterministic_lane.get("missing_critical_fields", []) or []
+
+    blocks = [
+        "DETERMINISTIC VERIFIED CLAIM BASELINE (use before free-form inference):",
+        f"- lane_status: {deterministic_lane.get('status', 'unknown')}",
+    ]
+    if field_lines:
+        blocks.append("Verified reconciled fields:")
+        blocks.extend(field_lines[:12])
+    blocks.append("Derived deterministic metrics:")
+    blocks.append(f"- risked_npv_aud_m: {derived.get('risked_npv_aud_m')}")
+    blocks.append(f"- risked_npv_usd_m: {derived.get('risked_npv_usd_m')}")
+    blocks.append(f"- npv_market_cap_ratio: {derived.get('npv_market_cap_ratio')}")
+    blocks.append(
+        "- value_npv_vs_market_cap_score: "
+        f"{score_components.get('value_npv_vs_market_cap_score')}"
+    )
+    blocks.append(
+        "- quality_stage_score_component: "
+        f"{score_components.get('quality_stage_score_component')}"
+    )
+    if missing_critical:
+        blocks.append(
+            "- missing_critical_fields: "
+            + ", ".join(str(item) for item in missing_critical[:8])
+        )
+    blocks.append(
+        "Use this deterministic lane as canonical for verified numeric fields unless newer primary evidence is cited."
+    )
+    return "\n".join(blocks)
+
+
 def _to_float(value: Any) -> Optional[float]:
     try:
         if value is None:
@@ -524,6 +592,68 @@ def _ensure_structured_fields_for_template(
                 structured_data["development_timeline"] = derived
 
 
+def _apply_deterministic_finance_lane(
+    structured_data: Dict[str, Any],
+    evidence_pack: Optional[Dict[str, Any]],
+) -> None:
+    """
+    Persist deterministic lane into Stage 3 output and align core finance fields.
+    """
+    if not isinstance(structured_data, dict):
+        return
+    if not isinstance(evidence_pack, dict):
+        return
+    deterministic_lane = evidence_pack.get("deterministic_finance_lane", {}) or {}
+    claim_ledger = evidence_pack.get("claim_ledger", {}) or {}
+    if not isinstance(deterministic_lane, dict) or not deterministic_lane:
+        return
+
+    council_meta = structured_data.get("council_metadata")
+    if not isinstance(council_meta, dict):
+        council_meta = {}
+        structured_data["council_metadata"] = council_meta
+    council_meta["deterministic_finance_lane"] = deterministic_lane
+
+    if isinstance(claim_ledger, dict) and claim_ledger:
+        council_meta["claim_ledger_counts"] = (claim_ledger.get("counts", {}) or {})
+
+    derived = deterministic_lane.get("derived_metrics", {}) or {}
+    score_components = deterministic_lane.get("score_components", {}) or {}
+    verified_fields = deterministic_lane.get("verified_fields", {}) or {}
+
+    if derived.get("risked_npv_aud_m") is not None and (
+        structured_data.get("total_risked_npv_aud_m") in (None, "", 0)
+    ):
+        structured_data["total_risked_npv_aud_m"] = derived.get("risked_npv_aud_m")
+
+    market_data = structured_data.get("market_data")
+    if not isinstance(market_data, dict):
+        market_data = {}
+        structured_data["market_data"] = market_data
+    market_cap = ((verified_fields.get("market_cap_aud_m") or {}).get("value"))
+    if market_cap is not None and market_data.get("market_cap_aud_m") in (None, "", 0):
+        market_data["market_cap_aud_m"] = market_cap
+
+    value_score = structured_data.get("value_score")
+    if not isinstance(value_score, dict):
+        value_score = {}
+        structured_data["value_score"] = value_score
+    score = score_components.get("value_npv_vs_market_cap_score")
+    if score is not None:
+        components = value_score.get("components")
+        if not isinstance(components, dict):
+            components = {}
+            value_score["components"] = components
+        npv_component = components.get("npv_vs_market_cap")
+        if not isinstance(npv_component, dict):
+            npv_component = {"weight": 0.30}
+            components["npv_vs_market_cap"] = npv_component
+        if npv_component.get("score") in (None, ""):
+            npv_component["score"] = score
+        if npv_component.get("ratio") in (None, "") and derived.get("npv_market_cap_ratio") is not None:
+            npv_component["ratio"] = derived.get("npv_market_cap_ratio")
+
+
 async def synthesize_structured_analysis(
     enhanced_context: str,
     stage1_results: List[Dict[str, Any]],
@@ -535,6 +665,7 @@ async def synthesize_structured_analysis(
     exchange: str = None,
     chairman_model: str = None,
     market_facts: Optional[Dict[str, Any]] = None,
+    evidence_pack: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Synthesize a structured investment analysis following template rubric.
@@ -549,6 +680,7 @@ async def synthesize_structured_analysis(
         company_name: Optional explicit company name
         exchange: Optional exchange id/name
         chairman_model: Optional chairman model override for this run
+        evidence_pack: Optional evidence pack containing claim ledger + deterministic lane
 
     Returns:
         Dict with structured analysis + JSON output
@@ -586,6 +718,7 @@ async def synthesize_structured_analysis(
     # Create weighted context (emphasize top-ranked responses)
     weighted_responses = create_weighted_context(stage1_results, stage2_results, label_to_model)
     market_facts_block = _market_facts_prompt_block(market_facts)
+    deterministic_finance_block = _deterministic_finance_prompt_block(evidence_pack)
 
     # Build comprehensive chairman prompt
     chairman_prompt = f"""You are the Chairman of an LLM Investment Council. Multiple AI models have analyzed a company and provided detailed responses. They have also peer-reviewed each other's responses. Your task is to synthesize their insights into a single, structured investment analysis.
@@ -599,6 +732,7 @@ PEER RANKINGS SUMMARY:
 {create_rankings_summary(stage2_results, label_to_model)}
 
 {market_facts_block}
+{deterministic_finance_block}
 
 YOUR TASK AS CHAIRMAN:
 You must produce a structured investment analysis following this detailed rubric:
@@ -696,6 +830,7 @@ Begin your JSON output now:"""
             ]
 
         _apply_market_facts_guardrails(structured_data, market_facts)
+        _apply_deterministic_finance_lane(structured_data, evidence_pack)
         _ensure_structured_fields_for_template(structured_data, template_id)
 
     return {

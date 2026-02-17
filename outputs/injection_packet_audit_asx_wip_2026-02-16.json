@@ -1,0 +1,2758 @@
+{
+  "generated_at": "2026-02-16T13:36:33.564346Z",
+  "rubric": {
+    "source_quality_40": "Primary ASX domain ratio, direct ASX PDF ratio, decoded ratio",
+    "filler_control_25": "Low-signal title suppression + high material-signal ratio",
+    "coverage_25": "Fact-pack sections, compact category breadth, timeline rows, critical gaps",
+    "token_efficiency_10": "Prompt char budget balance"
+  },
+  "companies": [
+    {
+      "ticker": "ASX:WWI",
+      "company_name": "West Wits Mining Limited",
+      "asx_deterministic_ingestion": {
+        "enabled": true,
+        "used": true,
+        "symbol": "WWI",
+        "reason": "ok",
+        "cache_hit": false,
+        "fetched_rows": 168,
+        "selected_rows": 10,
+        "decoded_rows": 10,
+        "target_rows": 10,
+        "price_sensitive_only": true,
+        "include_non_sensitive_fill": false,
+        "years_queried": [
+          2026,
+          2025
+        ],
+        "errors": []
+      },
+      "source_rows": [
+        {
+          "source_id": "S1",
+          "title": "2.2Moz Increase to WBP Global Resource Estimate to 7.24Moz",
+          "url": "https://announcements.asx.com.au/asxpdf/20260202/pdf/06vvhp4zxswsgh.pdf",
+          "published_at": "2026-02-02",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "z Au, highlighting robust nature of the project and upside to higher gold price\n\u27a2 Qala Shallows development advancing, with first gold pour on-track for Mar-26.\n\u27a2 Recently completed Institutional Placement strengthens balance sheet, fully funding Qala Shallows development to 70,000oz per annum2 steady-state production and positioning the Company to accelerate value creation.\nWest Wits CEO Rudi Dyesel said, \u201cThis 2.2Moz increase is a pleasing outcome for West Wits. It confirms the scale, continuity and high- grade nature of the Witwatersrand Basin Project and strengthens the long-term investment case for\nThe grant of PR 10839 provides a seamless depth extension to Qala Shallows, exactly where we want future tonnes and ounces to come from. Importantly, more than half of the global Mineral Resource is in the\ns are reported applying a gold price of $ 1 500/oz and ZAR 15.00/1 US$.\n\u2022 All Mineral Resources exclude geological structural loss.\n\u2022 Mineral Resources are reported as in-situ tonnes.\n\u2022 Any discrepancies in totals are due to rounding.\nThe following tonnage discounts factors have been applied for unknown geological losses:\n\u2022 5% for the Measured Category \u2022 10% for the Indicated C...",
+          "material_signal_score": 6
+        },
+        {
+          "source_id": "S2",
+          "title": "Quarterly Activities & Cashflow Reports",
+          "url": "https://announcements.asx.com.au/asxpdf/20260123/pdf/06vj8v3nlt4skk.pdf",
+          "published_at": "2026-01-23",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "23 January 2026\nReporting Period 1 October \u2013 31 December 2025 \u27a2 Qala Shallows Operational Progress: Advanced from mobilisation to underground development and production, delivering first underground ore to surface in mid-October 2025. Stockpiling is underway, with first gold pour on track for March 2026 following commencement of the main decline development, ramp-up of mechanised mining and commissioning of key infrastructure.\n\u27a2 Fully Funded Pathway to Sustainable Gold Production: Secured US$12.5 million from the first tranche of the Nebari facility, providing funding certainty. Strategic alignment with Absa Bank through issue of unlisted options to settle fees on senior loan facility which preserved cash and strengthened the balance sheet ahead of the transition to production.\n\u27a2 Long-Life, Scalable Asset\np-up at Qala Shallows During the quarter, West Wits delivered strong operational progress at its flagship Qala Shallows Gold Project, supported by the receipt of US$12.5 million from the first tranche of the Nebari Natural Resources Credit Fund II LP facility (see ASX announcement, 17 November 2025). This funding milestone ensured the Company is well capitalised to continue und...",
+          "material_signal_score": 9
+        },
+        {
+          "source_id": "S3",
+          "title": "Upsizing of Institutional Placement",
+          "url": "https://announcements.asx.com.au/asxpdf/20260122/pdf/06vgy03372xd1f.pdf",
+          "published_at": "2026-01-22",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "22 January 2026 Upsizing of Institutional Placement West Wits Mining Limited (ASX: WWI, West Wits or the Company) is pleased to announce an increased commitment from Tribeca Investment Partners (\u201cTribeca\u201d), an Asia Pacific based investment firm with specialist expertise in backing growth companies in the resources sector.\nTribeca will increase its strategic investment to $10M in the equity placement (\u201cPlacement\u201d) (announced to ASX on 20 January 2026).\nThis strategic investment increases the total under the Placement of A$27.5 million (before costs) announced on 20 January 2026 to A$33.74 million (before costs) via a firm equity placement from predominantly institutional investors, arranged by Evolution Capital.\nTribeca\u2019s $10M investment delivers on the Company\u2019s strategic objective to grow the Company\u2019s in\nuction, with first gold on track for March 2026.\u201d \u201cThis funding materially strengthens our balance sheet, enhances flexibility as we optimise our senior debt solution, and accelerates our transition into a gold producer. We are pleased to welcome Tribeca as a cornerstone institutional investor as we continue to build a high-quality,\n22 January 2026 Funds raised in the Placemen...",
+          "material_signal_score": 6
+        },
+        {
+          "source_id": "S4",
+          "title": "WWI Raises $27.5M to Advance Gold and Uranium Projects",
+          "url": "https://announcements.asx.com.au/asxpdf/20260120/pdf/06vf99fm6ywfp6.pdf",
+          "published_at": "2026-01-20",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "20 January 2026 WWI Raises $27.5M to Advance\nWest Wits Mining Limited (ASX: WWI, West Wits or the Company) is pleased to announce that it has secured A$27.5 million (before costs) via a firm equity placement (Placement) from predominantly institutional investors, arranged by Evolution Capital.\nThe placement significantly strengthens the Company\u2019s balance sheet and fully funds West Wits through to sustainable gold production at Qala Shallows, with first gold targeted for March 2026, while also providing capital to advance growth and exploration opportunities.\n\u27a2 Strong Institutional Validation: The placement was initiated through an unsolicited approach on behalf of institutional investors, reflecting growing confidence in West Wits\u2019 development strategy and transition to gold production.\n\u27a2 Attractive, Mark\nitutional investors, reflecting growing confidence in West Wits\u2019 development strategy and transition to gold production.\n\u27a2 Attractive, Market-Based Terms: Issue of 343.75 million new fully paid ordinary shares at A$0.08 per share, representing a 7% discount to the 15-day volume weighted average price (VWAP). Every two shares will be accompanied by one unlisted option ($0.11 (11...",
+          "material_signal_score": 6
+        },
+        {
+          "source_id": "S5",
+          "title": "Trading Halt",
+          "url": "https://announcements.asx.com.au/asxpdf/20260119/pdf/06vcw5knzrnht9.pdf",
+          "published_at": "2026-01-19",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "19 January 2026 West Wits Mining Limited (ASX: WWI) \u2013 Trading Halt Trading in the securities of West Wits Mining Limited (\u2018WWI\u2019) will be halted at the request of WWI, pending the release of an announcement by WWI.\nUnless ASX decides otherwise, the securities will remain in trading halt until the earlier of:\n\u2022 the commencement of normal trading on Wednesday, 21 January 2026; or \u2022 the release of the announcement to the market.\nWWI\u2019s request for a trading halt is attached below for the information of the market.\n19 January 2026 Market Announcement 1/1 ASX Limited ASX Customer Service Centre 131 279 | asx.com.au #11032642v1 ASX Announcement and Media Release 19 January 2026\nAdviser, Listings Compliance (Melbourne)\nLevel 4, North Tower Rialto Towers, 525 Collins Street MELBOURNE VIC 3000 By email only: tradi\n26\nAdviser, Listings Compliance (Melbourne)\nLevel 4, North Tower Rialto Towers, 525 Collins Street MELBOURNE VIC 3000 By email only: tradinghaltsmelbourne@asx.com.au\nWEST WITS MINING LIMITED (ASX:WWI) \u2013 REQUEST FOR TRADING HALT West Wits Mining Limited (ASX:WWI) (the Company) hereby requests a trading halt in relation to the Company\u2019s securities quoted on the ASX in accordance wi...",
+          "material_signal_score": 1
+        },
+        {
+          "source_id": "S6",
+          "title": "New Prospecting Right Granted at WBP and MRE Modelling",
+          "url": "https://announcements.asx.com.au/asxpdf/20251229/pdf/06tt2ghl4zxl9v.pdf",
+          "published_at": "2025-12-29",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "Monday, 29 December 2025 New Prospecting Right Granted at WBP and Geological\nWest Wits Mining Limited (ASX: WWI) (OTCQB: WMWWF) (\u201cWest Wits\u201d or \u201cthe Company\u201d) is pleased to report the granting of a new Prospecting Right GP10839PR (\u201cPR 10839\u201d) to the Company\u2018s operating subsidiary, West Wits MLI (Pty) Ltd (\u201cWest Wits MLI\u201d), by the South African Department of Mineral & Petroleum Resources (\u201cDMPR\u201d).\nPR 10839 is strategically positioned adjacent to West Wits MLI\u2019s existing Mining Right (\u201cMR 10073\u201d) at the Witwatersrand Basin Project (\u201cWBP\u201d), located in Johannesburg South Africa, and supports West Wits\u2019 long-term strategic expansion of the Qala Shallows project.\n\u2022 New Prospecting Right granted, PR 10839, providing a depth extension to the Qala Shallows Kimberley Reef ore body under the existing Mining Right (MR\necting Right granted, PR 10839, providing a depth extension to the Qala Shallows Kimberley Reef ore body under the existing Mining Right (MR 10073).\n\u2022 Geological modelling of existing sample and survey data being performed on the Kimberley Reefs within the newly granted PR 10839 area.\n\u2022 Review of the Kimberely Reef underway to assess the Company\u2019s current declared Mineral Reso...",
+          "material_signal_score": 4
+        },
+        {
+          "source_id": "S7",
+          "title": "WWI Operations Update and Funding Milestone at Qala",
+          "url": "https://announcements.asx.com.au/asxpdf/20251120/pdf/06s8224cltld6j.pdf",
+          "published_at": "2025-11-20",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "ASX Announcement and Media Release Thursday, 20 November 2025 West Wits Delivers Strong Operational Progress and Funding\nWest Wits Mining Ltd (ASX:WWI) (OTCQB:WMWWF) (West Wits, WWI or the Company) is pleased to advise that it has received US$12.5 million under the Nebari facility (refer to ASX release on 17 November 2025) and provide an operational update on ongoing development activities at its flagship Qala Shallows Gold Project, located within South Africa\u2019s Witwatersrand Basin. The Company continues to make strong progress across underground operations, fleet and workforce expansion, and site infrastructure as it advances toward its first gold pour targeted for March 2026.\n\u2022 US$12.5 million received from Nebari Natural Resources Credit Fund II LP, marking the first drawdown under a facility of up to US\nBasin.\nOur strategy has always been clear: deliver safely, efficiently, and with discipline. The progress achieved this quarter demonstrates that our people, our partners, and our funding structure are fully aligned to make that vision a reality.\u201d\nWest Wits has received US$12.5 million under the first tranche of its loan facility with Nebari Natural Resources Credit Fund II L...",
+          "material_signal_score": 9
+        },
+        {
+          "source_id": "S8",
+          "title": "Issue of Facility Drawdown Notice to Nebari",
+          "url": "https://announcements.asx.com.au/asxpdf/20251117/pdf/06s27367gxhymy.pdf",
+          "published_at": "2025-11-17",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "ASX Announcement and Media Release 17 November 2025 Issue of Facility Drawdown Notice to Nebari West Wits Mining Limited (ASX:WWI) (OTCQB:WMWWF) (\u201cWest Wits\u201d, \u201cWWI\u201d or \u201cthe Company\u201d) advises it has satisfied all conditions precedent for Tranche 1 under the Facility and has issued a drawdown notice to Nebari Natural Resources Credit Fund II LP (\u201cNebari\u201d) for the first tranche of US$12.5 million (\u201cTranche 1\u201d) under the loan facility between the Company and Nebari (\u201cFacility\u201d) with an anticipated drawdown date of 18 November 2025\nThe US$12.5 million represents the first of up to three tranches of funds made available by Nebari to West Wits under the Facility. The Company is able to drawdown a further US$22.5 million under the Facility (subject to conditions and approvals in respect of future tranches).\nOnce re\nable to drawdown a further US$22.5 million under the Facility (subject to conditions and approvals in respect of future tranches).\nOnce received, the funds will be used to advance development of the Qala Shallows Gold Project as the Company progresses towards its first gold pour targeted for March 2026.\nWest Wits Managing Director & CEO, Rudi Deysel stated: \u201cDrawdown of the i...",
+          "material_signal_score": 9
+        },
+        {
+          "source_id": "S9",
+          "title": "Senior Bank Lender Takes Options in Lieu of Fees",
+          "url": "https://announcements.asx.com.au/asxpdf/20251110/pdf/06rqg7sxcfljv1.pdf",
+          "published_at": "2025-11-10",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "ASX Announcement and Media Release 10 November 2025 Senior Bank Lender Takes Options in Lieu of Fees West Wits Mining Limited (ASX:WWI) (OTCQB:WMWWF) (West Wits, WWI or the Company) advises it has issued 100,386,000 unlisted options to Absa Bank Limited (acting through its Corporate and Investment Banking Division) (Absa) to settle fees of ZAR 7,656,250 (approx.\nAUD 680,000) payable to Absa under the R 875M senior syndicated loan facility (~USD 50 million) (the Facility). Each option has an exercise price of $0.0185 and expires 5 years from date of issue, to match the tenor of the Facility.\nAbsa\u2019s Strategic Endorsement and Partnership Absa, one of South Africa\u2019s leading commercial banks, has been pivotal in advancing the broader funding package for development of the Qala Shallows project.\nAbsa initiated d\nfirst stage of the broader WBP, and positions itself for long-term growth as a mid-tier gold producer.\nThe exercise price of $0.0185 (1.85c) represents a 15% premium to the 5-day VWAP of WWI shares prior to the ASX announcement of Credit Committee approval for the Facility on 20 February 2025.\nWhilst the current share price trades around $0.05 (5c), it is important to note tha...",
+          "material_signal_score": 8
+        },
+        {
+          "source_id": "S10",
+          "title": "Quarterly Activities and Cashflow Reports",
+          "url": "https://announcements.asx.com.au/asxpdf/20251029/pdf/06r62jp33jfwb3.pdf",
+          "published_at": "2025-10-29",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "29 October 2025\nReporting Period 1 July \u2013 30 September 2025 \u27a2 Transformational Quarter: Qala Shallows completes 3-months mobilisation program to enable first underground ore production, marking West Wits' transition to an operating gold company in the Witwatersrand Basin.\n\u27a2 Updated DFS Strengthens Economics: Revised study (all Mineral Resources) confirmed US$2.7 billion revenue, US$983 million free cash flow, and a post-tax NPV(7.5%) of US$500 million with an 81% IRR, an 88% uplift in free cash flow and shortened payback to 8 months from end of peak funding period.\n\u2022 Ore transfers to Ezulwini Plant commenced under a toll-treatment agreement with\n\u2022 Major underground infrastructure, LHD unit, and drill rig commissioned.\n\u2022 First ore delivered to surface in October 2025; 30,000t stockpile and first gold pour\nfrastructure, LHD unit, and drill rig commissioned.\n\u2022 First ore delivered to surface in October 2025; 30,000t stockpile and first gold pour targted for Q1 2026.\n\u2022 A$17.7 million equity placement completed with strong institutional support.\n\u2022 US$12.5 million Nebari loan facility executed, securing full funding to first gold\n\u2022 Rudi Deysel appointed Managing Director; Keith Middlet...",
+          "material_signal_score": 9
+        }
+      ],
+      "timeline_rows": [
+        {
+          "source_id": "S10",
+          "title": "Quarterly Activities and Cashflow Reports",
+          "url": "https://announcements.asx.com.au/asxpdf/20251029/pdf/06r62jp33jfwb3.pdf",
+          "published_at": "2025-10-29",
+          "authority_rank": 4,
+          "score": 18,
+          "fact": "\u2022 First ore delivered to surface in October 2025; 30,000t stockpile and first gold pour",
+          "windows": [
+            "October 2025"
+          ]
+        },
+        {
+          "source_id": "S10",
+          "title": "Quarterly Activities and Cashflow Reports",
+          "url": "https://announcements.asx.com.au/asxpdf/20251029/pdf/06r62jp33jfwb3.pdf",
+          "published_at": "2025-10-29",
+          "authority_rank": 4,
+          "score": 18,
+          "fact": "\u2022 First ore delivered to surface in October 2025; 30,000t stockpile and first gold pour targted for Q1 2026.",
+          "windows": [
+            "Q1 2026",
+            "October 2025"
+          ]
+        },
+        {
+          "source_id": "S2",
+          "title": "Quarterly Activities & Cashflow Reports",
+          "url": "https://announcements.asx.com.au/asxpdf/20260123/pdf/06vj8v3nlt4skk.pdf",
+          "published_at": "2026-01-23",
+          "authority_rank": 4,
+          "score": 15,
+          "fact": "Stockpiling is underway, with first gold pour on track for March 2026 following commencement of the main decline development, ramp-up of mechanised mining and commissioning of key infrastructure.",
+          "windows": [
+            "March 2026"
+          ]
+        },
+        {
+          "source_id": "S3",
+          "title": "Upsizing of Institutional Placement",
+          "url": "https://announcements.asx.com.au/asxpdf/20260122/pdf/06vgy03372xd1f.pdf",
+          "published_at": "2026-01-22",
+          "authority_rank": 4,
+          "score": 15,
+          "fact": "uction, with first gold on track for March 2026.\u201d \u201cThis funding materially strengthens our balance sheet, enhances flexibility as we optimise our senior debt solution, and accelerates our transition into a gold producer.",
+          "windows": [
+            "March 2026"
+          ]
+        },
+        {
+          "source_id": "S1",
+          "title": "2.2Moz Increase to WBP Global Resource Estimate to 7.24Moz",
+          "url": "https://announcements.asx.com.au/asxpdf/20260202/pdf/06vvhp4zxswsgh.pdf",
+          "published_at": "2026-02-02",
+          "authority_rank": 4,
+          "score": 14,
+          "fact": "\u27a2 Qala Shallows development advancing, with first gold pour on-track for Mar-26.",
+          "windows": []
+        },
+        {
+          "source_id": "S4",
+          "title": "WWI Raises $27.5M to Advance Gold and Uranium Projects",
+          "url": "https://announcements.asx.com.au/asxpdf/20260120/pdf/06vf99fm6ywfp6.pdf",
+          "published_at": "2026-01-20",
+          "authority_rank": 4,
+          "score": 14,
+          "fact": "The placement significantly strengthens the Company\u2019s balance sheet and fully funds West Wits through to sustainable gold production at Qala Shallows, with first gold targeted for March 2026, while also providing capi...",
+          "windows": [
+            "March 2026"
+          ]
+        },
+        {
+          "source_id": "S7",
+          "title": "WWI Operations Update and Funding Milestone at Qala",
+          "url": "https://announcements.asx.com.au/asxpdf/20251120/pdf/06s8224cltld6j.pdf",
+          "published_at": "2025-11-20",
+          "authority_rank": 4,
+          "score": 13,
+          "fact": "The Company continues to make strong progress across underground operations, fleet and workforce expansion, and site infrastructure as it advances toward its first gold pour targeted for March 2026.",
+          "windows": [
+            "March 2026"
+          ]
+        },
+        {
+          "source_id": "S8",
+          "title": "Issue of Facility Drawdown Notice to Nebari",
+          "url": "https://announcements.asx.com.au/asxpdf/20251117/pdf/06s27367gxhymy.pdf",
+          "published_at": "2025-11-17",
+          "authority_rank": 4,
+          "score": 13,
+          "fact": "Once received, the funds will be used to advance development of the Qala Shallows Gold Project as the Company progresses towards its first gold pour targeted for March 2026.",
+          "windows": [
+            "March 2026"
+          ]
+        }
+      ],
+      "fact_pack": {
+        "schema": "rubric_fact_pack_v1",
+        "source_index": [
+          {
+            "source_id": "S1",
+            "title": "2.2Moz Increase to WBP Global Resource Estimate to 7.24Moz",
+            "url": "https://announcements.asx.com.au/asxpdf/20260202/pdf/06vvhp4zxswsgh.pdf",
+            "published_at": "2026-02-02",
+            "decoded": true
+          },
+          {
+            "source_id": "S2",
+            "title": "Quarterly Activities & Cashflow Reports",
+            "url": "https://announcements.asx.com.au/asxpdf/20260123/pdf/06vj8v3nlt4skk.pdf",
+            "published_at": "2026-01-23",
+            "decoded": true
+          },
+          {
+            "source_id": "S3",
+            "title": "Upsizing of Institutional Placement",
+            "url": "https://announcements.asx.com.au/asxpdf/20260122/pdf/06vgy03372xd1f.pdf",
+            "published_at": "2026-01-22",
+            "decoded": true
+          },
+          {
+            "source_id": "S4",
+            "title": "WWI Raises $27.5M to Advance Gold and Uranium Projects",
+            "url": "https://announcements.asx.com.au/asxpdf/20260120/pdf/06vf99fm6ywfp6.pdf",
+            "published_at": "2026-01-20",
+            "decoded": true
+          },
+          {
+            "source_id": "S5",
+            "title": "Trading Halt",
+            "url": "https://announcements.asx.com.au/asxpdf/20260119/pdf/06vcw5knzrnht9.pdf",
+            "published_at": "2026-01-19",
+            "decoded": true
+          },
+          {
+            "source_id": "S6",
+            "title": "New Prospecting Right Granted at WBP and MRE Modelling",
+            "url": "https://announcements.asx.com.au/asxpdf/20251229/pdf/06tt2ghl4zxl9v.pdf",
+            "published_at": "2025-12-29",
+            "decoded": true
+          },
+          {
+            "source_id": "S7",
+            "title": "WWI Operations Update and Funding Milestone at Qala",
+            "url": "https://announcements.asx.com.au/asxpdf/20251120/pdf/06s8224cltld6j.pdf",
+            "published_at": "2025-11-20",
+            "decoded": true
+          },
+          {
+            "source_id": "S8",
+            "title": "Issue of Facility Drawdown Notice to Nebari",
+            "url": "https://announcements.asx.com.au/asxpdf/20251117/pdf/06s27367gxhymy.pdf",
+            "published_at": "2025-11-17",
+            "decoded": true
+          },
+          {
+            "source_id": "S9",
+            "title": "Senior Bank Lender Takes Options in Lieu of Fees",
+            "url": "https://announcements.asx.com.au/asxpdf/20251110/pdf/06rqg7sxcfljv1.pdf",
+            "published_at": "2025-11-10",
+            "decoded": true
+          },
+          {
+            "source_id": "S10",
+            "title": "Quarterly Activities and Cashflow Reports",
+            "url": "https://announcements.asx.com.au/asxpdf/20251029/pdf/06r62jp33jfwb3.pdf",
+            "published_at": "2025-10-29",
+            "decoded": true
+          }
+        ],
+        "sections": {
+          "market_data": [
+            {
+              "source_id": "S9",
+              "fact": "Whilst the current share price trades around $0.05 (5c), it is important to note tha..."
+            }
+          ],
+          "project_economics_npv_inputs": [
+            {
+              "source_id": "S1",
+              "fact": "\u27a2 Recently completed Institutional Placement strengthens balance sheet, fully funding Qala Shallows development to 70,000oz per annum2 steady-state production and positioning the Company to accelerate value creation."
+            },
+            {
+              "source_id": "S1",
+              "fact": "West Wits CEO Rudi Dyesel said, \u201cThis 2.2Moz increase is a pleasing outcome for West Wits."
+            },
+            {
+              "source_id": "S1",
+              "fact": "s are reported applying a gold price of $ 1 500/oz and ZAR 15.00/1 US$."
+            },
+            {
+              "source_id": "S2",
+              "fact": "\u27a2 Fully Funded Pathway to Sustainable Gold Production: Secured US$12.5 million from the first tranche of the Nebari facility, providing funding certainty."
+            }
+          ],
+          "resource_and_reserve": [
+            {
+              "source_id": "S1",
+              "fact": "It confirms the scale, continuity and high- grade nature of the Witwatersrand Basin Project and strengthens the long-term investment case for"
+            },
+            {
+              "source_id": "S1",
+              "fact": "Importantly, more than half of the global Mineral Resource is in the"
+            },
+            {
+              "source_id": "S1",
+              "fact": "\u2022 All Mineral Resources exclude geological structural loss."
+            },
+            {
+              "source_id": "S1",
+              "fact": "\u2022 Mineral Resources are reported as in-situ tonnes."
+            }
+          ],
+          "funding_and_balance_sheet": [
+            {
+              "source_id": "S2",
+              "fact": "Strategic alignment with Absa Bank through issue of unlisted options to settle fees on senior loan facility which preserved cash and strengthened the balance sheet ahead of the transition to production."
+            },
+            {
+              "source_id": "S3",
+              "fact": "22 January 2026 Upsizing of Institutional Placement West Wits Mining Limited (ASX: WWI, West Wits or the Company) is pleased to announce an increased commitment from Tribeca Investment Partners (\u201cTribeca\u201d), an Asia Pa..."
+            },
+            {
+              "source_id": "S3",
+              "fact": "Tribeca will increase its strategic investment to $10M in the equity placement (\u201cPlacement\u201d) (announced to ASX on 20 January 2026)."
+            },
+            {
+              "source_id": "S7",
+              "fact": "West Wits Mining Ltd (ASX:WWI) (OTCQB:WMWWF) (West Wits, WWI or the Company) is pleased to advise that it has received US$12.5 million under the Nebari facility (refer to ASX release on 17 November 2025) and provide a..."
+            }
+          ],
+          "development_timeline_and_milestones": [
+            {
+              "source_id": "S1",
+              "fact": "\u27a2 Qala Shallows development advancing, with first gold pour on-track for Mar-26."
+            },
+            {
+              "source_id": "S2",
+              "fact": "Reporting Period 1 October \u2013 31 December 2025 \u27a2 Qala Shallows Operational Progress: Advanced from mobilisation to underground development and production, delivering first underground ore to surface in mid-October 2025."
+            },
+            {
+              "source_id": "S2",
+              "fact": "Stockpiling is underway, with first gold pour on track for March 2026 following commencement of the main decline development, ramp-up of mechanised mining and commissioning of key infrastructure."
+            },
+            {
+              "source_id": "S2",
+              "fact": "This funding milestone ensured the Company is well capitalised to continue und..."
+            }
+          ],
+          "tailwinds_and_catalysts": [
+            {
+              "source_id": "S1",
+              "fact": "z Au, highlighting robust nature of the project and upside to higher gold price"
+            },
+            {
+              "source_id": "S3",
+              "fact": "Tribeca\u2019s $10M investment delivers on the Company\u2019s strategic objective to grow the Company\u2019s in"
+            },
+            {
+              "source_id": "S6",
+              "fact": "PR 10839 is strategically positioned adjacent to West Wits MLI\u2019s existing Mining Right (\u201cMR 10073\u201d) at the Witwatersrand Basin Project (\u201cWBP\u201d), located in Johannesburg South Africa, and supports West Wits\u2019 long-term s..."
+            },
+            {
+              "source_id": "S9",
+              "fact": "Absa\u2019s Strategic Endorsement and Partnership Absa, one of South Africa\u2019s leading commercial banks, has been pivotal in advancing the broader funding package for development of the Qala Shallows project."
+            }
+          ],
+          "valuation_and_peer_signals": [
+            {
+              "source_id": "S4",
+              "fact": "\u27a2 Attractive, Market-Based Terms: Issue of 343.75 million new fully paid ordinary shares at A$0.08 per share, representing a 7% discount to the 15-day volume weighted average price (VWAP)."
+            }
+          ],
+          "other_material_facts": [
+            {
+              "source_id": "S1",
+              "fact": "The grant of PR 10839 provides a seamless depth extension to Qala Shallows, exactly where we want future tonnes and ounces to come from."
+            },
+            {
+              "source_id": "S1",
+              "fact": "\u2022 5% for the Measured Category \u2022 10% for the Indicated C..."
+            },
+            {
+              "source_id": "S2",
+              "fact": "p-up at Qala Shallows During the quarter, West Wits delivered strong operational progress at its flagship Qala Shallows Gold Project, supported by the receipt of US$12.5 million from the first tranche of the Nebari Na..."
+            },
+            {
+              "source_id": "S4",
+              "fact": "Every two shares will be accompanied by one unlisted option ($0.11 (11..."
+            }
+          ]
+        },
+        "critical_gaps": [],
+        "counts": {
+          "source_count": 10,
+          "decoded_source_count": 10,
+          "total_facts": 26,
+          "sections_with_facts": 8
+        }
+      },
+      "fact_digest": {
+        "schema": "fact_digest_v2",
+        "source_index": [
+          {
+            "source_id": "S1",
+            "title": "2.2Moz Increase to WBP Global Resource Estimate to 7.24Moz",
+            "url": "https://announcements.asx.com.au/asxpdf/20260202/pdf/06vvhp4zxswsgh.pdf",
+            "published_at": "2026-02-02",
+            "decoded": true
+          },
+          {
+            "source_id": "S2",
+            "title": "Quarterly Activities & Cashflow Reports",
+            "url": "https://announcements.asx.com.au/asxpdf/20260123/pdf/06vj8v3nlt4skk.pdf",
+            "published_at": "2026-01-23",
+            "decoded": true
+          },
+          {
+            "source_id": "S3",
+            "title": "Upsizing of Institutional Placement",
+            "url": "https://announcements.asx.com.au/asxpdf/20260122/pdf/06vgy03372xd1f.pdf",
+            "published_at": "2026-01-22",
+            "decoded": true
+          },
+          {
+            "source_id": "S4",
+            "title": "WWI Raises $27.5M to Advance Gold and Uranium Projects",
+            "url": "https://announcements.asx.com.au/asxpdf/20260120/pdf/06vf99fm6ywfp6.pdf",
+            "published_at": "2026-01-20",
+            "decoded": true
+          },
+          {
+            "source_id": "S5",
+            "title": "Trading Halt",
+            "url": "https://announcements.asx.com.au/asxpdf/20260119/pdf/06vcw5knzrnht9.pdf",
+            "published_at": "2026-01-19",
+            "decoded": true
+          },
+          {
+            "source_id": "S6",
+            "title": "New Prospecting Right Granted at WBP and MRE Modelling",
+            "url": "https://announcements.asx.com.au/asxpdf/20251229/pdf/06tt2ghl4zxl9v.pdf",
+            "published_at": "2025-12-29",
+            "decoded": true
+          },
+          {
+            "source_id": "S7",
+            "title": "WWI Operations Update and Funding Milestone at Qala",
+            "url": "https://announcements.asx.com.au/asxpdf/20251120/pdf/06s8224cltld6j.pdf",
+            "published_at": "2025-11-20",
+            "decoded": true
+          },
+          {
+            "source_id": "S8",
+            "title": "Issue of Facility Drawdown Notice to Nebari",
+            "url": "https://announcements.asx.com.au/asxpdf/20251117/pdf/06s27367gxhymy.pdf",
+            "published_at": "2025-11-17",
+            "decoded": true
+          },
+          {
+            "source_id": "S9",
+            "title": "Senior Bank Lender Takes Options in Lieu of Fees",
+            "url": "https://announcements.asx.com.au/asxpdf/20251110/pdf/06rqg7sxcfljv1.pdf",
+            "published_at": "2025-11-10",
+            "decoded": true
+          },
+          {
+            "source_id": "S10",
+            "title": "Quarterly Activities and Cashflow Reports",
+            "url": "https://announcements.asx.com.au/asxpdf/20251029/pdf/06r62jp33jfwb3.pdf",
+            "published_at": "2025-10-29",
+            "decoded": true
+          }
+        ],
+        "sections": {
+          "timelines_deadlines": [
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-02",
+              "fact": "\u27a2 Qala Shallows development advancing, with first gold pour on-track for Mar-26.",
+              "windows": [],
+              "number_tokens": [
+                "26"
+              ]
+            },
+            {
+              "source_id": "S2",
+              "published_at": "2026-01-23",
+              "fact": "Stockpiling is underway, with first gold pour on track for March 2026 following commencement of the main decline development, ramp-up of mechanised mining and commissioning of key infrastructure.",
+              "windows": [
+                "March 2026"
+              ],
+              "number_tokens": [
+                "2026"
+              ]
+            },
+            {
+              "source_id": "S2",
+              "published_at": "2026-01-23",
+              "fact": "This funding milestone ensured the Company is well capitalised to continue und...",
+              "windows": [],
+              "number_tokens": []
+            },
+            {
+              "source_id": "S3",
+              "published_at": "2026-01-22",
+              "fact": "uction, with first gold on track for March 2026.\u201d \u201cThis funding materially strengthens our balance sheet, enhances flexibility as we optimise our senior debt solution, and accelerates our transition into a gold producer.",
+              "windows": [
+                "March 2026"
+              ],
+              "number_tokens": [
+                "2026"
+              ]
+            },
+            {
+              "source_id": "S4",
+              "published_at": "2026-01-20",
+              "fact": "The placement significantly strengthens the Company\u2019s balance sheet and fully funds West Wits through to sustainable gold production at Qala Shallows, with first gold targeted for March 2026, while also providing capi...",
+              "windows": [
+                "March 2026"
+              ],
+              "number_tokens": [
+                "2026,"
+              ]
+            },
+            {
+              "source_id": "S7",
+              "published_at": "2025-11-20",
+              "fact": "The Company continues to make strong progress across underground operations, fleet and workforce expansion, and site infrastructure as it advances toward its first gold pour targeted for March 2026.",
+              "windows": [
+                "March 2026"
+              ],
+              "number_tokens": [
+                "2026"
+              ]
+            }
+          ],
+          "financing_deals": [
+            {
+              "source_id": "S2",
+              "published_at": "2026-01-23",
+              "fact": "\u27a2 Fully Funded Pathway to Sustainable Gold Production: Secured US$12.5 million from the first tranche of the Nebari facility, providing funding certainty.",
+              "windows": [],
+              "number_tokens": [
+                "US$12.5 m"
+              ]
+            },
+            {
+              "source_id": "S2",
+              "published_at": "2026-01-23",
+              "fact": "Strategic alignment with Absa Bank through issue of unlisted options to settle fees on senior loan facility which preserved cash and strengthened the balance sheet ahead of the transition to production.",
+              "windows": [],
+              "number_tokens": []
+            },
+            {
+              "source_id": "S3",
+              "published_at": "2026-01-22",
+              "fact": "22 January 2026 Upsizing of Institutional Placement West Wits Mining Limited (ASX: WWI, West Wits or the Company) is pleased to announce an increased commitment from Tribeca Investment Partners (\u201cTribeca\u201d), an Asia Pa...",
+              "windows": [
+                "January 2026"
+              ],
+              "number_tokens": [
+                "22",
+                "2026"
+              ]
+            },
+            {
+              "source_id": "S3",
+              "published_at": "2026-01-22",
+              "fact": "Tribeca will increase its strategic investment to $10M in the equity placement (\u201cPlacement\u201d) (announced to ASX on 20 January 2026).",
+              "windows": [
+                "January 2026"
+              ],
+              "number_tokens": [
+                "$10M",
+                "20",
+                "2026"
+              ]
+            },
+            {
+              "source_id": "S3",
+              "published_at": "2026-01-22",
+              "fact": "This strategic investment increases the total under the Placement of A$27.5 million (before costs) announced on 20 January 2026 to A$33.74 million (before costs) via a firm equity placement from predominantly institut...",
+              "windows": [
+                "January 2026"
+              ],
+              "number_tokens": [
+                "A$27.5 m",
+                "20",
+                "2026",
+                "A$33.74 m"
+              ]
+            },
+            {
+              "source_id": "S4",
+              "published_at": "2026-01-20",
+              "fact": "West Wits Mining Limited (ASX: WWI, West Wits or the Company) is pleased to announce that it has secured A$27.5 million (before costs) via a firm equity placement (Placement) from predominantly institutional investors...",
+              "windows": [],
+              "number_tokens": [
+                "A$27.5 m"
+              ]
+            }
+          ],
+          "project_economics": [
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-02",
+              "fact": "It confirms the scale, continuity and high- grade nature of the Witwatersrand Basin Project and strengthens the long-term investment case for",
+              "windows": [],
+              "number_tokens": []
+            },
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-02",
+              "fact": "Importantly, more than half of the global Mineral Resource is in the",
+              "windows": [],
+              "number_tokens": []
+            },
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-02",
+              "fact": "s are reported applying a gold price of $ 1 500/oz and ZAR 15.00/1 US$.",
+              "windows": [],
+              "number_tokens": [
+                "$ 1",
+                "500",
+                "15.00",
+                "1"
+              ]
+            },
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-02",
+              "fact": "\u2022 All Mineral Resources exclude geological structural loss.",
+              "windows": [],
+              "number_tokens": []
+            },
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-02",
+              "fact": "\u2022 Mineral Resources are reported as in-situ tonnes.",
+              "windows": [],
+              "number_tokens": []
+            },
+            {
+              "source_id": "S10",
+              "published_at": "2025-10-29",
+              "fact": "Reporting Period 1 July \u2013 30 September 2025 \u27a2 Transformational Quarter: Qala Shallows completes 3-months mobilisation program to enable first underground ore production, marking West Wits' transition to an operating g...",
+              "windows": [
+                "September 2025"
+              ],
+              "number_tokens": [
+                "1",
+                "30",
+                "2025",
+                "3"
+              ]
+            }
+          ],
+          "market_share_structure": [
+            {
+              "source_id": "S4",
+              "published_at": "2026-01-20",
+              "fact": "\u27a2 Attractive, Market-Based Terms: Issue of 343.75 million new fully paid ordinary shares at A$0.08 per share, representing a 7% discount to the 15-day volume weighted average price (VWAP).",
+              "windows": [],
+              "number_tokens": [
+                "343.75 m",
+                "A$0.08",
+                "7%",
+                "15"
+              ]
+            },
+            {
+              "source_id": "S4",
+              "published_at": "2026-01-20",
+              "fact": "Every two shares will be accompanied by one unlisted option ($0.11 (11...",
+              "windows": [],
+              "number_tokens": [
+                "$0.11",
+                "11"
+              ]
+            },
+            {
+              "source_id": "S9",
+              "published_at": "2025-11-10",
+              "fact": "The exercise price of $0.0185 (1.85c) represents a 15% premium to the 5-day VWAP of WWI shares prior to the ASX announcement of Credit Committee approval for the Facility on 20 February 2025.",
+              "windows": [
+                "February 2025"
+              ],
+              "number_tokens": [
+                "$0.0185",
+                "1.85",
+                "15%",
+                "5"
+              ]
+            },
+            {
+              "source_id": "S9",
+              "published_at": "2025-11-10",
+              "fact": "Whilst the current share price trades around $0.05 (5c), it is important to note tha...",
+              "windows": [],
+              "number_tokens": [
+                "$0.05",
+                "5"
+              ]
+            }
+          ],
+          "operational_objectives": [
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-02",
+              "fact": "\u27a2 Recently completed Institutional Placement strengthens balance sheet, fully funding Qala Shallows development to 70,000oz per annum2 steady-state production and positioning the Company to accelerate value creation.",
+              "windows": [],
+              "number_tokens": [
+                "70,000oz",
+                "2"
+              ]
+            },
+            {
+              "source_id": "S2",
+              "published_at": "2026-01-23",
+              "fact": "Reporting Period 1 October \u2013 31 December 2025 \u27a2 Qala Shallows Operational Progress: Advanced from mobilisation to underground development and production, delivering first underground ore to surface in mid-October 2025.",
+              "windows": [
+                "December 2025",
+                "October 2025"
+              ],
+              "number_tokens": [
+                "1",
+                "31",
+                "2025"
+              ]
+            },
+            {
+              "source_id": "S3",
+              "published_at": "2026-01-22",
+              "fact": "Tribeca\u2019s $10M investment delivers on the Company\u2019s strategic objective to grow the Company\u2019s in",
+              "windows": [],
+              "number_tokens": [
+                "$10M"
+              ]
+            },
+            {
+              "source_id": "S4",
+              "published_at": "2026-01-20",
+              "fact": "itutional investors, reflecting growing confidence in West Wits\u2019 development strategy and transition to gold production.",
+              "windows": [],
+              "number_tokens": []
+            }
+          ],
+          "catalysts_tailwinds": [
+            {
+              "source_id": "S6",
+              "published_at": "2025-12-29",
+              "fact": "PR 10839 is strategically positioned adjacent to West Wits MLI\u2019s existing Mining Right (\u201cMR 10073\u201d) at the Witwatersrand Basin Project (\u201cWBP\u201d), located in Johannesburg South Africa, and supports West Wits\u2019 long-term s...",
+              "windows": [],
+              "number_tokens": [
+                "10839",
+                "10073"
+              ]
+            }
+          ],
+          "other_material_facts": [
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-02",
+              "fact": "West Wits CEO Rudi Dyesel said, \u201cThis 2.2Moz increase is a pleasing outcome for West Wits.",
+              "windows": [],
+              "number_tokens": [
+                "2.2Moz"
+              ]
+            },
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-02",
+              "fact": "The grant of PR 10839 provides a seamless depth extension to Qala Shallows, exactly where we want future tonnes and ounces to come from.",
+              "windows": [],
+              "number_tokens": [
+                "10839"
+              ]
+            },
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-02",
+              "fact": "\u2022 5% for the Measured Category \u2022 10% for the Indicated C...",
+              "windows": [],
+              "number_tokens": [
+                "5%",
+                "10%"
+              ]
+            },
+            {
+              "source_id": "S2",
+              "published_at": "2026-01-23",
+              "fact": "p-up at Qala Shallows During the quarter, West Wits delivered strong operational progress at its flagship Qala Shallows Gold Project, supported by the receipt of US$12.5 million from the first tranche of the Nebari Na...",
+              "windows": [],
+              "number_tokens": [
+                "US$12.5 m"
+              ]
+            },
+            {
+              "source_id": "S3",
+              "published_at": "2026-01-22",
+              "fact": "22 January 2026 Funds raised in the Placemen...",
+              "windows": [
+                "January 2026"
+              ],
+              "number_tokens": [
+                "22",
+                "2026"
+              ]
+            },
+            {
+              "source_id": "S4",
+              "published_at": "2026-01-20",
+              "fact": "20 January 2026 WWI Raises $27.5M to Advance",
+              "windows": [
+                "January 2026"
+              ],
+              "number_tokens": [
+                "20",
+                "2026",
+                "$27.5M"
+              ]
+            }
+          ]
+        },
+        "summary_bullets": [
+          "[S4] 2026-01-20: The placement significantly strengthens the Company\u2019s balance sheet and fully funds West Wits through to sustainable gold production at Qala Shallows, with first gold targeted for March 2026, while also providing capi...",
+          "[S9] 2025-11-10: The exercise price of $0.0185 (1.85c) represents a 15% premium to the 5-day VWAP of WWI shares prior to the ASX announcement of Credit Committee approval for the Facility on 20 February 2025.",
+          "[S1] 2026-02-02: \u27a2 Qala Shallows development advancing, with first gold pour on-track for Mar-26.",
+          "[S2] 2026-01-23: Stockpiling is underway, with first gold pour on track for March 2026 following commencement of the main decline development, ramp-up of mechanised mining and commissioning of key infrastructure.",
+          "[S3] 2026-01-22: uction, with first gold on track for March 2026.\u201d \u201cThis funding materially strengthens our balance sheet, enhances flexibility as we optimise our senior debt solution, and accelerates our transition into a gold producer.",
+          "[S7] 2025-11-20: The Company continues to make strong progress across underground operations, fleet and workforce expansion, and site infrastructure as it advances toward its first gold pour targeted for March 2026.",
+          "[S1] 2026-02-02: \u27a2 Recently completed Institutional Placement strengthens balance sheet, fully funding Qala Shallows development to 70,000oz per annum2 steady-state production and positioning the Company to accelerate value creation.",
+          "[S2] 2026-01-23: \u27a2 Fully Funded Pathway to Sustainable Gold Production: Secured US$12.5 million from the first tranche of the Nebari facility, providing funding certainty.",
+          "[S3] 2026-01-22: 22 January 2026 Upsizing of Institutional Placement West Wits Mining Limited (ASX: WWI, West Wits or the Company) is pleased to announce an increased commitment from Tribeca Investment Partners (\u201cTribeca\u201d), an Asia Pa...",
+          "[S3] 2026-01-22: Tribeca will increase its strategic investment to $10M in the equity placement (\u201cPlacement\u201d) (announced to ASX on 20 January 2026).",
+          "[S3] 2026-01-22: This strategic investment increases the total under the Placement of A$27.5 million (before costs) announced on 20 January 2026 to A$33.74 million (before costs) via a firm equity placement from predominantly institut...",
+          "[S4] 2026-01-20: West Wits Mining Limited (ASX: WWI, West Wits or the Company) is pleased to announce that it has secured A$27.5 million (before costs) via a firm equity placement (Placement) from predominantly institutional investors..."
+        ],
+        "narrative_summary": "Timelines Deadlines: \u27a2 Qala Shallows development advancing, with first gold pour on-track for Mar-26.; Stockpiling is underway, with first gold pour on track for March 2026 following commencement of the main decline development, ramp-up of mechanised mining and commissioning of key infrastructure. Financing Deals: \u27a2 Fully Funded Pathway to Sustainable Gold Production: Secured US$12.5 million from the first tranche of the Nebari facility, providing funding certainty.; Strategic alignment with Absa Bank through issue of unlisted options to settle fees on senior loan facility which preserved cash and strengthened the balance sheet ahead of the transition to production. Project Economics: It confirms the scale, continuity and high- grade nature of the Witwatersrand Basin Project and strengthens the long-term investment case for; Importantly, more than half of the global Mineral Resource is in the Market Share Structure: \u27a2 Attractive, Market-Based Terms: Issue of 343.75 million new fully paid ordinary shares at A$0.08 per share, representing a 7% discount to the 15-day volume weighted average price (VWAP).; Every two shares will be accompanied by one unlisted option ($0.11 (11... Operational Objectives: \u27a2 Recently completed Institutional Placement strengthens balance sheet, fully funding Qala Shallows development to 70,000oz per annum2 steady-state production and positioning the Company to accelerate value creation.; Reporting Period 1 October \u2013 31 December 2025 \u27a2 Qala Shallows Operational Progress: Advanced from mobilisation to underground development and production, delivering first underground ore to surface in mid-October 2025. Catalysts Tailwinds: PR 10839 is strategically positioned adjacent to West Wits MLI\u2019s existing Mining Right (\u201cMR 10073\u201d) at the Witwatersrand Basin Project (\u201cWBP\u201d), located in Johannesburg South Africa, and supports West Wits\u2019 long-term s...",
+        "conflicts": [],
+        "counts": {
+          "source_count": 10,
+          "decoded_source_count": 10,
+          "total_facts": 33,
+          "sections_with_facts": 7,
+          "summary_bullets": 12,
+          "conflicts": 0
+        }
+      },
+      "compact_fact_bundle": {
+        "schema": "compact_fact_bundle_v1",
+        "source_index": [
+          {
+            "source_id": "S1",
+            "title": "2.2Moz Increase to WBP Global Resource Estimate to 7.24Moz",
+            "url": "https://announcements.asx.com.au/asxpdf/20260202/pdf/06vvhp4zxswsgh.pdf",
+            "published_at": "2026-02-02"
+          },
+          {
+            "source_id": "S2",
+            "title": "Quarterly Activities & Cashflow Reports",
+            "url": "https://announcements.asx.com.au/asxpdf/20260123/pdf/06vj8v3nlt4skk.pdf",
+            "published_at": "2026-01-23"
+          },
+          {
+            "source_id": "S3",
+            "title": "Upsizing of Institutional Placement",
+            "url": "https://announcements.asx.com.au/asxpdf/20260122/pdf/06vgy03372xd1f.pdf",
+            "published_at": "2026-01-22"
+          },
+          {
+            "source_id": "S4",
+            "title": "WWI Raises $27.5M to Advance Gold and Uranium Projects",
+            "url": "https://announcements.asx.com.au/asxpdf/20260120/pdf/06vf99fm6ywfp6.pdf",
+            "published_at": "2026-01-20"
+          },
+          {
+            "source_id": "S5",
+            "title": "Trading Halt",
+            "url": "https://announcements.asx.com.au/asxpdf/20260119/pdf/06vcw5knzrnht9.pdf",
+            "published_at": "2026-01-19"
+          },
+          {
+            "source_id": "S6",
+            "title": "New Prospecting Right Granted at WBP and MRE Modelling",
+            "url": "https://announcements.asx.com.au/asxpdf/20251229/pdf/06tt2ghl4zxl9v.pdf",
+            "published_at": "2025-12-29"
+          },
+          {
+            "source_id": "S7",
+            "title": "WWI Operations Update and Funding Milestone at Qala",
+            "url": "https://announcements.asx.com.au/asxpdf/20251120/pdf/06s8224cltld6j.pdf",
+            "published_at": "2025-11-20"
+          },
+          {
+            "source_id": "S8",
+            "title": "Issue of Facility Drawdown Notice to Nebari",
+            "url": "https://announcements.asx.com.au/asxpdf/20251117/pdf/06s27367gxhymy.pdf",
+            "published_at": "2025-11-17"
+          },
+          {
+            "source_id": "S9",
+            "title": "Senior Bank Lender Takes Options in Lieu of Fees",
+            "url": "https://announcements.asx.com.au/asxpdf/20251110/pdf/06rqg7sxcfljv1.pdf",
+            "published_at": "2025-11-10"
+          },
+          {
+            "source_id": "S10",
+            "title": "Quarterly Activities and Cashflow Reports",
+            "url": "https://announcements.asx.com.au/asxpdf/20251029/pdf/06r62jp33jfwb3.pdf",
+            "published_at": "2025-10-29"
+          }
+        ],
+        "categories": {
+          "timeline_milestones": [
+            {
+              "source_id": "S1",
+              "fact": "\u27a2 Qala Shallows development advancing, with first gold pour on-track for Mar-26."
+            },
+            {
+              "source_id": "S7",
+              "fact": "The Company continues to make strong progress across underground operations, fleet and workforce expansion, and site infrastructure as it advances toward its first gold pour targeted for March 2026.",
+              "published_at": "2025-11-20"
+            },
+            {
+              "source_id": "S2",
+              "fact": "Stockpiling is underway, with first gold pour on track for March 2026 following commencement of the main decline development, ramp-up of mechanised mining and commissioning of key infrastructure."
+            },
+            {
+              "source_id": "S4",
+              "fact": "The placement significantly strengthens the Company\u2019s balance sheet and fully funds West Wits through to sustainable gold production at Qala Shallows, with first gold targeted for March 2026, while also providing capi...",
+              "published_at": "2026-01-20"
+            },
+            {
+              "source_id": "S3",
+              "fact": "uction, with first gold on track for March 2026.\u201d \u201cThis funding materially strengthens our balance sheet, enhances flexibility as we optimise our senior debt solution, and accelerates our transition into a gold producer.",
+              "published_at": "2026-01-22"
+            }
+          ],
+          "project_economics_resource": [
+            {
+              "source_id": "S1",
+              "fact": "\u27a2 Recently completed Institutional Placement strengthens balance sheet, fully funding Qala Shallows development to 70,000oz per annum2 steady-state production and positioning the Company to accelerate value creation."
+            },
+            {
+              "source_id": "S1",
+              "fact": "West Wits CEO Rudi Dyesel said, \u201cThis 2.2Moz increase is a pleasing outcome for West Wits."
+            },
+            {
+              "source_id": "S1",
+              "fact": "s are reported applying a gold price of $ 1 500/oz and ZAR 15.00/1 US$."
+            },
+            {
+              "source_id": "S2",
+              "fact": "\u27a2 Fully Funded Pathway to Sustainable Gold Production: Secured US$12.5 million from the first tranche of the Nebari facility, providing funding certainty."
+            },
+            {
+              "source_id": "S1",
+              "fact": "It confirms the scale, continuity and high- grade nature of the Witwatersrand Basin Project and strengthens the long-term investment case for"
+            }
+          ],
+          "funding_and_balance_sheet": [
+            {
+              "source_id": "S2",
+              "fact": "Strategic alignment with Absa Bank through issue of unlisted options to settle fees on senior loan facility which preserved cash and strengthened the balance sheet ahead of the transition to production."
+            },
+            {
+              "source_id": "S3",
+              "fact": "22 January 2026 Upsizing of Institutional Placement West Wits Mining Limited (ASX: WWI, West Wits or the Company) is pleased to announce an increased commitment from Tribeca Investment Partners (\u201cTribeca\u201d), an Asia Pa..."
+            },
+            {
+              "source_id": "S3",
+              "fact": "Tribeca will increase its strategic investment to $10M in the equity placement (\u201cPlacement\u201d) (announced to ASX on 20 January 2026)."
+            },
+            {
+              "source_id": "S7",
+              "fact": "West Wits Mining Ltd (ASX:WWI) (OTCQB:WMWWF) (West Wits, WWI or the Company) is pleased to advise that it has received US$12.5 million under the Nebari facility (refer to ASX release on 17 November 2025) and provide a..."
+            },
+            {
+              "source_id": "S2",
+              "fact": "\u27a2 Fully Funded Pathway to Sustainable Gold Production: Secured US$12.5 million from the first tranche of the Nebari facility, providing funding certainty.",
+              "published_at": "2026-01-23"
+            }
+          ],
+          "market_share_structure": [
+            {
+              "source_id": "S9",
+              "fact": "Whilst the current share price trades around $0.05 (5c), it is important to note tha..."
+            },
+            {
+              "source_id": "S4",
+              "fact": "\u27a2 Attractive, Market-Based Terms: Issue of 343.75 million new fully paid ordinary shares at A$0.08 per share, representing a 7% discount to the 15-day volume weighted average price (VWAP)."
+            },
+            {
+              "source_id": "S4",
+              "fact": "Every two shares will be accompanied by one unlisted option ($0.11 (11...",
+              "published_at": "2026-01-20"
+            },
+            {
+              "source_id": "S9",
+              "fact": "The exercise price of $0.0185 (1.85c) represents a 15% premium to the 5-day VWAP of WWI shares prior to the ASX announcement of Credit Committee approval for the Facility on 20 February 2025.",
+              "published_at": "2025-11-10"
+            }
+          ],
+          "catalysts_and_tailwinds": [
+            {
+              "source_id": "S1",
+              "fact": "z Au, highlighting robust nature of the project and upside to higher gold price"
+            },
+            {
+              "source_id": "S3",
+              "fact": "Tribeca\u2019s $10M investment delivers on the Company\u2019s strategic objective to grow the Company\u2019s in"
+            },
+            {
+              "source_id": "S6",
+              "fact": "PR 10839 is strategically positioned adjacent to West Wits MLI\u2019s existing Mining Right (\u201cMR 10073\u201d) at the Witwatersrand Basin Project (\u201cWBP\u201d), located in Johannesburg South Africa, and supports West Wits\u2019 long-term s..."
+            },
+            {
+              "source_id": "S9",
+              "fact": "Absa\u2019s Strategic Endorsement and Partnership Absa, one of South Africa\u2019s leading commercial banks, has been pivotal in advancing the broader funding package for development of the Qala Shallows project."
+            }
+          ],
+          "other_material_facts": [
+            {
+              "source_id": "S1",
+              "fact": "The grant of PR 10839 provides a seamless depth extension to Qala Shallows, exactly where we want future tonnes and ounces to come from."
+            },
+            {
+              "source_id": "S1",
+              "fact": "\u2022 5% for the Measured Category \u2022 10% for the Indicated C..."
+            },
+            {
+              "source_id": "S2",
+              "fact": "p-up at Qala Shallows During the quarter, West Wits delivered strong operational progress at its flagship Qala Shallows Gold Project, supported by the receipt of US$12.5 million from the first tranche of the Nebari Na..."
+            },
+            {
+              "source_id": "S4",
+              "fact": "Every two shares will be accompanied by one unlisted option ($0.11 (11..."
+            },
+            {
+              "source_id": "S1",
+              "fact": "\u27a2 Recently completed Institutional Placement strengthens balance sheet, fully funding Qala Shallows development to 70,000oz per annum2 steady-state production and positioning the Company to accelerate value creation.",
+              "published_at": "2026-02-02"
+            }
+          ]
+        },
+        "critical_gaps": [],
+        "counts": {
+          "source_count": 10,
+          "decoded_source_count": 10,
+          "categories_with_facts": 6,
+          "total_facts": 28
+        }
+      },
+      "prompt_chars": 39772,
+      "prompt_preview": "You are producing a Stage 1 model analysis for an investment council.\nThe user task below is the primary instruction and must be followed exactly.\n\nUSER TASK:\nRun an investment analysis on West Wits Mining Limited (ticker ASX:WWI) using the gold miner rubric. Include quality/value scoring, timeline, funding, and valuation evidence.\n\nANALYSIS BRIEF:\nFinancial analysis framing:\n- Template: gold_miner\n- Company type: gold_miner\n- Exchange: asx\n- Prioritize primary ASX filings and investor documents.\n\nRESEARCH SUMMARY FROM RETRIEVAL PASS:\n(none)\n\nLATEST UPDATES (from retrieval):\n(none)\n\nCOMPACT DENOISED FACT BUNDLE (primary signal for analysis):\n{\"schema\":\"compact_fact_bundle_v1\",\"source_index\":[{\"source_id\":\"S1\",\"title\":\"2.2Moz Increase to WBP Global Resource Estimate to 7.24Moz\",\"url\":\"https://announcements.asx.com.au/asxpdf/20260202/pdf/06vvhp4zxswsgh.pdf\",\"published_at\":\"2026-02-02\"},{\"source_id\":\"S2\",\"title\":\"Quarterly Activities & Cashflow Reports\",\"url\":\"https://announcements.asx.com.au/asxpdf/20260123/pdf/06vj8v3nlt4skk.pdf\",\"published_at\":\"2026-01-23\"},{\"source_id\":\"S3\",\"title\":\"Upsizing of Institutional Placement\",\"url\":\"https://announcements.asx.com.au/asxpdf/20260122/pdf/06",
+      "audit": {
+        "score_total": 93.0,
+        "subscores": {
+          "source_quality": 40.0,
+          "filler_control": 24.0,
+          "coverage": 25.0,
+          "token_efficiency": 4.0
+        },
+        "notes": [
+          "primary_domain_ratio=10/10",
+          "asx_pdf_ratio=10/10",
+          "decoded_ratio=10/10",
+          "low_signal_titles=0/10",
+          "fact_pack_sections_with_facts=8",
+          "fact_pack_critical_gaps=0",
+          "compact_categories_with_facts=6",
+          "timeline_rows=8",
+          "prompt_chars=39772",
+          "unique_domains=['announcements.asx.com.au']"
+        ]
+      }
+    },
+    {
+      "ticker": "ASX:SMI",
+      "company_name": "Santana Minerals Limited",
+      "asx_deterministic_ingestion": {
+        "enabled": true,
+        "used": true,
+        "symbol": "SMI",
+        "reason": "ok",
+        "cache_hit": false,
+        "fetched_rows": 104,
+        "selected_rows": 10,
+        "decoded_rows": 10,
+        "target_rows": 10,
+        "price_sensitive_only": true,
+        "include_non_sensitive_fill": false,
+        "years_queried": [
+          2026,
+          2025
+        ],
+        "errors": []
+      },
+      "source_rows": [
+        {
+          "source_id": "S1",
+          "title": "Trading Halt",
+          "url": "https://announcements.asx.com.au/asxpdf/20260216/pdf/06wbq6y7tprs37.pdf",
+          "published_at": "2026-02-16",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "16 February 2026 Santana Minerals Limited (ASX: SMI) \u2013 Trading Halt Trading in the securities of Santana Minerals Limited (\u2018SMI\u2019) will be halted at the request of SMI, pending the release of an announcement by SMI.\nUnless ASX decides otherwise, the securities will remain in trading halt until the earlier of:\n\u2022 the commencement of normal trading on Wednesday, 18 February 2026; or \u2022 the release of the announcement to the market.\nSMI\u2019s request for a trading halt is attached below for the information of the market.\n16 February 2026 Market Announcement 1/1 ASX Limited ASX Customer Service Centre 131 279 | asx.com.au\n16 February 2026\nLevel 40, Central Park Level 2, NZX Centre 152-158 St Georges Terrace 11 Cable Street Perth WA 6000 Wellington 6011 New Zealand By email: tradinghaltsperth@asx.com.au By email: i\nntre 152-158 St Georges Terrace 11 Cable Street Perth WA 6000 Wellington 6011 New Zealand By email: tradinghaltsperth@asx.com.au By email: issuer@nzregco.com\nSantana Minerals Ltd (ASX/NZX: SMI) (Santana) hereby requests that a halt be applied to the trading of its fully paid ordinary shares with effect prior to the commencement of trading today, Monday 16 February 2026.\nIn accord...",
+          "material_signal_score": 2
+        },
+        {
+          "source_id": "S2",
+          "title": "Decision Date Confirmed for Fast-track Consenting",
+          "url": "https://announcements.asx.com.au/asxpdf/20260205/pdf/06vzby1rql8nx9.pdf",
+          "published_at": "2026-02-05",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "5 February 2026 Decision Date Confirmed for Fast-track Consenting of Bendigo-\nA key milestone has been reached in the Fast-Track Approvals Act (FTA) process for the Bendigo-Ophir Gold Project, with the Panel Convener issuing a formal Minute on 4th February that confirms both the composition of the Expert Panel and the Statutory timeframe for determination of the application, providing clarity on the Project\u2019s Consent date.\nThe Panel Convener has used her discretion under the FTA and confirmed a 140 working-day statutory timeframe for determination of the Bendigo-Ophir Gold Project, with a decision due by 29 October 2026.\nIn setting this timeframe, the Convener emphasised a process designed to be efficient, proportionate and outcome-focused, enabling the Expert Panel to regulate its own procedures in a prac\ned a process designed to be efficient, proportionate and outcome-focused, enabling the Expert Panel to regulate its own procedures in a practical manner that supports a fair, well-tested and timely decision and avoid unnecessary procedural formality. The approach allows the participants to use expert conferencing to efficiently resolve issues, and narrow\nKey procedural milesto...",
+          "material_signal_score": 3
+        },
+        {
+          "source_id": "S3",
+          "title": "CODC endorses Bendigo-Ophir project",
+          "url": "https://announcements.asx.com.au/asxpdf/20260202/pdf/06vv3205wqnb43.pdf",
+          "published_at": "2026-02-02",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "2 February 2026 CODC endorses Bendigo-Ophir project Santana has concluded its long-running land access arrangements under the Crown Minerals Act with the Central Otago District Council (CODC), securing access over council roading assets necessary to enable the Bendigo-Ophir Gold Project (BOGP) to proceed, subject to receipt of Fast-track Approvals\nThe landmark agreement delivers multigenerational benefits to the Central Otago District, with the Company committing to an indexed payment of NZD$1.25 million per annum to CODC to fund infrastructure, environmental and community benefits packages as it sees fit, six months after commencement of commercial gold production, and transparently disclosed in Council\u2019s annual\nAny future road stopping as defined under the Public Works Act, will be subject to the full leg\ntransparently disclosed in Council\u2019s annual\nAny future road stopping as defined under the Public Works Act, will be subject to the full legislative process to be undertaken by the Council, and will also include the provision of an alternate route as applied for in the Company\u2019s FTA application.\n\u201cThis agreement is a material milestone for the Bendigo-Ophir Gold Project. It ref...",
+          "material_signal_score": 3
+        },
+        {
+          "source_id": "S4",
+          "title": "Quarterly Activities and Cashflow Reports",
+          "url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vl4rbjz3w2pg.pdf",
+          "published_at": "2026-01-27",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "ce the economic analysis set out in the Updated PFS 1 July 2025 that shows metrics at price steps above and below the base-case scenario, as per Table 1 below. A price step showing the impacts of the current gold price on NPV, IRR and Payback is added in the far-right column.\nSantana Minerals Ltd GPO Box 1305 T: +61 7 3221 7501 Level 1, 371 Queen St Brisbane, QLD4000 Brisbane, QLD 4000 ABN 37 161 946 989\n-10%/oz Base-Case Spot Price +10%/oz (26/01/26) A$3,150/oz A$3,500/oz A$4,950/oz A$5,446/oz A$7,300/oz NPV6.5% $601M $780M $1.52b $1.77b A$2.77b IRR 32% 39% 65% 73% 107% Payback 3.0Yrs 2.6Yrs 1.7Yrs 1.6Yrs 1.25Yrs Table 1: Updated PFS \u2013 June 2025, Gold Price Sensitivities with Current Gold Price Impact Operational Activities \u2013 Bendigo-Ophir Gold Project The BOGP is a large-scale, long-life gold development\nl (incl. 10% contingency) AUD 'mil 277 277 2691 Sustaining capital expenditure (funded from cash flow) Plant & infrastructure AUD 'mil 48 48 48 Waste stripping AUD 'mil 78 78 78 Underground mine plant & infrastructure (year 6) AUD 'mil 85 85 85 Closure capex (off-set against salvage value of PP&E) AUD 'mil (0) (0) (0) Total capex over mine life AUD 'mil 488 488 480\nTotal cash...",
+          "material_signal_score": 7
+        },
+        {
+          "source_id": "S5",
+          "title": "Exceptional Drill Intercepts at RAS North Honeypot",
+          "url": "https://announcements.asx.com.au/asxpdf/20251204/pdf/06sxs6nk7ld71z.pdf",
+          "published_at": "2025-12-04",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "g/t), a ributable to \ufb01ne disseminated gold.\nThese new results reinforce the previous intersec ons in the northern Honeypot zone, which extends HG1 well beyond the current underground Reserve at least a further 230m down-plunge, for a 60% increase beyond the current mine design, for a poten ally larger underground opera on than previously de\ufb01ned.\nIntercepts from these latest holes include:\nMDD487 8.7m @ 30.6g/t Au from 302.3m (true width 7.1m) MDD483 27.6m @ 3.5g/t Au from 447.4m (true width 25.4m) MDD486 12.6m @ 4.2g/t Au from 479.4m (true width 11.3m) MDD485 6.7m @ 2.0g/t Au from 459.3m (true width 6.3m) Figure 1. Plan view of RAS North showing new drill hole intercepts 1 Hole ID FROM TO Lithology Interval Au_ppm MDD487 300 301 TZ3 Waste 1 BDL MDD487 301 301.7 TZ3 Waste 0.7 BDL MDD487 301.7 302.3 TGF 0.6\ntedly observed across RAS, con nue to strengthen our con\ufb01dence in the geological model and the consistency of the high-grade domains.\u201d\nThis announcement has been authorised for release by the Board.\nExec. Director & CEO Exec. Director Corp A\ufb00airs & IR dspring@santanaminerals.com ssmith@santanaminerals.com 3 Previous Disclosure - 2012 JORC Code Information relating to Mineral Re...",
+          "material_signal_score": 3
+        },
+        {
+          "source_id": "S6",
+          "title": "Fast-track Approvals application accepted by EPA",
+          "url": "https://announcements.asx.com.au/asxpdf/20251124/pdf/06sddvhrq3801g.pdf",
+          "published_at": "2025-11-24",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "24 November 2025 Fast-track Approvals application accepted by EPA Santana Minerals Limited (\u201cCompany\u201d or \u201cSantana\u201d) is pleased to advise that the Environmental Protection Authority (EPA) has formally accepted the Company\u2019s application under the Fast-track Approvals Act (FTA) for the development of the Bendigo-Ophir Gold Project in Central Otago, New\nEPA acceptance confirms that the Company\u2019s submission meets all lodgement requirements under the FTA, allowing the application to proceed into the assessment phase.\nThe application will now be considered by the Panel Convener to determine the makeup of an expert panel. By the time the expert panel is convened, a date must be set down by which the panel must make a decision, which is expected to take approximately six months.\nCEO Damian Spring said the acceptanc\nset down by which the panel must make a decision, which is expected to take approximately six months.\nCEO Damian Spring said the acceptance is a significant step forward for the Project:\n\u201cWe are very pleased the EPA has accepted our FTA application for processing. This is a major procedural milestone for the Project and demonstrates the strength of the work completed to date....",
+          "material_signal_score": 2
+        },
+        {
+          "source_id": "S7",
+          "title": "Trading Halt",
+          "url": "https://announcements.asx.com.au/asxpdf/20251121/pdf/06sbps04f259pc.pdf",
+          "published_at": "2025-11-21",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "21 November 2025 Santana Minerals Limited (ASX: SMI) \u2013 Trading Halt Trading in the securities of Santana Minerals Limited (\u2018SMI\u2019) will be halted at the request of SMI, pending the release of an announcement by SMI.\nUnless ASX decides otherwise, the securities will remain in trading halt until the earlier of:\n\u2022 the commencement of normal trading on Tuesday, 25 November 2025; or \u2022 the release of the announcement to the market.\nSMI\u2019s request for a trading halt is attached below for the information of the market.\n21 November 2025 Market Announcement 1/1 ASX Limited ASX Customer Service Centre 131 279 | asx.com.au\n21 November 2025 ASX Compliance Pty Limited NZ RegCo Level 40, Central Park, 152-158 St Georges Terrace Level 2, NZX Centre Perth WA 6000 Wellington 6011 New Zealand By email: tradinghaltsperth@asx.\n40, Central Park, 152-158 St Georges Terrace Level 2, NZX Centre Perth WA 6000 Wellington 6011 New Zealand By email: tradinghaltsperth@asx.com.au; By email: issuer@nzregco.com\nSantana Minerals Ltd (ASX: SMI) (NZX: SMI) (Santana) hereby requests that a halt be applied to the trading of its fully paid ordinary shares with immediate effect.\nIn accordance with ASX Listing Rule 17.1...",
+          "material_signal_score": 2
+        },
+        {
+          "source_id": "S8",
+          "title": "RAS Northern Honeypot Expanded and Sweetened",
+          "url": "https://announcements.asx.com.au/asxpdf/20251118/pdf/06s3vyp9yvhzrk.pdf",
+          "published_at": "2025-11-18",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "rground mining zone.\nFurther to the north, MDD480 returned a strong interval that provides valuable infill control and supports the northward continuity of the high-grade system. Drillhole MDD478 intercept on the western fringe, typifies the gradual edge decrease\nIntercepts from these latest holes include:\nMDD482 21.1m @ 5.3 g/t Au from 435.0m (true width 19.5m) MDD481 13.5m @ 8.6 g/t Au from 450.5m (true width 12.7m) MDD480 19.3m @ 4.0 g/t Au from 474.7m (true width 18.2m) MDD478 3.0m @ 1.7g/t Au from 449.0m (true width 3.0m)\n2025 Updated\nFigure 1. Plan view of RAS North showing new drill hole intercepts 1\n0 50m 100m Figure 2. Schematic cross section at 5018150N showing high grade intersections Visible gold, typically at 100\u2013500 microns and occasionally up to 1 mm, was observed in MDD480 at 491.2 m (ha\nstatements. Accordingly, viewers are cautioned not to place undue reliance on forward-looking statements. Santana does not undertake to update publicly or to revise any of the included forward-looking statements, except as may be required under applicable securities\n4 Appendix 1 - New Drill holes \u2013 New Mineralised Intercepts (top-cut to 100 g/t and at a 0.50 g/t lower cut-off gra...",
+          "material_signal_score": 2
+        }
+      ],
+      "timeline_rows": [
+        {
+          "source_id": "S6",
+          "title": "Fast-track Approvals application accepted by EPA",
+          "url": "https://announcements.asx.com.au/asxpdf/20251124/pdf/06sddvhrq3801g.pdf",
+          "published_at": "2025-11-24",
+          "authority_rank": 4,
+          "score": 12,
+          "fact": "24 November 2025 Fast-track Approvals application accepted by EPA Santana Minerals Limited (\u201cCompany\u201d or \u201cSantana\u201d) is pleased to advise that the Environmental Protection Authority (EPA) has formally accepted the Comp...",
+          "windows": [
+            "November 2025"
+          ]
+        }
+      ],
+      "fact_pack": {
+        "schema": "rubric_fact_pack_v1",
+        "source_index": [
+          {
+            "source_id": "S1",
+            "title": "Trading Halt",
+            "url": "https://announcements.asx.com.au/asxpdf/20260216/pdf/06wbq6y7tprs37.pdf",
+            "published_at": "2026-02-16",
+            "decoded": true
+          },
+          {
+            "source_id": "S2",
+            "title": "Decision Date Confirmed for Fast-track Consenting",
+            "url": "https://announcements.asx.com.au/asxpdf/20260205/pdf/06vzby1rql8nx9.pdf",
+            "published_at": "2026-02-05",
+            "decoded": true
+          },
+          {
+            "source_id": "S3",
+            "title": "CODC endorses Bendigo-Ophir project",
+            "url": "https://announcements.asx.com.au/asxpdf/20260202/pdf/06vv3205wqnb43.pdf",
+            "published_at": "2026-02-02",
+            "decoded": true
+          },
+          {
+            "source_id": "S4",
+            "title": "Quarterly Activities and Cashflow Reports",
+            "url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vl4rbjz3w2pg.pdf",
+            "published_at": "2026-01-27",
+            "decoded": true
+          },
+          {
+            "source_id": "S5",
+            "title": "Exceptional Drill Intercepts at RAS North Honeypot",
+            "url": "https://announcements.asx.com.au/asxpdf/20251204/pdf/06sxs6nk7ld71z.pdf",
+            "published_at": "2025-12-04",
+            "decoded": true
+          },
+          {
+            "source_id": "S6",
+            "title": "Fast-track Approvals application accepted by EPA",
+            "url": "https://announcements.asx.com.au/asxpdf/20251124/pdf/06sddvhrq3801g.pdf",
+            "published_at": "2025-11-24",
+            "decoded": true
+          },
+          {
+            "source_id": "S7",
+            "title": "Trading Halt",
+            "url": "https://announcements.asx.com.au/asxpdf/20251121/pdf/06sbps04f259pc.pdf",
+            "published_at": "2025-11-21",
+            "decoded": true
+          },
+          {
+            "source_id": "S8",
+            "title": "RAS Northern Honeypot Expanded and Sweetened",
+            "url": "https://announcements.asx.com.au/asxpdf/20251118/pdf/06s3vyp9yvhzrk.pdf",
+            "published_at": "2025-11-18",
+            "decoded": true
+          }
+        ],
+        "sections": {
+          "market_data": [
+            {
+              "source_id": "S4",
+              "fact": "10% contingency) AUD 'mil 277 277 2691 Sustaining capital expenditure (funded from cash flow) Plant & infrastructure AUD 'mil 48 48 48 Waste stripping AUD 'mil 78 78 78 Underground mine plant & infrastructure (year 6)..."
+            }
+          ],
+          "project_economics_npv_inputs": [
+            {
+              "source_id": "S4",
+              "fact": "A price step showing the impacts of the current gold price on NPV, IRR and Payback is added in the far-right column."
+            },
+            {
+              "source_id": "S4",
+              "fact": "10%/oz Base-Case Spot Price +10%/oz (26/01/26) A$3,150/oz A$3,500/oz A$4,950/oz A$5,446/oz A$7,300/oz NPV6.5% $601M $780M $1.52b $1.77b A$2.77b IRR 32% 39% 65% 73% 107% Payback 3.0Yrs 2.6Yrs 1.7Yrs 1.6Yrs 1.25Yrs Tabl..."
+            }
+          ],
+          "resource_and_reserve": [
+            {
+              "source_id": "S5",
+              "fact": "g/t), a ributable to \ufb01ne disseminated gold."
+            },
+            {
+              "source_id": "S5",
+              "fact": "These new results reinforce the previous intersec ons in the northern Honeypot zone, which extends HG1 well beyond the current underground Reserve at least a further 230m down-plunge, for a 60% increase beyond the cur..."
+            },
+            {
+              "source_id": "S5",
+              "fact": "MDD487 8.7m @ 30.6g/t Au from 302.3m (true width 7.1m) MDD483 27.6m @ 3.5g/t Au from 447.4m (true width 25.4m) MDD486 12.6m @ 4.2g/t Au from 479.4m (true width 11.3m) MDD485 6.7m @ 2.0g/t Au from 459.3m (true width 6...."
+            },
+            {
+              "source_id": "S5",
+              "fact": "tedly observed across RAS, con nue to strengthen our con\ufb01dence in the geological model and the consistency of the high-grade domains.\u201d"
+            }
+          ],
+          "development_timeline_and_milestones": [
+            {
+              "source_id": "S1",
+              "fact": "16 February 2026 Santana Minerals Limited (ASX: SMI) \u2013 Trading Halt Trading in the securities of Santana Minerals Limited (\u2018SMI\u2019) will be halted at the request of SMI, pending the release of an announcement by SMI."
+            },
+            {
+              "source_id": "S1",
+              "fact": "\u2022 the commencement of normal trading on Wednesday, 18 February 2026; or \u2022 the release of the announcement to the market."
+            },
+            {
+              "source_id": "S1",
+              "fact": "16 February 2026 Market Announcement 1/1 ASX Limited ASX Customer Service Centre 131 279 | asx.com.au"
+            },
+            {
+              "source_id": "S1",
+              "fact": "Santana Minerals Ltd (ASX/NZX: SMI) (Santana) hereby requests that a halt be applied to the trading of its fully paid ordinary shares with effect prior to the commencement of trading today, Monday 16 February 2026."
+            }
+          ],
+          "other_material_facts": [
+            {
+              "source_id": "S1",
+              "fact": "Level 40, Central Park Level 2, NZX Centre 152-158 St Georges Terrace 11 Cable Street Perth WA 6000 Wellington 6011 New Zealand By email: tradinghaltsperth@asx.com.au By email: i"
+            },
+            {
+              "source_id": "S1",
+              "fact": "ntre 152-158 St Georges Terrace 11 Cable Street Perth WA 6000 Wellington 6011 New Zealand By email: tradinghaltsperth@asx.com.au By email: issuer@nzregco.com"
+            },
+            {
+              "source_id": "S3",
+              "fact": "The landmark agreement delivers multigenerational benefits to the Central Otago District, with the Company committing to an indexed payment of NZD$1.25 million per annum to CODC to fund infrastructure, environmental a..."
+            },
+            {
+              "source_id": "S4",
+              "fact": "Santana Minerals Ltd GPO Box 1305 T: +61 7 3221 7501 Level 1, 371 Queen St Brisbane, QLD4000 Brisbane, QLD 4000 ABN 37 161 946 989"
+            }
+          ]
+        },
+        "critical_gaps": [],
+        "counts": {
+          "source_count": 8,
+          "decoded_source_count": 8,
+          "total_facts": 15,
+          "sections_with_facts": 5
+        }
+      },
+      "fact_digest": {
+        "schema": "fact_digest_v2",
+        "source_index": [
+          {
+            "source_id": "S1",
+            "title": "Trading Halt",
+            "url": "https://announcements.asx.com.au/asxpdf/20260216/pdf/06wbq6y7tprs37.pdf",
+            "published_at": "2026-02-16",
+            "decoded": true
+          },
+          {
+            "source_id": "S2",
+            "title": "Decision Date Confirmed for Fast-track Consenting",
+            "url": "https://announcements.asx.com.au/asxpdf/20260205/pdf/06vzby1rql8nx9.pdf",
+            "published_at": "2026-02-05",
+            "decoded": true
+          },
+          {
+            "source_id": "S3",
+            "title": "CODC endorses Bendigo-Ophir project",
+            "url": "https://announcements.asx.com.au/asxpdf/20260202/pdf/06vv3205wqnb43.pdf",
+            "published_at": "2026-02-02",
+            "decoded": true
+          },
+          {
+            "source_id": "S4",
+            "title": "Quarterly Activities and Cashflow Reports",
+            "url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vl4rbjz3w2pg.pdf",
+            "published_at": "2026-01-27",
+            "decoded": true
+          },
+          {
+            "source_id": "S5",
+            "title": "Exceptional Drill Intercepts at RAS North Honeypot",
+            "url": "https://announcements.asx.com.au/asxpdf/20251204/pdf/06sxs6nk7ld71z.pdf",
+            "published_at": "2025-12-04",
+            "decoded": true
+          },
+          {
+            "source_id": "S6",
+            "title": "Fast-track Approvals application accepted by EPA",
+            "url": "https://announcements.asx.com.au/asxpdf/20251124/pdf/06sddvhrq3801g.pdf",
+            "published_at": "2025-11-24",
+            "decoded": true
+          },
+          {
+            "source_id": "S7",
+            "title": "Trading Halt",
+            "url": "https://announcements.asx.com.au/asxpdf/20251121/pdf/06sbps04f259pc.pdf",
+            "published_at": "2025-11-21",
+            "decoded": true
+          },
+          {
+            "source_id": "S8",
+            "title": "RAS Northern Honeypot Expanded and Sweetened",
+            "url": "https://announcements.asx.com.au/asxpdf/20251118/pdf/06s3vyp9yvhzrk.pdf",
+            "published_at": "2025-11-18",
+            "decoded": true
+          }
+        ],
+        "sections": {
+          "timelines_deadlines": [
+            {
+              "source_id": "S2",
+              "published_at": "2026-02-05",
+              "fact": "A key milestone has been reached in the Fast-Track Approvals Act (FTA) process for the Bendigo-Ophir Gold Project, with the Panel Convener issuing a formal Minute on 4th February that confirms both the composition of...",
+              "windows": [],
+              "number_tokens": [
+                "4"
+              ]
+            },
+            {
+              "source_id": "S3",
+              "published_at": "2026-02-02",
+              "fact": "\u201cThis agreement is a material milestone for the Bendigo-Ophir Gold Project.",
+              "windows": [],
+              "number_tokens": []
+            },
+            {
+              "source_id": "S6",
+              "published_at": "2025-11-24",
+              "fact": "This is a major procedural milestone for the Project and demonstrates the strength of the work completed to date....",
+              "windows": [],
+              "number_tokens": []
+            },
+            {
+              "source_id": "S6",
+              "published_at": "2025-11-24",
+              "fact": "24 November 2025 Fast-track Approvals application accepted by EPA Santana Minerals Limited (\u201cCompany\u201d or \u201cSantana\u201d) is pleased to advise that the Environmental Protection Authority (EPA) has formally accepted the Comp...",
+              "windows": [
+                "November 2025"
+              ],
+              "number_tokens": [
+                "24",
+                "2025"
+              ]
+            }
+          ],
+          "financing_deals": [
+            {
+              "source_id": "S3",
+              "published_at": "2026-02-02",
+              "fact": "The landmark agreement delivers multigenerational benefits to the Central Otago District, with the Company committing to an indexed payment of NZD$1.25 million per annum to CODC to fund infrastructure, environmental a...",
+              "windows": [],
+              "number_tokens": [
+                "$1.25 m"
+              ]
+            },
+            {
+              "source_id": "S4",
+              "published_at": "2026-01-27",
+              "fact": "10% contingency) AUD 'mil 277 277 2691 Sustaining capital expenditure (funded from cash flow) Plant & infrastructure AUD 'mil 48 48 48 Waste stripping AUD 'mil 78 78 78 Underground mine plant & infrastructure (year 6)...",
+              "windows": [],
+              "number_tokens": [
+                "10%",
+                "277",
+                "2691",
+                "48"
+              ]
+            }
+          ],
+          "project_economics": [
+            {
+              "source_id": "S4",
+              "published_at": "2026-01-27",
+              "fact": "A price step showing the impacts of the current gold price on NPV, IRR and Payback is added in the far-right column.",
+              "windows": [],
+              "number_tokens": []
+            },
+            {
+              "source_id": "S4",
+              "published_at": "2026-01-27",
+              "fact": "10%/oz Base-Case Spot Price +10%/oz (26/01/26) A$3,150/oz A$3,500/oz A$4,950/oz A$5,446/oz A$7,300/oz NPV6.5% $601M $780M $1.52b $1.77b A$2.77b IRR 32% 39% 65% 73% 107% Payback 3.0Yrs 2.6Yrs 1.7Yrs 1.6Yrs 1.25Yrs Tabl...",
+              "windows": [],
+              "number_tokens": [
+                "10%",
+                "26",
+                "01",
+                "A$3,150"
+              ]
+            },
+            {
+              "source_id": "S5",
+              "published_at": "2025-12-04",
+              "fact": "These new results reinforce the previous intersec ons in the northern Honeypot zone, which extends HG1 well beyond the current underground Reserve at least a further 230m down-plunge, for a 60% increase beyond the cur...",
+              "windows": [],
+              "number_tokens": [
+                "1",
+                "230m",
+                "60%"
+              ]
+            },
+            {
+              "source_id": "S5",
+              "published_at": "2025-12-04",
+              "fact": "tedly observed across RAS, con nue to strengthen our con\ufb01dence in the geological model and the consistency of the high-grade domains.\u201d",
+              "windows": [],
+              "number_tokens": []
+            },
+            {
+              "source_id": "S8",
+              "published_at": "2025-11-18",
+              "fact": "Further to the north, MDD480 returned a strong interval that provides valuable infill control and supports the northward continuity of the high-grade system.",
+              "windows": [],
+              "number_tokens": [
+                "480"
+              ]
+            },
+            {
+              "source_id": "S8",
+              "published_at": "2025-11-18",
+              "fact": "Schematic cross section at 5018150N showing high grade intersections Visible gold, typically at 100\u2013500 microns and occasionally up to 1 mm, was observed in MDD480 at 491.2 m (ha",
+              "windows": [],
+              "number_tokens": [
+                "5018150",
+                "100",
+                "500 m",
+                "1 m"
+              ]
+            }
+          ],
+          "market_share_structure": [
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-16",
+              "fact": "Santana Minerals Ltd (ASX/NZX: SMI) (Santana) hereby requests that a halt be applied to the trading of its fully paid ordinary shares with effect prior to the commencement of trading today, Monday 16 February 2026.",
+              "windows": [
+                "February 2026"
+              ],
+              "number_tokens": [
+                "16",
+                "2026"
+              ]
+            },
+            {
+              "source_id": "S4",
+              "published_at": "2026-01-27",
+              "fact": "ce the economic analysis set out in the Updated PFS 1 July 2025 that shows metrics at price steps above and below the base-case scenario, as per Table 1 below.",
+              "windows": [
+                "July 2025"
+              ],
+              "number_tokens": [
+                "1",
+                "2025",
+                "1 b"
+              ]
+            },
+            {
+              "source_id": "S7",
+              "published_at": "2025-11-21",
+              "fact": "Santana Minerals Ltd (ASX: SMI) (NZX: SMI) (Santana) hereby requests that a halt be applied to the trading of its fully paid ordinary shares with immediate effect.",
+              "windows": [],
+              "number_tokens": []
+            }
+          ],
+          "other_material_facts": [
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-16",
+              "fact": "16 February 2026 Santana Minerals Limited (ASX: SMI) \u2013 Trading Halt Trading in the securities of Santana Minerals Limited (\u2018SMI\u2019) will be halted at the request of SMI, pending the release of an announcement by SMI.",
+              "windows": [
+                "February 2026"
+              ],
+              "number_tokens": [
+                "16",
+                "2026"
+              ]
+            },
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-16",
+              "fact": "\u2022 the commencement of normal trading on Wednesday, 18 February 2026; or \u2022 the release of the announcement to the market.",
+              "windows": [
+                "February 2026"
+              ],
+              "number_tokens": [
+                "18",
+                "2026"
+              ]
+            },
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-16",
+              "fact": "16 February 2026 Market Announcement 1/1 ASX Limited ASX Customer Service Centre 131 279 | asx.com.au",
+              "windows": [
+                "February 2026"
+              ],
+              "number_tokens": [
+                "16",
+                "2026 M",
+                "1",
+                "131"
+              ]
+            },
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-16",
+              "fact": "Level 40, Central Park Level 2, NZX Centre 152-158 St Georges Terrace 11 Cable Street Perth WA 6000 Wellington 6011 New Zealand By email: tradinghaltsperth@asx.com.au By email: i",
+              "windows": [],
+              "number_tokens": [
+                "40,",
+                "2,",
+                "152",
+                "158"
+              ]
+            },
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-16",
+              "fact": "ntre 152-158 St Georges Terrace 11 Cable Street Perth WA 6000 Wellington 6011 New Zealand By email: tradinghaltsperth@asx.com.au By email: issuer@nzregco.com",
+              "windows": [],
+              "number_tokens": [
+                "152",
+                "158",
+                "11",
+                "6000"
+              ]
+            },
+            {
+              "source_id": "S2",
+              "published_at": "2026-02-05",
+              "fact": "5 February 2026 Decision Date Confirmed for Fast-track Consenting of Bendigo",
+              "windows": [
+                "February 2026"
+              ],
+              "number_tokens": [
+                "5",
+                "2026"
+              ]
+            }
+          ]
+        },
+        "summary_bullets": [
+          "[S2] 2026-02-05: A key milestone has been reached in the Fast-Track Approvals Act (FTA) process for the Bendigo-Ophir Gold Project, with the Panel Convener issuing a formal Minute on 4th February that confirms both the composition of...",
+          "[S6] 2025-11-24: 24 November 2025 Fast-track Approvals application accepted by EPA Santana Minerals Limited (\u201cCompany\u201d or \u201cSantana\u201d) is pleased to advise that the Environmental Protection Authority (EPA) has formally accepted the Comp...",
+          "[S4] 2026-01-27: 10%/oz Base-Case Spot Price +10%/oz (26/01/26) A$3,150/oz A$3,500/oz A$4,950/oz A$5,446/oz A$7,300/oz NPV6.5% $601M $780M $1.52b $1.77b A$2.77b IRR 32% 39% 65% 73% 107% Payback 3.0Yrs 2.6Yrs 1.7Yrs 1.6Yrs 1.25Yrs Tabl...",
+          "[S4] 2026-01-27: 10% contingency) AUD 'mil 277 277 2691 Sustaining capital expenditure (funded from cash flow) Plant & infrastructure AUD 'mil 48 48 48 Waste stripping AUD 'mil 78 78 78 Underground mine plant & infrastructure (year 6)...",
+          "[S4] 2026-01-27: A price step showing the impacts of the current gold price on NPV, IRR and Payback is added in the far-right column.",
+          "[S1] 2026-02-16: 16 February 2026 Santana Minerals Limited (ASX: SMI) \u2013 Trading Halt Trading in the securities of Santana Minerals Limited (\u2018SMI\u2019) will be halted at the request of SMI, pending the release of an announcement by SMI.",
+          "[S1] 2026-02-16: \u2022 the commencement of normal trading on Wednesday, 18 February 2026; or \u2022 the release of the announcement to the market.",
+          "[S1] 2026-02-16: 16 February 2026 Market Announcement 1/1 ASX Limited ASX Customer Service Centre 131 279 | asx.com.au",
+          "[S1] 2026-02-16: Level 40, Central Park Level 2, NZX Centre 152-158 St Georges Terrace 11 Cable Street Perth WA 6000 Wellington 6011 New Zealand By email: tradinghaltsperth@asx.com.au By email: i",
+          "[S1] 2026-02-16: ntre 152-158 St Georges Terrace 11 Cable Street Perth WA 6000 Wellington 6011 New Zealand By email: tradinghaltsperth@asx.com.au By email: issuer@nzregco.com",
+          "[S1] 2026-02-16: Santana Minerals Ltd (ASX/NZX: SMI) (Santana) hereby requests that a halt be applied to the trading of its fully paid ordinary shares with effect prior to the commencement of trading today, Monday 16 February 2026.",
+          "[S2] 2026-02-05: 5 February 2026 Decision Date Confirmed for Fast-track Consenting of Bendigo"
+        ],
+        "narrative_summary": "Timelines Deadlines: A key milestone has been reached in the Fast-Track Approvals Act (FTA) process for the Bendigo-Ophir Gold Project, with the Panel Convener issuing a formal Minute on 4th February that confirms both the composition of...; \u201cThis agreement is a material milestone for the Bendigo-Ophir Gold Project. Financing Deals: The landmark agreement delivers multigenerational benefits to the Central Otago District, with the Company committing to an indexed payment of NZD$1.25 million per annum to CODC to fund infrastructure, environmental a...; 10% contingency) AUD 'mil 277 277 2691 Sustaining capital expenditure (funded from cash flow) Plant & infrastructure AUD 'mil 48 48 48 Waste stripping AUD 'mil 78 78 78 Underground mine plant & infrastructure (year 6)... Project Economics: A price step showing the impacts of the current gold price on NPV, IRR and Payback is added in the far-right column.; 10%/oz Base-Case Spot Price +10%/oz (26/01/26) A$3,150/oz A$3,500/oz A$4,950/oz A$5,446/oz A$7,300/oz NPV6.5% $601M $780M $1.52b $1.77b A$2.77b IRR 32% 39% 65% 73% 107% Payback 3.0Yrs 2.6Yrs 1.7Yrs 1.6Yrs 1.25Yrs Tabl... Market Share Structure: Santana Minerals Ltd (ASX/NZX: SMI) (Santana) hereby requests that a halt be applied to the trading of its fully paid ordinary shares with effect prior to the commencement of trading today, Monday 16 February 2026.; ce the economic analysis set out in the Updated PFS 1 July 2025 that shows metrics at price steps above and below the base-case scenario, as per Table 1 below.",
+        "conflicts": [],
+        "counts": {
+          "source_count": 8,
+          "decoded_source_count": 8,
+          "total_facts": 21,
+          "sections_with_facts": 5,
+          "summary_bullets": 12,
+          "conflicts": 0
+        }
+      },
+      "compact_fact_bundle": {
+        "schema": "compact_fact_bundle_v1",
+        "source_index": [
+          {
+            "source_id": "S1",
+            "title": "Trading Halt",
+            "url": "https://announcements.asx.com.au/asxpdf/20260216/pdf/06wbq6y7tprs37.pdf",
+            "published_at": "2026-02-16"
+          },
+          {
+            "source_id": "S2",
+            "title": "Decision Date Confirmed for Fast-track Consenting",
+            "url": "https://announcements.asx.com.au/asxpdf/20260205/pdf/06vzby1rql8nx9.pdf",
+            "published_at": "2026-02-05"
+          },
+          {
+            "source_id": "S3",
+            "title": "CODC endorses Bendigo-Ophir project",
+            "url": "https://announcements.asx.com.au/asxpdf/20260202/pdf/06vv3205wqnb43.pdf",
+            "published_at": "2026-02-02"
+          },
+          {
+            "source_id": "S4",
+            "title": "Quarterly Activities and Cashflow Reports",
+            "url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vl4rbjz3w2pg.pdf",
+            "published_at": "2026-01-27"
+          },
+          {
+            "source_id": "S5",
+            "title": "Exceptional Drill Intercepts at RAS North Honeypot",
+            "url": "https://announcements.asx.com.au/asxpdf/20251204/pdf/06sxs6nk7ld71z.pdf",
+            "published_at": "2025-12-04"
+          },
+          {
+            "source_id": "S6",
+            "title": "Fast-track Approvals application accepted by EPA",
+            "url": "https://announcements.asx.com.au/asxpdf/20251124/pdf/06sddvhrq3801g.pdf",
+            "published_at": "2025-11-24"
+          },
+          {
+            "source_id": "S7",
+            "title": "Trading Halt",
+            "url": "https://announcements.asx.com.au/asxpdf/20251121/pdf/06sbps04f259pc.pdf",
+            "published_at": "2025-11-21"
+          },
+          {
+            "source_id": "S8",
+            "title": "RAS Northern Honeypot Expanded and Sweetened",
+            "url": "https://announcements.asx.com.au/asxpdf/20251118/pdf/06s3vyp9yvhzrk.pdf",
+            "published_at": "2025-11-18"
+          }
+        ],
+        "categories": {
+          "timeline_milestones": [
+            {
+              "source_id": "S1",
+              "fact": "16 February 2026 Santana Minerals Limited (ASX: SMI) \u2013 Trading Halt Trading in the securities of Santana Minerals Limited (\u2018SMI\u2019) will be halted at the request of SMI, pending the release of an announcement by SMI."
+            },
+            {
+              "source_id": "S1",
+              "fact": "\u2022 the commencement of normal trading on Wednesday, 18 February 2026; or \u2022 the release of the announcement to the market."
+            },
+            {
+              "source_id": "S1",
+              "fact": "16 February 2026 Market Announcement 1/1 ASX Limited ASX Customer Service Centre 131 279 | asx.com.au"
+            },
+            {
+              "source_id": "S1",
+              "fact": "Santana Minerals Ltd (ASX/NZX: SMI) (Santana) hereby requests that a halt be applied to the trading of its fully paid ordinary shares with effect prior to the commencement of trading today, Monday 16 February 2026."
+            },
+            {
+              "source_id": "S6",
+              "fact": "24 November 2025 Fast-track Approvals application accepted by EPA Santana Minerals Limited (\u201cCompany\u201d or \u201cSantana\u201d) is pleased to advise that the Environmental Protection Authority (EPA) has formally accepted the Comp...",
+              "published_at": "2025-11-24"
+            }
+          ],
+          "project_economics_resource": [
+            {
+              "source_id": "S4",
+              "fact": "A price step showing the impacts of the current gold price on NPV, IRR and Payback is added in the far-right column."
+            },
+            {
+              "source_id": "S4",
+              "fact": "10%/oz Base-Case Spot Price +10%/oz (26/01/26) A$3,150/oz A$3,500/oz A$4,950/oz A$5,446/oz A$7,300/oz NPV6.5% $601M $780M $1.52b $1.77b A$2.77b IRR 32% 39% 65% 73% 107% Payback 3.0Yrs 2.6Yrs 1.7Yrs 1.6Yrs 1.25Yrs Tabl..."
+            },
+            {
+              "source_id": "S5",
+              "fact": "g/t), a ributable to \ufb01ne disseminated gold."
+            },
+            {
+              "source_id": "S5",
+              "fact": "These new results reinforce the previous intersec ons in the northern Honeypot zone, which extends HG1 well beyond the current underground Reserve at least a further 230m down-plunge, for a 60% increase beyond the cur..."
+            },
+            {
+              "source_id": "S5",
+              "fact": "MDD487 8.7m @ 30.6g/t Au from 302.3m (true width 7.1m) MDD483 27.6m @ 3.5g/t Au from 447.4m (true width 25.4m) MDD486 12.6m @ 4.2g/t Au from 479.4m (true width 11.3m) MDD485 6.7m @ 2.0g/t Au from 459.3m (true width 6...."
+            }
+          ],
+          "funding_and_balance_sheet": [
+            {
+              "source_id": "S3",
+              "fact": "The landmark agreement delivers multigenerational benefits to the Central Otago District, with the Company committing to an indexed payment of NZD$1.25 million per annum to CODC to fund infrastructure, environmental a...",
+              "published_at": "2026-02-02"
+            },
+            {
+              "source_id": "S4",
+              "fact": "10% contingency) AUD 'mil 277 277 2691 Sustaining capital expenditure (funded from cash flow) Plant & infrastructure AUD 'mil 48 48 48 Waste stripping AUD 'mil 78 78 78 Underground mine plant & infrastructure (year 6)...",
+              "published_at": "2026-01-27"
+            }
+          ],
+          "market_share_structure": [
+            {
+              "source_id": "S4",
+              "fact": "10% contingency) AUD 'mil 277 277 2691 Sustaining capital expenditure (funded from cash flow) Plant & infrastructure AUD 'mil 48 48 48 Waste stripping AUD 'mil 78 78 78 Underground mine plant & infrastructure (year 6)..."
+            },
+            {
+              "source_id": "S1",
+              "fact": "Santana Minerals Ltd (ASX/NZX: SMI) (Santana) hereby requests that a halt be applied to the trading of its fully paid ordinary shares with effect prior to the commencement of trading today, Monday 16 February 2026.",
+              "published_at": "2026-02-16"
+            },
+            {
+              "source_id": "S4",
+              "fact": "ce the economic analysis set out in the Updated PFS 1 July 2025 that shows metrics at price steps above and below the base-case scenario, as per Table 1 below.",
+              "published_at": "2026-01-27"
+            },
+            {
+              "source_id": "S7",
+              "fact": "Santana Minerals Ltd (ASX: SMI) (NZX: SMI) (Santana) hereby requests that a halt be applied to the trading of its fully paid ordinary shares with immediate effect.",
+              "published_at": "2025-11-21"
+            }
+          ],
+          "other_material_facts": [
+            {
+              "source_id": "S1",
+              "fact": "Level 40, Central Park Level 2, NZX Centre 152-158 St Georges Terrace 11 Cable Street Perth WA 6000 Wellington 6011 New Zealand By email: tradinghaltsperth@asx.com.au By email: i"
+            },
+            {
+              "source_id": "S1",
+              "fact": "ntre 152-158 St Georges Terrace 11 Cable Street Perth WA 6000 Wellington 6011 New Zealand By email: tradinghaltsperth@asx.com.au By email: issuer@nzregco.com"
+            },
+            {
+              "source_id": "S3",
+              "fact": "The landmark agreement delivers multigenerational benefits to the Central Otago District, with the Company committing to an indexed payment of NZD$1.25 million per annum to CODC to fund infrastructure, environmental a..."
+            },
+            {
+              "source_id": "S4",
+              "fact": "Santana Minerals Ltd GPO Box 1305 T: +61 7 3221 7501 Level 1, 371 Queen St Brisbane, QLD4000 Brisbane, QLD 4000 ABN 37 161 946 989"
+            },
+            {
+              "source_id": "S1",
+              "fact": "16 February 2026 Santana Minerals Limited (ASX: SMI) \u2013 Trading Halt Trading in the securities of Santana Minerals Limited (\u2018SMI\u2019) will be halted at the request of SMI, pending the release of an announcement by SMI.",
+              "published_at": "2026-02-16"
+            }
+          ]
+        },
+        "critical_gaps": [],
+        "counts": {
+          "source_count": 8,
+          "decoded_source_count": 8,
+          "categories_with_facts": 5,
+          "total_facts": 21
+        }
+      },
+      "prompt_chars": 31391,
+      "prompt_preview": "You are producing a Stage 1 model analysis for an investment council.\nThe user task below is the primary instruction and must be followed exactly.\n\nUSER TASK:\nRun an investment analysis on Santana Minerals Limited (ticker ASX:SMI) using the gold miner rubric. Include quality/value scoring, timeline, funding, and valuation evidence.\n\nANALYSIS BRIEF:\nFinancial analysis framing:\n- Template: gold_miner\n- Company type: gold_miner\n- Exchange: asx\n- Prioritize primary ASX filings and investor documents.\n\nRESEARCH SUMMARY FROM RETRIEVAL PASS:\n(none)\n\nLATEST UPDATES (from retrieval):\n(none)\n\nCOMPACT DENOISED FACT BUNDLE (primary signal for analysis):\n{\"schema\":\"compact_fact_bundle_v1\",\"source_index\":[{\"source_id\":\"S1\",\"title\":\"Trading Halt\",\"url\":\"https://announcements.asx.com.au/asxpdf/20260216/pdf/06wbq6y7tprs37.pdf\",\"published_at\":\"2026-02-16\"},{\"source_id\":\"S2\",\"title\":\"Decision Date Confirmed for Fast-track Consenting\",\"url\":\"https://announcements.asx.com.au/asxpdf/20260205/pdf/06vzby1rql8nx9.pdf\",\"published_at\":\"2026-02-05\"},{\"source_id\":\"S3\",\"title\":\"CODC endorses Bendigo-Ophir project\",\"url\":\"https://announcements.asx.com.au/asxpdf/20260202/pdf/06vv3205wqnb43.pdf\",\"published_at\":\"20",
+      "audit": {
+        "score_total": 85.0,
+        "subscores": {
+          "source_quality": 40.0,
+          "filler_control": 16.2,
+          "coverage": 21.8,
+          "token_efficiency": 7.0
+        },
+        "notes": [
+          "primary_domain_ratio=8/8",
+          "asx_pdf_ratio=8/8",
+          "decoded_ratio=8/8",
+          "low_signal_titles=0/8",
+          "fact_pack_sections_with_facts=5",
+          "fact_pack_critical_gaps=0",
+          "compact_categories_with_facts=5",
+          "timeline_rows=1",
+          "prompt_chars=31391",
+          "unique_domains=['announcements.asx.com.au']"
+        ]
+      }
+    },
+    {
+      "ticker": "ASX:BTR",
+      "company_name": "Brightstar Resources Limited",
+      "asx_deterministic_ingestion": {
+        "enabled": true,
+        "used": true,
+        "symbol": "BTR",
+        "reason": "ok",
+        "cache_hit": false,
+        "fetched_rows": 171,
+        "selected_rows": 10,
+        "decoded_rows": 10,
+        "target_rows": 10,
+        "price_sensitive_only": true,
+        "include_non_sensitive_fill": false,
+        "years_queried": [
+          2026,
+          2025
+        ],
+        "errors": []
+      },
+      "source_rows": [
+        {
+          "source_id": "S1",
+          "title": "High grade assays continue from Sandstone RC drilling",
+          "url": "https://announcements.asx.com.au/asxpdf/20260205/pdf/06vzcvbd45qwt6.pdf",
+          "published_at": "2026-02-05",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "NRC25-085 \u25aa 4m @ 5.16g/t Au from 127m \u25aa 3m @ 7.16g/t Au from 245m Lord Henry Deposit Vanguard Deposit o LHRC25038 o VNRC25148 \u25aa 5m @ 10.7g/t Au from 57m \u25aa 7m @ 5.59g/t Au from 162m o LHRC25015 o VNRC25117:\n\u25aa 2m @ 9.04g/t Au from 46m \u25aa 14m @ 2.44g/t Au from 62m o LHRC25040: o VNRC25136 \u25aa 2m @ 6.98g/t Au from 104m \u2022 14m @ 2.31g/t Au from 133m \u2022 Assays from the diamond drilling completed in 2025 are pending \u2022 Sandstone Mineral Resource upgrade due in JunQ\u201926 with the Pre-Feasibility Study targeted for delivery early in the SepQ\u201926 \u2022 2026 drilling campaign has now commenced with the arrival of RC and diamond drill rigs at Sandstone to complete the last of the infill drilling for PFS work streams and commence extensional drilling targeting growth to the Mineral Resources Brightstar Resources Limited (ASX: BTR) (B\n6892701 519 -60 271 396 302m RC Pre-collar This ASX announcement has been approved by the Managing Director on behalf of the Board of Brightstar.\nFOR FURTHER INFORMATION, PLEASE CONTACT:\nEmail: alex@brightstarresources.com.au\nPhone: +61 408 228 889 Email: lucas@corporatestorytime.com 24\nBrightstar Resources Limited is an emerging gold producer and developer listed on the Aus...",
+          "material_signal_score": 6
+        },
+        {
+          "source_id": "S2",
+          "title": "Strategic $180M capital raising funds Goldfields development",
+          "url": "https://announcements.asx.com.au/asxpdf/20260202/pdf/06vvg93hpb37d2.pdf",
+          "published_at": "2026-02-02",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "providing all the equity funding required to build the Goldfields Project and advance the Sandstone Gold Project\n\u2022 Updated Goldfields DFS 2.01 has shown compelling operating and financial metrics:\no An initial mine life of six years producing +75koz pa from 505koz total mine\no ~A$1Bn of project free-cash flow delivering a NPV8 of A$606 million (@ A$6,000/oz) \u2022 Brightstar is well placed to make Final Investment Decision in MarQ\u201926 to enable the commencement of construction of the 1.5Mtpa processing plant on an EPC basis which would see first gold poured in JunQ\u2019CY27 \u2022 Capital raising proceeds will accelerate Brightstar\u2019s growth plans2 at Sandstone for which a Pre-Feasibility Study and maiden Ore Reserve is due for delivery early SepQCY\u201926 \u2022 Future cash flows from Goldfields Project, once in operation, are\nbility Study and maiden Ore Reserve is due for delivery early SepQCY\u201926 \u2022 Future cash flows from Goldfields Project, once in operation, are targeted to provide a material funding benefit for future Sandstone development capital requirements, which would enable Brightstar to achieve it\u2019s \u201cTARGET200\u201d vision of becoming a multi-asset +200,000oz pa Western Australian gold producer3...",
+          "material_signal_score": 9
+        },
+        {
+          "source_id": "S3",
+          "title": "Quarterly Activities/Appendix 5B Cash Flow Report",
+          "url": "https://announcements.asx.com.au/asxpdf/20260130/pdf/06vt73r7t5tgm5.pdf",
+          "published_at": "2026-01-30",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "30 January 2026 DECEMBER 2025 QUARTERLY ACTIVITY REPORT o Strategic acquisition of Aurumin Limited (ASX: AUN) completed on 2 December 20251 concluding Brightstar\u2019s Sandstone consolidation strategy delivering consolidated Mineral Resources of 2.4Moz @ 1.5g/t Au \u2013 of which 1.6Moz occurs in the top 150 metres from surface \u25aa Pre-Feasibility work streams (PFS) advancing with major infill programs nearing completion to underpin a Mineral Resource upgrade in JunQ\u2019CY26 \u25aa Other PFS works streams advancing including diamond drilling, geotechnical, metallurgical and mine designs to underpin the PFS due for delivery mid 2026 o Goldfields \u201cDFS 2.0\u201d continued to advance, which was subsequently released after quarter end2, delivering outstanding upgraded economics:\nKey Metrics Units A$5,000/oz A$5,500/oz A$6,000/oz A$6,500\nSustaining Cost (AISC) A$/oz 2,965 2,981 2,998 3,015 3,032 3,049 NPV8 / Pre-production Capex Ratio (x) 1.5x 2.3x 3.2x 4.2x 5.1x 6.1x \u25aa Brightstar is now focused on Goldfields project execution with a Final Investment Decision (FID) and a full funding solution targeted for completion in MarQ\u201926 \u25aa During the quarter, Brightstar significantly strengthened its operating capabili...",
+          "material_signal_score": 9
+        },
+        {
+          "source_id": "S4",
+          "title": "Updated Goldfields DFS Presentation",
+          "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vq4g52xn7155.pdf",
+          "published_at": "2026-01-29",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "ith it, any errors or omissions from it however caused, lack of accuracy, completeness, currency or reliability or you or any other person placing any on this Presentation, its accuracy, completeness, currency or reliability.\n\u2022 This Presentation is not a prospectus, disclosure document or other offering document under Australian law or under any other law. It is provided for information purposes and is not an invitation nor offer of shares or recommendation for subscription, purchase or sale in any jurisdiction. This Presentation does not purport to contain all the information that a prospective investor may require in connection with any potential investment in Brightstar. Each recipient must make its own independent assessment of Brightstar before making\n\u2022 Each recipient of the Presentation should make it\nFinancial metrics are presented on a pre-taxBrightstar Resources basis \u2013 as at 31 Limited December 2025, Brightstar| had\n$209M ofaGroup\ntax losses which areAustralian Gold\nminimising ultimate tax expense once taxable income commences to be generated.\n3. Some variances may occur due to rounding. | 12 Goldfields execution \u2013 First Gold JunQ\u2019271 Final Investment Decision (FID) ta...",
+          "material_signal_score": 9
+        },
+        {
+          "source_id": "S5",
+          "title": "Updated Goldfields Feasibility Study",
+          "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vq4d24z5ghxd.pdf",
+          "published_at": "2026-01-29",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "ase (A$7,000/oz) \u2022 Initial mine production of approximately 9.4Mt @ 1.7g/t Au for 457,000oz recovered over\n\u2022 Processing plant throughput right-sized to 1.5Mtpa (up from 1.0Mtpa previously) which increases average gold production to +75koz per annum, with strong potential to increase mine life with continued exploration of existing Mineral Resources:\no Processing plant designed with capability to enable expansion to 2.5Mtpa in the future \u2022 Cash flows from Menzies and Laverton operations targeted to provide material funding benefit for future Sandstone development capital requirements Level 2, 36 Rowland Street Tel: (618) 9277 6008 info@brightstarresources.com.au ASX:BTR Subiaco WA 6008 Fax: (618) 9277 6002 brightstarresources.com.au ACN 100 727 491 Brightstar\u2019s Managing Director, Alex Rovira, commented \u201cThe\n2.3x 3.2x 4.2x 5.1x 6.1x 1. Brightstar is evaluating pricing floor mechanisms (put options strategies) to underwrite Peak Funding Requirements during commissioning and early revenues.\n2. Financial metrics are presented on a pre-tax and ungeared basis \u2013 as at 31 December 2025, Brightstar had $209M of Group tax losses which are anticipated to be utilised for minimising ultimate...",
+          "material_signal_score": 5
+        },
+        {
+          "source_id": "S6",
+          "title": "Trading Halt",
+          "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vptlhbngwmn0.pdf",
+          "published_at": "2026-01-29",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "29 January 2026 Brightstar Resources Limited (ASX: BTR) \u2013 Trading Halt Trading in the securities of Brightstar Resources Limited (\u2018BTR\u2019) will be halted at the request of BTR, pending the release of an announcement by BTR.\nUnless ASX decides otherwise, the securities will remain in trading halt until the earlier of:\n\u2022 the commencement of normal trading on Monday, 2 February 2026; or \u2022 the release of the announcement to the market.\nBTR\u2019s request for a trading halt is attached below for the information of the market.\n29 January 2026 Market Announcement 1/1 ASX Limited ASX Customer Service Centre 131 279 | asx.com.au 29 January 2026 Australian Securities Exchange Level 40, Central Park 152 \u2013 158 St Georges Terrace PERTH WA 6000 Trading halt request \u2013 Brightstar Resources Limited Brightstar Resources Limited (\n, Central Park 152 \u2013 158 St Georges Terrace PERTH WA 6000 Trading halt request \u2013 Brightstar Resources Limited Brightstar Resources Limited (ASX: BTR) (the Company) requests that a trading halt be granted by ASX from the commencement of trading today, Thursday 29 January 2026.\nThe Company provides the following information in relation to the request in accordance with ASX Listin...",
+          "material_signal_score": 2
+        },
+        {
+          "source_id": "S7",
+          "title": "Pause in Trading",
+          "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vpr7wklgbzw2.pdf",
+          "published_at": "2026-01-29",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "29/01/2026\nTrading in the securities of the entity will be temporarily paused pending a further announcement.\n29/01/2026 Market Announcement 1/1",
+          "material_signal_score": 1
+        },
+        {
+          "source_id": "S8",
+          "title": "Material early-stage aircore drilling success at Sandstone",
+          "url": "https://announcements.asx.com.au/asxpdf/20260128/pdf/06vmr56zdxklbb.pdf",
+          "published_at": "2026-01-28",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "om 48m including 4m @ 4.68g/t Au from 56m Bollinger Prospect (1.5km away from the 0.3Moz Au Indomitable Mineral Resource) o SSAC25224 \u25aa 12m @ 2.08g/t from 124m, including 4m @ 5.60g/t from 124m o SSAC25230 \u2022 32m @ 0.93g/t Au from 16m o SSAC25222:\n\u25aa 12m @ 1.32g/t Au from 36m \u2022 The aircore results provide high-priority targets to test with follow-up RC drilling \u2022 2026 drilling campaign to commence with the arrival of RC and diamond drill rigs at Sandstone Brightstar Resources Limited (ASX: BTR) (Brightstar) is pleased to announce results from aircore drilling programs at the Sandstone Hub, which hosts a current Mineral Resource Estimate (MRE) of 2.4Moz @ 1.5g/t\nThe latest drilling targeted early-stage prospects across the Sandstone project with significant results produced at the Indomitable North and Bolling\nurces.com.au\nPhone: +61 408 228 889 Email: lucas@corporatestorytime.com\n1. Refer Brightstar ASX announcement dated 20 November 2025 \u201cAurumin Scheme Approved \u2013 Group MRE Grows to 3.9Moz Au\u201d 23\nBrightstar Resources Limited is an emerging gold producer listed on the Australian Securities Exchange (ASX: BTR) and based in\nThe Company hosts a portfolio of high-quality assets hosted...",
+          "material_signal_score": 3
+        },
+        {
+          "source_id": "S9",
+          "title": "Sandstone Strategic Plan to Deliver Long-Life Production Hub",
+          "url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vl7y6m9x0rj5.pdf",
+          "published_at": "2026-01-27",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "Geotechnical, metallurgical & design work streams comprehensive & quality technical work advancing in support of maiden Ore Reserve in PFS \u2713 4-5Mtpa processing plant identified as optimal capacity for \u2018Right-size\u2019 processing infrastructure PFS \u2013 leveraging 1.6Moz of gold occurring within the top\n3 as foundation for district-scale, long-life 150m from surface of Sandstone\u2019s Mineral Resource production centre \uf077 Engineering, costing, permitting & approvals work streams advancing in support of PFS due early Q3 CY26 Level 2, 36 Rowland Street Tel: (618) 9277 6008 info@brightstarresources.com.au ASX:BTR Subiaco WA 6008 Fax: (618) 9277 6002 brightstarresources.com.au ACN 100 727 491 \u2022 Brightstar\u2019s successful acquisition of Aurumin Ltd in December \u201925 concluded the Company\u2019s current M&A strategy to strategically con\non of a DFS, final approvals and permitting and a Final Investment\no Based on that timeline, future gold production from Sandstone is anticipated to complement the targeted steady-state operations at Brightstar\u2019s Goldfields Hub\nBrightstar Resources Limited (ASX: BTR) (Brightstar or the Company) is pleased to provide a project update on the Sandstone Gold Project (Sandstone o...",
+          "material_signal_score": 5
+        },
+        {
+          "source_id": "S10",
+          "title": "Fast Tracked Goldfields Development Update",
+          "url": "https://announcements.asx.com.au/asxpdf/20260120/pdf/06vdrzb74y903z.pdf",
+          "published_at": "2026-01-20",
+          "decode_status": "decoded",
+          "decoded": true,
+          "excerpt": "rd Byron 3 and Lady Shenton4 as the initial mill ore sources, to complement the existing Second Fortune and Fish operations o Mineral Resource at Lord Byron and Lady Shenton: 13.5Mt @ 1.4g/t Au for 0.6Moz \u2022 Debt financing discussions are well advanced with non-binding term sheets in place with three parties for up to ~A$150M of debt funding o Updated technical and legal due diligence activities are nearing completion, including updated technical information under DFS2.0 outputs Level 2, 36 Rowland Street Tel: (618) 9277 6008 info@brightstarresources.com.au ASX:BTR Subiaco WA 6008 Fax: (618) 9277 6002 brightstarresources.com.au ACN 100 727 491 Brightstar Resources Limited (ASX: BTR) (Brightstar or the Company) is pleased to provide a project update on the Goldfields Hub Project (the Project), the near-term dev\nh debt financing.\nDeconstruction and demolition of the legacy Beta plant has been completed, clearing the area for the new Laverton 1.5Mtpa processing plant construction footprint.\nImportantly, resale of pre-existing infrastructure enabled Brightstar to cover the full cost of these important site establishment works recently completed, with on-going site preparation work to...",
+          "material_signal_score": 6
+        }
+      ],
+      "timeline_rows": [
+        {
+          "source_id": "S4",
+          "title": "Updated Goldfields DFS Presentation",
+          "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vq4g52xn7155.pdf",
+          "published_at": "2026-01-29",
+          "authority_rank": 4,
+          "score": 14,
+          "fact": "| 12 Goldfields execution \u2013 First Gold JunQ\u2019271 Final Investment Decision (FID) ta...",
+          "windows": []
+        }
+      ],
+      "fact_pack": {
+        "schema": "rubric_fact_pack_v1",
+        "source_index": [
+          {
+            "source_id": "S1",
+            "title": "High grade assays continue from Sandstone RC drilling",
+            "url": "https://announcements.asx.com.au/asxpdf/20260205/pdf/06vzcvbd45qwt6.pdf",
+            "published_at": "2026-02-05",
+            "decoded": true
+          },
+          {
+            "source_id": "S2",
+            "title": "Strategic $180M capital raising funds Goldfields development",
+            "url": "https://announcements.asx.com.au/asxpdf/20260202/pdf/06vvg93hpb37d2.pdf",
+            "published_at": "2026-02-02",
+            "decoded": true
+          },
+          {
+            "source_id": "S3",
+            "title": "Quarterly Activities/Appendix 5B Cash Flow Report",
+            "url": "https://announcements.asx.com.au/asxpdf/20260130/pdf/06vt73r7t5tgm5.pdf",
+            "published_at": "2026-01-30",
+            "decoded": true
+          },
+          {
+            "source_id": "S4",
+            "title": "Updated Goldfields DFS Presentation",
+            "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vq4g52xn7155.pdf",
+            "published_at": "2026-01-29",
+            "decoded": true
+          },
+          {
+            "source_id": "S5",
+            "title": "Updated Goldfields Feasibility Study",
+            "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vq4d24z5ghxd.pdf",
+            "published_at": "2026-01-29",
+            "decoded": true
+          },
+          {
+            "source_id": "S6",
+            "title": "Trading Halt",
+            "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vptlhbngwmn0.pdf",
+            "published_at": "2026-01-29",
+            "decoded": true
+          },
+          {
+            "source_id": "S7",
+            "title": "Pause in Trading",
+            "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vpr7wklgbzw2.pdf",
+            "published_at": "2026-01-29",
+            "decoded": true
+          },
+          {
+            "source_id": "S8",
+            "title": "Material early-stage aircore drilling success at Sandstone",
+            "url": "https://announcements.asx.com.au/asxpdf/20260128/pdf/06vmr56zdxklbb.pdf",
+            "published_at": "2026-01-28",
+            "decoded": true
+          },
+          {
+            "source_id": "S9",
+            "title": "Sandstone Strategic Plan to Deliver Long-Life Production Hub",
+            "url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vl7y6m9x0rj5.pdf",
+            "published_at": "2026-01-27",
+            "decoded": true
+          },
+          {
+            "source_id": "S10",
+            "title": "Fast Tracked Goldfields Development Update",
+            "url": "https://announcements.asx.com.au/asxpdf/20260120/pdf/06vdrzb74y903z.pdf",
+            "published_at": "2026-01-20",
+            "decoded": true
+          }
+        ],
+        "sections": {
+          "market_data": [
+            {
+              "source_id": "S5",
+              "fact": "o Processing plant designed with capability to enable expansion to 2.5Mtpa in the future \u2022 Cash flows from Menzies and Laverton operations targeted to provide material funding benefit for future Sandstone development..."
+            }
+          ],
+          "project_economics_npv_inputs": [
+            {
+              "source_id": "S2",
+              "fact": "o An initial mine life of six years producing +75koz pa from 505koz total mine"
+            },
+            {
+              "source_id": "S2",
+              "fact": "o ~A$1Bn of project free-cash flow delivering a NPV8 of A$606 million (@ A$6,000/oz) \u2022 Brightstar is well placed to make Final Investment Decision in MarQ\u201926 to enable the commencement of construction of the 1.5Mtpa p..."
+            },
+            {
+              "source_id": "S3",
+              "fact": "Key Metrics Units A$5,000/oz A$5,500/oz A$6,000/oz A$6,500"
+            },
+            {
+              "source_id": "S3",
+              "fact": "Sustaining Cost (AISC) A$/oz 2,965 2,981 2,998 3,015 3,032 3,049 NPV8 / Pre-production Capex Ratio (x) 1.5x 2.3x 3.2x 4.2x 5.1x 6.1x \u25aa Brightstar is now focused on Goldfields project execution with a Final Investment..."
+            }
+          ],
+          "resource_and_reserve": [
+            {
+              "source_id": "S1",
+              "fact": "NRC25-085 \u25aa 4m @ 5.16g/t Au from 127m \u25aa 3m @ 7.16g/t Au from 245m Lord Henry Deposit Vanguard Deposit o LHRC25038 o VNRC25148 \u25aa 5m @ 10.7g/t Au from 57m \u25aa 7m @ 5.59g/t Au from 162m o LHRC25015 o VNRC25117:"
+            },
+            {
+              "source_id": "S1",
+              "fact": "\u25aa 2m @ 9.04g/t Au from 46m \u25aa 14m @ 2.44g/t Au from 62m o LHRC25040: o VNRC25136 \u25aa 2m @ 6.98g/t Au from 104m \u2022 14m @ 2.31g/t Au from 133m \u2022 Assays from the diamond drilling completed in 2025 are pending \u2022 Sandstone Min..."
+            },
+            {
+              "source_id": "S1",
+              "fact": "Brightstar Resources Limited is an emerging gold producer and developer listed on the Aus..."
+            },
+            {
+              "source_id": "S2",
+              "fact": "bility Study and maiden Ore Reserve is due for delivery early SepQCY\u201926 \u2022 Future cash flows from Goldfields Project, once in operation, are targeted to provide a material funding benefit for future Sandstone developme..."
+            }
+          ],
+          "development_timeline_and_milestones": [
+            {
+              "source_id": "S2",
+              "fact": "\u2022 Updated Goldfields DFS 2.01 has shown compelling operating and financial metrics:"
+            },
+            {
+              "source_id": "S3",
+              "fact": "30 January 2026 DECEMBER 2025 QUARTERLY ACTIVITY REPORT o Strategic acquisition of Aurumin Limited (ASX: AUN) completed on 2 December 20251 concluding Brightstar\u2019s Sandstone consolidation strategy delivering consolida..."
+            },
+            {
+              "source_id": "S4",
+              "fact": "| 12 Goldfields execution \u2013 First Gold JunQ\u2019271 Final Investment Decision (FID) ta..."
+            },
+            {
+              "source_id": "S5",
+              "fact": "Brightstar is evaluating pricing floor mechanisms (put options strategies) to underwrite Peak Funding Requirements during commissioning and early revenues."
+            }
+          ],
+          "management_and_governance": [
+            {
+              "source_id": "S1",
+              "fact": "6892701 519 -60 271 396 302m RC Pre-collar This ASX announcement has been approved by the Managing Director on behalf of the Board of Brightstar."
+            }
+          ],
+          "other_material_facts": [
+            {
+              "source_id": "S1",
+              "fact": "Phone: +61 408 228 889 Email: lucas@corporatestorytime.com 24"
+            },
+            {
+              "source_id": "S2",
+              "fact": "providing all the equity funding required to build the Goldfields Project and advance the Sandstone Gold Project"
+            },
+            {
+              "source_id": "S4",
+              "fact": "It is provided for information purposes and is not an invitation nor offer of shares or recommendation for subscription, purchase or sale in any jurisdiction."
+            },
+            {
+              "source_id": "S8",
+              "fact": "Phone: +61 408 228 889 Email: lucas@corporatestorytime.com"
+            }
+          ]
+        },
+        "critical_gaps": [],
+        "counts": {
+          "source_count": 10,
+          "decoded_source_count": 10,
+          "total_facts": 18,
+          "sections_with_facts": 6
+        }
+      },
+      "fact_digest": {
+        "schema": "fact_digest_v2",
+        "source_index": [
+          {
+            "source_id": "S1",
+            "title": "High grade assays continue from Sandstone RC drilling",
+            "url": "https://announcements.asx.com.au/asxpdf/20260205/pdf/06vzcvbd45qwt6.pdf",
+            "published_at": "2026-02-05",
+            "decoded": true
+          },
+          {
+            "source_id": "S2",
+            "title": "Strategic $180M capital raising funds Goldfields development",
+            "url": "https://announcements.asx.com.au/asxpdf/20260202/pdf/06vvg93hpb37d2.pdf",
+            "published_at": "2026-02-02",
+            "decoded": true
+          },
+          {
+            "source_id": "S3",
+            "title": "Quarterly Activities/Appendix 5B Cash Flow Report",
+            "url": "https://announcements.asx.com.au/asxpdf/20260130/pdf/06vt73r7t5tgm5.pdf",
+            "published_at": "2026-01-30",
+            "decoded": true
+          },
+          {
+            "source_id": "S4",
+            "title": "Updated Goldfields DFS Presentation",
+            "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vq4g52xn7155.pdf",
+            "published_at": "2026-01-29",
+            "decoded": true
+          },
+          {
+            "source_id": "S5",
+            "title": "Updated Goldfields Feasibility Study",
+            "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vq4d24z5ghxd.pdf",
+            "published_at": "2026-01-29",
+            "decoded": true
+          },
+          {
+            "source_id": "S6",
+            "title": "Trading Halt",
+            "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vptlhbngwmn0.pdf",
+            "published_at": "2026-01-29",
+            "decoded": true
+          },
+          {
+            "source_id": "S7",
+            "title": "Pause in Trading",
+            "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vpr7wklgbzw2.pdf",
+            "published_at": "2026-01-29",
+            "decoded": true
+          },
+          {
+            "source_id": "S8",
+            "title": "Material early-stage aircore drilling success at Sandstone",
+            "url": "https://announcements.asx.com.au/asxpdf/20260128/pdf/06vmr56zdxklbb.pdf",
+            "published_at": "2026-01-28",
+            "decoded": true
+          },
+          {
+            "source_id": "S9",
+            "title": "Sandstone Strategic Plan to Deliver Long-Life Production Hub",
+            "url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vl7y6m9x0rj5.pdf",
+            "published_at": "2026-01-27",
+            "decoded": true
+          },
+          {
+            "source_id": "S10",
+            "title": "Fast Tracked Goldfields Development Update",
+            "url": "https://announcements.asx.com.au/asxpdf/20260120/pdf/06vdrzb74y903z.pdf",
+            "published_at": "2026-01-20",
+            "decoded": true
+          }
+        ],
+        "sections": {
+          "timelines_deadlines": [
+            {
+              "source_id": "S2",
+              "published_at": "2026-02-02",
+              "fact": "bility Study and maiden Ore Reserve is due for delivery early SepQCY\u201926 \u2022 Future cash flows from Goldfields Project, once in operation, are targeted to provide a material funding benefit for future Sandstone developme...",
+              "windows": [],
+              "number_tokens": [
+                "26"
+              ]
+            },
+            {
+              "source_id": "S4",
+              "published_at": "2026-01-29",
+              "fact": "| 12 Goldfields execution \u2013 First Gold JunQ\u2019271 Final Investment Decision (FID) ta...",
+              "windows": [],
+              "number_tokens": [
+                "12",
+                "271"
+              ]
+            },
+            {
+              "source_id": "S8",
+              "published_at": "2026-01-28",
+              "fact": "\u25aa 12m @ 1.32g/t Au from 36m \u2022 The aircore results provide high-priority targets to test with follow-up RC drilling \u2022 2026 drilling campaign to commence with the arrival of RC and diamond drill rigs at Sandstone Bright...",
+              "windows": [],
+              "number_tokens": [
+                "12m",
+                "1.32g/t",
+                "36m",
+                "2026"
+              ]
+            },
+            {
+              "source_id": "S8",
+              "published_at": "2026-01-28",
+              "fact": "The latest drilling targeted early-stage prospects across the Sandstone project with significant results produced at the Indomitable North and Bolling",
+              "windows": [],
+              "number_tokens": []
+            },
+            {
+              "source_id": "S9",
+              "published_at": "2026-01-27",
+              "fact": "o Based on that timeline, future gold production from Sandstone is anticipated to complement the targeted steady-state operations at Brightstar\u2019s Goldfields Hub",
+              "windows": [],
+              "number_tokens": []
+            }
+          ],
+          "financing_deals": [
+            {
+              "source_id": "S2",
+              "published_at": "2026-02-02",
+              "fact": "o ~A$1Bn of project free-cash flow delivering a NPV8 of A$606 million (@ A$6,000/oz) \u2022 Brightstar is well placed to make Final Investment Decision in MarQ\u201926 to enable the commencement of construction of the 1.5Mtpa p...",
+              "windows": [],
+              "number_tokens": [
+                "A$1B",
+                "8",
+                "A$606 m",
+                "A$6,000"
+              ]
+            },
+            {
+              "source_id": "S10",
+              "published_at": "2026-01-20",
+              "fact": "rd Byron 3 and Lady Shenton4 as the initial mill ore sources, to complement the existing Second Fortune and Fish operations o Mineral Resource at Lord Byron and Lady Shenton: 13.5Mt @ 1.4g/t Au for 0.6Moz \u2022 Debt finan...",
+              "windows": [],
+              "number_tokens": [
+                "3",
+                "4",
+                "13.5Mt",
+                "1.4g/t"
+              ]
+            }
+          ],
+          "project_economics": [
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-05",
+              "fact": "Brightstar Resources Limited is an emerging gold producer and developer listed on the Aus...",
+              "windows": [],
+              "number_tokens": []
+            },
+            {
+              "source_id": "S2",
+              "published_at": "2026-02-02",
+              "fact": "o An initial mine life of six years producing +75koz pa from 505koz total mine",
+              "windows": [],
+              "number_tokens": [
+                "75koz",
+                "505koz"
+              ]
+            },
+            {
+              "source_id": "S3",
+              "published_at": "2026-01-30",
+              "fact": "Sustaining Cost (AISC) A$/oz 2,965 2,981 2,998 3,015 3,032 3,049 NPV8 / Pre-production Capex Ratio (x) 1.5x 2.3x 3.2x 4.2x 5.1x 6.1x \u25aa Brightstar is now focused on Goldfields project execution with a Final Investment...",
+              "windows": [],
+              "number_tokens": [
+                "2,965",
+                "2,981",
+                "2,998",
+                "3,015"
+              ]
+            },
+            {
+              "source_id": "S4",
+              "published_at": "2026-01-29",
+              "fact": "Financial metrics are presented on a pre-taxBrightstar Resources basis \u2013 as at 31 Limited December 2025, Brightstar| had",
+              "windows": [
+                "December 2025"
+              ],
+              "number_tokens": [
+                "31",
+                "2025, B"
+              ]
+            },
+            {
+              "source_id": "S5",
+              "published_at": "2026-01-29",
+              "fact": "ase (A$7,000/oz) \u2022 Initial mine production of approximately 9.4Mt @ 1.7g/t Au for 457,000oz recovered over",
+              "windows": [],
+              "number_tokens": [
+                "A$7,000",
+                "9.4Mt",
+                "1.7g/t",
+                "457,000oz"
+              ]
+            },
+            {
+              "source_id": "S5",
+              "published_at": "2026-01-29",
+              "fact": "\u2022 Processing plant throughput right-sized to 1.5Mtpa (up from 1.0Mtpa previously) which increases average gold production to +75koz per annum, with strong potential to increase mine life with continued exploration of...",
+              "windows": [],
+              "number_tokens": [
+                "1.5Mt",
+                "1.0Mt",
+                "75koz"
+              ]
+            }
+          ],
+          "market_share_structure": [
+            {
+              "source_id": "S4",
+              "published_at": "2026-01-29",
+              "fact": "It is provided for information purposes and is not an invitation nor offer of shares or recommendation for subscription, purchase or sale in any jurisdiction.",
+              "windows": [],
+              "number_tokens": []
+            }
+          ],
+          "operational_objectives": [
+            {
+              "source_id": "S5",
+              "published_at": "2026-01-29",
+              "fact": "o Processing plant designed with capability to enable expansion to 2.5Mtpa in the future \u2022 Cash flows from Menzies and Laverton operations targeted to provide material funding benefit for future Sandstone development...",
+              "windows": [],
+              "number_tokens": [
+                "2.5Mt"
+              ]
+            },
+            {
+              "source_id": "S10",
+              "published_at": "2026-01-20",
+              "fact": "Deconstruction and demolition of the legacy Beta plant has been completed, clearing the area for the new Laverton 1.5Mtpa processing plant construction footprint.",
+              "windows": [],
+              "number_tokens": [
+                "1.5Mt"
+              ]
+            }
+          ],
+          "catalysts_tailwinds": [
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-05",
+              "fact": "\u25aa 2m @ 9.04g/t Au from 46m \u25aa 14m @ 2.44g/t Au from 62m o LHRC25040: o VNRC25136 \u25aa 2m @ 6.98g/t Au from 104m \u2022 14m @ 2.31g/t Au from 133m \u2022 Assays from the diamond drilling completed in 2025 are pending \u2022 Sandstone Min...",
+              "windows": [],
+              "number_tokens": [
+                "2m",
+                "9.04g/t",
+                "46m",
+                "14m"
+              ]
+            },
+            {
+              "source_id": "S3",
+              "published_at": "2026-01-30",
+              "fact": "30 January 2026 DECEMBER 2025 QUARTERLY ACTIVITY REPORT o Strategic acquisition of Aurumin Limited (ASX: AUN) completed on 2 December 20251 concluding Brightstar\u2019s Sandstone consolidation strategy delivering consolida...",
+              "windows": [
+                "January 2026",
+                "December 2025"
+              ],
+              "number_tokens": [
+                "30",
+                "2026",
+                "2025",
+                "2"
+              ]
+            }
+          ],
+          "other_material_facts": [
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-05",
+              "fact": "NRC25-085 \u25aa 4m @ 5.16g/t Au from 127m \u25aa 3m @ 7.16g/t Au from 245m Lord Henry Deposit Vanguard Deposit o LHRC25038 o VNRC25148 \u25aa 5m @ 10.7g/t Au from 57m \u25aa 7m @ 5.59g/t Au from 162m o LHRC25015 o VNRC25117:",
+              "windows": [],
+              "number_tokens": [
+                "25",
+                "085",
+                "4m",
+                "5.16g/t"
+              ]
+            },
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-05",
+              "fact": "6892701 519 -60 271 396 302m RC Pre-collar This ASX announcement has been approved by the Managing Director on behalf of the Board of Brightstar.",
+              "windows": [],
+              "number_tokens": [
+                "6892701",
+                "519",
+                "60",
+                "271"
+              ]
+            },
+            {
+              "source_id": "S1",
+              "published_at": "2026-02-05",
+              "fact": "Phone: +61 408 228 889 Email: lucas@corporatestorytime.com 24",
+              "windows": [],
+              "number_tokens": [
+                "61",
+                "408",
+                "228",
+                "889"
+              ]
+            },
+            {
+              "source_id": "S2",
+              "published_at": "2026-02-02",
+              "fact": "\u2022 Updated Goldfields DFS 2.01 has shown compelling operating and financial metrics:",
+              "windows": [],
+              "number_tokens": [
+                "2.01"
+              ]
+            },
+            {
+              "source_id": "S3",
+              "published_at": "2026-01-30",
+              "fact": "Key Metrics Units A$5,000/oz A$5,500/oz A$6,000/oz A$6,500",
+              "windows": [],
+              "number_tokens": [
+                "A$5,000",
+                "A$5,500",
+                "A$6,000",
+                "A$6,500"
+              ]
+            },
+            {
+              "source_id": "S5",
+              "published_at": "2026-01-29",
+              "fact": "Financial metrics are presented on a pre-tax and ungeared basis \u2013 as at 31 December 2025, Brightstar had $209M of Group tax losses which are anticipated to be utilised for minimising ultimate...",
+              "windows": [
+                "December 2025"
+              ],
+              "number_tokens": [
+                "31",
+                "2025, B",
+                "$209M"
+              ]
+            }
+          ]
+        },
+        "summary_bullets": [
+          "[S4] 2026-01-29: | 12 Goldfields execution \u2013 First Gold JunQ\u2019271 Final Investment Decision (FID) ta...",
+          "[S2] 2026-02-02: o ~A$1Bn of project free-cash flow delivering a NPV8 of A$606 million (@ A$6,000/oz) \u2022 Brightstar is well placed to make Final Investment Decision in MarQ\u201926 to enable the commencement of construction of the 1.5Mtpa p...",
+          "[S3] 2026-01-30: Sustaining Cost (AISC) A$/oz 2,965 2,981 2,998 3,015 3,032 3,049 NPV8 / Pre-production Capex Ratio (x) 1.5x 2.3x 3.2x 4.2x 5.1x 6.1x \u25aa Brightstar is now focused on Goldfields project execution with a Final Investment...",
+          "[S1] 2026-02-05: NRC25-085 \u25aa 4m @ 5.16g/t Au from 127m \u25aa 3m @ 7.16g/t Au from 245m Lord Henry Deposit Vanguard Deposit o LHRC25038 o VNRC25148 \u25aa 5m @ 10.7g/t Au from 57m \u25aa 7m @ 5.59g/t Au from 162m o LHRC25015 o VNRC25117:",
+          "[S1] 2026-02-05: \u25aa 2m @ 9.04g/t Au from 46m \u25aa 14m @ 2.44g/t Au from 62m o LHRC25040: o VNRC25136 \u25aa 2m @ 6.98g/t Au from 104m \u2022 14m @ 2.31g/t Au from 133m \u2022 Assays from the diamond drilling completed in 2025 are pending \u2022 Sandstone Min...",
+          "[S1] 2026-02-05: 6892701 519 -60 271 396 302m RC Pre-collar This ASX announcement has been approved by the Managing Director on behalf of the Board of Brightstar.",
+          "[S1] 2026-02-05: Phone: +61 408 228 889 Email: lucas@corporatestorytime.com 24",
+          "[S2] 2026-02-02: \u2022 Updated Goldfields DFS 2.01 has shown compelling operating and financial metrics:",
+          "[S2] 2026-02-02: o An initial mine life of six years producing +75koz pa from 505koz total mine",
+          "[S2] 2026-02-02: bility Study and maiden Ore Reserve is due for delivery early SepQCY\u201926 \u2022 Future cash flows from Goldfields Project, once in operation, are targeted to provide a material funding benefit for future Sandstone developme...",
+          "[S3] 2026-01-30: 30 January 2026 DECEMBER 2025 QUARTERLY ACTIVITY REPORT o Strategic acquisition of Aurumin Limited (ASX: AUN) completed on 2 December 20251 concluding Brightstar\u2019s Sandstone consolidation strategy delivering consolida...",
+          "[S3] 2026-01-30: Key Metrics Units A$5,000/oz A$5,500/oz A$6,000/oz A$6,500"
+        ],
+        "narrative_summary": "Timelines Deadlines: bility Study and maiden Ore Reserve is due for delivery early SepQCY\u201926 \u2022 Future cash flows from Goldfields Project, once in operation, are targeted to provide a material funding benefit for future Sandstone developme...; | 12 Goldfields execution \u2013 First Gold JunQ\u2019271 Final Investment Decision (FID) ta... Financing Deals: o ~A$1Bn of project free-cash flow delivering a NPV8 of A$606 million (@ A$6,000/oz) \u2022 Brightstar is well placed to make Final Investment Decision in MarQ\u201926 to enable the commencement of construction of the 1.5Mtpa p...; rd Byron 3 and Lady Shenton4 as the initial mill ore sources, to complement the existing Second Fortune and Fish operations o Mineral Resource at Lord Byron and Lady Shenton: 13.5Mt @ 1.4g/t Au for 0.6Moz \u2022 Debt finan... Project Economics: Brightstar Resources Limited is an emerging gold producer and developer listed on the Aus...; o An initial mine life of six years producing +75koz pa from 505koz total mine Market Share Structure: It is provided for information purposes and is not an invitation nor offer of shares or recommendation for subscription, purchase or sale in any jurisdiction. Operational Objectives: o Processing plant designed with capability to enable expansion to 2.5Mtpa in the future \u2022 Cash flows from Menzies and Laverton operations targeted to provide material funding benefit for future Sandstone development...; Deconstruction and demolition of the legacy Beta plant has been completed, clearing the area for the new Laverton 1.5Mtpa processing plant construction footprint. Catalysts Tailwinds: \u25aa 2m @ 9.04g/t Au from 46m \u25aa 14m @ 2.44g/t Au from 62m o LHRC25040: o VNRC25136 \u25aa 2m @ 6.98g/t Au from 104m \u2022 14m @ 2.31g/t Au from 133m \u2022 Assays from the diamond drilling completed in 2025 are pending \u2022 Sandstone Min...; 30 January 2026 DECEMBER 2025 QUARTERLY ACTIVITY REPORT o Strategic acquisition of Aurumin Limited (ASX: AUN) completed on 2 December 20251 concluding Brightstar\u2019s Sandstone consolidation strategy delivering consolida...",
+        "conflicts": [],
+        "counts": {
+          "source_count": 10,
+          "decoded_source_count": 10,
+          "total_facts": 24,
+          "sections_with_facts": 7,
+          "summary_bullets": 12,
+          "conflicts": 0
+        }
+      },
+      "compact_fact_bundle": {
+        "schema": "compact_fact_bundle_v1",
+        "source_index": [
+          {
+            "source_id": "S1",
+            "title": "High grade assays continue from Sandstone RC drilling",
+            "url": "https://announcements.asx.com.au/asxpdf/20260205/pdf/06vzcvbd45qwt6.pdf",
+            "published_at": "2026-02-05"
+          },
+          {
+            "source_id": "S2",
+            "title": "Strategic $180M capital raising funds Goldfields development",
+            "url": "https://announcements.asx.com.au/asxpdf/20260202/pdf/06vvg93hpb37d2.pdf",
+            "published_at": "2026-02-02"
+          },
+          {
+            "source_id": "S3",
+            "title": "Quarterly Activities/Appendix 5B Cash Flow Report",
+            "url": "https://announcements.asx.com.au/asxpdf/20260130/pdf/06vt73r7t5tgm5.pdf",
+            "published_at": "2026-01-30"
+          },
+          {
+            "source_id": "S4",
+            "title": "Updated Goldfields DFS Presentation",
+            "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vq4g52xn7155.pdf",
+            "published_at": "2026-01-29"
+          },
+          {
+            "source_id": "S5",
+            "title": "Updated Goldfields Feasibility Study",
+            "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vq4d24z5ghxd.pdf",
+            "published_at": "2026-01-29"
+          },
+          {
+            "source_id": "S6",
+            "title": "Trading Halt",
+            "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vptlhbngwmn0.pdf",
+            "published_at": "2026-01-29"
+          },
+          {
+            "source_id": "S7",
+            "title": "Pause in Trading",
+            "url": "https://announcements.asx.com.au/asxpdf/20260129/pdf/06vpr7wklgbzw2.pdf",
+            "published_at": "2026-01-29"
+          },
+          {
+            "source_id": "S8",
+            "title": "Material early-stage aircore drilling success at Sandstone",
+            "url": "https://announcements.asx.com.au/asxpdf/20260128/pdf/06vmr56zdxklbb.pdf",
+            "published_at": "2026-01-28"
+          },
+          {
+            "source_id": "S9",
+            "title": "Sandstone Strategic Plan to Deliver Long-Life Production Hub",
+            "url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vl7y6m9x0rj5.pdf",
+            "published_at": "2026-01-27"
+          },
+          {
+            "source_id": "S10",
+            "title": "Fast Tracked Goldfields Development Update",
+            "url": "https://announcements.asx.com.au/asxpdf/20260120/pdf/06vdrzb74y903z.pdf",
+            "published_at": "2026-01-20"
+          }
+        ],
+        "categories": {
+          "timeline_milestones": [
+            {
+              "source_id": "S8",
+              "fact": "\u25aa 12m @ 1.32g/t Au from 36m \u2022 The aircore results provide high-priority targets to test with follow-up RC drilling \u2022 2026 drilling campaign to commence with the arrival of RC and diamond drill rigs at Sandstone Bright...",
+              "published_at": "2026-01-28"
+            },
+            {
+              "source_id": "S3",
+              "fact": "30 January 2026 DECEMBER 2025 QUARTERLY ACTIVITY REPORT o Strategic acquisition of Aurumin Limited (ASX: AUN) completed on 2 December 20251 concluding Brightstar\u2019s Sandstone consolidation strategy delivering consolida..."
+            },
+            {
+              "source_id": "S4",
+              "fact": "| 12 Goldfields execution \u2013 First Gold JunQ\u2019271 Final Investment Decision (FID) ta..."
+            },
+            {
+              "source_id": "S9",
+              "fact": "o Based on that timeline, future gold production from Sandstone is anticipated to complement the targeted steady-state operations at Brightstar\u2019s Goldfields Hub",
+              "published_at": "2026-01-27"
+            },
+            {
+              "source_id": "S2",
+              "fact": "bility Study and maiden Ore Reserve is due for delivery early SepQCY\u201926 \u2022 Future cash flows from Goldfields Project, once in operation, are targeted to provide a material funding benefit for future Sandstone developme...",
+              "published_at": "2026-02-02"
+            }
+          ],
+          "project_economics_resource": [
+            {
+              "source_id": "S2",
+              "fact": "o An initial mine life of six years producing +75koz pa from 505koz total mine"
+            },
+            {
+              "source_id": "S2",
+              "fact": "o ~A$1Bn of project free-cash flow delivering a NPV8 of A$606 million (@ A$6,000/oz) \u2022 Brightstar is well placed to make Final Investment Decision in MarQ\u201926 to enable the commencement of construction of the 1.5Mtpa p..."
+            },
+            {
+              "source_id": "S3",
+              "fact": "Key Metrics Units A$5,000/oz A$5,500/oz A$6,000/oz A$6,500"
+            },
+            {
+              "source_id": "S3",
+              "fact": "Sustaining Cost (AISC) A$/oz 2,965 2,981 2,998 3,015 3,032 3,049 NPV8 / Pre-production Capex Ratio (x) 1.5x 2.3x 3.2x 4.2x 5.1x 6.1x \u25aa Brightstar is now focused on Goldfields project execution with a Final Investment..."
+            },
+            {
+              "source_id": "S1",
+              "fact": "NRC25-085 \u25aa 4m @ 5.16g/t Au from 127m \u25aa 3m @ 7.16g/t Au from 245m Lord Henry Deposit Vanguard Deposit o LHRC25038 o VNRC25148 \u25aa 5m @ 10.7g/t Au from 57m \u25aa 7m @ 5.59g/t Au from 162m o LHRC25015 o VNRC25117:"
+            }
+          ],
+          "funding_and_balance_sheet": [
+            {
+              "source_id": "S2",
+              "fact": "o ~A$1Bn of project free-cash flow delivering a NPV8 of A$606 million (@ A$6,000/oz) \u2022 Brightstar is well placed to make Final Investment Decision in MarQ\u201926 to enable the commencement of construction of the 1.5Mtpa p...",
+              "published_at": "2026-02-02"
+            },
+            {
+              "source_id": "S10",
+              "fact": "rd Byron 3 and Lady Shenton4 as the initial mill ore sources, to complement the existing Second Fortune and Fish operations o Mineral Resource at Lord Byron and Lady Shenton: 13.5Mt @ 1.4g/t Au for 0.6Moz \u2022 Debt finan...",
+              "published_at": "2026-01-20"
+            }
+          ],
+          "market_share_structure": [
+            {
+              "source_id": "S5",
+              "fact": "o Processing plant designed with capability to enable expansion to 2.5Mtpa in the future \u2022 Cash flows from Menzies and Laverton operations targeted to provide material funding benefit for future Sandstone development..."
+            },
+            {
+              "source_id": "S4",
+              "fact": "It is provided for information purposes and is not an invitation nor offer of shares or recommendation for subscription, purchase or sale in any jurisdiction.",
+              "published_at": "2026-01-29"
+            }
+          ],
+          "catalysts_and_tailwinds": [
+            {
+              "source_id": "S1",
+              "fact": "\u25aa 2m @ 9.04g/t Au from 46m \u25aa 14m @ 2.44g/t Au from 62m o LHRC25040: o VNRC25136 \u25aa 2m @ 6.98g/t Au from 104m \u2022 14m @ 2.31g/t Au from 133m \u2022 Assays from the diamond drilling completed in 2025 are pending \u2022 Sandstone Min...",
+              "published_at": "2026-02-05"
+            },
+            {
+              "source_id": "S3",
+              "fact": "30 January 2026 DECEMBER 2025 QUARTERLY ACTIVITY REPORT o Strategic acquisition of Aurumin Limited (ASX: AUN) completed on 2 December 20251 concluding Brightstar\u2019s Sandstone consolidation strategy delivering consolida...",
+              "published_at": "2026-01-30"
+            }
+          ],
+          "management_and_governance": [
+            {
+              "source_id": "S1",
+              "fact": "6892701 519 -60 271 396 302m RC Pre-collar This ASX announcement has been approved by the Managing Director on behalf of the Board of Brightstar."
+            }
+          ],
+          "other_material_facts": [
+            {
+              "source_id": "S1",
+              "fact": "Phone: +61 408 228 889 Email: lucas@corporatestorytime.com 24"
+            },
+            {
+              "source_id": "S2",
+              "fact": "providing all the equity funding required to build the Goldfields Project and advance the Sandstone Gold Project"
+            },
+            {
+              "source_id": "S4",
+              "fact": "It is provided for information purposes and is not an invitation nor offer of shares or recommendation for subscription, purchase or sale in any jurisdiction."
+            },
+            {
+              "source_id": "S8",
+              "fact": "Phone: +61 408 228 889 Email: lucas@corporatestorytime.com"
+            },
+            {
+              "source_id": "S5",
+              "fact": "o Processing plant designed with capability to enable expansion to 2.5Mtpa in the future \u2022 Cash flows from Menzies and Laverton operations targeted to provide material funding benefit for future Sandstone development...",
+              "published_at": "2026-01-29"
+            }
+          ]
+        },
+        "critical_gaps": [],
+        "counts": {
+          "source_count": 10,
+          "decoded_source_count": 10,
+          "categories_with_facts": 7,
+          "total_facts": 22
+        }
+      },
+      "prompt_chars": 34247,
+      "prompt_preview": "You are producing a Stage 1 model analysis for an investment council.\nThe user task below is the primary instruction and must be followed exactly.\n\nUSER TASK:\nRun an investment analysis on Brightstar Resources Limited (ticker ASX:BTR) using the gold miner rubric. Include quality/value scoring, timeline, funding, and valuation evidence.\n\nANALYSIS BRIEF:\nFinancial analysis framing:\n- Template: gold_miner\n- Company type: gold_miner\n- Exchange: asx\n- Prioritize primary ASX filings and investor documents.\n\nRESEARCH SUMMARY FROM RETRIEVAL PASS:\n(none)\n\nLATEST UPDATES (from retrieval):\n(none)\n\nCOMPACT DENOISED FACT BUNDLE (primary signal for analysis):\n{\"schema\":\"compact_fact_bundle_v1\",\"source_index\":[{\"source_id\":\"S1\",\"title\":\"High grade assays continue from Sandstone RC drilling\",\"url\":\"https://announcements.asx.com.au/asxpdf/20260205/pdf/06vzcvbd45qwt6.pdf\",\"published_at\":\"2026-02-05\"},{\"source_id\":\"S2\",\"title\":\"Strategic $180M capital raising funds Goldfields development\",\"url\":\"https://announcements.asx.com.au/asxpdf/20260202/pdf/06vvg93hpb37d2.pdf\",\"published_at\":\"2026-02-02\"},{\"source_id\":\"S3\",\"title\":\"Quarterly Activities/Appendix 5B Cash Flow Report\",\"url\":\"https://announcements",
+      "audit": {
+        "score_total": 90.8,
+        "subscores": {
+          "source_quality": 40.0,
+          "filler_control": 22.0,
+          "coverage": 21.8,
+          "token_efficiency": 7.0
+        },
+        "notes": [
+          "primary_domain_ratio=10/10",
+          "asx_pdf_ratio=10/10",
+          "decoded_ratio=10/10",
+          "low_signal_titles=0/10",
+          "fact_pack_sections_with_facts=6",
+          "fact_pack_critical_gaps=0",
+          "compact_categories_with_facts=7",
+          "timeline_rows=1",
+          "prompt_chars=34247",
+          "unique_domains=['announcements.asx.com.au']"
+        ]
+      }
+    }
+  ]
+}

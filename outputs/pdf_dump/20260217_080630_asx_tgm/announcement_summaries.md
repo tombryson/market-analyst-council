@@ -1,0 +1,402 @@
+# Announcement Summaries
+
+- generated_at_utc: 2026-02-17T08:33:44.496074+00:00
+- worker_model: openai/gpt-4o-mini
+- dump_dir: /Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_080630_asx_tgm
+- total_processed: 4
+- kept_for_injection: 3
+- dropped_as_unimportant: 1
+
+## Kept Documents (JSON Elements)
+
+### 02_2025-10-24_trigg_minerals_limited_asx_tmg_announcements.md
+```json
+{
+  "doc_id": "02_2025-10-24_trigg_minerals_limited_asx_tmg_announcements.md",
+  "price_sensitive": {
+    "is_price_sensitive": true,
+    "confidence": 0.9,
+    "reason": "Announcement includes drilling permit approval and contractor engagement, impacting project progress and potential valuation."
+  },
+  "importance": {
+    "is_important": true,
+    "importance_score": 85,
+    "tier": "high",
+    "keep_for_injection": true,
+    "reason": "The announcement details regulations, drilling programs, and high-grade mineralization results that affect project value."
+  },
+  "summary": {
+    "one_line": "Trigg Minerals has received approval for a drilling program at the Antimony Canyon Project in Utah.",
+    "key_points": [
+      "Utah DOGM tentatively approved Notice of Intention for Antimony Canyon Project.",
+      "Drilling targets Trigg's 100% owned Patented Mining Claims.",
+      "First phase drilling planned to start by end of December 2025.",
+      "Contractor Energold Drilling USA engaged for diamond core drilling.",
+      "Drilling to test the 'Salt n Pepper' tuff horizon with prior sampling showing high grades of stibnite.",
+      "Company merged over 380 claims into a single land package for Antimony Canyon Project.",
+      "24 drill pads permitted, with a total of approximately 5,400 feet (1,650 meters) of drilling planned.",
+      "Drilling program includes close-spaced holes at Little Emma Prospect and structural tests at Gem Prospect.",
+      "Drilling equipped with heli-portable rigs to minimize environmental impact.",
+      "High-grade sampling returning 33.2% Sb and 29.4% Sb confirms potential of patented claims.",
+      "Completion of extensive site works and logistics for drilling preparation.",
+      "Strong relationship with Utah DOGM cited as beneficial for project advancement.",
+      "Drilling completion may inform potential pilot-scale mining activities in 2026.",
+      "Significant decrease in regulatory risk as drilling focuses on Patented Mining Claims.",
+      "Private land status allows a streamlined permitting process compared to federal lands.",
+      "Core samples will be logged and handled at a secured facility to maintain sample integrity."
+    ],
+    "numeric_facts": [
+      {
+        "metric": "Total planned drill holes",
+        "value": "24",
+        "unit": "holes",
+        "context": "Phase 1 drilling program",
+        "source_snippet": "The Phase 1 program includes at least 24 diamond drill holes"
+      },
+      {
+        "metric": "Total planned drilling length",
+        "value": "5400",
+        "unit": "feet",
+        "context": "Planned drilling depth",
+        "source_snippet": "totalling around 5,400 feet (1,650 metres)"
+      },
+      {
+        "metric": "Depth of deeper holes",
+        "value": "400",
+        "unit": "feet",
+        "context": "Planned depth for specific Gem Prospect holes",
+        "source_snippet": "targeting the structural feeders associated with the Gem Mine, where assays of 17.94% Sb2 were recently reported."
+      }
+    ],
+    "timeline_milestones": [
+      {
+        "milestone": "Start of drilling operations",
+        "target_window": "End of December 2025",
+        "direction": "new",
+        "source_snippet": "drilling is planned to begin before the end of December 2025."
+      }
+    ],
+    "capital_structure": [],
+    "catalysts_next_12m": [
+      "Completion of Phase 1 drilling and initial results assessment.",
+      "Potential applications for further drilling phases."
+    ],
+    "risks_headwinds": [
+      "Dependence on regulatory approvals for future drilling phases.",
+      "Geological uncertainties in drilling targeting high-grade zones."
+    ],
+    "market_impact_assessment": "The announcement is likely to positively impact market perception of Trigg Minerals, indicating progress and potential high-value mineral resources. The operational readiness enhances investor confidence in the company's project execution capabilities."
+  },
+  "extraction_quality": {
+    "text_truncated_for_model": false,
+    "signal_quality": "high",
+    "notes": []
+  },
+  "source_meta": {
+    "file_name": "02_2025-10-24_trigg_minerals_limited_asx_tmg_announcements.md",
+    "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_080630_asx_tgm/02_2025-10-24_trigg_minerals_limited_asx_tmg_announcements.md",
+    "title": "Trigg Minerals Limited (ASX:TMG) - Announcements",
+    "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tmg/trigg-minerals-limited/announcements",
+    "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251210/pdf/03035431.pdf",
+    "domain": "www.intelligentinvestor.com.au",
+    "published_at": "2025-10-24",
+    "decoded_chars_in_file": 28724
+  }
+}
+```
+
+### 03_2025-10-07_asx_announcement_pdf_2025_10_07.md
+```json
+{
+  "doc_id": "03_2025-10-07_asx_announcement_pdf_2025_10_07.md",
+  "price_sensitive": {
+    "is_price_sensitive": true,
+    "confidence": 1.0,
+    "reason": "The document contains information about a significant funding and equity raising which could affect share price."
+  },
+  "importance": {
+    "is_important": true,
+    "importance_score": 90,
+    "tier": "critical",
+    "keep_for_injection": true,
+    "reason": "The announcement details a major funding package to advance the TGME Gold Mine Project, impacting capital structure and project development."
+  },
+  "summary": {
+    "one_line": "Theta Gold Mines Limited has secured A$51.4 million for the TGME Gold Mine Project through equity and debt financing.",
+    "key_points": [
+      "Total funding secured is approximately A$51.4 million from various sources.",
+      "Equity raised includes: US$7.9 million (A$12 million) from placement to sophisticated investors at A$0.21 per share.",
+      "US$15 million (A$22.8 million) from private Cornerstone Investors in two tranches at A$0.155 per share.",
+      "US$1 million (A$1.5 million) commitment from NC New Energy Limited at A$0.155 per share.",
+      "Debt component is US$10 million (A$15.2 million) loan from Cornerstone Investors, following similar terms as a prior US$35 million loan.",
+      "Share Purchase Plan (SPP) planned to raise up to A$2 million for eligible shareholders at A$0.21 per share.",
+      "Participants in equity raise may receive free attaching options, exercisable at A$0.32 within 18 months.",
+      "Loan facility to support construction of TGME Gold Project including infrastructure and equipment.",
+      "Placement shares represent 19.2% discount to previous closing price of A$0.26.",
+      "Indicative timeline for key milestones includes shareholder approval by November 10, 2025, and share allotments on November 17, 2025.",
+      "Funds will be used for construction, infrastructure, and project-related expenses.",
+      "Strengthening company balance sheet projected as an outcome of this financing.",
+      "CEO highlights funding as a vote of confidence and plans for gold production.",
+      "Cornerstone Investors' involvement includes experience in significant investments.",
+      "Existing investors encouraged to participate in SPP to avoid dilution.",
+      "All funds raised are earmarked specifically for TGME project activities.",
+      "The issue of new shares will not require shareholder approval based on ASX listing capacity.",
+      "The financial impact is expected to enhance project momentum given current strong gold prices."
+    ],
+    "numeric_facts": [
+      {
+        "metric": "Total Funding Secured",
+        "value": "51.4",
+        "unit": "million AUD",
+        "context": "from equity and debt",
+        "source_snippet": "Total debt and equity of US$33.9 million, (~A$51.4 million) before costs secured..."
+      },
+      {
+        "metric": "Equity Portion",
+        "value": "36.3",
+        "unit": "million AUD",
+        "context": "from equity raise",
+        "source_snippet": "US$23.9 million, (~A$36.3 million) of equity comprising:"
+      },
+      {
+        "metric": "Debt Portion",
+        "value": "15.2",
+        "unit": "million AUD",
+        "context": "from loan facility",
+        "source_snippet": "Debt component comprising US$10 million (~A$15.2 million) from the private Cornerstone Investors..."
+      },
+      {
+        "metric": "Placement Price",
+        "value": "0.21",
+        "unit": "AUD",
+        "context": "per share offering",
+        "source_snippet": "at an issue price of A$0.21 per share"
+      }
+    ],
+    "timeline_milestones": [
+      {
+        "milestone": "Record date for SPP",
+        "target_window": "6 October 2025",
+        "direction": "new",
+        "source_snippet": "Record date for eligibility to participate in SPP..."
+      },
+      {
+        "milestone": "Settlement of Placement",
+        "target_window": "13 October 2025",
+        "direction": "new",
+        "source_snippet": "Settlement of Placement and Tranche 1 of private Cornerstone Investment"
+      },
+      {
+        "milestone": "Allotment of shares",
+        "target_window": "17 November 2025",
+        "direction": "new",
+        "source_snippet": "Allotment of SPP Shares on 17 November 2025"
+      },
+      {
+        "milestone": "Shareholder meeting",
+        "target_window": "26 November 2025",
+        "direction": "new",
+        "source_snippet": "Shareholder meeting on Wednesday, 26 November 2025"
+      }
+    ],
+    "capital_structure": [
+      "New shares to be issued at A$0.21 and A$0.155.",
+      "Planned SPP to raise up to A$2 million offers shares at the same price."
+    ],
+    "catalysts_next_12m": [
+      "Completion of fundraising and approval to proceed with project construction.",
+      "Potential market response to gold price fluctuations impacting valuations.",
+      "Completion of operational milestones leading to production."
+    ],
+    "risks_headwinds": [
+      "Dependent on shareholder approval for full execution of equity and options.",
+      "Market volatility around gold prices and associated production costs.",
+      "Execution risks in construction timelines amidst funding dependent activities."
+    ],
+    "market_impact_assessment": "This funding raise is expected to positively impact Theta Gold's stock price by signalling financial stability and potential for growth, aided by current favorable gold market conditions."
+  },
+  "extraction_quality": {
+    "text_truncated_for_model": false,
+    "signal_quality": "high",
+    "notes": [
+      "attempt_1:json_parse_failed"
+    ]
+  },
+  "source_meta": {
+    "file_name": "03_2025-10-07_asx_announcement_pdf_2025_10_07.md",
+    "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_080630_asx_tgm/03_2025-10-07_asx_announcement_pdf_2025_10_07.md",
+    "title": "ASX announcement PDF (2025-10-07)",
+    "source_url": "https://announcements.asx.com.au/asxpdf/20251007/pdf/06q716kbl7m10v.pdf",
+    "pdf_url": "https://announcements.asx.com.au/asxpdf/20251007/pdf/06q716kbl7m10v.pdf",
+    "domain": "announcements.asx.com.au",
+    "published_at": "2025-10-07",
+    "decoded_chars_in_file": 27406
+  }
+}
+```
+
+### 04_2025-04-30_1.md
+```json
+{
+  "doc_id": "04_2025-04-30_1.md",
+  "price_sensitive": {
+    "is_price_sensitive": true,
+    "confidence": 0.9,
+    "reason": "The document contains information about funding, project economics, regulatory updates, and operational development."
+  },
+  "importance": {
+    "is_important": true,
+    "importance_score": 85,
+    "tier": "high",
+    "keep_for_injection": true,
+    "reason": "Contains critical updates on funding, project timelines, resource estimates, and partnerships which impact investment decisions."
+  },
+  "summary": {
+    "one_line": "Theta Gold Mines outlines significant developments in project funding and operations for Q1 2025.",
+    "key_points": [
+      "Theta is advancing discussions with international debt funders for project CAPEX.",
+      "Pre-development plant construction is in progress, with design finalized for the processing plant.",
+      "An updated Feasibility Study is planned for Q2 to potentially include additional surface gold of 174,000 oz.",
+      "30 million unlisted options were converted, raising US$2.3 million (A$3.6 million) in funds.",
+      "Cash balance as of March 31, 2025, is US$2.9 million.",
+      "The estimated market capitalization of TGM is A$123 million (US$77 million).",
+      "Total unlisted options and performance rights amount to 103,054,394.",
+      "The project has reported 174,000 gold ounces available from surface resources.",
+      "Progress on environmental and social governance (ESG) with ecological compensation and community plans.",
+      "The plant execution plan is on track, with an anticipated completion for pre-project works by May 2025.",
+      "Debt discussions for financing ongoing, with more details expected in May.",
+      "A definitive feasibility study shows a pre-tax NPV10% of US$324 million and IRR of 65%.",
+      "Initial life-of-mine (LOM) projected at 12.9 years, producing 1.24 million ounces of gold.",
+      "Total mining exploration costs for the quarter were US$513,498.",
+      "The company is focusing on community involvement via the Social and Labour Plan (SLP).",
+      "The project has managed stakeholders effectively in the permitting process."
+    ],
+    "numeric_facts": [
+      {
+        "metric": "Funding raised from option exercise",
+        "value": "2.3",
+        "unit": "million USD",
+        "context": "Conversions of unlisted options",
+        "source_snippet": "30 million unlisted options were converted, raising US$2.3 million."
+      },
+      {
+        "metric": "Total cash position",
+        "value": "2.9",
+        "unit": "million USD",
+        "context": "Cash as of March 31, 2025",
+        "source_snippet": "Cash balance as of March 31, 2025, is US$2.9 million."
+      },
+      {
+        "metric": "Market capitalization",
+        "value": "123",
+        "unit": "million AUD",
+        "context": "Share price closing value",
+        "source_snippet": "The estimated market capitalization of TGM is A$123 million."
+      },
+      {
+        "metric": "Total ounces in surface resources",
+        "value": "174,000",
+        "unit": "oz",
+        "context": "Surface gold available",
+        "source_snippet": "The project has reported 174,000 gold ounces available from surface resources."
+      },
+      {
+        "metric": "NPV10%",
+        "value": "324",
+        "unit": "million USD",
+        "context": "Feasibility study",
+        "source_snippet": "A definitive feasibility study shows a pre-tax NPV10% of US$324 million."
+      },
+      {
+        "metric": "IRR",
+        "value": "65",
+        "unit": "%",
+        "context": "Investment return rate",
+        "source_snippet": "Pre-tax IRR of 65% at forecast gold price."
+      }
+    ],
+    "timeline_milestones": [
+      {
+        "milestone": "Completion of pre-project works",
+        "target_window": "May 2025",
+        "direction": "new",
+        "source_snippet": "The plant execution plan is on track with an anticipated completion for pre-project works by May 2025."
+      },
+      {
+        "milestone": "Updated Feasibility Study",
+        "target_window": "Q2 2025",
+        "direction": "new",
+        "source_snippet": "An updated Feasibility Study is planned for Q2."
+      }
+    ],
+    "capital_structure": [
+      "879,428,626 fully paid ordinary shares outstanding.",
+      "103,054,394 unlisted options and performance rights."
+    ],
+    "catalysts_next_12m": [
+      "Further funding announcements from international debt discussions.",
+      "Completion of the updated Feasibility Study."
+    ],
+    "risks_headwinds": [
+      "Reliance on securing additional project financing.",
+      "Potential market volatility affecting share price."
+    ],
+    "market_impact_assessment": "This quarterly report could impact investor sentiment positively as it outlines substantial progress towards funding and production goals, enhancing overall project viability."
+  },
+  "extraction_quality": {
+    "text_truncated_for_model": false,
+    "signal_quality": "high",
+    "notes": [
+      "Contained detailed financial and operational updates relevant to investors."
+    ]
+  },
+  "source_meta": {
+    "file_name": "04_2025-04-30_1.md",
+    "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_080630_asx_tgm/04_2025-04-30_1.md",
+    "title": "1",
+    "source_url": "https://data-api.marketindex.com.au/api/v1/announcements/XASX:TGM:6A1262749/pdf/inline/6A1262749.pdf",
+    "pdf_url": "https://data-api.marketindex.com.au/api/v1/announcements/XASX:TGM:6A1262749/pdf/inline/6A1262749.pdf",
+    "domain": "data-api.marketindex.com.au",
+    "published_at": "2025-04-30",
+    "decoded_chars_in_file": 46786
+  }
+}
+```
+
+## Dropped Documents (Classification Only)
+
+### 01_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md
+```json
+{
+  "doc_id": "01_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+  "price_sensitive": {
+    "is_price_sensitive": false,
+    "confidence": 0.9,
+    "reason": "Change of director's interest notice typically not price sensitive by itself."
+  },
+  "importance": {
+    "is_important": false,
+    "importance_score": 10,
+    "tier": "ignore",
+    "keep_for_injection": false,
+    "reason": "Contains no material changes to company operations, funding, or financial status."
+  },
+  "source_meta": {
+    "file_name": "01_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+    "file": "/Users/Toms_Macbook/Projects/llm-council/outputs/pdf_dump/20260217_080630_asx_tgm/01_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+    "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+    "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+    "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260216/pdf/03056918.pdf",
+    "domain": "www.intelligentinvestor.com.au",
+    "published_at": "2026-02-16",
+    "decoded_chars_in_file": 5394
+  },
+  "extraction_quality": {
+    "text_truncated_for_model": false,
+    "signal_quality": "low",
+    "notes": [
+      "Document primarily informs about director's interest, not fundamentally impactful."
+    ]
+  }
+}
+```

@@ -1,0 +1,1215 @@
+{
+  "model": "google/gemini-3-pro-preview",
+  "stage1_second_pass_prompt_chars": 27226,
+  "stage1_second_pass_injection_audit": {
+    "template_id": "gold_miner",
+    "source_rows_preview": [
+      {
+        "source_id": "S1",
+        "published_at": "2026-02-03",
+        "title": "Revised Feasibility Study Confirms A$1.4B Free Cash Flow",
+        "is_low_signal_notice": false,
+        "asx_deterministic": false,
+        "asx_price_sensitive": false
+      },
+      {
+        "source_id": "S2",
+        "published_at": "2026-01-30",
+        "title": "Quarterly Activities & Cashflow Report - 31 Dec'25",
+        "is_low_signal_notice": false,
+        "asx_deterministic": false,
+        "asx_price_sensitive": false
+      },
+      {
+        "source_id": "S3",
+        "published_at": "2025-12-16",
+        "title": "TGM enters into Non-Binding Funding Agreement for US$80M",
+        "is_low_signal_notice": false,
+        "asx_deterministic": false,
+        "asx_price_sensitive": false
+      },
+      {
+        "source_id": "S4",
+        "published_at": "2025-12-09",
+        "title": "TGME Project - Long-Lead Processing Plant & Equipment",
+        "is_low_signal_notice": false,
+        "asx_deterministic": false,
+        "asx_price_sensitive": false
+      },
+      {
+        "source_id": "S5",
+        "published_at": "2025-11-27",
+        "title": "TGME Plant Build Progress - Earthworks & Civils on Track",
+        "is_low_signal_notice": false,
+        "asx_deterministic": false,
+        "asx_price_sensitive": false
+      },
+      {
+        "source_id": "S6",
+        "published_at": "2025-11-04",
+        "title": "Plant Build - Ball Mills Secured, Construction Accelerates",
+        "is_low_signal_notice": false,
+        "asx_deterministic": false,
+        "asx_price_sensitive": false
+      },
+      {
+        "source_id": "S7",
+        "published_at": "2025-10-31",
+        "title": "Quarterly Activities & Cashflow Report - 30 Sept'25",
+        "is_low_signal_notice": false,
+        "asx_deterministic": false,
+        "asx_price_sensitive": false
+      },
+      {
+        "source_id": "S8",
+        "published_at": "2025-10-24",
+        "title": "Share Purchase Plan Opens - SPP Offer Document",
+        "is_low_signal_notice": false,
+        "asx_deterministic": false,
+        "asx_price_sensitive": false
+      },
+      {
+        "source_id": "S9",
+        "published_at": "2025-10-24",
+        "title": "Notice of Share Purchase Plan & Options Offer Prospectus",
+        "is_low_signal_notice": false,
+        "asx_deterministic": false,
+        "asx_price_sensitive": false
+      },
+      {
+        "source_id": "S10",
+        "published_at": "2025-06-10",
+        "title": "10 June 2025 ASX ANNOUNCEMENT (ASX: TGM) TGM Receives US$35m Loan Facility Funding Agreement Theta Gold Min...",
+        "is_low_signal_notice": false,
+        "asx_deterministic": false,
+        "asx_price_sensitive": false
+      }
+    ],
+    "compact_fact_bundle_preview": {
+      "timeline_milestones": [
+        {
+          "source_id": "S1",
+          "fact": "3 Ref to ASX Release dated 27 July 2022 titled, “Theta Gold’s TGME Project DFS confirms NPV of AUD432 Million”."
+        },
+        {
+          "source_id": "S2",
+          "fact": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 30 January 2026 1 October 2025 to 31 December 2025 Theta Gold Mines Limite"
+        }
+      ],
+      "project_economics_resource": [
+        {
+          "source_id": "S1",
+          "fact": "The TGME Project’s post- tax value has surged to US$455 million—an impressive US$236 million uplift over the 2022 FS—driven largely by higher gold prices."
+        },
+        {
+          "source_id": "S1",
+          "fact": "Key Assumptions: Long term average spot gold price of US$2,884 applied in Base Case scenario over LOM / AISC estimation of US$1,181/oz at +/- 15%"
+        }
+      ],
+      "funding_and_balance_sheet": [
+        {
+          "source_id": "S3",
+          "fact": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 16 December 2025 TGM has entered into Non-Binding Funding Agreement for US"
+        },
+        {
+          "source_id": "S3",
+          "fact": "Coupon: 3-month Secured Overnight Financing Rate (SOFR, with a floor of 3.75%) plus 10% per Capitalisation of Interest and Moratorium on Repayments: 12 months interest capitalisation and 18-month moratorium on principal "
+        }
+      ],
+      "market_share_structure": [
+        {
+          "source_id": "S7",
+          "fact": "Debt Funding Momentum: Debt syndication process with commercial co-lenders progressing to Post Quarter End Summary Update:"
+        },
+        {
+          "source_id": "S7",
+          "fact": "Secured A$60.72΄3 million, (US$39.9 million) in funding made up of equity and debt Share Purchase Plan (SPP) – opened on 24 October 2025 Figure 1: Site visit with the execution team and contractors August 2025 1 Ref to A"
+        }
+      ],
+      "risks_and_constraints": [
+        {
+          "source_id": "S1",
+          "fact": "5 First gold produced timing will be subject to securing funding and obtaining all necessary regulatory permitting approvals."
+        }
+      ],
+      "catalysts_and_tailwinds": [
+        {
+          "source_id": "S1",
+          "fact": "The project is gold price sensitive offering strong leverage as clearly demonstrated in tables 1 and 2 above."
+        }
+      ],
+      "management_and_governance": [
+        {
+          "source_id": "S4",
+          "fact": "This project is not just about gold – it’s about jobs, training, and creating lasting value for the region.” 2 This announcement was approved for release by Theta Gold Mines Limited’s Board."
+        }
+      ],
+      "other_material_facts": [
+        {
+          "source_id": "S1",
+          "fact": "2 Exchange rate USD:AUD applied throughout this document is 0.6606."
+        },
+        {
+          "source_id": "S1",
+          "fact": "6 Exchange rate USD:AUD applied throughout this document 0.6606."
+        }
+      ]
+    },
+    "fact_digest_counts": {
+      "source_count": 10,
+      "decoded_source_count": 10,
+      "total_facts": 26,
+      "sections_with_facts": 6,
+      "summary_bullets": 12,
+      "conflicts": 1
+    },
+    "fact_pack_counts": {
+      "source_count": 10,
+      "decoded_source_count": 10,
+      "total_facts": 25,
+      "sections_with_facts": 9
+    },
+    "timeline_evidence_count": 8,
+    "asx_deterministic_ingestion": {
+      "enabled": true,
+      "used": true,
+      "symbol": "TGM",
+      "reason": "ok",
+      "cache_hit": true,
+      "fetched_rows": 107,
+      "selected_rows": 10,
+      "decoded_rows": 10,
+      "target_rows": 10,
+      "price_sensitive_only": true,
+      "include_non_sensitive_fill": false,
+      "years_queried": [
+        2026,
+        2025
+      ],
+      "errors": []
+    },
+    "source_key_points_counts": {
+      "source_count": 10,
+      "sources_with_points": 10,
+      "total_points": 57,
+      "total_words": 1790,
+      "max_points_per_source": 8,
+      "max_words_per_source": 500
+    },
+    "prompt_compression_enabled": true,
+    "prompt_compression_applied": true,
+    "prompt_compression_appendix_omitted": true,
+    "prompt_target_chars": 32000,
+    "prompt_chars_before_compression": 40903,
+    "prompt_chars_after_compression": 26810,
+    "prompt_chars_saved": 14093,
+    "prompt_chars": 26810
+  },
+  "stage1_second_pass_source_rows": [
+    {
+      "source_id": "S1",
+      "title": "Revised Feasibility Study Confirms A$1.4B Free Cash Flow",
+      "url": "https://announcements.asx.com.au/asxpdf/20260203/pdf/06vx11tgf508sc.pdf",
+      "published_at": "2026-02-03",
+      "decode_status": "decoded",
+      "decoded": true,
+      "excerpt": "TGM continues to deliver strong project execution and disciplined cost management. The TGME Project’s post- tax value has surged to US$455 million—an impressive US$236 million uplift over the 2022 FS—driven largely by higher gold prices. This pricing strength has unlocked the ability to profitably mine lower-grade ore. The project is gold price sensitive offering strong leverage as clearly demonstrated in tables 1 and 2 above. 2 Exchange rate USD:AUD applied throughout this document is 0.6606. 3 Ref to ASX Release dated 27 July 2022 titled, “Theta Gold’s TGME Project DFS confirms NPV of AUD432 Million”. Key Assumptions: Long term average spot gold price of US$2,884 applied in Base Case scenario over LOM / AISC estimation of US$1,181/oz at +/- 15%\n4 Including Inferred Resources. 5 First gold produced timing will be subject to securing funding and obtaining all necessary regulatory permitting approvals. 6 Exchange rate USD:AUD applied throughout this document 0.6606. 7 Financial returns applying the ‘Base Case’ scenario statistics. 5 o Capital payback period of 29 months; o Post-tax IRR of 77%; pre-tax IRR of 84% o Combined Underground Projects have an AISC of US$1,181/oz (A$1,787...",
+      "material_signal_score": 9
+    },
+    {
+      "source_id": "S2",
+      "title": "Quarterly Activities & Cashflow Report - 31 Dec'25",
+      "url": "https://announcements.asx.com.au/asxpdf/20260130/pdf/06vsg473kmdn8n.pdf",
+      "published_at": "2026-01-30",
+      "decode_status": "decoded",
+      "decoded": true,
+      "excerpt": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 30 January 2026 1 October 2025 to 31 December 2025 Theta Gold Mines Limited (‘Theta Gold’ or the ‘Company’) (ASX: TGM) is pleased to report on its activities for the quarter ended 31 December 2025. The December quarter marked a decisive step forward in transforming TGM into South Africa’s next emerging gold producer. With construction momentum accelerating across the Transvaal Gold Mining Estates (TGME) Gold Project, the Company enters 2026 with strengthened financial capacity, clear operational visibility, and a fully aligned development pathway toward first gold production. During the December 2025 Quarter:\nIn accordance with ASX Listing Rules 5.3.1 and 5.3.2, the Company provides the following summary of expenditures incurred during the Quarter: Mining exploration costs (including exploration labour) Mining Production and Development Costs US $ 7,150,000 US $ 98,000 US $ 7,248,000 The Company’s Quarterly Appendix 5B reported US$119,000 in payments to related parties and their The current capital structure of the Company at 31 Decemb...",
+      "material_signal_score": 9
+    },
+    {
+      "source_id": "S3",
+      "title": "TGM enters into Non-Binding Funding Agreement for US$80M",
+      "url": "https://announcements.asx.com.au/asxpdf/20251216/pdf/06td0zczgjp32b.pdf",
+      "published_at": "2025-12-16",
+      "decode_status": "decoded",
+      "decoded": true,
+      "excerpt": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 16 December 2025 TGM has entered into Non-Binding Funding Agreement for US$80M (A$120M) Non-binding Senior Term Loan for US$80 million, (~A$120 million)1 subject to completion of due-diligence and execution of definitive documents, funding to be made available to Theta Gold Mines Limited, (“Theta Gold” or the “Borrower”) by Nebari Partners, LLC or its affiliates (“Nebari” or the “Lender”), comprised of two tranches:\no Tranche 1: US$45 million, (~A$68 million) available at closing, subject to conditions o Tranche 2: Up to US$35 million, (~A$52 million) upon request by Theta Gold, after 3 months of closing and remaining available for 24 months, subject to conditions precedent and operational milestones. Coupon: 3-month Secured Overnight Financing Rate (SOFR, with a floor of 3.75%) plus 10% per Capitalisation of Interest and Moratorium on Repayments: 12 months interest capitalisation and 18-month moratorium on principal repayments, from funding Tranche 1. Term: 60 months from T1 funding. Funded to First Pour: Facility provides a full fund...",
+      "material_signal_score": 9
+    },
+    {
+      "source_id": "S4",
+      "title": "TGME Project - Long-Lead Processing Plant & Equipment",
+      "url": "https://announcements.asx.com.au/asxpdf/20251209/pdf/06t3nhfpxt4631.pdf",
+      "published_at": "2025-12-09",
+      "decode_status": "decoded",
+      "decoded": true,
+      "excerpt": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 9 December 2025 TGME Gold Project – Long-Lead Processing Plant & Equipment Secured Major Procurement Milestone: Orders placed with Kemix (Pty) Ltd and MIP Industries (Pty) Ltd, leaders in South African metallurgical engineering. (see picture gallery – Appendix A) World-Class Technology: Equipment includes agitators, electrowinning circuit, thickeners, flocculant plant, and control instrumentation – critical for operational excellence. Integrated Delivery: Manufacturing and delivery aligned to prevent double-handling; both suppliers engaged in commissioning and on-site training.\n“Securing these critical long-lead items is a major milestone for TGME. With civil works advancing and world-class technology partners on board, we remain firmly on track for commissioning by end-2026. This project is not just about gold – it’s about jobs, training, and creating lasting value for the region.” 2 This announcement was approved for release by Theta Gold Mines Limited’s Board. For more information, please visit www.thetagoldmines.com or contact: T:...",
+      "material_signal_score": 4
+    },
+    {
+      "source_id": "S5",
+      "title": "TGME Plant Build Progress - Earthworks & Civils on Track",
+      "url": "https://announcements.asx.com.au/asxpdf/20251127/pdf/06skz0jm10qb23.pdf",
+      "published_at": "2025-11-27",
+      "decode_status": "decoded",
+      "decoded": true,
+      "excerpt": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 27 November 2025 TGME Plant Build Progress – Earthworks and Civil Works on Track Concrete Retaining Walls: Bulk excavations finished with casting of structural bases being finalised — a major milestone in civil works. Quality Control: All structural concrete to date has passed strength tests. Gold Room Platform Underway: Excavation complete, with backfilling and base construction Smart Cost Savings: Leveraging existing infrastructure and in-house resources to deliver efficiency without compromise.\nTGME Gold Project remains firmly aligned with end-2026 commissioning timeline Theta Gold Mines Limited, (‘Theta Gold’ or ‘the Company’) (ASX:TGM) is pleased to report strong momentum on the TGME Gold Project, with bulk earthworks and civil engineering packages advancing on schedule and within budget. These works are critical path items and mark a major milestone toward Since project commencement, significant ground movement has been achieved across terraces 2, 3, and 4, with over 12,000 cubic meters of material relocated and positive engineer...",
+      "material_signal_score": 5
+    },
+    {
+      "source_id": "S6",
+      "title": "Plant Build - Ball Mills Secured, Construction Accelerates",
+      "url": "https://announcements.asx.com.au/asxpdf/20251104/pdf/06rh2nb316yqzb.pdf",
+      "published_at": "2025-11-04",
+      "decode_status": "decoded",
+      "decoded": true,
+      "excerpt": "1 4 November 2025 TGME Plant Build Progress - Ball Mills Secured, Construction Accelerates Major Equipment Secured: Order placed with MechProTech for two (2) x Titan GDM3065 Ball Mills, marking a critical milestone in the TGME gold plant build (Design Specs – See Appendix A) o Dual Mill Configuration: Increases operational flexibility in terms of maintenance and redundancy. Under Theta’s plug-and-play model, the mills and all supporting infrastructure will be built in the factory, then trucked to the site to fast-track construction and reduce capital expenditure. o Locally Engineered: Manufacturer is located in South Africa within 4 hours of the mine site to ensure support and maintenance. Momentum Building: On-site team now 137 strong with civils underway — rapid progress\nBacked by a robust service agreement, on-site training, and full commissioning support from MechProTech’s expert engineers, this partnership is expected to drive operational excellence and establish a new benchmark in mineral processing performance. A more complete specification table is located at Appendix A for Ball Mill design and specifications. Figure 2: Engineering inspection of concrete test cubes Figur...",
+      "material_signal_score": 3
+    },
+    {
+      "source_id": "S7",
+      "title": "Quarterly Activities & Cashflow Report - 30 Sept'25",
+      "url": "https://announcements.asx.com.au/asxpdf/20251031/pdf/06rc9kq3yjkgjm.pdf",
+      "published_at": "2025-10-31",
+      "decode_status": "decoded",
+      "decoded": true,
+      "excerpt": "1 31 October 2025 1 July 2025 to 30 September 2025 Theta Gold Mines Limited (“Theta Gold” or “Company”) (ASX: TGM) is pleased to report on its activities for the quarter ended 30 September 2025. During the September 2025 Quarter: Construction Kicks Off: Bulk earthworks and civil works officially underway at Theta’s 6Moz Transvaal Gold Mining Estates (TGME) Gold Mine Project – a major step toward first gold. Capital Raise Secured: US$4 million1 (before costs) -Funds deployed to accelerate earthworks, water management systems, and site civils. Board Strengthened: Strategic appointments and management changes to drive execution. Debt Funding Momentum: Debt syndication process with commercial co-lenders progressing to Post Quarter End Summary Update:\nSecured A$60.72΄3 million, (US$39.9 million) in funding made up of equity and debt Share Purchase Plan (SPP) – opened on 24 October 2025 Figure 1: Site visit with the execution team and contractors August 2025 1 Ref to ASX Release dated 3 July 2025 titled, “TGM Approves TGM Gold Project Plus US$4 Million Placement” 2 Ref to ASX Release dated 7 October 2025 titled, “TGM secures total (A$51.4m) debt and equity to advance TGME Gold Mine Pr...",
+      "material_signal_score": 9
+    },
+    {
+      "source_id": "S8",
+      "title": "Share Purchase Plan Opens - SPP Offer Document",
+      "url": "https://announcements.asx.com.au/asxpdf/20251024/pdf/06r0jk8p3m601q.pdf",
+      "published_at": "2025-10-24",
+      "decode_status": "decoded",
+      "decoded": true,
+      "excerpt": "Tuesday, 7 October 2025 Lodgment of SPP Offer Booklet with ASX Friday, 24 October 2025 5:00pm (Sydney time) on Monday 17, November 2025 Announcement of results of the SPP Offer Monday, 24 November 2025 The Company reserves the right, subject to the Corporations Act, and other applicable laws, to vary the dates of the SPP Offer (including extending the SPP Offer or accepting late applications) without notice. Some capitalised words and expressions used in this SPP Offer Booklet have meanings which are explained in section 3. A reference to time in this SPP Offer Booklet is to the time in Sydney, Australia, unless otherwise stated. All financial amounts in this SPP Offer Booklet are expressed in Australian dollars.\nFor all enquiries concerning the SPP Offer, please contact the Company Secretary by telephone on 02 8046 7584. For all general shareholder enquiries, please contact the Company’s Share Registry on 1300 737 760 (within Australia) or +61 2 9290 9600 (outside Australia) between 8.30am and 7.00pm (AEST) Monday to Friday (excluding Public Holidays). 3 On behalf of the Board, we are pleased to invite you to participate in the Theta Gold Mines Limited On 7 October 2025 and 21...",
+      "material_signal_score": 5
+    },
+    {
+      "source_id": "S9",
+      "title": "Notice of Share Purchase Plan & Options Offer Prospectus",
+      "url": "https://announcements.asx.com.au/asxpdf/20251024/pdf/06r0jdlndtwdwd.pdf",
+      "published_at": "2025-10-24",
+      "decode_status": "decoded",
+      "decoded": true,
+      "excerpt": "1 Legal/93286974_1 Not for release to US wire service or distribution in the United States 24 October 2025 Issue of Share Purchase Plan Booklet and Options Offer Theta Gold Mines Limited (ACN 131 758 177) (Theta Gold or the Company) today announces the opening of the Share Purchase Plan (SPP Offer) and an offer of free attaching options offered under an Options Prospectus.\nThe SPP Offer will allow Eligible Shareholders on the register as at Record Date of 6 October 2025 (with registered addresses in Australia, New Zealand, the United Kingdom, Singapore or Hong Kong) to participate in the Company’s capital raising activities, at $0.21 (21 cents) per share (SPP Shares) being the same price as that offered to sophisticated and professional investors who participated in a private placement raising A$12 million (before costs) completed on 14 October 2025 (Placement).\nSubject to shareholder approval, the Company is making a separate offer under a Prospectus to shareholders who participate in the SPP Offer or the Placement of 1 free attaching option (Attaching Option) for every 2.38 shares subscribed for in the SPP Offer or Placement (rounded down to the nearest whole number) (Options...",
+      "material_signal_score": 2
+    },
+    {
+      "source_id": "S10",
+      "title": "10 June 2025 ASX ANNOUNCEMENT (ASX: TGM) TGM Receives US$35m Loan Facility Funding Agreement Theta Gold Min...",
+      "url": "https://announcements.asx.com.au/asxpdf/20250610/pdf/06kl3lp47wh2tp.pdf",
+      "published_at": "2025-06-10",
+      "decode_status": "decoded",
+      "decoded": true,
+      "excerpt": "1 10 June 2025 TGM Receives US$35m Loan Facility Funding Agreement Theta Gold Mines Limited (“Theta Gold” or the “Company”) (ASX:TGM) is pleased to announce that it has received agreed credit approved Loan Facility Agreement (“Facility”) and indicative funding terms from the Industrial Development Corporation of South Africa (“IDC”) for the joint funding of the TGME Underground Gold Mine Project in South Africa (the “Project”). Finalisation of the Facility with IDC is subject to conditions precedent (which are to be fulfilled to the Lenders’ satisfaction) including finalisation of definitive loan facility documentation.\nChairman, Bill Guy commented: “The IDC, a South Africa’s state-owned institution, has completed a due diligence and approved funding of the Project. Its debt funding Loan Facility Agreement in the TGME Underground Gold Project signals strong confidence in the project’s economics and alignment with IDC’s sustainable growth mandate. This is a major funding milestone, with next step finalising legal agreements. IDC has a proven track record backing early-stage African successes like Kumba Iron Ore and Alphamin Resources.” Overview of IDC funding approval TGM has rec...",
+      "material_signal_score": 9
+    }
+  ],
+  "stage1_second_pass_timeline_evidence": [
+    {
+      "source_id": "S4",
+      "title": "TGME Project - Long-Lead Processing Plant & Equipment",
+      "url": "https://announcements.asx.com.au/asxpdf/20251209/pdf/06t3nhfpxt4631.pdf",
+      "published_at": "2025-12-09",
+      "authority_rank": 4,
+      "score": 15,
+      "fact": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 9 December 2025 TGME Gold Project – Long-Lead Processing Plant & Equipment Secured Major Procurement Milestone: Orders placed with Kemix (Pty) Ltd and MIP Industries (Pty) Ltd, leaders in South African metallurgical engineering.",
+      "windows": [
+        "December 2025"
+      ]
+    },
+    {
+      "source_id": "S6",
+      "title": "Plant Build - Ball Mills Secured, Construction Accelerates",
+      "url": "https://announcements.asx.com.au/asxpdf/20251104/pdf/06rh2nb316yqzb.pdf",
+      "published_at": "2025-11-04",
+      "authority_rank": 4,
+      "score": 15,
+      "fact": "Backed by a robust service agreement, on-site training, and full commissioning support from MechProTech’s expert engineers, this partnership is expected to drive operational excellence and establish a new benchmark in mineral processing performance.",
+      "windows": []
+    },
+    {
+      "source_id": "S2",
+      "title": "Quarterly Activities & Cashflow Report - 31 Dec'25",
+      "url": "https://announcements.asx.com.au/asxpdf/20260130/pdf/06vsg473kmdn8n.pdf",
+      "published_at": "2026-01-30",
+      "authority_rank": 4,
+      "score": 14,
+      "fact": "With construction momentum accelerating across the Transvaal Gold Mining Estates (TGME) Gold Project, the Company enters 2026 with strengthened financial capacity, clear operational visibility, and a fully aligned development pathway toward first gold production.",
+      "windows": []
+    },
+    {
+      "source_id": "S4",
+      "title": "TGME Project - Long-Lead Processing Plant & Equipment",
+      "url": "https://announcements.asx.com.au/asxpdf/20251209/pdf/06t3nhfpxt4631.pdf",
+      "published_at": "2025-12-09",
+      "authority_rank": 4,
+      "score": 14,
+      "fact": "With civil works advancing and world-class technology partners on board, we remain firmly on track for commissioning by end-2026.",
+      "windows": []
+    },
+    {
+      "source_id": "S5",
+      "title": "TGME Plant Build Progress - Earthworks & Civils on Track",
+      "url": "https://announcements.asx.com.au/asxpdf/20251127/pdf/06skz0jm10qb23.pdf",
+      "published_at": "2025-11-27",
+      "authority_rank": 4,
+      "score": 14,
+      "fact": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 27 November 2025 TGME Plant Build Progress – Earthworks and Civil Works on Track Concrete Retaining Walls: Bulk excavations finished with casting of structural bases being finalised — a major milestone in civil works.",
+      "windows": [
+        "November 2025"
+      ]
+    },
+    {
+      "source_id": "S3",
+      "title": "TGM enters into Non-Binding Funding Agreement for US$80M",
+      "url": "https://announcements.asx.com.au/asxpdf/20251216/pdf/06td0zczgjp32b.pdf",
+      "published_at": "2025-12-16",
+      "authority_rank": 4,
+      "score": 13,
+      "fact": "o Tranche 1: US$45 million, (~A$68 million) available at closing, subject to conditions o Tranche 2: Up to US$35 million, (~A$52 million) upon request by Theta Gold, after 3 months of closing and remaining available for 24 months, subject to conditions precedent and operational milestones.",
+      "windows": []
+    },
+    {
+      "source_id": "S4",
+      "title": "TGME Project - Long-Lead Processing Plant & Equipment",
+      "url": "https://announcements.asx.com.au/asxpdf/20251209/pdf/06t3nhfpxt4631.pdf",
+      "published_at": "2025-12-09",
+      "authority_rank": 4,
+      "score": 13,
+      "fact": "“Securing these critical long-lead items is a major milestone for TGME.",
+      "windows": []
+    },
+    {
+      "source_id": "S5",
+      "title": "TGME Plant Build Progress - Earthworks & Civils on Track",
+      "url": "https://announcements.asx.com.au/asxpdf/20251127/pdf/06skz0jm10qb23.pdf",
+      "published_at": "2025-11-27",
+      "authority_rank": 4,
+      "score": 13,
+      "fact": "TGME Gold Project remains firmly aligned with end-2026 commissioning timeline Theta Gold Mines Limited, (‘Theta Gold’ or ‘the Company’) (ASX:TGM) is pleased to report strong momentum on the TGME Gold Project, with bulk earthworks and civil engineering packages advancing on schedule and within budget.",
+      "windows": []
+    }
+  ],
+  "stage1_second_pass_fact_digest_v2": {
+    "schema": "fact_digest_v2",
+    "source_index": [
+      {
+        "source_id": "S1",
+        "title": "Revised Feasibility Study Confirms A$1.4B Free Cash Flow",
+        "url": "https://announcements.asx.com.au/asxpdf/20260203/pdf/06vx11tgf508sc.pdf",
+        "published_at": "2026-02-03",
+        "decoded": true
+      },
+      {
+        "source_id": "S2",
+        "title": "Quarterly Activities & Cashflow Report - 31 Dec'25",
+        "url": "https://announcements.asx.com.au/asxpdf/20260130/pdf/06vsg473kmdn8n.pdf",
+        "published_at": "2026-01-30",
+        "decoded": true
+      },
+      {
+        "source_id": "S3",
+        "title": "TGM enters into Non-Binding Funding Agreement for US$80M",
+        "url": "https://announcements.asx.com.au/asxpdf/20251216/pdf/06td0zczgjp32b.pdf",
+        "published_at": "2025-12-16",
+        "decoded": true
+      },
+      {
+        "source_id": "S4",
+        "title": "TGME Project - Long-Lead Processing Plant & Equipment",
+        "url": "https://announcements.asx.com.au/asxpdf/20251209/pdf/06t3nhfpxt4631.pdf",
+        "published_at": "2025-12-09",
+        "decoded": true
+      },
+      {
+        "source_id": "S5",
+        "title": "TGME Plant Build Progress - Earthworks & Civils on Track",
+        "url": "https://announcements.asx.com.au/asxpdf/20251127/pdf/06skz0jm10qb23.pdf",
+        "published_at": "2025-11-27",
+        "decoded": true
+      },
+      {
+        "source_id": "S6",
+        "title": "Plant Build - Ball Mills Secured, Construction Accelerates",
+        "url": "https://announcements.asx.com.au/asxpdf/20251104/pdf/06rh2nb316yqzb.pdf",
+        "published_at": "2025-11-04",
+        "decoded": true
+      },
+      {
+        "source_id": "S7",
+        "title": "Quarterly Activities & Cashflow Report - 30 Sept'25",
+        "url": "https://announcements.asx.com.au/asxpdf/20251031/pdf/06rc9kq3yjkgjm.pdf",
+        "published_at": "2025-10-31",
+        "decoded": true
+      },
+      {
+        "source_id": "S8",
+        "title": "Share Purchase Plan Opens - SPP Offer Document",
+        "url": "https://announcements.asx.com.au/asxpdf/20251024/pdf/06r0jk8p3m601q.pdf",
+        "published_at": "2025-10-24",
+        "decoded": true
+      },
+      {
+        "source_id": "S9",
+        "title": "Notice of Share Purchase Plan & Options Offer Prospectus",
+        "url": "https://announcements.asx.com.au/asxpdf/20251024/pdf/06r0jdlndtwdwd.pdf",
+        "published_at": "2025-10-24",
+        "decoded": true
+      },
+      {
+        "source_id": "S10",
+        "title": "10 June 2025 ASX ANNOUNCEMENT (ASX: TGM) TGM Receives US$35m Loan Facility Funding Agreement Theta Gold Min...",
+        "url": "https://announcements.asx.com.au/asxpdf/20250610/pdf/06kl3lp47wh2tp.pdf",
+        "published_at": "2025-06-10",
+        "decoded": true
+      }
+    ],
+    "sections": {
+      "timelines_deadlines": [
+        {
+          "source_id": "S2",
+          "published_at": "2026-01-30",
+          "fact": "With construction momentum accelerating across the Transvaal Gold Mining Estates (TGME) Gold Project, the Company enters 2026 with strengthened financial capacity, clear operational visibility, and a fully aligned development pathway toward first gold production.",
+          "windows": [],
+          "number_tokens": [
+            "2026"
+          ]
+        },
+        {
+          "source_id": "S3",
+          "published_at": "2025-12-16",
+          "fact": "o Tranche 1: US$45 million, (~A$68 million) available at closing, subject to conditions o Tranche 2: Up to US$35 million, (~A$52 million) upon request by Theta Gold, after 3 months of closing and remaining available for 24 months, subject to conditions precedent and operational milestones.",
+          "windows": [],
+          "number_tokens": [
+            "1",
+            "US$45 m",
+            "A$68 m",
+            "2"
+          ]
+        },
+        {
+          "source_id": "S4",
+          "published_at": "2025-12-09",
+          "fact": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 9 December 2025 TGME Gold Project – Long-Lead Processing Plant & Equipment Secured Major Procurement Milestone: Orders placed with Kemix (Pty) Ltd and MIP Industries (Pty) Ltd, leaders in South African metallurgical engineering.",
+          "windows": [
+            "December 2025"
+          ],
+          "number_tokens": [
+            "131",
+            "758",
+            "177",
+            "35,"
+          ]
+        },
+        {
+          "source_id": "S4",
+          "published_at": "2025-12-09",
+          "fact": "“Securing these critical long-lead items is a major milestone for TGME.",
+          "windows": [],
+          "number_tokens": []
+        },
+        {
+          "source_id": "S4",
+          "published_at": "2025-12-09",
+          "fact": "With civil works advancing and world-class technology partners on board, we remain firmly on track for commissioning by end-2026.",
+          "windows": [],
+          "number_tokens": [
+            "2026"
+          ]
+        },
+        {
+          "source_id": "S5",
+          "published_at": "2025-11-27",
+          "fact": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 27 November 2025 TGME Plant Build Progress – Earthworks and Civil Works on Track Concrete Retaining Walls: Bulk excavations finished with casting of structural bases being finalised — a major milestone in civil works.",
+          "windows": [
+            "November 2025"
+          ],
+          "number_tokens": [
+            "131",
+            "758",
+            "177",
+            "35,"
+          ]
+        }
+      ],
+      "financing_deals": [
+        {
+          "source_id": "S3",
+          "published_at": "2025-12-16",
+          "fact": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 16 December 2025 TGM has entered into Non-Binding Funding Agreement for US$80M (A$120M) Non-binding Senior Term Loan for US$80 million, (~A$120 million)1 subject to completion of due-diligence and execution of definitive documents, funding to be made available to Theta G...",
+          "windows": [
+            "December 2025"
+          ],
+          "number_tokens": [
+            "131",
+            "758",
+            "177",
+            "35,"
+          ]
+        },
+        {
+          "source_id": "S3",
+          "published_at": "2025-12-16",
+          "fact": "Coupon: 3-month Secured Overnight Financing Rate (SOFR, with a floor of 3.75%) plus 10% per Capitalisation of Interest and Moratorium on Repayments: 12 months interest capitalisation and 18-month moratorium on principal repayments, from funding Tranche 1.",
+          "windows": [],
+          "number_tokens": [
+            "3",
+            "3.75%",
+            "10%",
+            "12 m"
+          ]
+        },
+        {
+          "source_id": "S3",
+          "published_at": "2025-12-16",
+          "fact": "Funded to First Pour: Facility provides a full fund...",
+          "windows": [],
+          "number_tokens": []
+        },
+        {
+          "source_id": "S7",
+          "published_at": "2025-10-31",
+          "fact": "Capital Raise Secured: US$4 million1 (before costs) -Funds deployed to accelerate earthworks, water management systems, and site civils.",
+          "windows": [],
+          "number_tokens": [
+            "US$4 m",
+            "1"
+          ]
+        },
+        {
+          "source_id": "S7",
+          "published_at": "2025-10-31",
+          "fact": "Debt Funding Momentum: Debt syndication process with commercial co-lenders progressing to Post Quarter End Summary Update:",
+          "windows": [],
+          "number_tokens": []
+        },
+        {
+          "source_id": "S7",
+          "published_at": "2025-10-31",
+          "fact": "Secured A$60.72΄3 million, (US$39.9 million) in funding made up of equity and debt Share Purchase Plan (SPP) – opened on 24 October 2025 Figure 1: Site visit with the execution team and contractors August 2025 1 Ref to ASX Release dated 3 July 2025 titled, “TGM Approves TGM Gold Project Plus US$4 Million Placement” 2 Ref to ASX Release dated 7 October 2025 titled, “TGM secures total (A$51.4m) debt and equity to ad...",
+          "windows": [
+            "October 2025",
+            "August 2025",
+            "July 2025"
+          ],
+          "number_tokens": [
+            "A$60.72",
+            "3 m",
+            "US$39.9 m",
+            "24"
+          ]
+        }
+      ],
+      "project_economics": [
+        {
+          "source_id": "S1",
+          "published_at": "2026-02-03",
+          "fact": "This pricing strength has unlocked the ability to profitably mine lower-grade ore.",
+          "windows": [],
+          "number_tokens": []
+        },
+        {
+          "source_id": "S1",
+          "published_at": "2026-02-03",
+          "fact": "3 Ref to ASX Release dated 27 July 2022 titled, “Theta Gold’s TGME Project DFS confirms NPV of AUD432 Million”.",
+          "windows": [
+            "July 2022"
+          ],
+          "number_tokens": [
+            "3",
+            "27",
+            "2022",
+            "432 M"
+          ]
+        },
+        {
+          "source_id": "S1",
+          "published_at": "2026-02-03",
+          "fact": "Key Assumptions: Long term average spot gold price of US$2,884 applied in Base Case scenario over LOM / AISC estimation of US$1,181/oz at +/- 15%",
+          "windows": [],
+          "number_tokens": [
+            "US$2,884",
+            "US$1,181",
+            "15%"
+          ]
+        },
+        {
+          "source_id": "S1",
+          "published_at": "2026-02-03",
+          "fact": "5 o Capital payback period of 29 months; o Post-tax IRR of 77%; pre-tax IRR of 84% o Combined Underground Projects have an AISC of US$1,181/oz (A$1,787...",
+          "windows": [],
+          "number_tokens": [
+            "5",
+            "29 m",
+            "77%",
+            "84%"
+          ]
+        },
+        {
+          "source_id": "S2",
+          "published_at": "2026-01-30",
+          "fact": "In accordance with ASX Listing Rules 5.3.1 and 5.3.2, the Company provides the following summary of expenditures incurred during the Quarter: Mining exploration costs (including exploration labour) Mining Production and Development Costs US $ 7,150,000 US $ 98,000 US $ 7,248,000 The Company’s Quarterly Appendix 5B reported US$119,000 in payments to related parties and their The current capital structure of the Com...",
+          "windows": [],
+          "number_tokens": [
+            "5.3",
+            "1",
+            "2,",
+            "$ 7,150,000"
+          ]
+        },
+        {
+          "source_id": "S5",
+          "published_at": "2025-11-27",
+          "fact": "Gold Room Platform Underway: Excavation complete, with backfilling and base construction Smart Cost Savings: Leveraging existing infrastructure and in-house resources to deliver efficiency without compromise.",
+          "windows": [],
+          "number_tokens": []
+        }
+      ],
+      "market_share_structure": [
+        {
+          "source_id": "S9",
+          "published_at": "2025-10-24",
+          "fact": "The SPP Offer will allow Eligible Shareholders on the register as at Record Date of 6 October 2025 (with registered addresses in Australia, New Zealand, the United Kingdom, Singapore or Hong Kong) to participate in the Company’s capital raising activities, at $0.21 (21 cents) per share (SPP Shares) being the same price as that offered to sophisticated and professional investors who participated in a private placem...",
+          "windows": [
+            "October 2025"
+          ],
+          "number_tokens": [
+            "6",
+            "2025",
+            "$0.21",
+            "21"
+          ]
+        }
+      ],
+      "risks_constraints": [
+        {
+          "source_id": "S1",
+          "published_at": "2026-02-03",
+          "fact": "5 First gold produced timing will be subject to securing funding and obtaining all necessary regulatory permitting approvals.",
+          "windows": [],
+          "number_tokens": [
+            "5"
+          ]
+        }
+      ],
+      "other_material_facts": [
+        {
+          "source_id": "S1",
+          "published_at": "2026-02-03",
+          "fact": "The TGME Project’s post- tax value has surged to US$455 million—an impressive US$236 million uplift over the 2022 FS—driven largely by higher gold prices.",
+          "windows": [],
+          "number_tokens": [
+            "US$455 m",
+            "US$236 m",
+            "2022"
+          ]
+        },
+        {
+          "source_id": "S1",
+          "published_at": "2026-02-03",
+          "fact": "The project is gold price sensitive offering strong leverage as clearly demonstrated in tables 1 and 2 above.",
+          "windows": [],
+          "number_tokens": [
+            "1",
+            "2"
+          ]
+        },
+        {
+          "source_id": "S1",
+          "published_at": "2026-02-03",
+          "fact": "2 Exchange rate USD:AUD applied throughout this document is 0.6606.",
+          "windows": [],
+          "number_tokens": [
+            "2",
+            "0.6606"
+          ]
+        },
+        {
+          "source_id": "S1",
+          "published_at": "2026-02-03",
+          "fact": "6 Exchange rate USD:AUD applied throughout this document 0.6606.",
+          "windows": [],
+          "number_tokens": [
+            "6",
+            "0.6606"
+          ]
+        },
+        {
+          "source_id": "S1",
+          "published_at": "2026-02-03",
+          "fact": "7 Financial returns applying the ‘Base Case’ scenario statistics.",
+          "windows": [],
+          "number_tokens": [
+            "7"
+          ]
+        },
+        {
+          "source_id": "S2",
+          "published_at": "2026-01-30",
+          "fact": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 30 January 2026 1 October 2025 to 31 December 2025 Theta Gold Mines Limited (‘Theta Gold’ or the ‘Company’) (ASX: TGM) is pleased to report on its activities for the quarter ended 31 December 2025.",
+          "windows": [
+            "January 2026",
+            "October 2025",
+            "December 2025"
+          ],
+          "number_tokens": [
+            "131",
+            "758",
+            "177",
+            "35,"
+          ]
+        }
+      ]
+    },
+    "summary_bullets": [
+      "[S1] 2026-02-03: 5 First gold produced timing will be subject to securing funding and obtaining all necessary regulatory permitting approvals.",
+      "[S2] 2026-01-30: With construction momentum accelerating across the Transvaal Gold Mining Estates (TGME) Gold Project, the Company enters 2026 with strengthened financial capacity, clear operational visibility, and a fully aligned development pathway toward first gold production.",
+      "[S1] 2026-02-03: 3 Ref to ASX Release dated 27 July 2022 titled, “Theta Gold’s TGME Project DFS confirms NPV of AUD432 Million”.",
+      "[S1] 2026-02-03: Key Assumptions: Long term average spot gold price of US$2,884 applied in Base Case scenario over LOM / AISC estimation of US$1,181/oz at +/- 15%",
+      "[S1] 2026-02-03: 5 o Capital payback period of 29 months; o Post-tax IRR of 77%; pre-tax IRR of 84% o Combined Underground Projects have an AISC of US$1,181/oz (A$1,787...",
+      "[S3] 2025-12-16: Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 16 December 2025 TGM has entered into Non-Binding Funding Agreement for US$80M (A$120M) Non-binding Senior Term Loan for US$80 million, (~A$120 million)1 subject to completion of due-diligence and execution of definitive documents, funding to be made available to Theta G...",
+      "[S7] 2025-10-31: Capital Raise Secured: US$4 million1 (before costs) -Funds deployed to accelerate earthworks, water management systems, and site civils.",
+      "[S7] 2025-10-31: Secured A$60.72΄3 million, (US$39.9 million) in funding made up of equity and debt Share Purchase Plan (SPP) – opened on 24 October 2025 Figure 1: Site visit with the execution team and contractors August 2025 1 Ref to ASX Release dated 3 July 2025 titled, “TGM Approves TGM Gold Project Plus US$4 Million Placement” 2 Ref to ASX Release dated 7 October 2025 titled, “TGM secures total (A$51.4m) debt and equity to ad...",
+      "[S3] 2025-12-16: Funded to First Pour: Facility provides a full fund...",
+      "[S1] 2026-02-03: The TGME Project’s post- tax value has surged to US$455 million—an impressive US$236 million uplift over the 2022 FS—driven largely by higher gold prices.",
+      "[S1] 2026-02-03: The project is gold price sensitive offering strong leverage as clearly demonstrated in tables 1 and 2 above.",
+      "[S1] 2026-02-03: 2 Exchange rate USD:AUD applied throughout this document is 0.6606."
+    ],
+    "narrative_summary": "Timelines Deadlines: With construction momentum accelerating across the Transvaal Gold Mining Estates (TGME) Gold Project, the Company enters 2026 with strengthened financial capacity, clear operational visibility, and a fully aligned development pathway toward first gold production.; o Tranche 1: US$45 million, (~A$68 million) available at closing, subject to conditions o Tranche 2: Up to US$35 million, (~A$52 million) upon request by Theta Gold, after 3 months of closing and remaining available for 24 months, subject to conditions precedent and operational milestones. Project Economics: This pricing strength has unlocked the ability to profitably mine lower-grade ore.; 3 Ref to ASX Release dated 27 July 2022 titled, “Theta Gold’s TGME Project DFS confirms NPV of AUD432 Million”. Financing Deals: Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 16 December 2025 TGM has entered into Non-Binding Funding Agreement for US$80M (A$120M) Non-binding Senior Term Loan for US$80 million, (~A$120 million)1 subject to completion of due-diligence and execution of definitive documents, funding to be made available to Theta G...; Coupon: 3-month Secured Overnight Financing Rate (SOFR, with a floor of 3.75%) plus 10% per Capitalisation of Interest and Moratorium on Repayments: 12 months interest capitalisation and 18-month moratorium on principal repayments, from funding Tranche 1. Market Share Structure: The SPP Offer will allow Eligible Shareholders on the register as at Record Date of 6 October 2025 (with registered addresses in Australia, New Zealand, the United Kingdom, Singapore or Hong Kong) to participate in the Company’s capital raising activities, at $0.21 (21 cents) per share (SPP Shares) being the same price as that offered to sophisticated and professional investors who participated in a private placem... Risks Constraints: 5 First gold produced timing will be subject to securing funding and obtaining all necessary regulatory permitting approvals.",
+    "conflicts": [
+      {
+        "field": "timeline_window",
+        "values": [
+          {
+            "window": "December 2025",
+            "source_id": "S4",
+            "published_at": "2025-12-09"
+          },
+          {
+            "window": "November 2025",
+            "source_id": "S5",
+            "published_at": "2025-11-27"
+          }
+        ],
+        "canonical": {
+          "window": "December 2025",
+          "source_id": "S4",
+          "published_at": "2025-12-09"
+        },
+        "resolution_rule": "prefer newest dated primary-source timeline evidence"
+      }
+    ],
+    "counts": {
+      "source_count": 10,
+      "decoded_source_count": 10,
+      "total_facts": 26,
+      "sections_with_facts": 6,
+      "summary_bullets": 12,
+      "conflicts": 1
+    }
+  },
+  "stage1_second_pass_fact_pack": {
+    "schema": "rubric_fact_pack_v1",
+    "source_index": [
+      {
+        "source_id": "S1",
+        "title": "Revised Feasibility Study Confirms A$1.4B Free Cash Flow",
+        "url": "https://announcements.asx.com.au/asxpdf/20260203/pdf/06vx11tgf508sc.pdf",
+        "published_at": "2026-02-03",
+        "decoded": true
+      },
+      {
+        "source_id": "S2",
+        "title": "Quarterly Activities & Cashflow Report - 31 Dec'25",
+        "url": "https://announcements.asx.com.au/asxpdf/20260130/pdf/06vsg473kmdn8n.pdf",
+        "published_at": "2026-01-30",
+        "decoded": true
+      },
+      {
+        "source_id": "S3",
+        "title": "TGM enters into Non-Binding Funding Agreement for US$80M",
+        "url": "https://announcements.asx.com.au/asxpdf/20251216/pdf/06td0zczgjp32b.pdf",
+        "published_at": "2025-12-16",
+        "decoded": true
+      },
+      {
+        "source_id": "S4",
+        "title": "TGME Project - Long-Lead Processing Plant & Equipment",
+        "url": "https://announcements.asx.com.au/asxpdf/20251209/pdf/06t3nhfpxt4631.pdf",
+        "published_at": "2025-12-09",
+        "decoded": true
+      },
+      {
+        "source_id": "S5",
+        "title": "TGME Plant Build Progress - Earthworks & Civils on Track",
+        "url": "https://announcements.asx.com.au/asxpdf/20251127/pdf/06skz0jm10qb23.pdf",
+        "published_at": "2025-11-27",
+        "decoded": true
+      },
+      {
+        "source_id": "S6",
+        "title": "Plant Build - Ball Mills Secured, Construction Accelerates",
+        "url": "https://announcements.asx.com.au/asxpdf/20251104/pdf/06rh2nb316yqzb.pdf",
+        "published_at": "2025-11-04",
+        "decoded": true
+      },
+      {
+        "source_id": "S7",
+        "title": "Quarterly Activities & Cashflow Report - 30 Sept'25",
+        "url": "https://announcements.asx.com.au/asxpdf/20251031/pdf/06rc9kq3yjkgjm.pdf",
+        "published_at": "2025-10-31",
+        "decoded": true
+      },
+      {
+        "source_id": "S8",
+        "title": "Share Purchase Plan Opens - SPP Offer Document",
+        "url": "https://announcements.asx.com.au/asxpdf/20251024/pdf/06r0jk8p3m601q.pdf",
+        "published_at": "2025-10-24",
+        "decoded": true
+      },
+      {
+        "source_id": "S9",
+        "title": "Notice of Share Purchase Plan & Options Offer Prospectus",
+        "url": "https://announcements.asx.com.au/asxpdf/20251024/pdf/06r0jdlndtwdwd.pdf",
+        "published_at": "2025-10-24",
+        "decoded": true
+      },
+      {
+        "source_id": "S10",
+        "title": "10 June 2025 ASX ANNOUNCEMENT (ASX: TGM) TGM Receives US$35m Loan Facility Funding Agreement Theta Gold Min...",
+        "url": "https://announcements.asx.com.au/asxpdf/20250610/pdf/06kl3lp47wh2tp.pdf",
+        "published_at": "2025-06-10",
+        "decoded": true
+      }
+    ],
+    "sections": {
+      "market_data": [
+        {
+          "source_id": "S7",
+          "fact": "Debt Funding Momentum: Debt syndication process with commercial co-lenders progressing to Post Quarter End Summary Update:"
+        },
+        {
+          "source_id": "S7",
+          "fact": "Secured A$60.72΄3 million, (US$39.9 million) in funding made up of equity and debt Share Purchase Plan (SPP) – opened on 24 October 2025 Figure 1: Site visit with the execution team and contractors August 2025 1 Ref to ASX Release dated 3 July 2025 titled, “TGM Approves TGM Gold Project Plus US$4 Million Placement” 2 Ref to ASX Release dated 7 October 2025 titled, “TGM secures total (A$51.4m) debt and equity to ad..."
+        }
+      ],
+      "project_economics_npv_inputs": [
+        {
+          "source_id": "S1",
+          "fact": "The TGME Project’s post- tax value has surged to US$455 million—an impressive US$236 million uplift over the 2022 FS—driven largely by higher gold prices."
+        },
+        {
+          "source_id": "S1",
+          "fact": "Key Assumptions: Long term average spot gold price of US$2,884 applied in Base Case scenario over LOM / AISC estimation of US$1,181/oz at +/- 15%"
+        },
+        {
+          "source_id": "S1",
+          "fact": "5 o Capital payback period of 29 months; o Post-tax IRR of 77%; pre-tax IRR of 84% o Combined Underground Projects have an AISC of US$1,181/oz (A$1,787..."
+        },
+        {
+          "source_id": "S2",
+          "fact": "In accordance with ASX Listing Rules 5.3.1 and 5.3.2, the Company provides the following summary of expenditures incurred during the Quarter: Mining exploration costs (including exploration labour) Mining Production and Development Costs US $ 7,150,000 US $ 98,000 US $ 7,248,000 The Company’s Quarterly Appendix 5B reported US$119,000 in payments to related parties and their The current capital structure of the Com..."
+        }
+      ],
+      "resource_and_reserve": [
+        {
+          "source_id": "S1",
+          "fact": "This pricing strength has unlocked the ability to profitably mine lower-grade ore."
+        },
+        {
+          "source_id": "S4",
+          "fact": "For more information, please visit www.thetagoldmines.com or contact: T:..."
+        },
+        {
+          "source_id": "S5",
+          "fact": "Gold Room Platform Underway: Excavation complete, with backfilling and base construction Smart Cost Savings: Leveraging existing infrastructure and in-house resources to deliver efficiency without compromise."
+        },
+        {
+          "source_id": "S7",
+          "fact": "Capital Raise Secured: US$4 million1 (before costs) -Funds deployed to accelerate earthworks, water management systems, and site civils."
+        }
+      ],
+      "funding_and_balance_sheet": [
+        {
+          "source_id": "S3",
+          "fact": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 16 December 2025 TGM has entered into Non-Binding Funding Agreement for US$80M (A$120M) Non-binding Senior Term Loan for US$80 million, (~A$120 million)1 subject to completion of due-diligence and execution of definitive documents, funding to be made available to Theta G..."
+        },
+        {
+          "source_id": "S3",
+          "fact": "Coupon: 3-month Secured Overnight Financing Rate (SOFR, with a floor of 3.75%) plus 10% per Capitalisation of Interest and Moratorium on Repayments: 12 months interest capitalisation and 18-month moratorium on principal repayments, from funding Tranche 1."
+        },
+        {
+          "source_id": "S3",
+          "fact": "Funded to First Pour: Facility provides a full fund..."
+        },
+        {
+          "source_id": "S9",
+          "fact": "Subject to shareholder approval, the Company is making a separate offer under a Prospectus to shareholders who participate in the SPP Offer or the Placement of 1 free attaching option (Attaching Option) for every 2.38 shares subscribed for in the SPP Offer or Placement (rounded down to the nearest whole number) (Options..."
+        }
+      ],
+      "development_timeline_and_milestones": [
+        {
+          "source_id": "S1",
+          "fact": "3 Ref to ASX Release dated 27 July 2022 titled, “Theta Gold’s TGME Project DFS confirms NPV of AUD432 Million”."
+        },
+        {
+          "source_id": "S2",
+          "fact": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 30 January 2026 1 October 2025 to 31 December 2025 Theta Gold Mines Limited (‘Theta Gold’ or the ‘Company’) (ASX: TGM) is pleased to report on its activities for the quarter ended 31 December 2025."
+        },
+        {
+          "source_id": "S2",
+          "fact": "With construction momentum accelerating across the Transvaal Gold Mining Estates (TGME) Gold Project, the Company enters 2026 with strengthened financial capacity, clear operational visibility, and a fully aligned development pathway toward first gold production."
+        },
+        {
+          "source_id": "S3",
+          "fact": "o Tranche 1: US$45 million, (~A$68 million) available at closing, subject to conditions o Tranche 2: Up to US$35 million, (~A$52 million) upon request by Theta Gold, after 3 months of closing and remaining available for 24 months, subject to conditions precedent and operational milestones."
+        }
+      ],
+      "headwinds_and_risks": [
+        {
+          "source_id": "S1",
+          "fact": "5 First gold produced timing will be subject to securing funding and obtaining all necessary regulatory permitting approvals."
+        }
+      ],
+      "tailwinds_and_catalysts": [
+        {
+          "source_id": "S1",
+          "fact": "The project is gold price sensitive offering strong leverage as clearly demonstrated in tables 1 and 2 above."
+        }
+      ],
+      "management_and_governance": [
+        {
+          "source_id": "S4",
+          "fact": "This project is not just about gold – it’s about jobs, training, and creating lasting value for the region.” 2 This announcement was approved for release by Theta Gold Mines Limited’s Board."
+        }
+      ],
+      "other_material_facts": [
+        {
+          "source_id": "S1",
+          "fact": "2 Exchange rate USD:AUD applied throughout this document is 0.6606."
+        },
+        {
+          "source_id": "S1",
+          "fact": "6 Exchange rate USD:AUD applied throughout this document 0.6606."
+        },
+        {
+          "source_id": "S1",
+          "fact": "7 Financial returns applying the ‘Base Case’ scenario statistics."
+        },
+        {
+          "source_id": "S2",
+          "fact": "The December quarter marked a decisive step forward in transforming TGM into South Africa’s next emerging gold producer."
+        }
+      ]
+    },
+    "critical_gaps": [],
+    "counts": {
+      "source_count": 10,
+      "decoded_source_count": 10,
+      "total_facts": 25,
+      "sections_with_facts": 9
+    }
+  },
+  "stage1_second_pass_compact_fact_bundle": {
+    "schema": "compact_fact_bundle_v1",
+    "source_index": [
+      {
+        "source_id": "S1",
+        "title": "Revised Feasibility Study Confirms A$1.4B Free Cash Flow",
+        "url": "https://announcements.asx.com.au/asxpdf/20260203/pdf/06vx11tgf508sc.pdf",
+        "published_at": "2026-02-03"
+      },
+      {
+        "source_id": "S2",
+        "title": "Quarterly Activities & Cashflow Report - 31 Dec'25",
+        "url": "https://announcements.asx.com.au/asxpdf/20260130/pdf/06vsg473kmdn8n.pdf",
+        "published_at": "2026-01-30"
+      },
+      {
+        "source_id": "S3",
+        "title": "TGM enters into Non-Binding Funding Agreement for US$80M",
+        "url": "https://announcements.asx.com.au/asxpdf/20251216/pdf/06td0zczgjp32b.pdf",
+        "published_at": "2025-12-16"
+      },
+      {
+        "source_id": "S4",
+        "title": "TGME Project - Long-Lead Processing Plant & Equipment",
+        "url": "https://announcements.asx.com.au/asxpdf/20251209/pdf/06t3nhfpxt4631.pdf",
+        "published_at": "2025-12-09"
+      },
+      {
+        "source_id": "S5",
+        "title": "TGME Plant Build Progress - Earthworks & Civils on Track",
+        "url": "https://announcements.asx.com.au/asxpdf/20251127/pdf/06skz0jm10qb23.pdf",
+        "published_at": "2025-11-27"
+      },
+      {
+        "source_id": "S6",
+        "title": "Plant Build - Ball Mills Secured, Construction Accelerates",
+        "url": "https://announcements.asx.com.au/asxpdf/20251104/pdf/06rh2nb316yqzb.pdf",
+        "published_at": "2025-11-04"
+      },
+      {
+        "source_id": "S7",
+        "title": "Quarterly Activities & Cashflow Report - 30 Sept'25",
+        "url": "https://announcements.asx.com.au/asxpdf/20251031/pdf/06rc9kq3yjkgjm.pdf",
+        "published_at": "2025-10-31"
+      },
+      {
+        "source_id": "S8",
+        "title": "Share Purchase Plan Opens - SPP Offer Document",
+        "url": "https://announcements.asx.com.au/asxpdf/20251024/pdf/06r0jk8p3m601q.pdf",
+        "published_at": "2025-10-24"
+      },
+      {
+        "source_id": "S9",
+        "title": "Notice of Share Purchase Plan & Options Offer Prospectus",
+        "url": "https://announcements.asx.com.au/asxpdf/20251024/pdf/06r0jdlndtwdwd.pdf",
+        "published_at": "2025-10-24"
+      },
+      {
+        "source_id": "S10",
+        "title": "10 June 2025 ASX ANNOUNCEMENT (ASX: TGM) TGM Receives US$35m Loan Facility Funding Agreement Theta Gold Min...",
+        "url": "https://announcements.asx.com.au/asxpdf/20250610/pdf/06kl3lp47wh2tp.pdf",
+        "published_at": "2025-06-10"
+      }
+    ],
+    "categories": {
+      "timeline_milestones": [
+        {
+          "source_id": "S1",
+          "fact": "3 Ref to ASX Release dated 27 July 2022 titled, “Theta Gold’s TGME Project DFS confirms NPV of AUD432 Million”."
+        },
+        {
+          "source_id": "S2",
+          "fact": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 30 January 2026 1 October 2025 to 31 December 2025 Theta Gold Mines Limited (‘Theta Gold’ or the ‘Company’) (ASX: TGM) is pleased to report on its activities for the quarter ended 31 December 2025."
+        },
+        {
+          "source_id": "S2",
+          "fact": "With construction momentum accelerating across the Transvaal Gold Mining Estates (TGME) Gold Project, the Company enters 2026 with strengthened financial capacity, clear operational visibility, and a fully aligned development pathway toward first gold production."
+        },
+        {
+          "source_id": "S4",
+          "fact": "With civil works advancing and world-class technology partners on board, we remain firmly on track for commissioning by end-2026.",
+          "published_at": "2025-12-09"
+        },
+        {
+          "source_id": "S4",
+          "fact": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 9 December 2025 TGME Gold Project – Long-Lead Processing Plant & Equipment Secured Major Procurement Milestone: Orders placed with Kemix (Pty) Ltd and MIP Industries (Pty) Ltd, leaders in South African metallurgical engineering.",
+          "published_at": "2025-12-09"
+        }
+      ],
+      "project_economics_resource": [
+        {
+          "source_id": "S1",
+          "fact": "The TGME Project’s post- tax value has surged to US$455 million—an impressive US$236 million uplift over the 2022 FS—driven largely by higher gold prices."
+        },
+        {
+          "source_id": "S1",
+          "fact": "Key Assumptions: Long term average spot gold price of US$2,884 applied in Base Case scenario over LOM / AISC estimation of US$1,181/oz at +/- 15%"
+        },
+        {
+          "source_id": "S1",
+          "fact": "5 o Capital payback period of 29 months; o Post-tax IRR of 77%; pre-tax IRR of 84% o Combined Underground Projects have an AISC of US$1,181/oz (A$1,787..."
+        },
+        {
+          "source_id": "S2",
+          "fact": "In accordance with ASX Listing Rules 5.3.1 and 5.3.2, the Company provides the following summary of expenditures incurred during the Quarter: Mining exploration costs (including exploration labour) Mining Production and Development Costs US $ 7,150,000 US $ 98,000 US $ 7,248,000 The Company’s Quarterly Appendix 5B reported US$119,000 in payments to related parties and their The current capital structure of the Com..."
+        },
+        {
+          "source_id": "S1",
+          "fact": "This pricing strength has unlocked the ability to profitably mine lower-grade ore."
+        }
+      ],
+      "funding_and_balance_sheet": [
+        {
+          "source_id": "S3",
+          "fact": "Theta Gold Mines Limited ACN 131 758 177 Registered Office: Level 35, One International Towers, 100 Barangaroo Avenue Sydney, NSW 2000, Australia 16 December 2025 TGM has entered into Non-Binding Funding Agreement for US$80M (A$120M) Non-binding Senior Term Loan for US$80 million, (~A$120 million)1 subject to completion of due-diligence and execution of definitive documents, funding to be made available to Theta G..."
+        },
+        {
+          "source_id": "S3",
+          "fact": "Coupon: 3-month Secured Overnight Financing Rate (SOFR, with a floor of 3.75%) plus 10% per Capitalisation of Interest and Moratorium on Repayments: 12 months interest capitalisation and 18-month moratorium on principal repayments, from funding Tranche 1."
+        },
+        {
+          "source_id": "S3",
+          "fact": "Funded to First Pour: Facility provides a full fund..."
+        },
+        {
+          "source_id": "S9",
+          "fact": "Subject to shareholder approval, the Company is making a separate offer under a Prospectus to shareholders who participate in the SPP Offer or the Placement of 1 free attaching option (Attaching Option) for every 2.38 shares subscribed for in the SPP Offer or Placement (rounded down to the nearest whole number) (Options..."
+        },
+        {
+          "source_id": "S7",
+          "fact": "Capital Raise Secured: US$4 million1 (before costs) -Funds deployed to accelerate earthworks, water management systems, and site civils.",
+          "published_at": "2025-10-31"
+        }
+      ],
+      "market_share_structure": [
+        {
+          "source_id": "S7",
+          "fact": "Debt Funding Momentum: Debt syndication process with commercial co-lenders progressing to Post Quarter End Summary Update:"
+        },
+        {
+          "source_id": "S7",
+          "fact": "Secured A$60.72΄3 million, (US$39.9 million) in funding made up of equity and debt Share Purchase Plan (SPP) – opened on 24 October 2025 Figure 1: Site visit with the execution team and contractors August 2025 1 Ref to ASX Release dated 3 July 2025 titled, “TGM Approves TGM Gold Project Plus US$4 Million Placement” 2 Ref to ASX Release dated 7 October 2025 titled, “TGM secures total (A$51.4m) debt and equity to ad..."
+        },
+        {
+          "source_id": "S9",
+          "fact": "The SPP Offer will allow Eligible Shareholders on the register as at Record Date of 6 October 2025 (with registered addresses in Australia, New Zealand, the United Kingdom, Singapore or Hong Kong) to participate in the Company’s capital raising activities, at $0.21 (21 cents) per share (SPP Shares) being the same price as that offered to sophisticated and professional investors who participated in a private placem...",
+          "published_at": "2025-10-24"
+        }
+      ],
+      "risks_and_constraints": [
+        {
+          "source_id": "S1",
+          "fact": "5 First gold produced timing will be subject to securing funding and obtaining all necessary regulatory permitting approvals."
+        }
+      ],
+      "catalysts_and_tailwinds": [
+        {
+          "source_id": "S1",
+          "fact": "The project is gold price sensitive offering strong leverage as clearly demonstrated in tables 1 and 2 above."
+        }
+      ],
+      "management_and_governance": [
+        {
+          "source_id": "S4",
+          "fact": "This project is not just about gold – it’s about jobs, training, and creating lasting value for the region.” 2 This announcement was approved for release by Theta Gold Mines Limited’s Board."
+        }
+      ],
+      "other_material_facts": [
+        {
+          "source_id": "S1",
+          "fact": "2 Exchange rate USD:AUD applied throughout this document is 0.6606."
+        },
+        {
+          "source_id": "S1",
+          "fact": "6 Exchange rate USD:AUD applied throughout this document 0.6606."
+        },
+        {
+          "source_id": "S1",
+          "fact": "7 Financial returns applying the ‘Base Case’ scenario statistics."
+        },
+        {
+          "source_id": "S2",
+          "fact": "The December quarter marked a decisive step forward in transforming TGM into South Africa’s next emerging gold producer."
+        },
+        {
+          "source_id": "S1",
+          "fact": "The TGME Project’s post- tax value has surged to US$455 million—an impressive US$236 million uplift over the 2022 FS—driven largely by higher gold prices.",
+          "published_at": "2026-02-03"
+        }
+      ]
+    },
+    "critical_gaps": [],
+    "counts": {
+      "source_count": 10,
+      "decoded_source_count": 10,
+      "categories_with_facts": 8,
+      "total_facts": 26
+    }
+  }
+}

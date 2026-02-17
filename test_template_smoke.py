@@ -66,15 +66,8 @@ def _print_header(args: argparse.Namespace, selection: Dict[str, Any]) -> None:
         f"source={selection.get('selection_source')} "
         f"exchange_source={selection.get('exchange_selection_source')}"
     )
-    if args.council_models:
-        print(f"Stage 1 models override: {args.council_models}")
-    if args.stage2_models:
-        print(f"Stage 2 models override: {args.stage2_models}")
-    if args.chairman_model:
-        print(f"Chairman model override: {args.chairman_model}")
     print(f"Depth: {args.depth}")
-    print(f"Max sources: {args.max_sources}")
-    print(f"Decode max per model: {args.decode_max_per_model}")
+    print("Runtime config source: .env (no CLI overrides)")
     print("-" * 100)
 
 
@@ -161,20 +154,7 @@ def _print_stage3(stage3_result: Dict[str, Any]) -> None:
 
 
 async def _run(args: argparse.Namespace) -> None:
-    # Runtime overrides for this test run.
-    os.environ["PERPLEXITY_MAX_STEPS"] = str(args.max_steps)
-    os.environ["MAX_SOURCES"] = str(args.max_sources)
-    os.environ["PERPLEXITY_MAX_RESULTS_PER_QUERY"] = str(args.max_sources)
-    os.environ["SOURCE_DECODING_MAX_PER_MODEL"] = str(args.decode_max_per_model)
-    os.environ["PERPLEXITY_REASONING_EFFORT"] = args.reasoning_effort
-    if args.council_models:
-        os.environ["PERPLEXITY_COUNCIL_MODELS"] = args.council_models
-    if args.stage2_models:
-        os.environ["COUNCIL_MODELS"] = args.stage2_models
-    if args.chairman_model:
-        os.environ["CHAIRMAN_MODEL"] = args.chairman_model
-
-    # Import after env overrides so backend config picks up runtime settings.
+    # Import runtime config from .env (authoritative).
     from backend.council import (
         stage1_collect_perplexity_research_responses,
         stage2_collect_rankings,
@@ -227,6 +207,7 @@ async def _run(args: argparse.Namespace) -> None:
         attachment_context="",
         depth=args.depth,
         research_brief=stage1_research_brief,
+        template_id=selected_template_id,
     )
     _progress(f"Stage 1 done in {perf_counter() - stage1_start:.1f}s")
     _print_stage1(metadata)
@@ -273,6 +254,7 @@ async def _run(args: argparse.Namespace) -> None:
         company_name=selected_company_name,
         exchange=selected_exchange,
         chairman_model=chairman_model,
+        evidence_pack=search_results.get("evidence_pack", {}),
     )
     _progress(f"Stage 3 done in {perf_counter() - stage3_start:.1f}s")
     _print_stage3(stage3_result)
@@ -344,49 +326,6 @@ def _build_parser() -> argparse.ArgumentParser:
         default="deep",
         choices=["basic", "deep"],
         help="Research depth.",
-    )
-    parser.add_argument(
-        "--max-steps",
-        type=int,
-        default=4,
-        help="PERPLEXITY_MAX_STEPS override for this run.",
-    )
-    parser.add_argument(
-        "--max-sources",
-        type=int,
-        default=10,
-        help="MAX_SOURCES and PERPLEXITY_MAX_RESULTS_PER_QUERY override for this run.",
-    )
-    parser.add_argument(
-        "--decode-max-per-model",
-        type=int,
-        default=10,
-        help="SOURCE_DECODING_MAX_PER_MODEL override for this run.",
-    )
-    parser.add_argument(
-        "--reasoning-effort",
-        type=str,
-        default="low",
-        choices=["low", "medium", "high"],
-        help="PERPLEXITY_REASONING_EFFORT override for this run.",
-    )
-    parser.add_argument(
-        "--council-models",
-        type=str,
-        default=None,
-        help="PERPLEXITY_COUNCIL_MODELS override (comma-separated).",
-    )
-    parser.add_argument(
-        "--stage2-models",
-        type=str,
-        default=None,
-        help="COUNCIL_MODELS override for Stage 2 peer ranking (comma-separated).",
-    )
-    parser.add_argument(
-        "--chairman-model",
-        type=str,
-        default=None,
-        help="CHAIRMAN_MODEL override for Stage 3.",
     )
     parser.add_argument(
         "--dump-json",

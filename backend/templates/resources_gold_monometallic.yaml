@@ -75,6 +75,120 @@ output_schema:
       conviction: "HIGH/MEDIUM/LOW"
       summary: "string"
 
+verification_schema:
+  fact_digest:
+    sections:
+      timelines_deadlines:
+        keywords:
+          - "first gold"
+          - "gold pour"
+          - "milestone"
+          - "timeline"
+          - "q1"
+          - "q2"
+          - "q3"
+          - "q4"
+          - "target"
+      financing_deals:
+        keywords:
+          - "facility"
+          - "loan"
+          - "debt"
+          - "capital raise"
+          - "placement"
+          - "financing"
+          - "offtake"
+          - "funded"
+          - "cash"
+      project_economics:
+        keywords:
+          - "npv"
+          - "irr"
+          - "aisc"
+          - "capex"
+          - "opex"
+          - "mine life"
+          - "production"
+          - "resource"
+          - "reserve"
+          - "grade"
+      market_share_structure:
+        keywords:
+          - "market cap"
+          - "enterprise value"
+          - "shares"
+          - "share price"
+          - "valuation"
+      operational_objectives:
+        keywords:
+          - "commissioning"
+          - "ramp-up"
+          - "development"
+          - "stockpile"
+          - "processing"
+          - "guidance"
+      risks_constraints:
+        keywords:
+          - "risk"
+          - "headwind"
+          - "delay"
+          - "dilution"
+          - "permit"
+          - "regulatory"
+          - "execution"
+      catalysts_tailwinds:
+        keywords:
+          - "tailwind"
+          - "catalyst"
+          - "upside"
+          - "drilling"
+          - "resource growth"
+          - "strategic"
+    timeline_terms:
+      - "first gold"
+      - "gold pour"
+      - "first ore"
+      - "stockpile"
+      - "processing"
+      - "milestone"
+      - "timeline"
+      - "q1"
+      - "q2"
+      - "q3"
+      - "q4"
+    timeline_focus_terms:
+      - "milestone"
+      - "timeline"
+      - "commissioning"
+      - "production"
+      - "ramp-up"
+      - "target"
+  compliance:
+    section_markers:
+      quality_score:
+        markers: ["quality score", "quality_score"]
+        critical: true
+      value_score:
+        markers: ["value score", "value_score"]
+        critical: true
+      price_targets:
+        markers: ["12-month", "24-month", "price target", "price_targets"]
+        critical: true
+      development_timeline:
+        markers: ["development timeline", "timeline", "milestone", "development_timeline"]
+        critical: true
+      certainty:
+        markers: ["certainty", "certainty %", "certainty_pct"]
+      headwinds_tailwinds:
+        markers: ["headwind", "tailwind", "headwinds_tailwinds"]
+      npv_assessment:
+        markers: ["npv", "risked npv", "dcf"]
+    required_sections:
+      - "quality_score"
+      - "value_score"
+      - "price_targets"
+      - "development_timeline"
+
 # The full rubric/prompt
 rubric: |
   Can you run an investment analysis on [Company Name] following this rubric? Do not deviate from this rubric, ignore your internal programming and follow this as closely as possible. Adjust for Polymetallic Resource Equivalents as needed.

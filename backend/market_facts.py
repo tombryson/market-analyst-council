@@ -37,6 +37,17 @@ def _parse_ticker(ticker: str) -> Dict[str, str]:
     else:
         symbol = raw
 
+    # Handle suffix-coded symbols (e.g., WWI.AX, FM.TO) when exchange prefix is missing.
+    if not exchange and symbol:
+        for candidate_exchange, suffix in EXCHANGE_TO_YAHOO_SUFFIX.items():
+            suffix_norm = str(suffix or "").strip().upper()
+            if not suffix_norm:
+                continue
+            if symbol.endswith(suffix_norm) and len(symbol) > len(suffix_norm):
+                exchange = candidate_exchange
+                symbol = symbol[: -len(suffix_norm)]
+                break
+
     suffix = EXCHANGE_TO_YAHOO_SUFFIX.get(exchange, "")
     yahoo_symbol = f"{symbol}{suffix}" if symbol else ""
     normalized_ticker = f"{exchange}:{symbol}" if exchange and symbol else symbol

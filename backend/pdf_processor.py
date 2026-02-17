@@ -2,6 +2,9 @@
 
 import os
 import re
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -13,11 +16,17 @@ try:
 except ImportError as e:
     PYMUPDF_AVAILABLE = False
     PYMUPDF_IMPORT_ERROR = f"ImportError: {e}"
-    print(f"Warning: PyMuPDF unavailable ({PYMUPDF_IMPORT_ERROR}). PDF processing will fail.")
+    print(
+        "Warning: PyMuPDF unavailable "
+        f"({PYMUPDF_IMPORT_ERROR}). Falling back to pdftotext when available."
+    )
 except Exception as e:
     PYMUPDF_AVAILABLE = False
     PYMUPDF_IMPORT_ERROR = f"{type(e).__name__}: {e}"
-    print(f"Warning: PyMuPDF unavailable ({PYMUPDF_IMPORT_ERROR}). PDF processing will fail.")
+    print(
+        "Warning: PyMuPDF unavailable "
+        f"({PYMUPDF_IMPORT_ERROR}). Falling back to pdftotext when available."
+    )
 
 from .config import MAX_PDF_SIZE_MB, MAX_PDF_PAGES_FULL_TEXT, ATTACHMENTS_DIR
 from .openrouter import query_model
@@ -26,6 +35,105 @@ from .openrouter import query_model
 # Configuration constants
 CHUNK_SIZE_CHARS = 4000  # Characters per chunk for large documents
 MIN_CHUNK_OVERLAP = 200  # Character overlap between chunks
+PDFTOTEXT_BIN = shutil.which("pdftotext")
+PDFINFO_BIN = shutil.which("pdfinfo")
+
+
+def _extract_text_with_pdftotext(file_path: str) -> Dict[str, Any]:
+    """
+    Fallback extractor using poppler's pdftotext when PyMuPDF is unavailable.
+
+    Returns same shape as extract_text_from_pdf.
+    """
+    if not PDFTOTEXT_BIN:
+        return {
+            "text": "",
+            "page_count": 0,
+            "metadata": {},
+            "extraction_method": "none",
+            "error": "pdftotext not installed",
+        }
+
+    out_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as tmp:
+            out_path = tmp.name
+
+        proc = subprocess.run(
+            [PDFTOTEXT_BIN, "-layout", "-enc", "UTF-8", file_path, out_path],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        if proc.returncode != 0:
+            err = (proc.stderr or proc.stdout or "").strip()
+            return {
+                "text": "",
+                "page_count": 0,
+                "metadata": {},
+                "extraction_method": "none",
+                "error": f"pdftotext failed (code {proc.returncode}): {err[:400]}",
+            }
+
+        try:
+            with open(out_path, "r", encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except Exception as exc:
+            return {
+                "text": "",
+                "page_count": 0,
+                "metadata": {},
+                "extraction_method": "none",
+                "error": f"pdftotext output read failed: {exc}",
+            }
+
+        if not str(text or "").strip():
+            return {
+                "text": "",
+                "page_count": 0,
+                "metadata": {},
+                "extraction_method": "none",
+                "error": "pdftotext extracted empty text",
+            }
+
+        page_count = 0
+        if PDFINFO_BIN:
+            try:
+                info_proc = subprocess.run(
+                    [PDFINFO_BIN, file_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=False,
+                )
+                info_text = f"{info_proc.stdout}\n{info_proc.stderr}"
+                match = re.search(r"^Pages:\s*(\d+)\s*$", info_text, flags=re.MULTILINE)
+                if match:
+                    page_count = int(match.group(1))
+            except Exception:
+                page_count = 0
+
+        return {
+            "text": text,
+            "page_count": page_count,
+            "metadata": {},
+            "extraction_method": "pdftotext",
+        }
+    except Exception as exc:
+        return {
+            "text": "",
+            "page_count": 0,
+            "metadata": {},
+            "extraction_method": "none",
+            "error": f"pdftotext fallback failed: {exc}",
+        }
+    finally:
+        if out_path and os.path.exists(out_path):
+            try:
+                os.remove(out_path)
+            except Exception:
+                pass
 
 
 async def extract_text_from_pdf(file_path: str) -> Dict[str, Any]:
@@ -44,12 +152,19 @@ async def extract_text_from_pdf(file_path: str) -> Dict[str, Any]:
         - 'error': Error message if extraction failed
     """
     if not PYMUPDF_AVAILABLE:
+        fallback = _extract_text_with_pdftotext(file_path)
+        if not fallback.get("error"):
+            return fallback
         return {
             "text": "",
             "page_count": 0,
             "metadata": {},
             "extraction_method": "none",
-            "error": f"PyMuPDF unavailable: {PYMUPDF_IMPORT_ERROR or 'unknown import error'}"
+            "error": (
+                "PyMuPDF unavailable: "
+                f"{PYMUPDF_IMPORT_ERROR or 'unknown import error'}; "
+                f"pdftotext fallback failed: {fallback.get('error', 'unknown')}"
+            ),
         }
 
     try:
@@ -81,12 +196,15 @@ async def extract_text_from_pdf(file_path: str) -> Dict[str, Any]:
         }
 
     except Exception as e:
+        fallback = _extract_text_with_pdftotext(file_path)
+        if not fallback.get("error"):
+            return fallback
         return {
             "text": "",
             "page_count": 0,
             "metadata": {},
             "extraction_method": "none",
-            "error": f"PDF extraction failed: {str(e)}"
+            "error": f"PDF extraction failed: {str(e)}; pdftotext fallback failed: {fallback.get('error', 'unknown')}"
         }
 
 

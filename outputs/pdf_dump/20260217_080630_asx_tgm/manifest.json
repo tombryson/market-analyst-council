@@ -1,0 +1,62 @@
+{
+  "query": "ASX:Theta Gold Mines Limited latest announcements, investor presentations and quarterly reports",
+  "ticker": "ASX:TGM",
+  "depth": "deep",
+  "lookback_days": 365,
+  "generated_at_utc": "2026-02-17T08:06:33.738747+00:00",
+  "allowed_domains": [
+    "asx.com.au",
+    "marketindex.com.au",
+    "intelligentinvestor.com.au"
+  ],
+  "retrieved_sources": 40,
+  "candidate_sources_in_window": 6,
+  "selected_pdf_candidates": 4,
+  "written_files": [
+    {
+      "index": 1,
+      "file": "outputs/pdf_dump/20260217_080630_asx_tgm/01_2026-02-16_theta_gold_mines_limited_asx_tgm_announcements.md",
+      "title": "Theta Gold Mines Limited (ASX:TGM) - Announcements",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260216/pdf/03056918.pdf",
+      "published_at": "2026-02-16",
+      "score": 6.3500000000000005,
+      "decoded_chars": 5394,
+      "page_count": 0
+    },
+    {
+      "index": 2,
+      "file": "outputs/pdf_dump/20260217_080630_asx_tgm/02_2025-10-24_trigg_minerals_limited_asx_tmg_announcements.md",
+      "title": "Trigg Minerals Limited (ASX:TMG) - Announcements",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tmg/trigg-minerals-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20251210/pdf/03035431.pdf",
+      "published_at": "2025-10-24",
+      "score": 3.7500000000000004,
+      "decoded_chars": 28724,
+      "page_count": 0
+    },
+    {
+      "index": 3,
+      "file": "outputs/pdf_dump/20260217_080630_asx_tgm/03_2025-10-07_asx_announcement_pdf_2025_10_07.md",
+      "title": "ASX announcement PDF (2025-10-07)",
+      "source_url": "https://announcements.asx.com.au/asxpdf/20251007/pdf/06q716kbl7m10v.pdf",
+      "pdf_url": "https://announcements.asx.com.au/asxpdf/20251007/pdf/06q716kbl7m10v.pdf",
+      "published_at": "2025-10-07",
+      "score": 12.55,
+      "decoded_chars": 27406,
+      "page_count": 0
+    },
+    {
+      "index": 4,
+      "file": "outputs/pdf_dump/20260217_080630_asx_tgm/04_2025-04-30_1.md",
+      "title": "1",
+      "source_url": "https://data-api.marketindex.com.au/api/v1/announcements/XASX:TGM:6A1262749/pdf/inline/6A1262749.pdf",
+      "pdf_url": "https://data-api.marketindex.com.au/api/v1/announcements/XASX:TGM:6A1262749/pdf/inline/6A1262749.pdf",
+      "published_at": "2025-04-30",
+      "score": 5.8500000000000005,
+      "decoded_chars": 46786,
+      "page_count": 0
+    }
+  ],
+  "failed_files": []
+}

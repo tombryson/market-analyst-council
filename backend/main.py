@@ -18,6 +18,7 @@ from .council import (
     stage2_collect_rankings,
     stage3_synthesize_final,
     calculate_aggregate_rankings,
+    _is_openrouter_compatible_model,
 )
 from .search import (
     perform_search,
@@ -34,6 +35,8 @@ from .config import (
     CHAIRMAN_MODEL,
     ENABLE_MARKET_FACTS_PREPASS,
     PROGRESS_LOGGING,
+    SYSTEM_ENABLED,
+    SYSTEM_SHUTDOWN_REASON,
 )
 from .research import ResearchService, format_evidence_pack_for_prompt
 from .market_facts import (
@@ -41,9 +44,22 @@ from .market_facts import (
     format_market_facts_query_prefix,
     prepend_market_facts_to_query,
 )
+from .company_type_detector import detect_company_type_via_api
 
 app = FastAPI(title="LLM Council API")
 research_service = ResearchService()
+
+
+def _ensure_system_enabled() -> None:
+    """Block runtime execution while global shutdown is active."""
+    if SYSTEM_ENABLED:
+        return
+    raise HTTPException(
+        status_code=503,
+        detail=(
+            f"System disabled: {SYSTEM_SHUTDOWN_REASON or 'maintenance mode active'}"
+        ),
+    )
 
 # Enable CORS for local development
 app.add_middleware(
@@ -65,6 +81,14 @@ class SendMessageRequest(BaseModel):
     content: str
 
 
+class CompanyTypeDetectRequest(BaseModel):
+    """Request payload for company-type detection prepass."""
+    content: str = ""
+    ticker: Optional[str] = None
+    company_name: Optional[str] = None
+    exchange: Optional[str] = None
+
+
 class ConversationMetadata(BaseModel):
     """Conversation metadata for list view."""
     id: str
@@ -84,7 +108,12 @@ class Conversation(BaseModel):
 @app.get("/")
 async def root():
     """Health check endpoint."""
-    return {"status": "ok", "service": "LLM Council API"}
+    return {
+        "status": "ok",
+        "service": "LLM Council API",
+        "system_enabled": bool(SYSTEM_ENABLED),
+        "shutdown_reason": SYSTEM_SHUTDOWN_REASON if not SYSTEM_ENABLED else "",
+    }
 
 
 @app.get("/api/templates")
@@ -108,6 +137,20 @@ async def list_exchanges():
     return list_available_exchanges()
 
 
+@app.post("/api/company-types/detect")
+async def detect_company_type(request: CompanyTypeDetectRequest):
+    """
+    Lightweight API-assisted company-type detection for template routing.
+    """
+    result = await detect_company_type_via_api(
+        user_query=request.content,
+        ticker=request.ticker,
+        company_name=request.company_name,
+        exchange=request.exchange,
+    )
+    return result
+
+
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
 async def list_conversations():
     """List all conversations (metadata only)."""
@@ -117,6 +160,7 @@ async def list_conversations():
 @app.post("/api/conversations", response_model=Conversation)
 async def create_conversation(request: CreateConversationRequest):
     """Create a new conversation."""
+    _ensure_system_enabled()
     conversation_id = str(uuid.uuid4())
     conversation = storage.create_conversation(conversation_id)
     return conversation
@@ -137,6 +181,7 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
     Send a message and run the 3-stage council process.
     Returns the complete response with all stages.
     """
+    _ensure_system_enabled()
     # Check if conversation exists
     conversation = storage.get_conversation(conversation_id)
     if conversation is None:
@@ -193,6 +238,7 @@ async def send_message_stream(
     Supports optional PDF attachments and internet search.
     Returns Server-Sent Events as each stage completes.
     """
+    _ensure_system_enabled()
     # Check if conversation exists
     conversation = storage.get_conversation(conversation_id)
     if conversation is None:
@@ -258,18 +304,42 @@ async def send_message_stream(
 
             from .template_loader import get_template_loader, resolve_template_selection
             loader = get_template_loader()
+            auto_company_name = loader.infer_company_name(content, ticker=search_ticker)
+            auto_detected_company_type = None
+            company_type_detection: Dict[str, Any] = {}
+            if not company_type:
+                yield f"data: {json.dumps({'type': 'company_type_detection_start'})}\n\n"
+                company_type_detection = await detect_company_type_via_api(
+                    user_query=content,
+                    ticker=search_ticker,
+                    company_name=auto_company_name,
+                    exchange=exchange,
+                )
+                auto_detected_company_type = str(
+                    company_type_detection.get("selected_company_type") or ""
+                ).strip()
+                yield (
+                    "data: "
+                    f"{json.dumps({'type': 'company_type_detection_complete', 'data': company_type_detection})}\n\n"
+                )
+
             template_selection = resolve_template_selection(
                 user_query=content,
                 ticker=search_ticker,
                 explicit_template_id=template_id,
-                company_type=company_type,
+                company_type=(company_type or auto_detected_company_type or None),
                 exchange=exchange,
             )
+            if company_type_detection:
+                template_selection["company_type_detection"] = company_type_detection
             selected_template_id = template_selection["template_id"]
             selected_company_type = template_selection.get("company_type")
             selected_company_name = template_selection.get("company_name")
             selected_exchange = template_selection.get("exchange")
             template_selection_source = template_selection.get("selection_source", "auto")
+            if auto_detected_company_type and not company_type:
+                template_selection_source = "api_company_type_detected"
+                template_selection["selection_source"] = template_selection_source
             exchange_selection_source = template_selection.get("exchange_selection_source", "auto_exchange")
             use_structured_analysis = loader.is_structured_template(selected_template_id)
             template_data = loader.get_template(selected_template_id) or {}
@@ -425,12 +495,23 @@ async def send_message_stream(
                     attachment_context=attachment_context,
                     depth=selected_research_depth,
                     research_brief=stage1_effective_research_brief,
+                    template_id=selected_template_id,
                 )
                 stage2_ranking_models = [
                     item.get("model")
                     for item in stage1_results
-                    if item.get("model")
+                    if item.get("model") and _is_openrouter_compatible_model(item.get("model"))
                 ]
+                excluded_stage2_models = [
+                    item.get("model")
+                    for item in stage1_results
+                    if item.get("model") and not _is_openrouter_compatible_model(item.get("model"))
+                ]
+                if excluded_stage2_models and PROGRESS_LOGGING:
+                    print(
+                        "Stage2 judge-model filter excluded non-OpenRouter models: "
+                        f"{excluded_stage2_models}"
+                    )
                 if stage2_ranking_models:
                     stage3_chairman_model = (
                         CHAIRMAN_MODEL
@@ -441,6 +522,10 @@ async def send_message_stream(
                     stage3_chairman_model = CHAIRMAN_MODEL
 
                 search_results = emulated_metadata.get("aggregated_search_results", {})
+                if excluded_stage2_models:
+                    search_meta = search_results.setdefault("metadata", {})
+                    if isinstance(search_meta, dict):
+                        search_meta["stage2_excluded_non_openrouter_models"] = excluded_stage2_models
                 evidence_pack = search_results.get("evidence_pack")
                 if evidence_pack:
                     yield f"data: {json.dumps({'type': 'evidence_complete', 'data': evidence_pack})}\n\n"
@@ -495,6 +580,7 @@ async def send_message_stream(
                 exchange=selected_exchange,
                 chairman_model=stage3_chairman_model,
                 market_facts=market_facts,
+                evidence_pack=(search_results or {}).get("evidence_pack"),
             )
             yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
@@ -634,7 +720,13 @@ def build_template_context_for_prompt(
 def normalize_council_mode(mode: Optional[str]) -> str:
     """Normalize council mode aliases to supported values."""
     normalized = (mode or "local").strip().lower()
-    if normalized in {"perplexity", "perplexity_emulated", "perplexity_council_emulated"}:
+    if normalized in {
+        "perplexity",
+        "perplexity_emulated",
+        "perplexity_council_emulated",
+        "hybrid_mixed",
+        "perplexity_mixed",
+    }:
         return "perplexity_emulated"
     return "local"
 
