@@ -1,0 +1,176 @@
+{
+  "analysis_type": "resources",
+  "ticker": "ASX:AUC",
+  "company_name": "Ausgold Limited",
+  "analysis_date": "2026-02-18",
+  "current_development_stage": "Definitive Feasibility Study (DFS) complete; advancing approvals/financing toward FID (development-ready, not yet in construction).",
+  "certainty_pct_24m": 65.0,
+  "market_data": {
+    "current_price": 1.0099999904632568,
+    "market_cap_aud_m": 553.3383331852024,
+    "shares_outstanding_m": 547.859741,
+    "enterprise_value_aud_m": 523.3383331852024,
+    "cash_aud_m": 30.0,
+    "debt_aud_m": 0.0
+  },
+  "projects": [
+    {
+      "project_name": "Katanning Gold Project (KGP), Western Australia (100%)",
+      "stage": "DFS",
+      "stage_multiplier": 0.4,
+      "npv_model": {
+        "inputs": {
+          "resource_tonnes_mt": {
+            "value_used": 37.0,
+            "source_url": "https://api.investi.com.au/api/announcements/auc/fe121bfd-e09.pdf",
+            "document_date": "2025-12-16",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "Back-solved to be internally consistent with Updated DFS life-of-mine gold production (~1.22Moz) using assumed recovery (0.90) and average reserve grade (1.14 g/t) as typical for KGP DFS-era parameters."
+          },
+          "grade_gpt": {
+            "value_used": 1.14,
+            "source_url": "https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf",
+            "document_date": "2025-06-30",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "DFS announcement referenced; exact reserve grade not visible in evidence snippet, so set to a DFS-consistent WA open-pit grade and aligned to recovered ounces implied by Updated DFS production."
+          },
+          "recovery_fraction": {
+            "value_used": 0.9,
+            "source_url": "https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf",
+            "document_date": "2025-06-30",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "Metallurgical recovery not provided in extracted text; 90% is a common DFS-level assumption for WA CIL/gravity circuits and used by council consensus."
+          },
+          "mine_life_years": {
+            "value_used": 11,
+            "source_url": "https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf",
+            "document_date": "2025-06-30",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "Mine life not visible in extracted text; 11 years matches council’s DFS-based modeling and is consistent with ~1.22Moz LOM production at ~100–120kozpa scale."
+          },
+          "aisc_aud_per_oz": {
+            "value_used": 1747.0,
+            "source_url": "https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf",
+            "document_date": "2025-06-30",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "AISC not present in the evidence snippet; council used ~A$1,747/oz for DFS LOM. Note: a later quarterly references AISC in USD (see dissenting views), creating uncertainty on the correct reporting currency."
+          },
+          "capex_aud_m_initial": {
+            "value_used": 296.0,
+            "source_url": "https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf",
+            "document_date": "2025-06-30",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "Initial capex for the original DFS not visible in extracted text; set to council consensus (A$296m) for DFS-era pre-production capex. Updated DFS indicates larger total funding requirement (see funding headwind)."
+          },
+          "discount_rate": {
+            "value_used": 0.05,
+            "source_url": "rubric",
+            "document_date": "2026-02-18",
+            "estimate_tag": null,
+            "estimate_justification": null
+          },
+          "current_gold_price_aud_per_oz": {
+            "value_used": 4100.0,
+            "source_url": null,
+            "document_date": "2026-02-18",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "Spot AUD gold price not provided in the evidence pack; assumed A$4,100/oz to reflect a high AUD gold environment consistent with council modeling. Replace with a primary price source for production use."
+          },
+          "royalty_rate_fraction": {
+            "value_used": 0.05,
+            "source_url": "rubric default",
+            "document_date": "2026-02-18",
+            "estimate_tag": null,
+            "estimate_justification": null
+          },
+          "tax_rate_fraction": {
+            "value_used": 0.3,
+            "source_url": "rubric default (Australia)",
+            "document_date": "2026-02-18",
+            "estimate_tag": null,
+            "estimate_justification": null
+          },
+          "sustaining_capex_aud_m_per_year": {
+            "value_used": 10.0,
+            "source_url": "https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf",
+            "document_date": "2025-06-30",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "Sustaining capex not visible in extracted text; assumed A$10m/yr (low sustaining) consistent with council’s DFS-based model and within rubric norms."
+          },
+          "working_capital_pct_revenue": {
+            "value_used": 0.05,
+            "source_url": "rubric",
+            "document_date": "2026-02-18",
+            "estimate_tag": null,
+            "estimate_justification": null
+          },
+          "ramp_up_years": {
+            "value_used": 1,
+            "source_url": "rubric",
+            "document_date": "2026-02-18",
+            "estimate_tag": null,
+            "estimate_justification": null
+          }
+        },
+        "derived_operating_metrics": {
+          "recovered_ounces_moz": {
+            "value_used": 1.2199,
+            "source_url": "Derived from inputs above",
+            "document_date": "2026-02-18",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "Calculated via rubric formula using (37.0Mt, 1.14 g/t, 0.90 recovery)."
+          },
+          "full_annual_production_koz": {
+            "value_used": 110.9,
+            "source_url": "Derived from recovered ounces and mine life",
+            "document_date": "2026-02-18",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "Recovered ounces divided by 11-year mine life."
+          },
+          "effective_annual_production_koz": {
+            "value_used": 105.8,
+            "source_url": "Derived from ramp-up assumption",
+            "document_date": "2026-02-18",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "Ramp-up factor (0.5 in Year 1; full thereafter) implies average factor (0.5+10)/11=0.9545."
+          },
+          "annual_revenue_aud_m": {
+            "value_used": 433.8,
+            "source_url": "Derived from effective production and gold price",
+            "document_date": "2026-02-18",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "Effective production × A$4,100/oz."
+          },
+          "annual_royalty_aud_m": {
+            "value_used": 21.7,
+            "source_url": "Derived (5% of revenue)",
+            "document_date": "2026-02-18",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "5% royalty per rubric."
+          },
+          "annual_aisc_costs_aud_m": {
+            "value_used": 184.8,
+            "source_url": "Derived from AISC and effective production",
+            "document_date": "2026-02-18",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "AISC × effective production."
+          },
+          "annual_margin_before_sustaining_aud_m": {
+            "value_used": 227.3,
+            "source_url": "Derived",
+            "document_date": "2026-02-18",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "Revenue - royalty - AISC costs."
+          }
+        },
+        "dcf_timeline_and_npv": {
+          "depreciation_aud_m_per_year": {
+            "value_used": 26.9,
+            "source_url": "Derived (capex/mine life)",
+            "document_date": "2026-02-18",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "A$296m / 11 years."
+          },
+          "year0_cashflow_aud_m": {
+            "value_used": -317.7,
+            "source_url": "Derived (capex + working capital

@@ -4,7 +4,7 @@ Uses detailed rubrics for resources and pharma sectors.
 """
 
 import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 
 
@@ -432,6 +432,341 @@ def _deterministic_finance_prompt_block(evidence_pack: Optional[Dict[str, Any]])
     return "\n".join(blocks)
 
 
+def _extract_user_question_from_enhanced_context(enhanced_context: str) -> str:
+    """Extract the original user question line to avoid duplicating large context in Stage 3."""
+    text = str(enhanced_context or "").strip()
+    if not text:
+        return ""
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.lower().startswith("user question:"):
+            return stripped[len("user question:"):].strip()
+    # Fallback: first paragraph only.
+    return text.split("\n\n", 1)[0].strip()
+
+
+def _parse_json_from_text(raw_text: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """Parse JSON from direct text, fenced block, or embedded object."""
+    text = str(raw_text or "").strip()
+    if not text:
+        return None, "Empty response"
+
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return parsed, None
+        return None, "Parsed JSON is not an object"
+    except json.JSONDecodeError as direct_error:
+        import re
+
+        fenced = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
+        if fenced:
+            try:
+                parsed = json.loads(fenced.group(1))
+                if isinstance(parsed, dict):
+                    return parsed, None
+                return None, "Fenced JSON parsed but is not an object"
+            except json.JSONDecodeError as fenced_error:
+                return None, f"Failed to parse fenced JSON: {fenced_error}"
+
+        embedded = re.search(r"\{.*\}", text, re.DOTALL)
+        if embedded:
+            try:
+                parsed = json.loads(embedded.group(0))
+                if isinstance(parsed, dict):
+                    return parsed, None
+                return None, "Embedded JSON parsed but is not an object"
+            except json.JSONDecodeError as embedded_error:
+                return None, f"Failed to parse embedded JSON: {embedded_error}"
+
+        return None, f"No JSON found in response: {direct_error}"
+
+
+def _build_chairman_xml_prompt(
+    *,
+    original_user_question: str,
+    weighted_responses: str,
+    rankings_summary: str,
+    rubric: str,
+) -> str:
+    """Prompt chairman for structured plain text (XML-like tags), not JSON."""
+    return f"""You are the Chairman of an LLM Investment Council. Multiple AI models have analyzed a company and peer-ranked each other.
+
+ORIGINAL USER QUESTION:
+{original_user_question}
+
+{weighted_responses}
+
+PEER RANKINGS SUMMARY:
+{rankings_summary}
+
+YOUR TASK AS CHAIRMAN:
+Synthesize a single neutral, decision-useful analysis using the rubric below and the council evidence only.
+Do not run new retrieval. Do not add unrelated facts.
+
+RUBRIC TO HONOR:
+{rubric}
+
+OUTPUT FORMAT:
+Return plain text only using the following XML tags exactly once each:
+<executive_summary>...</executive_summary>
+<quality_and_value_scoring>...</quality_and_value_scoring>
+<price_targets_and_scenarios>...</price_targets_and_scenarios>
+<development_timeline>...</development_timeline>
+<headwinds_tailwinds>...</headwinds_tailwinds>
+<dissenting_views>...</dissenting_views>
+<investment_verdict>...</investment_verdict>
+<data_gaps_and_assumptions>...</data_gaps_and_assumptions>
+
+Inside <investment_verdict>, include:
+- top 3 reasons for success (bull case)
+- top 3 failure conditions (bear case)
+
+Do NOT output JSON in this step. Output only the tagged plain text."""
+
+
+def _build_jsonifier_prompt(
+    *,
+    schema_json: str,
+    chairman_text: str,
+    company_name: str,
+) -> str:
+    """Prompt secondary model to convert chairman XML/plain text into strict JSON."""
+    return f"""You are a strict JSON normalizer for investment analysis.
+Convert the chairman's tagged plain-text analysis into a single valid JSON object.
+
+Target company: {company_name}
+
+Target JSON schema shape:
+{schema_json}
+
+Rules:
+1. Output ONLY a single valid JSON object, no markdown.
+2. Preserve facts and numbers from the input; do not invent new numeric values.
+3. If a field is unavailable, use null, empty string, or [] as appropriate.
+4. Keep dissent and uncertainty when present.
+5. Map content from XML sections into the most relevant schema fields.
+6. Map scenario drivers from <price_targets_and_scenarios> into:
+   price_targets.scenario_drivers.12m.base|bull|bear
+   price_targets.scenario_drivers.24m.base|bull|bear
+   using concise arrays of driver strings.
+7. Map numeric scenario targets from <price_targets_and_scenarios> into:
+   price_targets.scenario_targets.12m.base|bull|bear
+   price_targets.scenario_targets.24m.base|bull|bear
+   and populate price_targets.target_12m/target_24m from 12m.base and 24m.base.
+
+Chairman input:
+{chairman_text}
+"""
+
+
+def _extract_price_target_scenario_drivers(
+    chairman_text: str,
+) -> Dict[str, Dict[str, List[str]]]:
+    """Extract 12m/24m base-bull-bear driver bullets from chairman XML text."""
+    import re
+
+    def _clean_text(value: str) -> str:
+        text = str(value or "").strip()
+        text = re.sub(r"[*_`]+", "", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text
+
+    def _split_drivers(raw: str) -> List[str]:
+        cleaned = _clean_text(raw)
+        if not cleaned:
+            return []
+        parts = [p.strip(" .") for p in cleaned.split(";")]
+        parts = [p for p in parts if p]
+        if not parts:
+            return [cleaned]
+        return parts[:5]
+
+    out: Dict[str, Dict[str, List[str]]] = {
+        "12m": {"base": [], "bull": [], "bear": []},
+        "24m": {"base": [], "bull": [], "bear": []},
+    }
+
+    text = str(chairman_text or "")
+    section_match = re.search(
+        r"<price_targets_and_scenarios>\s*(.*?)\s*</price_targets_and_scenarios>",
+        text,
+        re.DOTALL | re.IGNORECASE,
+    )
+    section = section_match.group(1) if section_match else text
+
+    current_horizon: Optional[str] = None
+    current_scenario: Optional[str] = None
+
+    for raw_line in section.splitlines():
+        line = _clean_text(raw_line)
+        if not line:
+            continue
+        lower = line.lower()
+
+        if re.search(r"\b12[\s-]*month\b", lower):
+            current_horizon = "12m"
+            current_scenario = None
+            continue
+        if re.search(r"\b24[\s-]*month\b", lower):
+            current_horizon = "24m"
+            current_scenario = None
+            continue
+
+        scenario_match = re.search(r"\b(base|bull|bear)\b", lower)
+        if scenario_match and ("case" in lower or "scenario" in lower or line.startswith("-") or line.startswith("*")):
+            current_scenario = scenario_match.group(1)
+
+        driver_match = re.search(r"drivers?\s*:\s*(.+)", line, re.IGNORECASE)
+        if driver_match and current_horizon and current_scenario:
+            for driver in _split_drivers(driver_match.group(1)):
+                if driver and driver not in out[current_horizon][current_scenario]:
+                    out[current_horizon][current_scenario].append(driver)
+            continue
+
+        if (
+            current_horizon
+            and current_scenario
+            and (line.startswith("-") or line.startswith("*"))
+            and "drivers" not in lower
+        ):
+            bullet = _clean_text(re.sub(r"^[-*]\s*", "", line))
+            if bullet and bullet not in out[current_horizon][current_scenario]:
+                out[current_horizon][current_scenario].append(bullet)
+
+    return out
+
+
+def _extract_price_target_values(
+    chairman_text: str,
+) -> Dict[str, Dict[str, Optional[float]]]:
+    """Extract 12m/24m base-bull-bear numeric targets from chairman XML text."""
+    import re
+
+    out: Dict[str, Dict[str, Optional[float]]] = {
+        "12m": {"base": None, "bull": None, "bear": None},
+        "24m": {"base": None, "bull": None, "bear": None},
+    }
+
+    text = str(chairman_text or "")
+    section_match = re.search(
+        r"<price_targets_and_scenarios>\s*(.*?)\s*</price_targets_and_scenarios>",
+        text,
+        re.DOTALL | re.IGNORECASE,
+    )
+    section = section_match.group(1) if section_match else text
+
+    def _clean(value: str) -> str:
+        line = str(value or "").strip()
+        line = re.sub(r"[*_`]+", "", line)
+        line = re.sub(r"\s+", " ", line).strip()
+        return line
+
+    current_horizon: Optional[str] = None
+    for raw_line in section.splitlines():
+        line = _clean(raw_line)
+        if not line:
+            continue
+        lower = line.lower()
+
+        if re.search(r"\b12[\s-]*month\b", lower):
+            current_horizon = "12m"
+            continue
+        if re.search(r"\b24[\s-]*month\b", lower):
+            current_horizon = "24m"
+            continue
+        if not current_horizon:
+            continue
+
+        m = re.search(
+            r"\b(base|bull|bear)\b[^:]{0,60}:\s*(?:A\$|\$|USD\s*)?\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?)",
+            line,
+            re.IGNORECASE,
+        )
+        if not m:
+            continue
+        scenario = m.group(1).lower()
+        try:
+            value = float(m.group(2).replace(",", ""))
+        except (TypeError, ValueError):
+            value = None
+        if value is not None:
+            out[current_horizon][scenario] = value
+
+    return out
+
+
+def _apply_scenario_driver_enrichment(
+    structured_data: Dict[str, Any],
+    chairman_text: str,
+) -> None:
+    """Ensure scenario drivers are present in structured JSON for Gantt/thesis tracking."""
+    if not isinstance(structured_data, dict):
+        return
+
+    extracted = _extract_price_target_scenario_drivers(chairman_text)
+    extracted_targets = _extract_price_target_values(chairman_text)
+
+    price_targets = structured_data.get("price_targets")
+    if not isinstance(price_targets, dict):
+        price_targets = {}
+        structured_data["price_targets"] = price_targets
+
+    scenario_drivers = price_targets.get("scenario_drivers")
+    if not isinstance(scenario_drivers, dict):
+        scenario_drivers = {}
+
+    scenario_targets = price_targets.get("scenario_targets")
+    if not isinstance(scenario_targets, dict):
+        scenario_targets = {}
+
+    for horizon in ("12m", "24m"):
+        horizon_map = scenario_drivers.get(horizon)
+        if not isinstance(horizon_map, dict):
+            horizon_map = {}
+        target_map = scenario_targets.get(horizon)
+        if not isinstance(target_map, dict):
+            target_map = {}
+        for scenario in ("base", "bull", "bear"):
+            existing = horizon_map.get(scenario)
+            if isinstance(existing, list) and existing:
+                pass
+            else:
+                horizon_map[scenario] = extracted.get(horizon, {}).get(scenario, [])[:5]
+
+            if _to_float(target_map.get(scenario)) is None:
+                parsed_target = extracted_targets.get(horizon, {}).get(scenario)
+                target_map[scenario] = parsed_target
+
+        scenario_drivers[horizon] = horizon_map
+        scenario_targets[horizon] = target_map
+
+    price_targets["scenario_drivers"] = scenario_drivers
+    price_targets["scenario_targets"] = scenario_targets
+
+    if _to_float(price_targets.get("target_12m")) is None:
+        price_targets["target_12m"] = scenario_targets.get("12m", {}).get("base")
+    if _to_float(price_targets.get("target_24m")) is None:
+        price_targets["target_24m"] = scenario_targets.get("24m", {}).get("base")
+
+    scenarios = price_targets.get("scenarios")
+    if not isinstance(scenarios, dict):
+        scenarios = {}
+    for scenario in ("base", "bull", "bear"):
+        if _to_float(scenarios.get(scenario)) is None:
+            scenarios[scenario] = scenario_targets.get("12m", {}).get(scenario)
+    price_targets["scenarios"] = scenarios
+
+    current_price = _to_float(price_targets.get("current_price"))
+    target_12m = _to_float(price_targets.get("target_12m"))
+    target_24m = _to_float(price_targets.get("target_24m"))
+    if current_price and current_price > 0:
+        if _to_float(price_targets.get("upside_12m_pct")) is None and target_12m is not None:
+            price_targets["upside_12m_pct"] = round(((target_12m / current_price) - 1.0) * 100.0, 2)
+        if _to_float(price_targets.get("upside_24m_pct")) is None and target_24m is not None:
+            price_targets["upside_24m_pct"] = round(((target_24m / current_price) - 1.0) * 100.0, 2)
+
+
 def _to_float(value: Any) -> Optional[float]:
     try:
         if value is None:
@@ -542,8 +877,92 @@ def _ensure_structured_fields_for_template(
     if not isinstance(structured_data, dict):
         return
 
+    # Keep bull/bear reasoning explicit and monitorable in plain language.
+    verdict = structured_data.get("investment_verdict")
+    if not isinstance(verdict, dict):
+        verdict = {}
+        structured_data["investment_verdict"] = verdict
+
+    def _clean_text_list(values: Any, max_items: int = 3) -> List[str]:
+        out: List[str] = []
+        for raw in values if isinstance(values, list) else []:
+            text = " ".join(str(raw or "").split()).strip()
+            if not text:
+                continue
+            if text in out:
+                continue
+            out.append(text)
+            if len(out) >= max_items:
+                break
+        return out
+
+    top_reasons = _clean_text_list(verdict.get("top_reasons"), max_items=3)
+    failure_conditions = _clean_text_list(verdict.get("failure_conditions"), max_items=3)
+
+    recommendation = structured_data.get("investment_recommendation")
+    if isinstance(recommendation, dict):
+        if not top_reasons:
+            top_reasons = _clean_text_list(recommendation.get("key_opportunities"), max_items=3)
+        if not failure_conditions:
+            failure_conditions = _clean_text_list(recommendation.get("key_risks"), max_items=3)
+
+    headwinds_tailwinds = structured_data.get("headwinds_tailwinds")
+    if isinstance(headwinds_tailwinds, dict) and (len(top_reasons) < 3 or len(failure_conditions) < 3):
+        for section_name in ("qualitative", "quantitative"):
+            for row in (headwinds_tailwinds.get(section_name) or []):
+                if isinstance(row, str):
+                    bullet = " ".join(row.split()).strip()
+                    signal_type = ""
+                elif isinstance(row, dict):
+                    signal_type = str(row.get("type") or "").strip().lower()
+                    factor = str(row.get("factor") or row.get("name") or "").strip()
+                    impact = str(row.get("impact") or "").strip()
+                    bullet = f"{factor}: {impact}" if factor and impact else factor
+                else:
+                    continue
+                if not bullet:
+                    continue
+                if "tailwind" in signal_type and len(top_reasons) < 3 and bullet not in top_reasons:
+                    top_reasons.append(bullet)
+                if "headwind" in signal_type and len(failure_conditions) < 3 and bullet not in failure_conditions:
+                    failure_conditions.append(bullet)
+                if len(top_reasons) >= 3 and len(failure_conditions) >= 3:
+                    break
+
+    verdict["top_reasons"] = top_reasons[:3]
+    verdict["failure_conditions"] = failure_conditions[:3]
+
     template_key = (template_id or "").strip()
     if template_key == "gold_miner":
+        price_targets = structured_data.get("price_targets")
+        if not isinstance(price_targets, dict):
+            price_targets = {}
+            structured_data["price_targets"] = price_targets
+        scenario_targets = price_targets.get("scenario_targets")
+        if not isinstance(scenario_targets, dict):
+            scenario_targets = {}
+        for horizon in ("12m", "24m"):
+            horizon_targets = scenario_targets.get(horizon)
+            if not isinstance(horizon_targets, dict):
+                horizon_targets = {}
+            for scenario in ("base", "bull", "bear"):
+                horizon_targets.setdefault(scenario, None)
+            scenario_targets[horizon] = horizon_targets
+        price_targets["scenario_targets"] = scenario_targets
+
+        scenario_drivers = price_targets.get("scenario_drivers")
+        if not isinstance(scenario_drivers, dict):
+            scenario_drivers = {}
+        for horizon in ("12m", "24m"):
+            horizon_map = scenario_drivers.get(horizon)
+            if not isinstance(horizon_map, dict):
+                horizon_map = {}
+            for scenario in ("base", "bull", "bear"):
+                if not isinstance(horizon_map.get(scenario), list):
+                    horizon_map[scenario] = []
+            scenario_drivers[horizon] = horizon_map
+        price_targets["scenario_drivers"] = scenario_drivers
+
         if not isinstance(structured_data.get("development_timeline"), list):
             structured_data["development_timeline"] = []
         if not isinstance(structured_data.get("current_development_stage"), str):
@@ -686,7 +1105,15 @@ async def synthesize_structured_analysis(
         Dict with structured analysis + JSON output
     """
     from .openrouter import query_model
-    from .config import CHAIRMAN_MODEL
+    from .config import (
+        CHAIRMAN_MODEL,
+        CHAIRMAN_MAX_OUTPUT_TOKENS,
+        CHAIRMAN_TIMEOUT_SECONDS,
+        CHAIRMAN_OUTPUT_STYLE,
+        CHAIRMAN_JSONIFIER_MODEL,
+        CHAIRMAN_JSONIFIER_TIMEOUT_SECONDS,
+        CHAIRMAN_JSONIFIER_MAX_OUTPUT_TOKENS,
+    )
     from .template_loader import get_template_loader
 
     # Load the template
@@ -717,22 +1144,20 @@ async def synthesize_structured_analysis(
 
     # Create weighted context (emphasize top-ranked responses)
     weighted_responses = create_weighted_context(stage1_results, stage2_results, label_to_model)
-    market_facts_block = _market_facts_prompt_block(market_facts)
-    deterministic_finance_block = _deterministic_finance_prompt_block(evidence_pack)
+    original_user_question = _extract_user_question_from_enhanced_context(enhanced_context)
 
-    # Build comprehensive chairman prompt
-    chairman_prompt = f"""You are the Chairman of an LLM Investment Council. Multiple AI models have analyzed a company and provided detailed responses. They have also peer-reviewed each other's responses. Your task is to synthesize their insights into a single, structured investment analysis.
+    rankings_summary = create_rankings_summary(stage2_results, label_to_model)
+    output_style = str(CHAIRMAN_OUTPUT_STYLE or "text_xml").strip().lower()
+    if output_style == "json":
+        chairman_prompt = f"""You are the Chairman of an LLM Investment Council. Multiple AI models have analyzed a company and provided detailed responses. They have also peer-reviewed each other's responses. Your task is to synthesize their insights into a single, structured investment analysis.
 
-ORIGINAL QUESTION AND CONTEXT:
-{enhanced_context}
+ORIGINAL USER QUESTION:
+{original_user_question}
 
 {weighted_responses}
 
 PEER RANKINGS SUMMARY:
-{create_rankings_summary(stage2_results, label_to_model)}
-
-{market_facts_block}
-{deterministic_finance_block}
+{rankings_summary}
 
 YOUR TASK AS CHAIRMAN:
 You must produce a structured investment analysis following this detailed rubric:
@@ -740,27 +1165,43 @@ You must produce a structured investment analysis following this detailed rubric
 {rubric}
 
 CRITICAL REQUIREMENTS:
-1. Follow the rubric EXACTLY - do not deviate from the scoring methodology
-2. Use the council's responses to inform your analysis, giving MORE WEIGHT to responses that were ranked higher by peers
-3. Where council members disagree, note this in the "dissenting_views" field
-4. Calculate all scores precisely using the weighted formulas provided
-5. Provide specific, quantitative data (not vague statements)
-6. Preserve and report key catalysts/sensitivities/market commentary in the structured output
-7. If market data differs from prepass, include explicit override notes with newer source URL + date
-8. Output your final analysis as VALID JSON that includes at least this structure:
+1. Use the council responses as the primary evidence source and weight higher-ranked responses more heavily.
+2. Do not re-run retrieval or introduce unrelated facts; synthesize and adjudicate what the council already produced.
+3. Where members disagree materially, record dissent in `extended_analysis.dissenting_views`.
+4. Output valid JSON matching this structure:
+5. In `investment_verdict`, include EXACTLY:
+   - `top_reasons`: top 3 plain-language reasons for success (this is the bull case)
+   - `failure_conditions`: top 3 plain-language failure conditions (this is the bear case)
+   Keep these concise, specific, and monitorable over time.
 
 {template_json}
 
 IMPORTANT: Your response must be ONLY the JSON output. Do not include any explanatory text before or after the JSON. The JSON must be valid and parseable. Additional useful fields beyond the minimum schema are allowed.
 
 Begin your JSON output now:"""
+    else:
+        chairman_prompt = _build_chairman_xml_prompt(
+            original_user_question=original_user_question,
+            weighted_responses=weighted_responses,
+            rankings_summary=rankings_summary,
+            rubric=rubric,
+        )
 
     messages = [{"role": "user", "content": chairman_prompt}]
 
     selected_chairman_model = chairman_model or CHAIRMAN_MODEL
 
-    # Query the chairman model with extended timeout (this is a complex task)
-    response = await query_model(selected_chairman_model, messages, timeout=180.0)
+    # Query the chairman model with explicit timeout/token budget.
+    response = await query_model(
+        selected_chairman_model,
+        messages,
+        timeout=float(CHAIRMAN_TIMEOUT_SECONDS),
+        max_tokens=(
+            int(CHAIRMAN_MAX_OUTPUT_TOKENS)
+            if int(CHAIRMAN_MAX_OUTPUT_TOKENS) > 0
+            else None
+        ),
+    )
 
     if response is None:
         return {
@@ -772,32 +1213,61 @@ Begin your JSON output now:"""
 
     response_text = response.get('content', '')
 
-    # Try to parse JSON from response
-    structured_data = None
-    parse_error = None
+    # Parse/normalize JSON:
+    # - If chairman emits JSON directly, parse it.
+    # - Otherwise run a secondary JSON-normalizer model (default gpt-4o-mini).
+    structured_data, parse_error = _parse_json_from_text(response_text)
+    normalization_meta: Dict[str, Any] = {
+        "chairman_output_style": output_style,
+        "chairman_json_parse_error": parse_error,
+        "jsonifier_used": False,
+    }
 
-    try:
-        # Try direct JSON parse
-        structured_data = json.loads(response_text)
-    except json.JSONDecodeError as e:
-        # Try to extract JSON from markdown code blocks
-        import re
-        json_match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
-        if json_match:
-            try:
-                structured_data = json.loads(json_match.group(1))
-            except json.JSONDecodeError as e2:
-                parse_error = f"Failed to parse JSON from markdown: {str(e2)}"
+    if not structured_data:
+        jsonifier_prompt = _build_jsonifier_prompt(
+            schema_json=template_json,
+            chairman_text=response_text,
+            company_name=resolved_company_name or "the company",
+        )
+        jsonifier_response = await query_model(
+            CHAIRMAN_JSONIFIER_MODEL,
+            [{"role": "user", "content": jsonifier_prompt}],
+            timeout=float(CHAIRMAN_JSONIFIER_TIMEOUT_SECONDS),
+            max_tokens=(
+                int(CHAIRMAN_JSONIFIER_MAX_OUTPUT_TOKENS)
+                if int(CHAIRMAN_JSONIFIER_MAX_OUTPUT_TOKENS) > 0
+                else None
+            ),
+        )
+
+        normalization_meta["jsonifier_used"] = True
+        normalization_meta["jsonifier_model"] = CHAIRMAN_JSONIFIER_MODEL
+        normalization_meta["jsonifier_timeout_seconds"] = float(
+            CHAIRMAN_JSONIFIER_TIMEOUT_SECONDS
+        )
+        normalization_meta["jsonifier_max_output_tokens"] = int(
+            CHAIRMAN_JSONIFIER_MAX_OUTPUT_TOKENS
+        )
+
+        if jsonifier_response is None:
+            parse_error = (
+                (parse_error + " | ") if parse_error else ""
+            ) + "JSON normalizer model failed to respond"
+            normalization_meta["jsonifier_parse_error"] = "model failed to respond"
         else:
-            # Try to find any JSON object in the response
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                try:
-                    structured_data = json.loads(json_match.group(0))
-                except json.JSONDecodeError as e3:
-                    parse_error = f"Failed to parse extracted JSON: {str(e3)}"
+            jsonifier_text = jsonifier_response.get("content", "")
+            normalized_structured, jsonifier_parse_error = _parse_json_from_text(
+                jsonifier_text
+            )
+            normalization_meta["jsonifier_parse_error"] = jsonifier_parse_error
+            normalization_meta["jsonifier_response_length"] = len(jsonifier_text or "")
+            if normalized_structured:
+                structured_data = normalized_structured
+                parse_error = None
             else:
-                parse_error = f"No JSON found in response: {str(e)}"
+                parse_error = (
+                    (parse_error + " | ") if parse_error else ""
+                ) + (jsonifier_parse_error or "JSON normalizer parse failed")
 
     # Add metadata from council process
     if structured_data and isinstance(structured_data, dict):
@@ -831,13 +1301,16 @@ Begin your JSON output now:"""
 
         _apply_market_facts_guardrails(structured_data, market_facts)
         _apply_deterministic_finance_lane(structured_data, evidence_pack)
+        _apply_scenario_driver_enrichment(structured_data, response_text)
         _ensure_structured_fields_for_template(structured_data, template_id)
+        structured_data["council_metadata"]["normalization"] = normalization_meta
 
     return {
         "model": selected_chairman_model,
         "response": response_text,
         "structured_data": structured_data,
-        "parse_error": parse_error
+        "parse_error": parse_error,
+        "normalization": normalization_meta,
     }
 
 

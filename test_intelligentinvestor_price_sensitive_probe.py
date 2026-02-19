@@ -10,6 +10,7 @@ import json
 import re
 from html import unescape
 from typing import Any, Dict, List, Optional
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
 
@@ -115,15 +116,18 @@ async def _fetch(url: str) -> str:
         return str(response.text or "")
 
 
-async def main() -> None:
-    parser = argparse.ArgumentParser(description="Probe II price-sensitive markers")
-    parser.add_argument("--url", required=True, help="Intelligent Investor announcements URL")
-    parser.add_argument("--output-json", default="", help="Optional output file path")
-    args = parser.parse_args()
+def _with_query_params(url: str, updates: Dict[str, str]) -> str:
+    parts = urlsplit(str(url or "").strip())
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    for key, value in updates.items():
+        query[str(key)] = str(value)
+    new_query = urlencode(query, doseq=True)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, new_query, parts.fragment))
 
-    html = await _fetch(args.url)
-    rows = _extract_announcements(html)
-    rows.sort(
+
+def _build_probe_output(url: str, rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    rows_sorted = list(rows)
+    rows_sorted.sort(
         key=lambda row: (
             1 if row.get("ii_price_sensitive_marker") else 0,
             row.get("published_at_raw", ""),
@@ -131,15 +135,78 @@ async def main() -> None:
         ),
         reverse=True,
     )
-
-    flagged = [row for row in rows if row.get("ii_price_sensitive_marker")]
-    out = {
-        "url": args.url,
-        "total_rows_with_pdf": len(rows),
+    flagged = [row for row in rows_sorted if row.get("ii_price_sensitive_marker")]
+    return {
+        "url": url,
+        "total_rows_with_pdf": len(rows_sorted),
         "flagged_price_sensitive_rows": len(flagged),
         "sample_flagged": flagged[:8],
-        "sample_unflagged": [row for row in rows if not row.get("ii_price_sensitive_marker")][:8],
-        "rows": rows,
+        "sample_unflagged": [row for row in rows_sorted if not row.get("ii_price_sensitive_marker")][:8],
+        "rows": rows_sorted,
+    }
+
+
+async def main() -> None:
+    parser = argparse.ArgumentParser(description="Probe II price-sensitive markers")
+    parser.add_argument("--url", required=True, help="Intelligent Investor announcements URL")
+    parser.add_argument(
+        "--strategy",
+        choices=["auto", "single"],
+        default="auto",
+        help="auto: try size=50 page=1 then fallback to size=25 page=1 if no signal",
+    )
+    parser.add_argument("--output-json", default="", help="Optional output file path")
+    args = parser.parse_args()
+
+    attempts: List[Dict[str, Any]] = []
+    if args.strategy == "auto":
+        primary_url = _with_query_params(args.url, {"page": "1", "size": "50"})
+        fallback_url = _with_query_params(args.url, {"page": "1", "size": "25"})
+        probe_urls = [
+            ("primary_size50_page1", primary_url),
+            ("fallback_size25_page1", fallback_url),
+        ]
+    else:
+        probe_urls = [("single", str(args.url))]
+
+    selected_out: Optional[Dict[str, Any]] = None
+    selected_label = ""
+    selected_reason = ""
+
+    for idx, (label, probe_url) in enumerate(probe_urls):
+        html = await _fetch(probe_url)
+        rows = _extract_announcements(html)
+        out = _build_probe_output(probe_url, rows)
+        attempts.append(
+            {
+                "label": label,
+                "url": probe_url,
+                "total_rows_with_pdf": int(out["total_rows_with_pdf"]),
+                "flagged_price_sensitive_rows": int(out["flagged_price_sensitive_rows"]),
+            }
+        )
+        if idx == 0 and args.strategy == "auto":
+            if int(out["flagged_price_sensitive_rows"]) > 0:
+                selected_out = out
+                selected_label = label
+                selected_reason = "primary_has_signal"
+                break
+            continue
+        selected_out = out
+        selected_label = label
+        selected_reason = "fallback_used" if args.strategy == "auto" else "single_pass"
+
+    if selected_out is None:
+        selected_out = _build_probe_output(str(args.url), [])
+        selected_label = "none"
+        selected_reason = "no_attempt_results"
+
+    out = {
+        "strategy": args.strategy,
+        "selected_attempt_label": selected_label,
+        "selected_reason": selected_reason,
+        "attempts": attempts,
+        **selected_out,
     }
 
     if args.output_json:
@@ -149,6 +216,10 @@ async def main() -> None:
 
     print(json.dumps(
         {
+            "strategy": out.get("strategy"),
+            "selected_attempt_label": out.get("selected_attempt_label"),
+            "selected_reason": out.get("selected_reason"),
+            "attempts": out.get("attempts", []),
             "total_rows_with_pdf": out["total_rows_with_pdf"],
             "flagged_price_sensitive_rows": out["flagged_price_sensitive_rows"],
             "sample_flagged_titles": [item.get("title", "") for item in out["sample_flagged"][:5]],
@@ -162,4 +233,3 @@ if __name__ == "__main__":
     import asyncio
 
     asyncio.run(main())
-

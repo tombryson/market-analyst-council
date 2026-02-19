@@ -25,6 +25,16 @@ inputs:
   - exchange
   - pdf_documents
 
+stage1_focus_prompt: |
+  Research [Company Name] for investment analysis evidence quality. Prioritize recent primary sources and valuation-relevant filings.
+
+  Output should be concise and evidence-led (not full rubric/formula restatement). Include:
+  - Base-case thesis conditions currently reached (minimum 3).
+  - Bull-case thesis conditions that could be reached in the next 12-24 months (2-4).
+  - Bear-case conditions currently failed or most at risk of failing (2-4).
+  - Timeline milestones and target windows, funding status/gap, project economics, and market/share-structure facts.
+  - Source URL + date for key numeric claims.
+
 output_schema:
   type: "object"
   required_fields:
@@ -77,6 +87,24 @@ output_schema:
         base: "float"
         bull: "float"
         bear: "float"
+      scenario_targets:
+        "12m":
+          base: "float"
+          bull: "float"
+          bear: "float"
+        "24m":
+          base: "float"
+          bull: "float"
+          bear: "float"
+      scenario_drivers:
+        "12m":
+          base: "array[string]"
+          bull: "array[string]"
+          bear: "array[string]"
+        "24m":
+          base: "array[string]"
+          bull: "array[string]"
+          bear: "array[string]"
     investment_recommendation:
       rating: "BUY/HOLD/SELL"
       conviction: "HIGH/MEDIUM/LOW"

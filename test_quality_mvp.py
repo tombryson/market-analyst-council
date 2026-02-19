@@ -14,8 +14,9 @@ import re
 import shutil
 import sys
 from datetime import datetime
+from pathlib import Path
 from time import perf_counter
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def _progress(message: str) -> None:
@@ -45,6 +46,88 @@ def _ensure_pymupdf_runtime() -> None:
             "Run with: uv run python test_quality_mvp.py ..."
         )
         sys.exit(1)
+
+
+def _build_injection_bundle_attachment_context(
+    *,
+    bundle_path: str,
+    max_docs: int,
+    max_chars: int,
+) -> Tuple[str, Dict[str, Any]]:
+    path = Path(str(bundle_path or "")).expanduser().resolve()
+    if not path.exists() or not path.is_file():
+        raise FileNotFoundError(f"Injection bundle not found: {path}")
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    docs = list(payload.get("docs", []) or [])
+    total_docs = len(docs)
+    if int(max_docs) > 0:
+        docs = docs[: int(max_docs)]
+
+    lines: List[str] = [
+        "EXTERNAL PREPASS INJECTION BUNDLE (STRICT, USER-PROVIDED)",
+        "Use these points as high-priority evidence alongside live retrieval.",
+        "",
+    ]
+    for idx, row in enumerate(docs, 1):
+        if not isinstance(row, dict):
+            continue
+        lines.append(
+            f"[D{idx}] {row.get('title', '')} | {row.get('published_at', '')} "
+            f"| importance={row.get('importance_score', '')}"
+        )
+        one_line = str(row.get("one_line", "")).strip()
+        if one_line:
+            lines.append(f"- Summary: {one_line}")
+
+        for item in list(row.get("key_points", []) or [])[:10]:
+            text = str(item).strip()
+            if text:
+                lines.append(f"- Key: {text}")
+        for item in list(row.get("timeline_milestones", []) or [])[:4]:
+            if isinstance(item, dict):
+                milestone = str(item.get("milestone", "")).strip()
+                target = str(item.get("target_window", "")).strip()
+                direction = str(item.get("direction", "")).strip()
+                if milestone or target:
+                    lines.append(
+                        f"- Timeline: {milestone} | target={target} | direction={direction}"
+                    )
+            else:
+                text = str(item).strip()
+                if text:
+                    lines.append(f"- Timeline: {text}")
+        for item in list(row.get("catalysts_next_12m", []) or [])[:4]:
+            text = str(item).strip()
+            if text:
+                lines.append(f"- Catalyst: {text}")
+        for item in list(row.get("risks_headwinds", []) or [])[:4]:
+            text = str(item).strip()
+            if text:
+                lines.append(f"- Risk: {text}")
+        lines.append("")
+
+    raw = "\n".join(lines).strip()
+    cap = int(max_chars)
+    truncated = False
+    if cap > 0:
+        trimmed = raw[:cap]
+        if len(raw) > cap:
+            truncated = True
+            trimmed = trimmed.rstrip() + "\n\n[TRUNCATED DUE TO MAX CHARS]"
+    else:
+        trimmed = raw
+
+    meta = {
+        "bundle_path": str(path),
+        "total_docs_in_bundle": int(total_docs),
+        "docs_included": int(len(docs)),
+        "raw_chars": int(len(raw)),
+        "included_chars": int(len(trimmed)),
+        "max_chars": int(cap),
+        "truncated": bool(truncated),
+    }
+    return trimmed, meta
 
 def _print_header(args: argparse.Namespace, selection: Dict[str, Any]) -> None:
     print("=" * 90)
@@ -602,8 +685,41 @@ def _print_stage2(stage2_results: list[Dict[str, Any]], aggregate_rankings: list
             print(f"  {i}. {item['model']} (avg rank: {item['average_rank']:.2f})")
 
 
-def _print_stage3(stage3_result: Dict[str, Any]) -> None:
-    print("\nSTAGE 3")
+def _print_stage2_revision(
+    stage2_revision_summary: Dict[str, Any],
+    stage2_revision_results: List[Dict[str, Any]],
+) -> None:
+    print("\nSTAGE 2.5 (REVISION PASS)")
+    print("-" * 90)
+    if not stage2_revision_summary or not stage2_revision_summary.get("enabled"):
+        print("Revision pass disabled.")
+        return
+    print(
+        "Revision summary: "
+        f"attempted={len(stage2_revision_summary.get('models_attempted', []) or [])} "
+        f"accepted={stage2_revision_summary.get('accepted_count', 0)} "
+        f"changed={stage2_revision_summary.get('changed_count', 0)} "
+        f"parse_failed={stage2_revision_summary.get('parse_failed_count', 0)}"
+    )
+    apply_summary = stage2_revision_summary.get("apply") or {}
+    if apply_summary:
+        print(
+            "Applied deltas: "
+            f"{apply_summary.get('revisions_applied', 0)}/"
+            f"{apply_summary.get('models_total', 0)}"
+        )
+    for row in stage2_revision_results or []:
+        print(
+            f"  - {row.get('model')}: "
+            f"accepted={row.get('accepted')} "
+            f"changed={row.get('changed')} "
+            f"parse_error={row.get('parse_error') or 'none'} "
+            f"response_chars={row.get('response_chars', 0)}"
+        )
+
+
+def _print_stage3(stage3_result: Dict[str, Any], *, title: str = "STAGE 3") -> None:
+    print(f"\n{title}")
     print("-" * 90)
     print(f"Chairman model: {stage3_result.get('model', 'unknown')}")
     if stage3_result.get("parse_error"):
@@ -758,6 +874,124 @@ def _print_stage3(stage3_result: Dict[str, Any]) -> None:
             print(f"  - {item}")
 
 
+def _build_stage3_comparison(
+    primary: Dict[str, Any],
+    secondary: Dict[str, Any] | None,
+) -> Dict[str, Any]:
+    if not secondary:
+        return {}
+
+    p = primary.get("structured_data") or {}
+    s = secondary.get("structured_data") or {}
+    if not isinstance(p, dict) or not isinstance(s, dict):
+        return {
+            "available": False,
+            "reason": "missing_structured_data",
+            "primary_model": primary.get("model"),
+            "secondary_model": secondary.get("model"),
+        }
+
+    def _score_total(block: Dict[str, Any], key: str) -> Optional[float]:
+        obj = block.get(key) or {}
+        if isinstance(obj, dict):
+            val = obj.get("total")
+            try:
+                return float(val) if val is not None else None
+            except (TypeError, ValueError):
+                return None
+        return None
+
+    p_quality = _score_total(p, "quality_score")
+    s_quality = _score_total(s, "quality_score")
+    p_value = _score_total(p, "value_score")
+    s_value = _score_total(s, "value_score")
+
+    p_targets = p.get("price_targets") or {}
+    s_targets = s.get("price_targets") or {}
+
+    p_rec = (p.get("investment_recommendation") or {}).get("rating")
+    s_rec = (s.get("investment_recommendation") or {}).get("rating")
+
+    return {
+        "available": True,
+        "primary_model": primary.get("model"),
+        "secondary_model": secondary.get("model"),
+        "quality_total": {"primary": p_quality, "secondary": s_quality},
+        "value_total": {"primary": p_value, "secondary": s_value},
+        "quality_delta_secondary_minus_primary": (
+            (s_quality - p_quality)
+            if (s_quality is not None and p_quality is not None)
+            else None
+        ),
+        "value_delta_secondary_minus_primary": (
+            (s_value - p_value)
+            if (s_value is not None and p_value is not None)
+            else None
+        ),
+        "recommendation": {"primary": p_rec, "secondary": s_rec},
+        "target_12m": {
+            "primary": p_targets.get("target_12m"),
+            "secondary": s_targets.get("target_12m"),
+        },
+        "target_24m": {
+            "primary": p_targets.get("target_24m"),
+            "secondary": s_targets.get("target_24m"),
+        },
+    }
+
+
+def _print_stage3_comparison(stage3_comparison: Dict[str, Any]) -> None:
+    print("\nSTAGE 3 COMPARISON")
+    print("-" * 90)
+    if not stage3_comparison:
+        print("No secondary chairman run.")
+        return
+    if not stage3_comparison.get("available"):
+        print(
+            "Comparison unavailable: "
+            f"{stage3_comparison.get('reason', 'unknown')}"
+        )
+        print(
+            "Models: "
+            f"{stage3_comparison.get('primary_model')} vs "
+            f"{stage3_comparison.get('secondary_model')}"
+        )
+        return
+
+    print(
+        "Models: "
+        f"{stage3_comparison.get('primary_model')} vs "
+        f"{stage3_comparison.get('secondary_model')}"
+    )
+    print(
+        "Quality totals: "
+        f"primary={stage3_comparison.get('quality_total', {}).get('primary')} "
+        f"secondary={stage3_comparison.get('quality_total', {}).get('secondary')} "
+        f"delta={stage3_comparison.get('quality_delta_secondary_minus_primary')}"
+    )
+    print(
+        "Value totals: "
+        f"primary={stage3_comparison.get('value_total', {}).get('primary')} "
+        f"secondary={stage3_comparison.get('value_total', {}).get('secondary')} "
+        f"delta={stage3_comparison.get('value_delta_secondary_minus_primary')}"
+    )
+    print(
+        "Recommendations: "
+        f"primary={stage3_comparison.get('recommendation', {}).get('primary')} "
+        f"secondary={stage3_comparison.get('recommendation', {}).get('secondary')}"
+    )
+    print(
+        "12m targets: "
+        f"primary={stage3_comparison.get('target_12m', {}).get('primary')} "
+        f"secondary={stage3_comparison.get('target_12m', {}).get('secondary')}"
+    )
+    print(
+        "24m targets: "
+        f"primary={stage3_comparison.get('target_24m', {}).get('primary')} "
+        f"secondary={stage3_comparison.get('target_24m', {}).get('secondary')}"
+    )
+
+
 def _print_input_audit(
     selection: Dict[str, Any],
     effective_query: str,
@@ -765,6 +999,8 @@ def _print_input_audit(
     stage1_research_brief: str,
     market_facts: Dict[str, Any] | None,
     market_facts_query_prefix: str,
+    injection_bundle_meta: Dict[str, Any] | None,
+    injection_bundle_context: str,
 ) -> None:
     print("\nINPUT AUDIT")
     print("-" * 90)
@@ -780,6 +1016,10 @@ def _print_input_audit(
     print(market_facts_query_prefix or "(none)")
     print("\nMarket Facts Object:")
     print(json.dumps(market_facts or {}, indent=2))
+    print("\nInjection Bundle Meta:")
+    print(json.dumps(injection_bundle_meta or {}, indent=2))
+    print("\nInjection Bundle Context Sent As Attachment Context:")
+    print(injection_bundle_context or "(none)")
 
 
 def _print_provider_request_audit(
@@ -806,11 +1046,14 @@ async def _run(args: argparse.Namespace) -> None:
     from backend.council import (
         stage1_collect_perplexity_research_responses,
         stage2_collect_rankings,
+        stage2_collect_revision_deltas,
+        apply_stage2_revision_deltas,
         stage3_synthesize_final,
         calculate_aggregate_rankings,
     )
     from backend.config import CHAIRMAN_MODEL
     from backend.config import ENABLE_MARKET_FACTS_PREPASS
+    from backend.config import STAGE2_REVISION_PASS_ENABLED
     from backend.config import PERPLEXITY_API_URL, PERPLEXITY_COUNCIL_MODELS, MAX_SOURCES
     from backend.main import build_enhanced_context
     from backend.market_facts import (
@@ -855,14 +1098,14 @@ async def _run(args: argparse.Namespace) -> None:
     loader = get_template_loader()
     use_structured_analysis = loader.is_structured_template(selected_template_id)
 
-    effective_query = loader.render_template_rubric(
+    effective_query = loader.render_stage1_query_prompt(
         selected_template_id,
         company_name=selected_company_name,
         exchange=selected_exchange,
     )
     if not effective_query:
         raise ValueError(
-            f"Template '{selected_template_id}' has no rubric to use as query."
+            f"Template '{selected_template_id}' has no Stage 1 prompt to use as query."
         )
 
     stage1_research_brief = loader.get_stage1_research_brief(
@@ -901,6 +1144,23 @@ async def _run(args: argparse.Namespace) -> None:
     stage1_effective_research_brief = stage1_research_brief
     market_facts_query_prefix = format_market_facts_query_prefix(market_facts)
     stage1_effective_query = prepend_market_facts_to_query(effective_query, market_facts)
+    injection_bundle_context = ""
+    injection_bundle_meta: Dict[str, Any] = {}
+    if args.injection_bundle_json:
+        _progress("External injection bundle load start")
+        injection_bundle_context, injection_bundle_meta = _build_injection_bundle_attachment_context(
+            bundle_path=str(args.injection_bundle_json),
+            max_docs=int(args.injection_max_docs),
+            max_chars=int(args.injection_max_chars),
+        )
+        _progress(
+            "External injection bundle loaded: "
+            f"docs={injection_bundle_meta.get('docs_included', 0)} "
+            f"raw_chars={injection_bundle_meta.get('raw_chars', 0)} "
+            f"chars={injection_bundle_meta.get('included_chars', 0)} "
+            f"max_chars={injection_bundle_meta.get('max_chars', 0)} "
+            f"truncated={injection_bundle_meta.get('truncated', False)}"
+        )
 
     _print_input_audit(
         selection=selection,
@@ -909,6 +1169,8 @@ async def _run(args: argparse.Namespace) -> None:
         stage1_research_brief=stage1_effective_research_brief,
         market_facts=market_facts,
         market_facts_query_prefix=market_facts_query_prefix,
+        injection_bundle_meta=injection_bundle_meta,
+        injection_bundle_context=injection_bundle_context,
     )
 
     if args.dry_run_input:
@@ -945,7 +1207,7 @@ async def _run(args: argparse.Namespace) -> None:
     stage1_results, metadata = await stage1_collect_perplexity_research_responses(
         user_query=stage1_effective_query,
         ticker=args.ticker,
-        attachment_context="",
+        attachment_context=injection_bundle_context,
         depth="deep",
         research_brief=stage1_effective_research_brief,
         template_id=selected_template_id,
@@ -970,6 +1232,8 @@ async def _run(args: argparse.Namespace) -> None:
                     "stage1_research_brief": stage1_effective_research_brief,
                     "market_facts_query_prefix": market_facts_query_prefix,
                     "market_facts": market_facts or {},
+                    "injection_bundle_meta": injection_bundle_meta,
+                    "injection_bundle_context": injection_bundle_context,
                 },
                 "stage1_results": stage1_results,
                 "stage1_model_audit": stage1_model_audit,
@@ -993,11 +1257,12 @@ async def _run(args: argparse.Namespace) -> None:
         market_facts=market_facts,
     )
     ranking_models = [item.get("model") for item in stage1_results if item.get("model")]
-    chairman_model = (
+    primary_chairman_model = (
         CHAIRMAN_MODEL
         if CHAIRMAN_MODEL in ranking_models
         else (ranking_models[0] if ranking_models else CHAIRMAN_MODEL)
     )
+    secondary_chairman_model = str(args.secondary_chairman_model or "").strip() or None
 
     _progress("Stage 2 start")
     stage2_start = perf_counter()
@@ -1010,11 +1275,41 @@ async def _run(args: argparse.Namespace) -> None:
     _progress(f"Stage 2 done in {perf_counter() - stage2_start:.1f}s")
     _print_stage2(stage2_results, aggregate_rankings)
 
+    revision_mode = (args.stage2_revision_pass or "auto").strip().lower()
+    revision_enabled = (
+        bool(STAGE2_REVISION_PASS_ENABLED)
+        if revision_mode == "auto"
+        else (revision_mode == "on")
+    )
+    stage2_revision_results: List[Dict[str, Any]] = []
+    stage2_revision_summary: Dict[str, Any] = {"enabled": False}
+    stage1_results_for_stage3 = stage1_results
+    if revision_enabled:
+        _progress("Stage 2.5 revision pass start")
+        stage2_revision_start = perf_counter()
+        stage2_revision_results, stage2_revision_summary = await stage2_collect_revision_deltas(
+            enhanced_context,
+            stage1_results,
+            stage2_results,
+            label_to_model,
+            revision_models=ranking_models,
+        )
+        stage1_results_for_stage3, apply_summary = apply_stage2_revision_deltas(
+            stage1_results,
+            stage2_revision_results,
+        )
+        stage2_revision_summary["apply"] = apply_summary
+        _progress(
+            "Stage 2.5 revision pass done in "
+            f"{perf_counter() - stage2_revision_start:.1f}s"
+        )
+    _print_stage2_revision(stage2_revision_summary, stage2_revision_results)
+
     _progress("Stage 3 start")
-    stage3_start = perf_counter()
-    stage3_result = await stage3_synthesize_final(
+    stage3_primary_start = perf_counter()
+    stage3_result_primary = await stage3_synthesize_final(
         enhanced_context,
-        stage1_results,
+        stage1_results_for_stage3,
         stage2_results,
         label_to_model=label_to_model,
         use_structured_analysis=use_structured_analysis,
@@ -1022,12 +1317,44 @@ async def _run(args: argparse.Namespace) -> None:
         ticker=args.ticker,
         company_name=selected_company_name,
         exchange=selected_exchange,
-        chairman_model=chairman_model,
+        chairman_model=primary_chairman_model,
         market_facts=market_facts,
         evidence_pack=search_results.get("evidence_pack", {}),
     )
-    _progress(f"Stage 3 done in {perf_counter() - stage3_start:.1f}s")
-    _print_stage3(stage3_result)
+    stage3_primary_elapsed = perf_counter() - stage3_primary_start
+    _progress(f"Stage 3 primary done in {stage3_primary_elapsed:.1f}s")
+    _print_stage3(stage3_result_primary, title="STAGE 3 (PRIMARY CHAIRMAN)")
+
+    stage3_result_secondary: Dict[str, Any] | None = None
+    stage3_secondary_elapsed: Optional[float] = None
+    if secondary_chairman_model and secondary_chairman_model != primary_chairman_model:
+        _progress(f"Stage 3 secondary start ({secondary_chairman_model})")
+        stage3_secondary_start = perf_counter()
+        stage3_result_secondary = await stage3_synthesize_final(
+            enhanced_context,
+            stage1_results_for_stage3,
+            stage2_results,
+            label_to_model=label_to_model,
+            use_structured_analysis=use_structured_analysis,
+            template_id=selected_template_id,
+            ticker=args.ticker,
+            company_name=selected_company_name,
+            exchange=selected_exchange,
+            chairman_model=secondary_chairman_model,
+            market_facts=market_facts,
+            evidence_pack=search_results.get("evidence_pack", {}),
+        )
+        stage3_secondary_elapsed = perf_counter() - stage3_secondary_start
+        _progress(f"Stage 3 secondary done in {stage3_secondary_elapsed:.1f}s")
+        _print_stage3(stage3_result_secondary, title="STAGE 3 (SECONDARY CHAIRMAN)")
+
+    stage3_comparison = _build_stage3_comparison(
+        stage3_result_primary,
+        stage3_result_secondary,
+    )
+    _print_stage3_comparison(stage3_comparison)
+
+    stage3_result = stage3_result_primary
 
     if args.dump_json:
         payload = {
@@ -1038,10 +1365,26 @@ async def _run(args: argparse.Namespace) -> None:
                 "stage1_research_brief": stage1_effective_research_brief,
                 "market_facts_query_prefix": market_facts_query_prefix,
                 "market_facts": market_facts or {},
+                "injection_bundle_meta": injection_bundle_meta,
+                "injection_bundle_context": injection_bundle_context,
             },
             "stage1_results": stage1_results,
+            "stage1_results_for_stage3": stage1_results_for_stage3,
             "stage1_model_audit": stage1_model_audit,
             "stage2_results": stage2_results,
+            "stage2_revision_results": stage2_revision_results,
+            "stage2_revision_summary": stage2_revision_summary,
+            "stage3_primary_model": primary_chairman_model,
+            "stage3_secondary_model": secondary_chairman_model,
+            "stage3_timing_seconds": {
+                "primary": round(stage3_primary_elapsed, 3),
+                "secondary": round(stage3_secondary_elapsed, 3)
+                if stage3_secondary_elapsed is not None
+                else None,
+            },
+            "stage3_result_primary": stage3_result_primary,
+            "stage3_result_secondary": stage3_result_secondary,
+            "stage3_comparison": stage3_comparison,
             "stage3_result": stage3_result,
             "metadata": metadata,
             "selection": selection,
@@ -1064,7 +1407,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Optional company/query hint for template/company detection. "
-            "The rendered template rubric is always used as the Stage 1 task prompt."
+            "The rendered template Stage 1 prompt is used as the Stage 1 task prompt."
         ),
     )
     parser.add_argument(
@@ -1102,6 +1445,33 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Optional exchange (e.g., asx, nyse, nasdaq, tsx, tsxv, lse, aim).",
     )
     parser.add_argument(
+        "--secondary-chairman-model",
+        type=str,
+        default=None,
+        help=(
+            "Optional secondary chairman model for side-by-side Stage 3 output "
+            "(e.g., openai/gpt-5.3)."
+        ),
+    )
+    parser.add_argument(
+        "--injection-bundle-json",
+        type=str,
+        default=None,
+        help="Optional path to a prebuilt injection_bundle.json to pass into Stage 1 attachment context.",
+    )
+    parser.add_argument(
+        "--injection-max-docs",
+        type=int,
+        default=0,
+        help="Optional cap for docs from injection bundle (0=all in file order).",
+    )
+    parser.add_argument(
+        "--injection-max-chars",
+        type=int,
+        default=0,
+        help="Max chars from injection bundle context sent to Stage 1 attachment context (0=no truncation).",
+    )
+    parser.add_argument(
         "--dump-json",
         type=str,
         default=None,
@@ -1116,6 +1486,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "--stage1-only",
         action="store_true",
         help="Run only Stage 1 and exit (skips Stage 2/3).",
+    )
+    parser.add_argument(
+        "--stage2-revision-pass",
+        type=str,
+        choices=["auto", "on", "off"],
+        default="on",
+        help=(
+            "Run Stage 2.5 self-revision pass. "
+            "on=enabled by default, off=disable, auto=use .env STAGE2_REVISION_PASS_ENABLED."
+        ),
     )
     parser.add_argument(
         "--diagnostic-mode",

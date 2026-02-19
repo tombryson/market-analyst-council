@@ -11,6 +11,7 @@ from .providers import (
     TavilyResearchProvider,
     ResearchProvider,
 )
+from ..template_loader import get_template_loader
 from ..config import (
     RESEARCH_PROVIDER,
     RESEARCH_DEPTH,
@@ -647,15 +648,7 @@ def _source_tier_boost(
     u = (url or "").lower()
     c = (content or "").lower()
     text = f"{t} {u} {c[:500]}"
-    exchange_key = (exchange or "").strip().upper()
-
-    exchange_primary = set(_expected_domains_for_exchange(exchange_key))
-    if exchange_key == "ASX":
-        exchange_primary.update({"announcements.asx.com.au", "asx.com.au", "wcsecure.weblink.com.au", "marketindex.com.au"})
-    elif exchange_key in {"NYSE", "NASDAQ"}:
-        exchange_primary.update({"sec.gov", "www.sec.gov"})
-    elif exchange_key in {"TSX", "TSXV"}:
-        exchange_primary.update({"sedarplus.ca", "tsx.com", "www.tsx.com"})
+    exchange_primary = set(_expected_domains_for_exchange(exchange))
 
     if any(domain in h for domain in exchange_primary):
         return "primary_exchange", 0.62
@@ -909,8 +902,7 @@ def _infer_exchange_from_ticker(ticker: str) -> str:
 
 def _expected_domains_for_exchange(exchange: str) -> List[str]:
     """Primary filing/reference domains expected for a given exchange."""
-    key = (exchange or "").strip().upper()
-    mapping = {
+    fallback_map = {
         "ASX": ["asx.com.au", "marketindex.com.au", "wcsecure.weblink.com.au"],
         "NYSE": ["sec.gov"],
         "NASDAQ": ["sec.gov"],
@@ -919,7 +911,41 @@ def _expected_domains_for_exchange(exchange: str) -> List[str]:
         "LSE": ["londonstockexchange.com", "investegate.co.uk"],
         "AIM": ["londonstockexchange.com", "investegate.co.uk"],
     }
-    return mapping.get(key, [])
+
+    key = (exchange or "").strip()
+    key_upper = key.upper()
+
+    try:
+        loader = get_template_loader()
+        normalized = loader.normalize_exchange(key) or loader.normalize_exchange(key_upper)
+        if not normalized and key_upper:
+            alias_map = {
+                "ASX": "asx",
+                "NYSE": "nyse",
+                "NASDAQ": "nasdaq",
+                "TSX": "tsx",
+                "TSXV": "tsxv",
+                "LSE": "lse",
+                "AIM": "aim",
+            }
+            normalized = alias_map.get(key_upper)
+        if normalized:
+            params = loader.get_exchange_retrieval_params(normalized)
+            suffixes = [
+                str(item).strip().lower()
+                for item in (params.get("allowed_domain_suffixes", []) or [])
+                if str(item).strip()
+            ]
+            deduped: List[str] = []
+            for item in suffixes:
+                if item not in deduped:
+                    deduped.append(item)
+            if deduped:
+                return deduped
+    except Exception:
+        pass
+
+    return fallback_map.get(key_upper, [])
 
 
 def _sources_include_expected_domains(

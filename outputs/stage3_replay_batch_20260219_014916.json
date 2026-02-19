@@ -1,0 +1,1477 @@
+{
+  "created_at": "2026-02-19T01:53:56.282790",
+  "artifacts_count": 3,
+  "chairman_model": "google/gemini-3-pro-preview",
+  "chairman_timeout_seconds": 420.0,
+  "chairman_max_output_tokens": 16000,
+  "jsonifier_model": "openai/gpt-4o-mini",
+  "results": [
+    {
+      "source_artifact": "/Users/Toms_Macbook/Projects/llm-council/outputs/quality_ausgold_dual_chairman_pplx3_20260218_152501.json",
+      "selection": {
+        "template_id": "gold_miner",
+        "template_name": "Gold Miner",
+        "company_type": "gold_miner",
+        "company_name": "Ausgold Limited",
+        "exchange": "asx",
+        "exchange_selection_source": "explicit_exchange",
+        "exchange_assumptions": "Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.",
+        "selection_source": "explicit_template"
+      },
+      "chairman_model": "google/gemini-3-pro-preview",
+      "jsonifier_model": "openai/gpt-4o-mini",
+      "label_to_model": {
+        "Response A": "openai/gpt-5.1",
+        "Response B": "google/gemini-3-pro-preview",
+        "Response C": "anthropic/claude-sonnet-4-5"
+      },
+      "stage3_result": {
+        "model": "google/gemini-3-pro-preview",
+        "response": "```json\n{\n  \"analysis_type\": \"resources\",\n  \"ticker\": \"ASX:AUC\",\n  \"company_name\": \"Ausgold Limited\",\n  \"analysis_date\": \"2024-12-19\",\n  \"current_development_stage\": \"Definitive Feasibility Study (DFS) Complete\",\n  \"certainty_pct_24m\": 60.0,\n  \"market_data\": {\n    \"current_price\": 1.01,\n    \"market_cap_aud_m\": 553.338,\n    \"shares_outstanding_m\": 547.859,\n    \"enterprise_value_aud_m\": 538.338,\n    \"cash_aud_m\": 15.0,\n    \"debt_aud_m\": 0.0\n  },\n  \"projects\": [\n    {\n      \"project_name\": \"Katanning Gold Project (KGP)\",\n      \"location\": \"Western Australia\",\n      \"stage\": \"DFS\",\n      \"resource_tonnes_mt\": 36.4,\n      \"grade_gt\": 1.14,\n      \"recovery_fraction\": 0.9,\n      \"mine_life_years\": 11,\n      \"aisc_aud_oz\": 1747,\n      \"capex_aud_m\": 296,\n      \"sustaining_capex_aud_m_yr\": 10,\n      \"discount_rate\": 0.05,\n      \"tax_rate\": 0.3,\n      \"royalty_rate\": 0.05,\n      \"working_capital_pct_rev\": 0.05,\n      \"commodities\": [\n        \"Gold\"\n      ],\n      \"economics\": {\n        \"gold_price_aud_oz\": 4150,\n        \"outputs\": {\n          \"recovered_ounces_moz\": 1.18,\n          \"full_annual_production_koz\": 107.27,\n          \"annual_revenue_aud_m\": 445.17,\n          \"annual_margin_pre_tax_aud_m\": 242.0,\n          \"project_npv_post_tax_aud_m\": 1109.0,\n          \"risked_npv_aud_m\": 443.6\n        },\n        \"notes\": \"Inputs derived from April 2024 DFS (Reserve Case) using Spot Gold ~A$4,150/oz as per highest-ranked peer analysis. Resource input uses Ore Reserve tonnes (36.4Mt) to reflect LOM economics accurately.\"\n      }\n    }\n  ],\n  \"total_risked_npv_aud_m\": 443.6,\n  \"quality_score\": {\n    \"total\": 68.5,\n    \"breakdown\": {\n      \"jurisdiction\": 20.0,\n      \"infrastructure\": 9.0,\n      \"management\": 12.75,\n      \"development_stage\": 6.0,\n      \"funding\": 8.0,\n      \"certainty\": 7.0,\n      \"esg\": 8.0\n    }\n  },\n  \"value_score\": {\n    \"total\": 64.0,\n    \"breakdown\": {\n      \"npv_vs_market_cap\": 18.0,\n      \"ev_resource_oz\": 8.0,\n      \"exploration_upside\": 16.0,\n      \"cost_competitiveness\": 12.0,\n      \"ma_strategic_value\": 12.0\n    }\n  },\n  \"development_timeline\": [\n    {\n      \"milestone\": \"Permitting & Approvals\",\n      \"target_period\": \"H1 2025\",\n      \"status\": \"in progress\",\n      \"confidence_pct\": 75.0\n    },\n    {\n      \"milestone\": \"Final Investment Decision (FID)\",\n      \"target_period\": \"Q3 2025\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 65.0\n    },\n    {\n      \"milestone\": \"Construction Start\",\n      \"target_period\": \"H2 2025\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 60.0\n    },\n    {\n      \"milestone\": \"First Gold Pour\",\n      \"target_period\": \"H2 2026\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 50.0\n    }\n  ],\n  \"headwinds_tailwinds\": {\n    \"quantitative\": [\n      \"Spot Gold Price (~A$4,150/oz) is ~38% above DFS Base Case (A$3,000/oz), adding ~$500M to Pre-tax NPV.\",\n      \"Funding Gap >A$50M: Implied Capex ~A$296M vs Cash ~A$15M requires significant dilution (20-30% equity component).\"\n    ],\n    \"qualitative\": [\n      \"Tier 1 Jurisdiction (WA) commands valuation premium and reduces expropriation risk.\",\n      \"Cost Inflation Risk: WA labor/materials market may push capex above DFS estimate of A$296M before construction begins.\"\n    ]\n  },\n  \"price_targets\": {\n    \"current_price\": 1.01,\n    \"target_12m\": 1.35,\n    \"target_24m\": 2.1,\n    \"upside_12m_pct\": 33.6,\n    \"upside_24m_pct\": 107.9,\n    \"scenarios\": {\n      \"base\": 1.35,\n      \"bull\": 1.85,\n      \"bear\": 0.65\n    }\n  },\n  \"investment_recommendation\": {\n    \"rating\": \"BUY\",\n    \"conviction\": \"MEDIUM\",\n    \"summary\": \"Ausgold offers high leverage to the AUD gold price with a completed DFS in a Tier-1 jurisdiction. While the current market cap trades at a premium to the risked study NPV (~1.2x), the spot gold price implies an unrisked NPV >A$1.1B (2x current MCAP). Successful financing is the key catalyst to unlock this value.\"\n  },\n  \"investment_verdict\": {\n    \"top_reasons\": [\n      \"Extreme leverage to AUD gold price: At spot prices, project payback is <12 months post-build.\",\n      \"Strategic Scarcity: Few undeveloped +1Moz Reserve open-pit projects exist in WA near infrastructure.\",\n      \"De-risked Technicals: DFS completed with 1.28Moz Reserve underpinning 11-year mine life.\"\n    ],\n    \"failure_conditions\": [\n      \"Inability to secure debt/equity financing for ~A$300M Capex, forcing delays or excessive dilution.\",\n      \"Gold price collapse <A$3,000/oz erasing the margin buffer against inflationary cost pressures.\",\n      \"Capex blowout >40% rendering the DFS economics obsolete before construction starts.\"\n    ]\n  },\n  \"market_data_provenance\": {\n    \"prepass_as_of_utc\": \"2024-12-19\",\n    \"prepass_source_urls\": [\n      \"normalized_facts\"\n    ],\n    \"prepass_ticker\": \"ASX:AUC\",\n    \"prepass_currency\": \"AUD\",\n    \"override_notes\": [\n      \"Used injected normalized_facts for price (A$1.01) and shares (~548m) which correctly reflect the Nov 2024 10-for-1 consolidation.\"\n    ]\n  },\n  \"extended_analysis\": {\n    \"next_major_catalysts\": [\n      \"Granting of final environmental permits (H1 2025)\",\n      \"Announcement of Debt/Equity Financing Package (Mid-2025)\",\n      \"Final Investment Decision (Q3 2025)\"\n    ],\n    \"sensitivity_analysis\": [\n      {\n        \"factor\": \"Gold Price\",\n        \"impact\": \"High: +/- A$100/oz changes NPV by ~A$80M\"\n      },\n      {\n        \"factor\": \"Capex\",\n        \"impact\": \"Medium: 10% increase reduces NPV by ~A$30M\"\n      }\n    ],\n    \"market_context\": [\n      \"Gold hovering near ATH in AUD terms supports developer valuations.\",\n      \"WA labor market remains tight, pressuring capital estimates.\"\n    ],\n    \"commentary\": \"The divergence in peer valuations stems from the choice of Gold Price input and weight on financing risk. The highest-rated peer emphasizes the specific DFS robustness at Spot Prices (Buy), while dissenting peers focus on the premium to 'Risked' NAV and dilution (Sell/Hold). This analysis favors the DFS data but acknowledges the financing hurdle via a Medium conviction.\",\n    \"dissenting_views\": [\n      \"Peer #2 (Rank 2) rated SELL, citing that Risked NPV (~A$45M in their model) is far below Market Cap (~A$553M), implying the stock is priced for perfection.\",\n      \"Peer #2 estimates Capex at A$400M (vs DFS A$296M), suggesting potential cost blowouts are not priced in.\"\n    ],\n    \"peer_observations\": [\n      \"Peer #1 provided the highest fidelity data based on the April 2024 DFS.\",\n      \"Peer #3 aligned on the Hold/Medium conviction due to the funding gap.\"\n    ]\n  }\n}\n```",
+        "structured_data": {
+          "analysis_type": "resources",
+          "ticker": "AUC",
+          "company_name": "Ausgold Limited",
+          "analysis_date": "2026-02-19T01:50:08.461200",
+          "current_development_stage": "Definitive Feasibility Study (DFS) Complete",
+          "certainty_pct_24m": 60.0,
+          "market_data": {
+            "current_price": 1.01,
+            "market_cap_aud_m": 553.338,
+            "shares_outstanding_m": 547.859,
+            "enterprise_value_aud_m": 538.338,
+            "cash_aud_m": 15.0,
+            "debt_aud_m": 0.0
+          },
+          "projects": [
+            {
+              "project_name": "Katanning Gold Project (KGP)",
+              "location": "Western Australia",
+              "stage": "DFS",
+              "resource_tonnes_mt": 36.4,
+              "grade_gt": 1.14,
+              "recovery_fraction": 0.9,
+              "mine_life_years": 11,
+              "aisc_aud_oz": 1747,
+              "capex_aud_m": 296,
+              "sustaining_capex_aud_m_yr": 10,
+              "discount_rate": 0.05,
+              "tax_rate": 0.3,
+              "royalty_rate": 0.05,
+              "working_capital_pct_rev": 0.05,
+              "commodities": [
+                "Gold"
+              ],
+              "economics": {
+                "gold_price_aud_oz": 4150,
+                "outputs": {
+                  "recovered_ounces_moz": 1.18,
+                  "full_annual_production_koz": 107.27,
+                  "annual_revenue_aud_m": 445.17,
+                  "annual_margin_pre_tax_aud_m": 242.0,
+                  "project_npv_post_tax_aud_m": 1109.0,
+                  "risked_npv_aud_m": 443.6
+                },
+                "notes": "Inputs derived from April 2024 DFS (Reserve Case) using Spot Gold ~A$4,150/oz as per highest-ranked peer analysis. Resource input uses Ore Reserve tonnes (36.4Mt) to reflect LOM economics accurately."
+              }
+            }
+          ],
+          "total_risked_npv_aud_m": 443.6,
+          "quality_score": {
+            "total": 68.5,
+            "breakdown": {
+              "jurisdiction": 20.0,
+              "infrastructure": 9.0,
+              "management": 12.75,
+              "development_stage": 6.0,
+              "funding": 8.0,
+              "certainty": 7.0,
+              "esg": 8.0
+            }
+          },
+          "value_score": {
+            "total": 64.0,
+            "breakdown": {
+              "npv_vs_market_cap": 18.0,
+              "ev_resource_oz": 8.0,
+              "exploration_upside": 16.0,
+              "cost_competitiveness": 12.0,
+              "ma_strategic_value": 12.0
+            }
+          },
+          "development_timeline": [
+            {
+              "milestone": "Permitting & Approvals",
+              "target_period": "H1 2025",
+              "status": "in progress",
+              "confidence_pct": 75.0
+            },
+            {
+              "milestone": "Final Investment Decision (FID)",
+              "target_period": "Q3 2025",
+              "status": "planned",
+              "confidence_pct": 65.0
+            },
+            {
+              "milestone": "Construction Start",
+              "target_period": "H2 2025",
+              "status": "planned",
+              "confidence_pct": 60.0
+            },
+            {
+              "milestone": "First Gold Pour",
+              "target_period": "H2 2026",
+              "status": "planned",
+              "confidence_pct": 50.0
+            }
+          ],
+          "headwinds_tailwinds": {
+            "quantitative": [
+              "Spot Gold Price (~A$4,150/oz) is ~38% above DFS Base Case (A$3,000/oz), adding ~$500M to Pre-tax NPV.",
+              "Funding Gap >A$50M: Implied Capex ~A$296M vs Cash ~A$15M requires significant dilution (20-30% equity component)."
+            ],
+            "qualitative": [
+              "Tier 1 Jurisdiction (WA) commands valuation premium and reduces expropriation risk.",
+              "Cost Inflation Risk: WA labor/materials market may push capex above DFS estimate of A$296M before construction begins."
+            ]
+          },
+          "price_targets": {
+            "current_price": 1.01,
+            "target_12m": 1.35,
+            "target_24m": 2.1,
+            "upside_12m_pct": 33.6,
+            "upside_24m_pct": 107.9,
+            "scenarios": {
+              "base": 1.35,
+              "bull": 1.85,
+              "bear": 0.65
+            }
+          },
+          "investment_recommendation": {
+            "rating": "BUY",
+            "conviction": "MEDIUM",
+            "summary": "Ausgold offers high leverage to the AUD gold price with a completed DFS in a Tier-1 jurisdiction. While the current market cap trades at a premium to the risked study NPV (~1.2x), the spot gold price implies an unrisked NPV >A$1.1B (2x current MCAP). Successful financing is the key catalyst to unlock this value."
+          },
+          "investment_verdict": {
+            "top_reasons": [
+              "Extreme leverage to AUD gold price: At spot prices, project payback is <12 months post-build.",
+              "Strategic Scarcity: Few undeveloped +1Moz Reserve open-pit projects exist in WA near infrastructure.",
+              "De-risked Technicals: DFS completed with 1.28Moz Reserve underpinning 11-year mine life."
+            ],
+            "failure_conditions": [
+              "Inability to secure debt/equity financing for ~A$300M Capex, forcing delays or excessive dilution.",
+              "Gold price collapse <A$3,000/oz erasing the margin buffer against inflationary cost pressures.",
+              "Capex blowout >40% rendering the DFS economics obsolete before construction starts."
+            ]
+          },
+          "market_data_provenance": {
+            "prepass_as_of_utc": "2024-12-19",
+            "prepass_source_urls": [
+              "normalized_facts"
+            ],
+            "prepass_ticker": "ASX:AUC",
+            "prepass_currency": "AUD",
+            "override_notes": [
+              "Used injected normalized_facts for price (A$1.01) and shares (~548m) which correctly reflect the Nov 2024 10-for-1 consolidation."
+            ]
+          },
+          "extended_analysis": {
+            "next_major_catalysts": [
+              "Granting of final environmental permits (H1 2025)",
+              "Announcement of Debt/Equity Financing Package (Mid-2025)",
+              "Final Investment Decision (Q3 2025)"
+            ],
+            "sensitivity_analysis": [
+              {
+                "factor": "Gold Price",
+                "impact": "High: +/- A$100/oz changes NPV by ~A$80M"
+              },
+              {
+                "factor": "Capex",
+                "impact": "Medium: 10% increase reduces NPV by ~A$30M"
+              }
+            ],
+            "market_context": [
+              "Gold hovering near ATH in AUD terms supports developer valuations.",
+              "WA labor market remains tight, pressuring capital estimates."
+            ],
+            "commentary": "The divergence in peer valuations stems from the choice of Gold Price input and weight on financing risk. The highest-rated peer emphasizes the specific DFS robustness at Spot Prices (Buy), while dissenting peers focus on the premium to 'Risked' NAV and dilution (Sell/Hold). This analysis favors the DFS data but acknowledges the financing hurdle via a Medium conviction.",
+            "dissenting_views": [
+              "Peer #2 (Rank 2) rated SELL, citing that Risked NPV (~A$45M in their model) is far below Market Cap (~A$553M), implying the stock is priced for perfection.",
+              "Peer #2 estimates Capex at A$400M (vs DFS A$296M), suggesting potential cost blowouts are not priced in."
+            ],
+            "peer_observations": [
+              "Peer #1 provided the highest fidelity data based on the April 2024 DFS.",
+              "Peer #3 aligned on the Hold/Medium conviction due to the funding gap."
+            ]
+          },
+          "council_metadata": {
+            "resolved_company_name": "Ausgold Limited",
+            "top_ranked_models": [
+              "google/gemini-3-pro-preview (avg rank: 1.00)",
+              "openai/gpt-5.1 (avg rank: 2.00)",
+              "anthropic/claude-sonnet-4-5 (avg rank: 3.00)"
+            ],
+            "market_facts_validation": {
+              "override_allowed": true,
+              "aligned_fields": [],
+              "corrected_fields": [],
+              "unresolved_mismatches": []
+            },
+            "deterministic_finance_lane": {
+              "schema": "deterministic_finance_lane_v1",
+              "generated_at": "2026-02-18T04:38:21.951714",
+              "status": "partial",
+              "project_stage": "dfs",
+              "verified_fields": {
+                "project_stage": {
+                  "value": "dfs",
+                  "unit": "categorical",
+                  "source_id": "openai/gpt-5.1:S1",
+                  "url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vlblbmnlvf47.pdf",
+                  "published_at": "2026-01-27",
+                  "confidence": 0.7200000000000001,
+                  "model": "openai/gpt-5.1"
+                },
+                "stage_multiplier": {
+                  "value": 0.4,
+                  "unit": "multiplier",
+                  "source_id": "openai/gpt-5.1:S1",
+                  "url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vlblbmnlvf47.pdf",
+                  "published_at": "2026-01-27",
+                  "confidence": 0.7100000000000001,
+                  "model": "openai/gpt-5.1"
+                },
+                "irr_pct": {
+                  "value": 92.0,
+                  "unit": "pct",
+                  "source_id": "openai/gpt-5.1:S2",
+                  "url": "https://announcements.asx.com.au/asxpdf/20260116/pdf/06v9w3kwyjx3xm.pdf",
+                  "published_at": "2026-01-16",
+                  "confidence": 0.74,
+                  "model": "openai/gpt-5.1"
+                },
+                "aisc_usd_per_oz": {
+                  "value": 2252.0,
+                  "unit": "usd_per_oz",
+                  "source_id": "openai/gpt-5.1:S2",
+                  "url": "https://announcements.asx.com.au/asxpdf/20260116/pdf/06v9w3kwyjx3xm.pdf",
+                  "published_at": "2026-01-16",
+                  "confidence": 0.74,
+                  "model": "openai/gpt-5.1"
+                },
+                "market_cap_aud_m": {
+                  "value": 553.3383331852024,
+                  "unit": "aud_m",
+                  "source_id": "normalized_facts_prepass",
+                  "url": "",
+                  "published_at": "",
+                  "confidence": 0.99,
+                  "model": "system"
+                }
+              },
+              "derived_metrics": {
+                "risked_npv_aud_m": null,
+                "risked_npv_usd_m": null,
+                "npv_market_cap_ratio": null,
+                "npv_market_cap_ratio_basis": ""
+              },
+              "score_components": {
+                "value_npv_vs_market_cap_score": null,
+                "value_cost_competitiveness_score_proxy": 60.0,
+                "quality_stage_score_component": 40.0,
+                "quality_funding_score_component": null
+              },
+              "market_facts_baseline": {
+                "used": true,
+                "market_cap_aud_m": 553.3383331852024,
+                "currency": "AUD"
+              },
+              "calculation_trace": [
+                "risked_npv = post_tax_npv * stage_multiplier",
+                "npv_market_cap_ratio = risked_npv_aud_m / market_cap_aud_m",
+                "npv_vs_market_cap_score thresholds: >3x=100, 2-3x=80, 1-2x=60, <1x=40"
+              ],
+              "missing_critical_fields": [
+                "post_tax_npv_aud_m"
+              ]
+            },
+            "claim_ledger_counts": {
+              "raw_claims": 75,
+              "resolved_fields": 4,
+              "conflicts": 2
+            }
+          },
+          "company": "Ausgold Limited"
+        },
+        "parse_error": null
+      },
+      "stage3_jsonified": {
+        "model": "openai/gpt-4o-mini",
+        "response": "{\n  \"analysis_type\": \"resources\",\n  \"ticker\": \"ASX:AUC\",\n  \"company_name\": \"Ausgold Limited\",\n  \"analysis_date\": \"2024-12-19\",\n  \"current_development_stage\": \"Definitive Feasibility Study (DFS) Complete\",\n  \"certainty_pct_24m\": 60.0,\n  \"market_data\": {\n    \"current_price\": 1.01,\n    \"market_cap_aud_m\": 553.338,\n    \"shares_outstanding_m\": 547.859,\n    \"enterprise_value_aud_m\": 538.338,\n    \"cash_aud_m\": 15.0,\n    \"debt_aud_m\": 0.0\n  },\n  \"projects\": [\n    {\n      \"project_name\": \"Katanning Gold Project (KGP)\",\n      \"location\": \"Western Australia\",\n      \"stage\": \"DFS\",\n      \"resource_tonnes_mt\": 36.4,\n      \"grade_gt\": 1.14,\n      \"recovery_fraction\": 0.9,\n      \"mine_life_years\": 11,\n      \"aisc_aud_oz\": 1747,\n      \"capex_aud_m\": 296,\n      \"sustaining_capex_aud_m_yr\": 10,\n      \"discount_rate\": 0.05,\n      \"tax_rate\": 0.3,\n      \"royalty_rate\": 0.05,\n      \"working_capital_pct_rev\": 0.05,\n      \"commodities\": [\n        \"Gold\"\n      ],\n      \"economics\": {\n        \"gold_price_aud_oz\": 4150,\n        \"outputs\": {\n          \"recovered_ounces_moz\": 1.18,\n          \"full_annual_production_koz\": 107.27,\n          \"annual_revenue_aud_m\": 445.17,\n          \"annual_margin_pre_tax_aud_m\": 242.0,\n          \"project_npv_post_tax_aud_m\": 1109.0,\n          \"risked_npv_aud_m\": 443.6\n        },\n        \"notes\": \"Inputs derived from April 2024 DFS (Reserve Case) using Spot Gold ~A$4,150/oz as per highest-ranked peer analysis. Resource input uses Ore Reserve tonnes (36.4Mt) to reflect LOM economics accurately.\"\n      }\n    }\n  ],\n  \"total_risked_npv_aud_m\": 443.6,\n  \"quality_score\": {\n    \"total\": 68.5,\n    \"breakdown\": {\n      \"jurisdiction\": 20.0,\n      \"infrastructure\": 9.0,\n      \"management\": 12.75,\n      \"development_stage\": 6.0,\n      \"funding\": 8.0,\n      \"certainty\": 7.0,\n      \"esg\": 8.0\n    }\n  },\n  \"value_score\": {\n    \"total\": 64.0,\n    \"breakdown\": {\n      \"npv_vs_market_cap\": 18.0,\n      \"ev_resource_oz\": 8.0,\n      \"exploration_upside\": 16.0,\n      \"cost_competitiveness\": 12.0,\n      \"ma_strategic_value\": 12.0\n    }\n  },\n  \"development_timeline\": [\n    {\n      \"milestone\": \"Permitting & Approvals\",\n      \"target_period\": \"H1 2025\",\n      \"status\": \"in progress\",\n      \"confidence_pct\": 75.0\n    },\n    {\n      \"milestone\": \"Final Investment Decision (FID)\",\n      \"target_period\": \"Q3 2025\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 65.0\n    },\n    {\n      \"milestone\": \"Construction Start\",\n      \"target_period\": \"H2 2025\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 60.0\n    },\n    {\n      \"milestone\": \"First Gold Pour\",\n      \"target_period\": \"H2 2026\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 50.0\n    }\n  ],\n  \"headwinds_tailwinds\": {\n    \"quantitative\": [\n      \"Spot Gold Price (~A$4,150/oz) is ~38% above DFS Base Case (A$3,000/oz), adding ~$500M to Pre-tax NPV.\",\n      \"Funding Gap >A$50M: Implied Capex ~A$296M vs Cash ~A$15M requires significant dilution (20-30% equity component).\"\n    ],\n    \"qualitative\": [\n      \"Tier 1 Jurisdiction (WA) commands valuation premium and reduces expropriation risk.\",\n      \"Cost Inflation Risk: WA labor/materials market may push capex above DFS estimate of A$296M before construction begins.\"\n    ]\n  },\n  \"price_targets\": {\n    \"current_price\": 1.01,\n    \"target_12m\": 1.35,\n    \"target_24m\": 2.1,\n    \"upside_12m_pct\": 33.6,\n    \"upside_24m_pct\": 107.9,\n    \"scenarios\": {\n      \"base\": 1.35,\n      \"bull\": 1.85,\n      \"bear\": 0.65\n    }\n  },\n  \"investment_recommendation\": {\n    \"rating\": \"BUY\",\n    \"conviction\": \"MEDIUM\",\n    \"summary\": \"Ausgold offers high leverage to the AUD gold price with a completed DFS in a Tier-1 jurisdiction. While the current market cap trades at a premium to the risked study NPV (~1.2x), the spot gold price implies an unrisked NPV >A$1.1B (2x current MCAP). Successful financing is the key catalyst to unlock this value.\"\n  },\n  \"investment_verdict\": {\n    \"top_reasons\": [\n      \"Extreme leverage to AUD gold price: At spot prices, project payback is <12 months post-build.\",\n      \"Strategic Scarcity: Few undeveloped +1Moz Reserve open-pit projects exist in WA near infrastructure.\",\n      \"De-risked Technicals: DFS completed with 1.28Moz Reserve underpinning 11-year mine life.\"\n    ],\n    \"failure_conditions\": [\n      \"Inability to secure debt/equity financing for ~A$300M Capex, forcing delays or excessive dilution.\",\n      \"Gold price collapse <A$3,000/oz erasing the margin buffer against inflationary cost pressures.\",\n      \"Capex blowout >40% rendering the DFS economics obsolete before construction starts.\"\n    ]\n  },\n  \"market_data_provenance\": {\n    \"prepass_as_of_utc\": \"2024-12-19\",\n    \"prepass_source_urls\": [\n      \"normalized_facts\"\n    ],\n    \"prepass_ticker\": \"ASX:AUC\",\n    \"prepass_currency\": \"AUD\",\n    \"override_notes\": [\n      \"Used injected normalized_facts for price (A$1.01) and shares (~548m) which correctly reflect the Nov 2024 10-for-1 consolidation.\"\n    ]\n  },\n  \"extended_analysis\": {\n    \"next_major_catalysts\": [\n      \"Granting of final environmental permits (H1 2025)\",\n      \"Announcement of Debt/Equity Financing Package (Mid-2025)\",\n      \"Final Investment Decision (Q3 2025)\"\n    ],\n    \"sensitivity_analysis\": [\n      {\n        \"factor\": \"Gold Price\",\n        \"impact\": \"High: +/- A$100/oz changes NPV by ~A$80M\"\n      },\n      {\n        \"factor\": \"Capex\",\n        \"impact\": \"Medium: 10% increase reduces NPV by ~A$30M\"\n      }\n    ],\n    \"market_context\": [\n      \"Gold hovering near ATH in AUD terms supports developer valuations.\",\n      \"WA labor market remains tight, pressuring capital estimates.\"\n    ],\n    \"commentary\": \"The divergence in peer valuations stems from the choice of Gold Price input and weight on financing risk. The highest-rated peer emphasizes the specific DFS robustness at Spot Prices (Buy), while dissenting peers focus on the premium to 'Risked' NAV and dilution (Sell/Hold). This analysis favors the DFS data but acknowledges the financing hurdle via a Medium conviction.\",\n    \"dissenting_views\": [\n      \"Peer #2 (Rank 2) rated SELL, citing that Risked NPV (~A$45M in their model) is far below Market Cap (~A$553M), implying the stock is priced for perfection.\",\n      \"Peer #2 estimates Capex at A$400M (vs DFS A$296M), suggesting potential cost blowouts are not priced in.\"\n    ],\n    \"peer_observations\": [\n      \"Peer #1 provided the highest fidelity data based on the April 2024 DFS.\",\n      \"Peer #3 aligned on the Hold/Medium conviction due to the funding gap.\"\n    ]\n  }\n}",
+        "structured_data": {
+          "analysis_type": "resources",
+          "ticker": "ASX:AUC",
+          "company_name": "Ausgold Limited",
+          "analysis_date": "2024-12-19",
+          "current_development_stage": "Definitive Feasibility Study (DFS) Complete",
+          "certainty_pct_24m": 60.0,
+          "market_data": {
+            "current_price": 1.01,
+            "market_cap_aud_m": 553.338,
+            "shares_outstanding_m": 547.859,
+            "enterprise_value_aud_m": 538.338,
+            "cash_aud_m": 15.0,
+            "debt_aud_m": 0.0
+          },
+          "projects": [
+            {
+              "project_name": "Katanning Gold Project (KGP)",
+              "location": "Western Australia",
+              "stage": "DFS",
+              "resource_tonnes_mt": 36.4,
+              "grade_gt": 1.14,
+              "recovery_fraction": 0.9,
+              "mine_life_years": 11,
+              "aisc_aud_oz": 1747,
+              "capex_aud_m": 296,
+              "sustaining_capex_aud_m_yr": 10,
+              "discount_rate": 0.05,
+              "tax_rate": 0.3,
+              "royalty_rate": 0.05,
+              "working_capital_pct_rev": 0.05,
+              "commodities": [
+                "Gold"
+              ],
+              "economics": {
+                "gold_price_aud_oz": 4150,
+                "outputs": {
+                  "recovered_ounces_moz": 1.18,
+                  "full_annual_production_koz": 107.27,
+                  "annual_revenue_aud_m": 445.17,
+                  "annual_margin_pre_tax_aud_m": 242.0,
+                  "project_npv_post_tax_aud_m": 1109.0,
+                  "risked_npv_aud_m": 443.6
+                },
+                "notes": "Inputs derived from April 2024 DFS (Reserve Case) using Spot Gold ~A$4,150/oz as per highest-ranked peer analysis. Resource input uses Ore Reserve tonnes (36.4Mt) to reflect LOM economics accurately."
+              }
+            }
+          ],
+          "total_risked_npv_aud_m": 443.6,
+          "quality_score": {
+            "total": 68.5,
+            "breakdown": {
+              "jurisdiction": 20.0,
+              "infrastructure": 9.0,
+              "management": 12.75,
+              "development_stage": 6.0,
+              "funding": 8.0,
+              "certainty": 7.0,
+              "esg": 8.0
+            }
+          },
+          "value_score": {
+            "total": 64.0,
+            "breakdown": {
+              "npv_vs_market_cap": 18.0,
+              "ev_resource_oz": 8.0,
+              "exploration_upside": 16.0,
+              "cost_competitiveness": 12.0,
+              "ma_strategic_value": 12.0
+            }
+          },
+          "development_timeline": [
+            {
+              "milestone": "Permitting & Approvals",
+              "target_period": "H1 2025",
+              "status": "in progress",
+              "confidence_pct": 75.0
+            },
+            {
+              "milestone": "Final Investment Decision (FID)",
+              "target_period": "Q3 2025",
+              "status": "planned",
+              "confidence_pct": 65.0
+            },
+            {
+              "milestone": "Construction Start",
+              "target_period": "H2 2025",
+              "status": "planned",
+              "confidence_pct": 60.0
+            },
+            {
+              "milestone": "First Gold Pour",
+              "target_period": "H2 2026",
+              "status": "planned",
+              "confidence_pct": 50.0
+            }
+          ],
+          "headwinds_tailwinds": {
+            "quantitative": [
+              "Spot Gold Price (~A$4,150/oz) is ~38% above DFS Base Case (A$3,000/oz), adding ~$500M to Pre-tax NPV.",
+              "Funding Gap >A$50M: Implied Capex ~A$296M vs Cash ~A$15M requires significant dilution (20-30% equity component)."
+            ],
+            "qualitative": [
+              "Tier 1 Jurisdiction (WA) commands valuation premium and reduces expropriation risk.",
+              "Cost Inflation Risk: WA labor/materials market may push capex above DFS estimate of A$296M before construction begins."
+            ]
+          },
+          "price_targets": {
+            "current_price": 1.01,
+            "target_12m": 1.35,
+            "target_24m": 2.1,
+            "upside_12m_pct": 33.6,
+            "upside_24m_pct": 107.9,
+            "scenarios": {
+              "base": 1.35,
+              "bull": 1.85,
+              "bear": 0.65
+            }
+          },
+          "investment_recommendation": {
+            "rating": "BUY",
+            "conviction": "MEDIUM",
+            "summary": "Ausgold offers high leverage to the AUD gold price with a completed DFS in a Tier-1 jurisdiction. While the current market cap trades at a premium to the risked study NPV (~1.2x), the spot gold price implies an unrisked NPV >A$1.1B (2x current MCAP). Successful financing is the key catalyst to unlock this value."
+          },
+          "investment_verdict": {
+            "top_reasons": [
+              "Extreme leverage to AUD gold price: At spot prices, project payback is <12 months post-build.",
+              "Strategic Scarcity: Few undeveloped +1Moz Reserve open-pit projects exist in WA near infrastructure.",
+              "De-risked Technicals: DFS completed with 1.28Moz Reserve underpinning 11-year mine life."
+            ],
+            "failure_conditions": [
+              "Inability to secure debt/equity financing for ~A$300M Capex, forcing delays or excessive dilution.",
+              "Gold price collapse <A$3,000/oz erasing the margin buffer against inflationary cost pressures.",
+              "Capex blowout >40% rendering the DFS economics obsolete before construction starts."
+            ]
+          },
+          "market_data_provenance": {
+            "prepass_as_of_utc": "2024-12-19",
+            "prepass_source_urls": [
+              "normalized_facts"
+            ],
+            "prepass_ticker": "ASX:AUC",
+            "prepass_currency": "AUD",
+            "override_notes": [
+              "Used injected normalized_facts for price (A$1.01) and shares (~548m) which correctly reflect the Nov 2024 10-for-1 consolidation."
+            ]
+          },
+          "extended_analysis": {
+            "next_major_catalysts": [
+              "Granting of final environmental permits (H1 2025)",
+              "Announcement of Debt/Equity Financing Package (Mid-2025)",
+              "Final Investment Decision (Q3 2025)"
+            ],
+            "sensitivity_analysis": [
+              {
+                "factor": "Gold Price",
+                "impact": "High: +/- A$100/oz changes NPV by ~A$80M"
+              },
+              {
+                "factor": "Capex",
+                "impact": "Medium: 10% increase reduces NPV by ~A$30M"
+              }
+            ],
+            "market_context": [
+              "Gold hovering near ATH in AUD terms supports developer valuations.",
+              "WA labor market remains tight, pressuring capital estimates."
+            ],
+            "commentary": "The divergence in peer valuations stems from the choice of Gold Price input and weight on financing risk. The highest-rated peer emphasizes the specific DFS robustness at Spot Prices (Buy), while dissenting peers focus on the premium to 'Risked' NAV and dilution (Sell/Hold). This analysis favors the DFS data but acknowledges the financing hurdle via a Medium conviction.",
+            "dissenting_views": [
+              "Peer #2 (Rank 2) rated SELL, citing that Risked NPV (~A$45M in their model) is far below Market Cap (~A$553M), implying the stock is priced for perfection.",
+              "Peer #2 estimates Capex at A$400M (vs DFS A$296M), suggesting potential cost blowouts are not priced in."
+            ],
+            "peer_observations": [
+              "Peer #1 provided the highest fidelity data based on the April 2024 DFS.",
+              "Peer #3 aligned on the Hold/Medium conviction due to the funding gap."
+            ]
+          }
+        },
+        "parse_error": null,
+        "usage": {
+          "prompt_tokens": 5243,
+          "completion_tokens": 1921,
+          "total_tokens": 7164,
+          "cost": 0.00193905,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "audio_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00193905,
+            "upstream_inference_prompt_cost": 0.00078645,
+            "upstream_inference_completions_cost": 0.0011526
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "finish_reason": "stop",
+        "provider": "OpenAI"
+      }
+    },
+    {
+      "source_artifact": "/Users/Toms_Macbook/Projects/llm-council/outputs/quality_pzg_bundle_stage123_20260218.json",
+      "selection": {
+        "template_id": "gold_miner",
+        "template_name": "Gold Miner",
+        "company_type": "gold_miner",
+        "company_name": "Paramount Gold Nevada Corp",
+        "exchange": "nyse",
+        "exchange_selection_source": "explicit_exchange",
+        "exchange_assumptions": "Exchange profile: NYSE (United States). Prefer SEC filings (10-K/10-Q/8-K), official earnings releases, and investor presentations. Market data in USD by default.",
+        "selection_source": "explicit_template"
+      },
+      "chairman_model": "google/gemini-3-pro-preview",
+      "jsonifier_model": "openai/gpt-4o-mini",
+      "label_to_model": {
+        "Response A": "openai/gpt-5.1",
+        "Response B": "google/gemini-3-pro-preview",
+        "Response C": "anthropic/claude-sonnet-4-5",
+        "Response D": "minimax/minimax-m2.5",
+        "Response E": "z-ai/glm-5",
+        "Response F": "moonshotai/kimi-k2.5"
+      },
+      "stage3_result": {
+        "model": "google/gemini-3-pro-preview",
+        "response": "```json\n{\n  \"analysis_type\": \"resources\",\n  \"ticker\": \"PZG\",\n  \"company_name\": \"Paramount Gold Nevada Corp\",\n  \"analysis_date\": \"2024-12-19\",\n  \"current_development_stage\": \"PFS Complete / Permitting (Advanced)\",\n  \"certainty_pct_24m\": 45.0,\n  \"market_data\": {\n    \"current_price\": 2.21,\n    \"market_cap_aud_m\": 276.46,\n    \"shares_outstanding_m\": 83.81,\n    \"enterprise_value_aud_m\": 276.46,\n    \"cash_aud_m\": 15.0,\n    \"debt_aud_m\": 0.0\n  },\n  \"projects\": [\n    {\n      \"project_name\": \"Grassy Mountain (Oregon)\",\n      \"status\": \"Feasibility/Permitting\",\n      \"resource_tonnes_mt\": 2.8,\n      \"grade_gpt\": 7.5,\n      \"recovery_fraction\": 0.92,\n      \"mine_life_years\": 8,\n      \"aisc_aud_oz\": 1650,\n      \"capex_initial_aud_m\": 195,\n      \"gold_price_aud_oz\": 3000,\n      \"risked_npv_aud_m\": 88.5,\n      \"unrisked_npv_aud_m\": 221.2,\n      \"stage_multiplier\": 0.4\n    },\n    {\n      \"project_name\": \"Sleeper (Nevada)\",\n      \"status\": \"Pre-Feasibility (PFS)\",\n      \"resource_tonnes_mt\": 150.0,\n      \"grade_gpt\": 0.7,\n      \"recovery_fraction\": 0.8,\n      \"mine_life_years\": 12,\n      \"aisc_aud_oz\": 2100,\n      \"capex_initial_aud_m\": 500,\n      \"gold_price_aud_oz\": 3000,\n      \"risked_npv_aud_m\": 72.0,\n      \"unrisked_npv_aud_m\": 288.0,\n      \"stage_multiplier\": 0.25\n    }\n  ],\n  \"total_risked_npv_aud_m\": 160.5,\n  \"quality_score\": {\n    \"total\": 65.0,\n    \"breakdown\": {\n      \"jurisdiction\": 19.0,\n      \"infrastructure\": 8.0,\n      \"management\": 12.75,\n      \"development_stage\": 5.25,\n      \"funding\": 8.0,\n      \"certainty\": 5.0,\n      \"esg\": 7.0\n    }\n  },\n  \"value_score\": {\n    \"total\": 66.0,\n    \"breakdown\": {\n      \"npv_ratio\": 12.0,\n      \"ev_resource\": 14.0,\n      \"exploration_upside\": 16.0,\n      \"cost_competitiveness\": 12.0,\n      \"ma_strategic\": 12.0\n    }\n  },\n  \"development_timeline\": [\n    {\n      \"milestone\": \"Updated FS / Mine Plan (Grassy)\",\n      \"target_period\": \"Q2 2025\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 65.0\n    },\n    {\n      \"milestone\": \"Final Permitting Record of Decision (Grassy)\",\n      \"target_period\": \"Q4 2025 - Q1 2026\",\n      \"status\": \"at risk\",\n      \"confidence_pct\": 50.0\n    },\n    {\n      \"milestone\": \"Project Financing Package (>A$150m)\",\n      \"target_period\": \"Q1 2026\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 40.0\n    },\n    {\n      \"milestone\": \"Construction Mobilization\",\n      \"target_period\": \"Q2 2026\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 35.0\n    }\n  ],\n  \"headwinds_tailwinds\": {\n    \"quantitative\": [\n      \"Funding Gap: Capex (~A$200m) vs MCap (~A$276m) implies high dilution risk (>40%).\",\n      \"Valuation Premium: Trading at ~1.7x Risked NPV, requiring gold price >$2,400 USD to justify.\"\n    ],\n    \"qualitative\": [\n      \"Oregon Permitting Risk: Complex regulatory environment and potential for delays beyond Nevada norms.\",\n      \"Single-Asset Focus: Valuation heavily weighted to Grassy execution; Sleeper is largely option value.\"\n    ]\n  },\n  \"price_targets\": {\n    \"current_price\": 2.21,\n    \"target_12m\": 2.6,\n    \"target_24m\": 3.5,\n    \"upside_12m_pct\": 17.6,\n    \"upside_24m_pct\": 58.4,\n    \"scenarios\": {\n      \"base\": 2.6,\n      \"bull\": 4.2,\n      \"bear\": 1.35\n    }\n  },\n  \"investment_recommendation\": {\n    \"rating\": \"HOLD\",\n    \"conviction\": \"MEDIUM\",\n    \"summary\": \"PZG offers exposure to high-grade US gold (Grassy) and massive optionality (Sleeper). However, it trades at a premium to its risked NPV, reflecting priced-in permitting success. The significant funding gap and Oregon regulatory hurdles suggest sticking to a HOLD until the Record of Decision is clearer.\"\n  },\n  \"investment_verdict\": {\n    \"top_reasons\": [\n      \"High-grade Grassy Mountain asset (approx. 7-8 g/t Au) ensures robust margins even at lower gold prices.\",\n      \"Tier 1 Jurisdiction (Nevada/Oregon) appeals to majors seeking safe North American ounces.\",\n      \"Sleeper Project acts as a massive call option on gold price with multi-million ounce leverage.\"\n    ],\n    \"failure_conditions\": [\n      \"Permitting Failure in Oregon: A rejection or multi-year delay would crush the share price closer to Sleeper-only value (~$1.00).\",\n      \"Dilutive Financing: Raising Capex (> $100M USD) via equity at current prices would severely dilute existing holders.\",\n      \"Gold Price Correction: A drop below $1,800/oz would make the project financing extremely difficult.\"\n    ]\n  },\n  \"market_data_provenance\": {\n    \"prepass_as_of_utc\": \"2024-12-19T00:00:00Z\",\n    \"prepass_source_urls\": [\n      \"normalized_facts_injected\"\n    ],\n    \"prepass_ticker\": \"PZG\",\n    \"prepass_currency\": \"USD\",\n    \"override_notes\": [\n      \"Used USD$2.21 from injected facts.\",\n      \"Converted to AUD at 0.67 rate for NPV calculations.\",\n      \"Market Cap A$276m derived from USD$185.2m.\"\n    ]\n  },\n  \"extended_analysis\": {\n    \"next_major_catalysts\": [\n      \"Grassy Mountain Record of Decision (ROD)\",\n      \"Updated Feasibility Study economics\",\n      \"Financing term sheet announcement\"\n    ],\n    \"sensitivity_analysis\": [\n      {\n        \"variable\": \"Gold Price\",\n        \"impact\": \"High. +/- 10% Gold Price = +/- 20% NPV\"\n      },\n      {\n        \"variable\": \"Permitting Delay\",\n        \"impact\": \"Critical. 1 year delay reduces IRR by ~3-4%\"\n      }\n    ],\n    \"market_context\": [\n      \"Gold Juniors in North America trading at ~0.4-0.6x NAV; PZG trading at premium (~0.8x-1.0x NAV) suggesting M&A or permitting optimism.\"\n    ],\n    \"commentary\": \"The divergence between the models regarding the date (2024 vs 2026) in the source retrieval suggests some data may be simulated or future-dated. This analysis anchors to the 2024-2025 timeline (pre-final permit) as the conservative base case.\",\n    \"dissenting_views\": [\n      \"Response #6 (lowest ranked) suggests approvals already received in 2026; dismissed as likely hallucination/simulation artifact conflicting with current market data inputs.\",\n      \"Response #5 rates as SELL due to valuation premium; this is a valid view given the 1.7x risked NPV multiple.\"\n    ],\n    \"peer_observations\": [\n      \"Trades expensive on EV/oz compared to Nevada peers, justified by higher grade at Grassy.\"\n    ]\n  }\n}\n```",
+        "structured_data": {
+          "analysis_type": "resources",
+          "ticker": "PZG",
+          "company_name": "Paramount Gold Nevada Corp",
+          "analysis_date": "2026-02-19T01:51:53.119431",
+          "current_development_stage": "PFS Complete / Permitting (Advanced)",
+          "certainty_pct_24m": 45.0,
+          "market_data": {
+            "current_price": 2.21,
+            "market_cap_aud_m": 276.46,
+            "shares_outstanding_m": 83.81,
+            "enterprise_value_aud_m": 276.46,
+            "cash_aud_m": 15.0,
+            "debt_aud_m": 0.0
+          },
+          "projects": [
+            {
+              "project_name": "Grassy Mountain (Oregon)",
+              "status": "Feasibility/Permitting",
+              "resource_tonnes_mt": 2.8,
+              "grade_gpt": 7.5,
+              "recovery_fraction": 0.92,
+              "mine_life_years": 8,
+              "aisc_aud_oz": 1650,
+              "capex_initial_aud_m": 195,
+              "gold_price_aud_oz": 3000,
+              "risked_npv_aud_m": 88.5,
+              "unrisked_npv_aud_m": 221.2,
+              "stage_multiplier": 0.4
+            },
+            {
+              "project_name": "Sleeper (Nevada)",
+              "status": "Pre-Feasibility (PFS)",
+              "resource_tonnes_mt": 150.0,
+              "grade_gpt": 0.7,
+              "recovery_fraction": 0.8,
+              "mine_life_years": 12,
+              "aisc_aud_oz": 2100,
+              "capex_initial_aud_m": 500,
+              "gold_price_aud_oz": 3000,
+              "risked_npv_aud_m": 72.0,
+              "unrisked_npv_aud_m": 288.0,
+              "stage_multiplier": 0.25
+            }
+          ],
+          "total_risked_npv_aud_m": 160.5,
+          "quality_score": {
+            "total": 65.0,
+            "breakdown": {
+              "jurisdiction": 19.0,
+              "infrastructure": 8.0,
+              "management": 12.75,
+              "development_stage": 5.25,
+              "funding": 8.0,
+              "certainty": 5.0,
+              "esg": 7.0
+            }
+          },
+          "value_score": {
+            "total": 66.0,
+            "breakdown": {
+              "npv_ratio": 12.0,
+              "ev_resource": 14.0,
+              "exploration_upside": 16.0,
+              "cost_competitiveness": 12.0,
+              "ma_strategic": 12.0
+            }
+          },
+          "development_timeline": [
+            {
+              "milestone": "Updated FS / Mine Plan (Grassy)",
+              "target_period": "Q2 2025",
+              "status": "planned",
+              "confidence_pct": 65.0
+            },
+            {
+              "milestone": "Final Permitting Record of Decision (Grassy)",
+              "target_period": "Q4 2025 - Q1 2026",
+              "status": "at risk",
+              "confidence_pct": 50.0
+            },
+            {
+              "milestone": "Project Financing Package (>A$150m)",
+              "target_period": "Q1 2026",
+              "status": "planned",
+              "confidence_pct": 40.0
+            },
+            {
+              "milestone": "Construction Mobilization",
+              "target_period": "Q2 2026",
+              "status": "planned",
+              "confidence_pct": 35.0
+            }
+          ],
+          "headwinds_tailwinds": {
+            "quantitative": [
+              "Funding Gap: Capex (~A$200m) vs MCap (~A$276m) implies high dilution risk (>40%).",
+              "Valuation Premium: Trading at ~1.7x Risked NPV, requiring gold price >$2,400 USD to justify."
+            ],
+            "qualitative": [
+              "Oregon Permitting Risk: Complex regulatory environment and potential for delays beyond Nevada norms.",
+              "Single-Asset Focus: Valuation heavily weighted to Grassy execution; Sleeper is largely option value."
+            ]
+          },
+          "price_targets": {
+            "current_price": 2.21,
+            "target_12m": 2.6,
+            "target_24m": 3.5,
+            "upside_12m_pct": 17.6,
+            "upside_24m_pct": 58.4,
+            "scenarios": {
+              "base": 2.6,
+              "bull": 4.2,
+              "bear": 1.35
+            }
+          },
+          "investment_recommendation": {
+            "rating": "HOLD",
+            "conviction": "MEDIUM",
+            "summary": "PZG offers exposure to high-grade US gold (Grassy) and massive optionality (Sleeper). However, it trades at a premium to its risked NPV, reflecting priced-in permitting success. The significant funding gap and Oregon regulatory hurdles suggest sticking to a HOLD until the Record of Decision is clearer."
+          },
+          "investment_verdict": {
+            "top_reasons": [
+              "High-grade Grassy Mountain asset (approx. 7-8 g/t Au) ensures robust margins even at lower gold prices.",
+              "Tier 1 Jurisdiction (Nevada/Oregon) appeals to majors seeking safe North American ounces.",
+              "Sleeper Project acts as a massive call option on gold price with multi-million ounce leverage."
+            ],
+            "failure_conditions": [
+              "Permitting Failure in Oregon: A rejection or multi-year delay would crush the share price closer to Sleeper-only value (~$1.00).",
+              "Dilutive Financing: Raising Capex (> $100M USD) via equity at current prices would severely dilute existing holders.",
+              "Gold Price Correction: A drop below $1,800/oz would make the project financing extremely difficult."
+            ]
+          },
+          "market_data_provenance": {
+            "prepass_as_of_utc": "2024-12-19T00:00:00Z",
+            "prepass_source_urls": [
+              "normalized_facts_injected"
+            ],
+            "prepass_ticker": "PZG",
+            "prepass_currency": "USD",
+            "override_notes": [
+              "Used USD$2.21 from injected facts.",
+              "Converted to AUD at 0.67 rate for NPV calculations.",
+              "Market Cap A$276m derived from USD$185.2m."
+            ]
+          },
+          "extended_analysis": {
+            "next_major_catalysts": [
+              "Grassy Mountain Record of Decision (ROD)",
+              "Updated Feasibility Study economics",
+              "Financing term sheet announcement"
+            ],
+            "sensitivity_analysis": [
+              {
+                "variable": "Gold Price",
+                "impact": "High. +/- 10% Gold Price = +/- 20% NPV"
+              },
+              {
+                "variable": "Permitting Delay",
+                "impact": "Critical. 1 year delay reduces IRR by ~3-4%"
+              }
+            ],
+            "market_context": [
+              "Gold Juniors in North America trading at ~0.4-0.6x NAV; PZG trading at premium (~0.8x-1.0x NAV) suggesting M&A or permitting optimism."
+            ],
+            "commentary": "The divergence between the models regarding the date (2024 vs 2026) in the source retrieval suggests some data may be simulated or future-dated. This analysis anchors to the 2024-2025 timeline (pre-final permit) as the conservative base case.",
+            "dissenting_views": [
+              "Response #6 (lowest ranked) suggests approvals already received in 2026; dismissed as likely hallucination/simulation artifact conflicting with current market data inputs.",
+              "Response #5 rates as SELL due to valuation premium; this is a valid view given the 1.7x risked NPV multiple."
+            ],
+            "peer_observations": [
+              "Trades expensive on EV/oz compared to Nevada peers, justified by higher grade at Grassy."
+            ]
+          },
+          "council_metadata": {
+            "resolved_company_name": "Paramount Gold Nevada Corp",
+            "top_ranked_models": [
+              "openai/gpt-5.1 (avg rank: 2.17)",
+              "z-ai/glm-5 (avg rank: 2.17)",
+              "moonshotai/kimi-k2.5 (avg rank: 2.50)"
+            ],
+            "market_facts_validation": {
+              "override_allowed": true,
+              "aligned_fields": [],
+              "corrected_fields": [],
+              "unresolved_mismatches": []
+            },
+            "deterministic_finance_lane": {
+              "schema": "deterministic_finance_lane_v1",
+              "generated_at": "2026-02-18T10:06:16.675129",
+              "status": "partial",
+              "project_stage": "development",
+              "verified_fields": {
+                "project_stage": {
+                  "value": "development",
+                  "unit": "categorical",
+                  "source_id": "openai/gpt-5.1:S4",
+                  "url": "https://www.globenewswire.com/news-release/2026/01/29/3229150/0/en/Paramount-Gold-Receives-Federal-Approval-for-the-Grassy-Mountain-Gold-Project.html",
+                  "published_at": "2026-01-29",
+                  "confidence": 0.6000000000000001,
+                  "model": "openai/gpt-5.1"
+                },
+                "stage_multiplier": {
+                  "value": 0.6,
+                  "unit": "multiplier",
+                  "source_id": "openai/gpt-5.1:S4",
+                  "url": "https://www.globenewswire.com/news-release/2026/01/29/3229150/0/en/Paramount-Gold-Receives-Federal-Approval-for-the-Grassy-Mountain-Gold-Project.html",
+                  "published_at": "2026-01-29",
+                  "confidence": 0.5900000000000001,
+                  "model": "openai/gpt-5.1"
+                },
+                "market_cap_aud_m": {
+                  "value": 185.22726801722146,
+                  "unit": "aud_m",
+                  "source_id": "normalized_facts_prepass",
+                  "url": "",
+                  "published_at": "",
+                  "confidence": 0.99,
+                  "model": "system"
+                }
+              },
+              "derived_metrics": {
+                "risked_npv_aud_m": null,
+                "risked_npv_usd_m": null,
+                "npv_market_cap_ratio": null,
+                "npv_market_cap_ratio_basis": ""
+              },
+              "score_components": {
+                "value_npv_vs_market_cap_score": null,
+                "value_cost_competitiveness_score_proxy": null,
+                "quality_stage_score_component": 60.0,
+                "quality_funding_score_component": null
+              },
+              "market_facts_baseline": {
+                "used": true,
+                "market_cap_aud_m": 185.22726801722146,
+                "currency": "USD"
+              },
+              "calculation_trace": [
+                "risked_npv = post_tax_npv * stage_multiplier",
+                "npv_market_cap_ratio = risked_npv_aud_m / market_cap_aud_m",
+                "npv_vs_market_cap_score thresholds: >3x=100, 2-3x=80, 1-2x=60, <1x=40"
+              ],
+              "missing_critical_fields": [
+                "post_tax_npv_aud_m"
+              ]
+            },
+            "claim_ledger_counts": {
+              "raw_claims": 108,
+              "resolved_fields": 2,
+              "conflicts": 0
+            }
+          },
+          "company": "Paramount Gold Nevada Corp"
+        },
+        "parse_error": null
+      },
+      "stage3_jsonified": {
+        "model": "openai/gpt-4o-mini",
+        "response": "{\n  \"analysis_type\": \"resources\",\n  \"ticker\": \"PZG\",\n  \"company_name\": \"Paramount Gold Nevada Corp\",\n  \"analysis_date\": \"2024-12-19\",\n  \"current_development_stage\": \"PFS Complete / Permitting (Advanced)\",\n  \"certainty_pct_24m\": 45.0,\n  \"market_data\": {\n    \"current_price\": 2.21,\n    \"market_cap_aud_m\": 276.46,\n    \"shares_outstanding_m\": 83.81,\n    \"enterprise_value_aud_m\": 276.46,\n    \"cash_aud_m\": 15.0,\n    \"debt_aud_m\": 0.0\n  },\n  \"projects\": [\n    {\n      \"project_name\": \"Grassy Mountain (Oregon)\",\n      \"status\": \"Feasibility/Permitting\",\n      \"resource_tonnes_mt\": 2.8,\n      \"grade_gpt\": 7.5,\n      \"recovery_fraction\": 0.92,\n      \"mine_life_years\": 8,\n      \"aisc_aud_oz\": 1650,\n      \"capex_initial_aud_m\": 195,\n      \"gold_price_aud_oz\": 3000,\n      \"risked_npv_aud_m\": 88.5,\n      \"unrisked_npv_aud_m\": 221.2,\n      \"stage_multiplier\": 0.4\n    },\n    {\n      \"project_name\": \"Sleeper (Nevada)\",\n      \"status\": \"Pre-Feasibility (PFS)\",\n      \"resource_tonnes_mt\": 150.0,\n      \"grade_gpt\": 0.7,\n      \"recovery_fraction\": 0.8,\n      \"mine_life_years\": 12,\n      \"aisc_aud_oz\": 2100,\n      \"capex_initial_aud_m\": 500,\n      \"gold_price_aud_oz\": 3000,\n      \"risked_npv_aud_m\": 72.0,\n      \"unrisked_npv_aud_m\": 288.0,\n      \"stage_multiplier\": 0.25\n    }\n  ],\n  \"total_risked_npv_aud_m\": 160.5,\n  \"quality_score\": {\n    \"total\": 65.0,\n    \"breakdown\": {\n      \"jurisdiction\": 19.0,\n      \"infrastructure\": 8.0,\n      \"management\": 12.75,\n      \"development_stage\": 5.25,\n      \"funding\": 8.0,\n      \"certainty\": 5.0,\n      \"esg\": 7.0\n    }\n  },\n  \"value_score\": {\n    \"total\": 66.0,\n    \"breakdown\": {\n      \"npv_ratio\": 12.0,\n      \"ev_resource\": 14.0,\n      \"exploration_upside\": 16.0,\n      \"cost_competitiveness\": 12.0,\n      \"ma_strategic\": 12.0\n    }\n  },\n  \"development_timeline\": [\n    {\n      \"milestone\": \"Updated FS / Mine Plan (Grassy)\",\n      \"target_period\": \"Q2 2025\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 65.0\n    },\n    {\n      \"milestone\": \"Final Permitting Record of Decision (Grassy)\",\n      \"target_period\": \"Q4 2025 - Q1 2026\",\n      \"status\": \"at risk\",\n      \"confidence_pct\": 50.0\n    },\n    {\n      \"milestone\": \"Project Financing Package (>A$150m)\",\n      \"target_period\": \"Q1 2026\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 40.0\n    },\n    {\n      \"milestone\": \"Construction Mobilization\",\n      \"target_period\": \"Q2 2026\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 35.0\n    }\n  ],\n  \"headwinds_tailwinds\": {\n    \"quantitative\": [\n      \"Funding Gap: Capex (~A$200m) vs MCap (~A$276m) implies high dilution risk (>40%).\",\n      \"Valuation Premium: Trading at ~1.7x Risked NPV, requiring gold price >$2,400 USD to justify.\"\n    ],\n    \"qualitative\": [\n      \"Oregon Permitting Risk: Complex regulatory environment and potential for delays beyond Nevada norms.\",\n      \"Single-Asset Focus: Valuation heavily weighted to Grassy execution; Sleeper is largely option value.\"\n    ]\n  },\n  \"price_targets\": {\n    \"current_price\": 2.21,\n    \"target_12m\": 2.6,\n    \"target_24m\": 3.5,\n    \"upside_12m_pct\": 17.6,\n    \"upside_24m_pct\": 58.4,\n    \"scenarios\": {\n      \"base\": 2.6,\n      \"bull\": 4.2,\n      \"bear\": 1.35\n    }\n  },\n  \"investment_recommendation\": {\n    \"rating\": \"HOLD\",\n    \"conviction\": \"MEDIUM\",\n    \"summary\": \"PZG offers exposure to high-grade US gold (Grassy) and massive optionality (Sleeper). However, it trades at a premium to its risked NPV, reflecting priced-in permitting success. The significant funding gap and Oregon regulatory hurdles suggest sticking to a HOLD until the Record of Decision is clearer.\"\n  },\n  \"investment_verdict\": {\n    \"top_reasons\": [\n      \"High-grade Grassy Mountain asset (approx. 7-8 g/t Au) ensures robust margins even at lower gold prices.\",\n      \"Tier 1 Jurisdiction (Nevada/Oregon) appeals to majors seeking safe North American ounces.\",\n      \"Sleeper Project acts as a massive call option on gold price with multi-million ounce leverage.\"\n    ],\n    \"failure_conditions\": [\n      \"Permitting Failure in Oregon: A rejection or multi-year delay would crush the share price closer to Sleeper-only value (~$1.00).\",\n      \"Dilutive Financing: Raising Capex (> $100M USD) via equity at current prices would severely dilute existing holders.\",\n      \"Gold Price Correction: A drop below $1,800/oz would make the project financing extremely difficult.\"\n    ]\n  },\n  \"market_data_provenance\": {\n    \"prepass_as_of_utc\": \"2024-12-19T00:00:00Z\",\n    \"prepass_source_urls\": [\n      \"normalized_facts_injected\"\n    ],\n    \"prepass_ticker\": \"PZG\",\n    \"prepass_currency\": \"USD\",\n    \"override_notes\": [\n      \"Used USD$2.21 from injected facts.\",\n      \"Converted to AUD at 0.67 rate for NPV calculations.\",\n      \"Market Cap A$276m derived from USD$185.2m.\"\n    ]\n  },\n  \"extended_analysis\": {\n    \"next_major_catalysts\": [\n      \"Grassy Mountain Record of Decision (ROD)\",\n      \"Updated Feasibility Study economics\",\n      \"Financing term sheet announcement\"\n    ],\n    \"sensitivity_analysis\": [\n      {\n        \"variable\": \"Gold Price\",\n        \"impact\": \"High. +/- 10% Gold Price = +/- 20% NPV\"\n      },\n      {\n        \"variable\": \"Permitting Delay\",\n        \"impact\": \"Critical. 1 year delay reduces IRR by ~3-4%\"\n      }\n    ],\n    \"market_context\": [\n      \"Gold Juniors in North America trading at ~0.4-0.6x NAV; PZG trading at premium (~0.8x-1.0x NAV) suggesting M&A or permitting optimism.\"\n    ],\n    \"commentary\": \"The divergence between the models regarding the date (2024 vs 2026) in the source retrieval suggests some data may be simulated or future-dated. This analysis anchors to the 2024-2025 timeline (pre-final permit) as the conservative base case.\",\n    \"dissenting_views\": [\n      \"Response #6 (lowest ranked) suggests approvals already received in 2026; dismissed as likely hallucination/simulation artifact conflicting with current market data inputs.\",\n      \"Response #5 rates as SELL due to valuation premium; this is a valid view given the 1.7x risked NPV multiple.\"\n    ],\n    \"peer_observations\": [\n      \"Trades expensive on EV/oz compared to Nevada peers, justified by higher grade at Grassy.\"\n    ]\n  }\n}",
+        "structured_data": {
+          "analysis_type": "resources",
+          "ticker": "PZG",
+          "company_name": "Paramount Gold Nevada Corp",
+          "analysis_date": "2024-12-19",
+          "current_development_stage": "PFS Complete / Permitting (Advanced)",
+          "certainty_pct_24m": 45.0,
+          "market_data": {
+            "current_price": 2.21,
+            "market_cap_aud_m": 276.46,
+            "shares_outstanding_m": 83.81,
+            "enterprise_value_aud_m": 276.46,
+            "cash_aud_m": 15.0,
+            "debt_aud_m": 0.0
+          },
+          "projects": [
+            {
+              "project_name": "Grassy Mountain (Oregon)",
+              "status": "Feasibility/Permitting",
+              "resource_tonnes_mt": 2.8,
+              "grade_gpt": 7.5,
+              "recovery_fraction": 0.92,
+              "mine_life_years": 8,
+              "aisc_aud_oz": 1650,
+              "capex_initial_aud_m": 195,
+              "gold_price_aud_oz": 3000,
+              "risked_npv_aud_m": 88.5,
+              "unrisked_npv_aud_m": 221.2,
+              "stage_multiplier": 0.4
+            },
+            {
+              "project_name": "Sleeper (Nevada)",
+              "status": "Pre-Feasibility (PFS)",
+              "resource_tonnes_mt": 150.0,
+              "grade_gpt": 0.7,
+              "recovery_fraction": 0.8,
+              "mine_life_years": 12,
+              "aisc_aud_oz": 2100,
+              "capex_initial_aud_m": 500,
+              "gold_price_aud_oz": 3000,
+              "risked_npv_aud_m": 72.0,
+              "unrisked_npv_aud_m": 288.0,
+              "stage_multiplier": 0.25
+            }
+          ],
+          "total_risked_npv_aud_m": 160.5,
+          "quality_score": {
+            "total": 65.0,
+            "breakdown": {
+              "jurisdiction": 19.0,
+              "infrastructure": 8.0,
+              "management": 12.75,
+              "development_stage": 5.25,
+              "funding": 8.0,
+              "certainty": 5.0,
+              "esg": 7.0
+            }
+          },
+          "value_score": {
+            "total": 66.0,
+            "breakdown": {
+              "npv_ratio": 12.0,
+              "ev_resource": 14.0,
+              "exploration_upside": 16.0,
+              "cost_competitiveness": 12.0,
+              "ma_strategic": 12.0
+            }
+          },
+          "development_timeline": [
+            {
+              "milestone": "Updated FS / Mine Plan (Grassy)",
+              "target_period": "Q2 2025",
+              "status": "planned",
+              "confidence_pct": 65.0
+            },
+            {
+              "milestone": "Final Permitting Record of Decision (Grassy)",
+              "target_period": "Q4 2025 - Q1 2026",
+              "status": "at risk",
+              "confidence_pct": 50.0
+            },
+            {
+              "milestone": "Project Financing Package (>A$150m)",
+              "target_period": "Q1 2026",
+              "status": "planned",
+              "confidence_pct": 40.0
+            },
+            {
+              "milestone": "Construction Mobilization",
+              "target_period": "Q2 2026",
+              "status": "planned",
+              "confidence_pct": 35.0
+            }
+          ],
+          "headwinds_tailwinds": {
+            "quantitative": [
+              "Funding Gap: Capex (~A$200m) vs MCap (~A$276m) implies high dilution risk (>40%).",
+              "Valuation Premium: Trading at ~1.7x Risked NPV, requiring gold price >$2,400 USD to justify."
+            ],
+            "qualitative": [
+              "Oregon Permitting Risk: Complex regulatory environment and potential for delays beyond Nevada norms.",
+              "Single-Asset Focus: Valuation heavily weighted to Grassy execution; Sleeper is largely option value."
+            ]
+          },
+          "price_targets": {
+            "current_price": 2.21,
+            "target_12m": 2.6,
+            "target_24m": 3.5,
+            "upside_12m_pct": 17.6,
+            "upside_24m_pct": 58.4,
+            "scenarios": {
+              "base": 2.6,
+              "bull": 4.2,
+              "bear": 1.35
+            }
+          },
+          "investment_recommendation": {
+            "rating": "HOLD",
+            "conviction": "MEDIUM",
+            "summary": "PZG offers exposure to high-grade US gold (Grassy) and massive optionality (Sleeper). However, it trades at a premium to its risked NPV, reflecting priced-in permitting success. The significant funding gap and Oregon regulatory hurdles suggest sticking to a HOLD until the Record of Decision is clearer."
+          },
+          "investment_verdict": {
+            "top_reasons": [
+              "High-grade Grassy Mountain asset (approx. 7-8 g/t Au) ensures robust margins even at lower gold prices.",
+              "Tier 1 Jurisdiction (Nevada/Oregon) appeals to majors seeking safe North American ounces.",
+              "Sleeper Project acts as a massive call option on gold price with multi-million ounce leverage."
+            ],
+            "failure_conditions": [
+              "Permitting Failure in Oregon: A rejection or multi-year delay would crush the share price closer to Sleeper-only value (~$1.00).",
+              "Dilutive Financing: Raising Capex (> $100M USD) via equity at current prices would severely dilute existing holders.",
+              "Gold Price Correction: A drop below $1,800/oz would make the project financing extremely difficult."
+            ]
+          },
+          "market_data_provenance": {
+            "prepass_as_of_utc": "2024-12-19T00:00:00Z",
+            "prepass_source_urls": [
+              "normalized_facts_injected"
+            ],
+            "prepass_ticker": "PZG",
+            "prepass_currency": "USD",
+            "override_notes": [
+              "Used USD$2.21 from injected facts.",
+              "Converted to AUD at 0.67 rate for NPV calculations.",
+              "Market Cap A$276m derived from USD$185.2m."
+            ]
+          },
+          "extended_analysis": {
+            "next_major_catalysts": [
+              "Grassy Mountain Record of Decision (ROD)",
+              "Updated Feasibility Study economics",
+              "Financing term sheet announcement"
+            ],
+            "sensitivity_analysis": [
+              {
+                "variable": "Gold Price",
+                "impact": "High. +/- 10% Gold Price = +/- 20% NPV"
+              },
+              {
+                "variable": "Permitting Delay",
+                "impact": "Critical. 1 year delay reduces IRR by ~3-4%"
+              }
+            ],
+            "market_context": [
+              "Gold Juniors in North America trading at ~0.4-0.6x NAV; PZG trading at premium (~0.8x-1.0x NAV) suggesting M&A or permitting optimism."
+            ],
+            "commentary": "The divergence between the models regarding the date (2024 vs 2026) in the source retrieval suggests some data may be simulated or future-dated. This analysis anchors to the 2024-2025 timeline (pre-final permit) as the conservative base case.",
+            "dissenting_views": [
+              "Response #6 (lowest ranked) suggests approvals already received in 2026; dismissed as likely hallucination/simulation artifact conflicting with current market data inputs.",
+              "Response #5 rates as SELL due to valuation premium; this is a valid view given the 1.7x risked NPV multiple."
+            ],
+            "peer_observations": [
+              "Trades expensive on EV/oz compared to Nevada peers, justified by higher grade at Grassy."
+            ]
+          }
+        },
+        "parse_error": null,
+        "usage": {
+          "prompt_tokens": 4913,
+          "completion_tokens": 1835,
+          "total_tokens": 6748,
+          "cost": 0.00183795,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "audio_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00183795,
+            "upstream_inference_prompt_cost": 0.00073695,
+            "upstream_inference_completions_cost": 0.001101
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "finish_reason": "stop",
+        "provider": "OpenAI"
+      }
+    },
+    {
+      "source_artifact": "/Users/Toms_Macbook/Projects/llm-council/outputs/quality_gldg_stage123_20260218.json",
+      "selection": {
+        "template_id": "gold_miner",
+        "template_name": "Gold Miner",
+        "company_type": "gold_miner",
+        "company_name": "GoldMining Inc",
+        "exchange": "nyse",
+        "exchange_selection_source": "explicit_exchange",
+        "exchange_assumptions": "Exchange profile: NYSE (United States). Prefer SEC filings (10-K/10-Q/8-K), official earnings releases, and investor presentations. Market data in USD by default.",
+        "selection_source": "explicit_template"
+      },
+      "chairman_model": "google/gemini-3-pro-preview",
+      "jsonifier_model": "openai/gpt-4o-mini",
+      "label_to_model": {
+        "Response A": "openai/gpt-5.1",
+        "Response B": "google/gemini-3-pro-preview",
+        "Response C": "anthropic/claude-sonnet-4-5",
+        "Response D": "minimax/minimax-m2.5",
+        "Response E": "z-ai/glm-5",
+        "Response F": "moonshotai/kimi-k2.5"
+      },
+      "stage3_result": {
+        "model": "google/gemini-3-pro-preview",
+        "response": "```json\n{\n  \"analysis_type\": \"resources\",\n  \"ticker\": \"GLDG\",\n  \"company_name\": \"GoldMining Inc.\",\n  \"analysis_date\": \"2024-06-15\",\n  \"current_development_stage\": \"Pre-Feasibility (PFS) / Advanced Exploration\",\n  \"certainty_pct_24m\": 55,\n  \"market_data\": {\n    \"current_price\": 1.46,\n    \"market_cap_aud_m\": 471.7,\n    \"shares_outstanding_m\": 209.8,\n    \"enterprise_value_aud_m\": 440.4,\n    \"cash_aud_m\": 31.0,\n    \"debt_aud_m\": 0.0\n  },\n  \"projects\": [\n    {\n      \"project_name\": \"S\u00e3o Jorge (Brazil)\",\n      \"stage\": \"PFS\",\n      \"resource_moz\": 2.0,\n      \"grade_gt\": 2.1,\n      \"npv_aud_m\": 271.0,\n      \"source\": \"PFS Technical Report (Sept 2022)\"\n    },\n    {\n      \"project_name\": \"Titiribi (Colombia)\",\n      \"stage\": \"PEA\",\n      \"resource_moz\": 2.14,\n      \"grade_gt\": 0.68,\n      \"npv_aud_m\": 463.0,\n      \"source\": \"PEA Technical Report (2021)\"\n    },\n    {\n      \"project_name\": \"Cachoeira (Brazil)\",\n      \"stage\": \"PEA\",\n      \"resource_moz\": 2.36,\n      \"grade_gt\": 1.05,\n      \"npv_aud_m\": 530.0,\n      \"source\": \"PEA Technical Report (2022)\"\n    }\n  ],\n  \"total_risked_npv_aud_m\": 1264.0,\n  \"quality_score\": {\n    \"total\": 61,\n    \"breakdown\": {\n      \"jurisdiction\": 17.0,\n      \"infrastructure\": 6.5,\n      \"management\": 12.0,\n      \"development_stage\": 3.75,\n      \"funding\": 8.0,\n      \"certainty\": 6.0,\n      \"esg\": 7.5\n    }\n  },\n  \"value_score\": {\n    \"total\": 85,\n    \"breakdown\": {\n      \"npv_vs_market_cap\": 18.0,\n      \"ev_per_resource_oz\": 20.0,\n      \"exploration_upside\": 20.0,\n      \"cost_competitiveness\": 12.0,\n      \"ma_strategic_value\": 15.0\n    }\n  },\n  \"development_timeline\": [\n    {\n      \"milestone\": \"S\u00e3o Jorge DFS Completion\",\n      \"target_period\": \"Q1 2025\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 70\n    },\n    {\n      \"milestone\": \"Environmental License (LP) Approval\",\n      \"target_period\": \"Q2 2025\",\n      \"status\": \"at risk\",\n      \"confidence_pct\": 60\n    },\n    {\n      \"milestone\": \"Project Financing (Construction)\",\n      \"target_period\": \"Q3-Q4 2025\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 40\n    }\n  ],\n  \"headwinds_tailwinds\": {\n    \"quantitative\": [\n      \"Funding Gap >A$200M: Construction capex exceeds current cash (~A$31M) significantly, implying dilution risk.\",\n      \"Cash Burn Rate: ~$15M USD/year estimated burn limits runway to <24 months without financing.\"\n    ],\n    \"qualitative\": [\n      \"Permitting Delays: Brazil/Colombia bureaucratic hurdles for environmental licenses (LP) often exceed timelines.\",\n      \"Strategic Optionality: High M&A appeal for mid-tier producers seeking established resource bases in the Americas.\"\n    ]\n  },\n  \"price_targets\": {\n    \"current_price\": 1.46,\n    \"target_12m\": 2.0,\n    \"target_24m\": 2.8,\n    \"upside_12m_pct\": 37.0,\n    \"upside_24m_pct\": 91.8,\n    \"scenarios\": {\n      \"base\": 2.0,\n      \"bull\": 2.6,\n      \"bear\": 1.1\n    }\n  },\n  \"investment_recommendation\": {\n    \"rating\": \"BUY\",\n    \"conviction\": \"MEDIUM\",\n    \"summary\": \"GoldMining Inc. offers a deep value opportunity (trading <$20/oz EV) with a massive 20Moz+ resource base. While funding and permitting risks persist, the portfolio's option value on gold price and potential M&A make it a compelling speculative buy.\"\n  },\n  \"investment_verdict\": {\n    \"top_reasons\": [\n      \"Extreme Undervaluation: EV/Resource oz is ~$20-30/oz vs peer average >$50/oz, providing a high margin of safety.\",\n      \"Strategic Asset Base: Control of large, scarce gold-copper porphyry systems (Titiribi, Whistler, La Mina) attractive to majors.\",\n      \"High Leverage to Gold: Project economics (NPV) expand disproportionately with gold prices >$2,300/oz.\"\n    ],\n    \"failure_conditions\": [\n      \"Dilutive Financing: Inability to secure non-equity funding (JV, debt, stream) for construction causing >40% shareholder dilution.\",\n      \"Permitting Stagnation: Failure to obtain key environmental licenses (LP) in Brazil or Colombia within 24 months.\",\n      \"Gold Price Collapse: Sustained drop below $1,800/oz rendering large-scale, lower-grade projects uneconomic.\"\n    ]\n  },\n  \"market_data_provenance\": {\n    \"prepass_as_of_utc\": \"2024-06-15\",\n    \"prepass_source_urls\": [\n      \"Injected normalized_facts\"\n    ],\n    \"prepass_ticker\": \"GLDG\",\n    \"prepass_currency\": \"USD\",\n    \"override_notes\": [\n      \"Converted market cap/EV to AUD at 1.54 exchange rate for reporting consistency with rubric.\",\n      \"Used normalized_facts for USD share price ($1.46) and share count (209.8M).\"\n    ]\n  },\n  \"extended_analysis\": {\n    \"next_major_catalysts\": [\n      \"S\u00e3o Jorge DFS results\",\n      \"Potential spin-out or JV of Colombian assets\",\n      \"Gold Royalty Corp (GROY) dividend/equity appreciation\"\n    ],\n    \"sensitivity_analysis\": [\n      {\n        \"factor\": \"Gold Price\",\n        \"impact\": \"High: +/- $100/oz swings NPV by ~15-20%\"\n      },\n      {\n        \"factor\": \"Discount Rate\",\n        \"impact\": \"Moderate: 5% to 8% reduces NPV by ~25%\"\n      }\n    ],\n    \"market_context\": [\n      \"Junior developers trading at historic discount to spot gold.\",\n      \"M&A activity heating up in the Americas (e.g., BHP/Filo, Gold Fields/Osisko).\"\n    ],\n    \"commentary\": \"The company operates as a 'Resource Bank' or 'Project Generator'. It is not strictly a mine builder. Valuation should reflect the 'option value' of ounces in the ground plus the liquidity of its equity holdings (GROY, USGO).\",\n    \"dissenting_views\": [\n      \"Some peers (Response #4) incorrectly identified Almas as a primary asset; Almas was divested.\",\n      \"Disagreement on discount rates: 5% is standard for rubric but 8% may be more realistic for LatAm jurisdictional risk.\"\n    ],\n    \"peer_observations\": [\n      \"Response #1 provided best project-specific fidelity (S\u00e3o Jorge PFS parameters).\",\n      \"Response #2 correctly identified the broader portfolio value contribution.\"\n    ]\n  }\n}\n```",
+        "structured_data": {
+          "analysis_type": "resources",
+          "ticker": "GLDG",
+          "company_name": "GoldMining Inc.",
+          "analysis_date": "2026-02-19T01:53:23.366112",
+          "current_development_stage": "Pre-Feasibility (PFS) / Advanced Exploration",
+          "certainty_pct_24m": 55,
+          "market_data": {
+            "current_price": 1.46,
+            "market_cap_aud_m": 471.7,
+            "shares_outstanding_m": 209.8,
+            "enterprise_value_aud_m": 440.4,
+            "cash_aud_m": 31.0,
+            "debt_aud_m": 0.0
+          },
+          "projects": [
+            {
+              "project_name": "S\u00e3o Jorge (Brazil)",
+              "stage": "PFS",
+              "resource_moz": 2.0,
+              "grade_gt": 2.1,
+              "npv_aud_m": 271.0,
+              "source": "PFS Technical Report (Sept 2022)"
+            },
+            {
+              "project_name": "Titiribi (Colombia)",
+              "stage": "PEA",
+              "resource_moz": 2.14,
+              "grade_gt": 0.68,
+              "npv_aud_m": 463.0,
+              "source": "PEA Technical Report (2021)"
+            },
+            {
+              "project_name": "Cachoeira (Brazil)",
+              "stage": "PEA",
+              "resource_moz": 2.36,
+              "grade_gt": 1.05,
+              "npv_aud_m": 530.0,
+              "source": "PEA Technical Report (2022)"
+            }
+          ],
+          "total_risked_npv_aud_m": 1264.0,
+          "quality_score": {
+            "total": 61,
+            "breakdown": {
+              "jurisdiction": 17.0,
+              "infrastructure": 6.5,
+              "management": 12.0,
+              "development_stage": 3.75,
+              "funding": 8.0,
+              "certainty": 6.0,
+              "esg": 7.5
+            }
+          },
+          "value_score": {
+            "total": 85,
+            "breakdown": {
+              "npv_vs_market_cap": 18.0,
+              "ev_per_resource_oz": 20.0,
+              "exploration_upside": 20.0,
+              "cost_competitiveness": 12.0,
+              "ma_strategic_value": 15.0
+            }
+          },
+          "development_timeline": [
+            {
+              "milestone": "S\u00e3o Jorge DFS Completion",
+              "target_period": "Q1 2025",
+              "status": "planned",
+              "confidence_pct": 70
+            },
+            {
+              "milestone": "Environmental License (LP) Approval",
+              "target_period": "Q2 2025",
+              "status": "at risk",
+              "confidence_pct": 60
+            },
+            {
+              "milestone": "Project Financing (Construction)",
+              "target_period": "Q3-Q4 2025",
+              "status": "planned",
+              "confidence_pct": 40
+            }
+          ],
+          "headwinds_tailwinds": {
+            "quantitative": [
+              "Funding Gap >A$200M: Construction capex exceeds current cash (~A$31M) significantly, implying dilution risk.",
+              "Cash Burn Rate: ~$15M USD/year estimated burn limits runway to <24 months without financing."
+            ],
+            "qualitative": [
+              "Permitting Delays: Brazil/Colombia bureaucratic hurdles for environmental licenses (LP) often exceed timelines.",
+              "Strategic Optionality: High M&A appeal for mid-tier producers seeking established resource bases in the Americas."
+            ]
+          },
+          "price_targets": {
+            "current_price": 1.46,
+            "target_12m": 2.0,
+            "target_24m": 2.8,
+            "upside_12m_pct": 37.0,
+            "upside_24m_pct": 91.8,
+            "scenarios": {
+              "base": 2.0,
+              "bull": 2.6,
+              "bear": 1.1
+            }
+          },
+          "investment_recommendation": {
+            "rating": "BUY",
+            "conviction": "MEDIUM",
+            "summary": "GoldMining Inc. offers a deep value opportunity (trading <$20/oz EV) with a massive 20Moz+ resource base. While funding and permitting risks persist, the portfolio's option value on gold price and potential M&A make it a compelling speculative buy."
+          },
+          "investment_verdict": {
+            "top_reasons": [
+              "Extreme Undervaluation: EV/Resource oz is ~$20-30/oz vs peer average >$50/oz, providing a high margin of safety.",
+              "Strategic Asset Base: Control of large, scarce gold-copper porphyry systems (Titiribi, Whistler, La Mina) attractive to majors.",
+              "High Leverage to Gold: Project economics (NPV) expand disproportionately with gold prices >$2,300/oz."
+            ],
+            "failure_conditions": [
+              "Dilutive Financing: Inability to secure non-equity funding (JV, debt, stream) for construction causing >40% shareholder dilution.",
+              "Permitting Stagnation: Failure to obtain key environmental licenses (LP) in Brazil or Colombia within 24 months.",
+              "Gold Price Collapse: Sustained drop below $1,800/oz rendering large-scale, lower-grade projects uneconomic."
+            ]
+          },
+          "market_data_provenance": {
+            "prepass_as_of_utc": "2024-06-15",
+            "prepass_source_urls": [
+              "Injected normalized_facts"
+            ],
+            "prepass_ticker": "GLDG",
+            "prepass_currency": "USD",
+            "override_notes": [
+              "Converted market cap/EV to AUD at 1.54 exchange rate for reporting consistency with rubric.",
+              "Used normalized_facts for USD share price ($1.46) and share count (209.8M)."
+            ]
+          },
+          "extended_analysis": {
+            "next_major_catalysts": [
+              "S\u00e3o Jorge DFS results",
+              "Potential spin-out or JV of Colombian assets",
+              "Gold Royalty Corp (GROY) dividend/equity appreciation"
+            ],
+            "sensitivity_analysis": [
+              {
+                "factor": "Gold Price",
+                "impact": "High: +/- $100/oz swings NPV by ~15-20%"
+              },
+              {
+                "factor": "Discount Rate",
+                "impact": "Moderate: 5% to 8% reduces NPV by ~25%"
+              }
+            ],
+            "market_context": [
+              "Junior developers trading at historic discount to spot gold.",
+              "M&A activity heating up in the Americas (e.g., BHP/Filo, Gold Fields/Osisko)."
+            ],
+            "commentary": "The company operates as a 'Resource Bank' or 'Project Generator'. It is not strictly a mine builder. Valuation should reflect the 'option value' of ounces in the ground plus the liquidity of its equity holdings (GROY, USGO).",
+            "dissenting_views": [
+              "Some peers (Response #4) incorrectly identified Almas as a primary asset; Almas was divested.",
+              "Disagreement on discount rates: 5% is standard for rubric but 8% may be more realistic for LatAm jurisdictional risk."
+            ],
+            "peer_observations": [
+              "Response #1 provided best project-specific fidelity (S\u00e3o Jorge PFS parameters).",
+              "Response #2 correctly identified the broader portfolio value contribution."
+            ]
+          },
+          "council_metadata": {
+            "resolved_company_name": "GoldMining Inc",
+            "top_ranked_models": [
+              "moonshotai/kimi-k2.5 (avg rank: 1.50)",
+              "anthropic/claude-sonnet-4-5 (avg rank: 2.17)",
+              "openai/gpt-5.1 (avg rank: 3.17)"
+            ],
+            "market_facts_validation": {
+              "override_allowed": true,
+              "aligned_fields": [],
+              "corrected_fields": [],
+              "unresolved_mismatches": []
+            },
+            "deterministic_finance_lane": {
+              "schema": "deterministic_finance_lane_v1",
+              "generated_at": "2026-02-18T12:36:11.521733",
+              "status": "partial",
+              "project_stage": "development",
+              "verified_fields": {
+                "project_stage": {
+                  "value": "development",
+                  "unit": "categorical",
+                  "source_id": "openai/gpt-5.1:S7",
+                  "url": "https://public.com/stocks/usgo",
+                  "published_at": "2026-01-26",
+                  "confidence": 0.6000000000000001,
+                  "model": "openai/gpt-5.1"
+                },
+                "stage_multiplier": {
+                  "value": 0.6,
+                  "unit": "multiplier",
+                  "source_id": "openai/gpt-5.1:S7",
+                  "url": "https://public.com/stocks/usgo",
+                  "published_at": "2026-01-26",
+                  "confidence": 0.5900000000000001,
+                  "model": "openai/gpt-5.1"
+                },
+                "production_koz_pa": {
+                  "value": 200.0,
+                  "unit": "koz_pa",
+                  "source_id": "openai/gpt-5.1:S1",
+                  "url": "https://www.goldmining.com/_resources/presentations/corporate-presentation.pdf",
+                  "published_at": "",
+                  "confidence": 0.62,
+                  "model": "openai/gpt-5.1"
+                },
+                "market_cap_aud_m": {
+                  "value": 306.2773231824331,
+                  "unit": "aud_m",
+                  "source_id": "normalized_facts_prepass",
+                  "url": "",
+                  "published_at": "",
+                  "confidence": 0.99,
+                  "model": "system"
+                }
+              },
+              "derived_metrics": {
+                "risked_npv_aud_m": null,
+                "risked_npv_usd_m": null,
+                "npv_market_cap_ratio": null,
+                "npv_market_cap_ratio_basis": ""
+              },
+              "score_components": {
+                "value_npv_vs_market_cap_score": null,
+                "value_cost_competitiveness_score_proxy": null,
+                "quality_stage_score_component": 60.0,
+                "quality_funding_score_component": null
+              },
+              "market_facts_baseline": {
+                "used": true,
+                "market_cap_aud_m": 306.2773231824331,
+                "currency": "USD"
+              },
+              "calculation_trace": [
+                "risked_npv = post_tax_npv * stage_multiplier",
+                "npv_market_cap_ratio = risked_npv_aud_m / market_cap_aud_m",
+                "npv_vs_market_cap_score thresholds: >3x=100, 2-3x=80, 1-2x=60, <1x=40"
+              ],
+              "missing_critical_fields": [
+                "post_tax_npv_aud_m"
+              ]
+            },
+            "claim_ledger_counts": {
+              "raw_claims": 42,
+              "resolved_fields": 4,
+              "conflicts": 1
+            }
+          },
+          "company": "GoldMining Inc"
+        },
+        "parse_error": null
+      },
+      "stage3_jsonified": {
+        "model": "openai/gpt-4o-mini",
+        "response": "{\n  \"analysis_type\": \"resources\",\n  \"ticker\": \"GLDG\",\n  \"company_name\": \"GoldMining Inc.\",\n  \"analysis_date\": \"2024-06-15\",\n  \"current_development_stage\": \"Pre-Feasibility (PFS) / Advanced Exploration\",\n  \"certainty_pct_24m\": 55.0,\n  \"market_data\": {\n    \"current_price\": 1.46,\n    \"market_cap_aud_m\": 471.7,\n    \"shares_outstanding_m\": 209.8,\n    \"enterprise_value_aud_m\": 440.4,\n    \"cash_aud_m\": 31.0,\n    \"debt_aud_m\": 0.0\n  },\n  \"projects\": [\n    {\n      \"project_name\": \"S\u00e3o Jorge (Brazil)\",\n      \"stage\": \"PFS\",\n      \"resource_moz\": 2.0,\n      \"grade_gt\": 2.1,\n      \"npv_aud_m\": 271.0,\n      \"source\": \"PFS Technical Report (Sept 2022)\"\n    },\n    {\n      \"project_name\": \"Titiribi (Colombia)\",\n      \"stage\": \"PEA\",\n      \"resource_moz\": 2.14,\n      \"grade_gt\": 0.68,\n      \"npv_aud_m\": 463.0,\n      \"source\": \"PEA Technical Report (2021)\"\n    },\n    {\n      \"project_name\": \"Cachoeira (Brazil)\",\n      \"stage\": \"PEA\",\n      \"resource_moz\": 2.36,\n      \"grade_gt\": 1.05,\n      \"npv_aud_m\": 530.0,\n      \"source\": \"PEA Technical Report (2022)\"\n    }\n  ],\n  \"total_risked_npv_aud_m\": 1264.0,\n  \"quality_score\": {\n    \"total\": 61.0,\n    \"breakdown\": {\n      \"jurisdiction\": 17.0,\n      \"infrastructure\": 6.5,\n      \"management\": 12.0,\n      \"development_stage\": 3.75,\n      \"funding\": 8.0,\n      \"certainty\": 6.0,\n      \"esg\": 7.5\n    }\n  },\n  \"value_score\": {\n    \"total\": 85.0,\n    \"breakdown\": {\n      \"npv_vs_market_cap\": 18.0,\n      \"ev_per_resource_oz\": 20.0,\n      \"exploration_upside\": 20.0,\n      \"cost_competitiveness\": 12.0,\n      \"ma_strategic_value\": 15.0\n    }\n  },\n  \"development_timeline\": [\n    {\n      \"milestone\": \"S\u00e3o Jorge DFS Completion\",\n      \"target_period\": \"Q1 2025\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 70.0\n    },\n    {\n      \"milestone\": \"Environmental License (LP) Approval\",\n      \"target_period\": \"Q2 2025\",\n      \"status\": \"at risk\",\n      \"confidence_pct\": 60.0\n    },\n    {\n      \"milestone\": \"Project Financing (Construction)\",\n      \"target_period\": \"Q3-Q4 2025\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 40.0\n    }\n  ],\n  \"headwinds_tailwinds\": {\n    \"quantitative\": [\n      \"Funding Gap >A$200M: Construction capex exceeds current cash (~A$31M) significantly, implying dilution risk.\",\n      \"Cash Burn Rate: ~$15M USD/year estimated burn limits runway to <24 months without financing.\"\n    ],\n    \"qualitative\": [\n      \"Permitting Delays: Brazil/Colombia bureaucratic hurdles for environmental licenses (LP) often exceed timelines.\",\n      \"Strategic Optionality: High M&A appeal for mid-tier producers seeking established resource bases in the Americas.\"\n    ]\n  },\n  \"price_targets\": {\n    \"current_price\": 1.46,\n    \"target_12m\": 2.0,\n    \"target_24m\": 2.8,\n    \"upside_12m_pct\": 37.0,\n    \"upside_24m_pct\": 91.8,\n    \"scenarios\": {\n      \"base\": 2.0,\n      \"bull\": 2.6,\n      \"bear\": 1.1\n    }\n  },\n  \"investment_recommendation\": {\n    \"rating\": \"BUY\",\n    \"conviction\": \"MEDIUM\",\n    \"summary\": \"GoldMining Inc. offers a deep value opportunity (trading <$20/oz EV) with a massive 20Moz+ resource base. While funding and permitting risks persist, the portfolio's option value on gold price and potential M&A make it a compelling speculative buy.\"\n  },\n  \"investment_verdict\": {\n    \"top_reasons\": [\n      \"Extreme Undervaluation: EV/Resource oz is ~$20-30/oz vs peer average >$50/oz, providing a high margin of safety.\",\n      \"Strategic Asset Base: Control of large, scarce gold-copper porphyry systems (Titiribi, Whistler, La Mina) attractive to majors.\",\n      \"High Leverage to Gold: Project economics (NPV) expand disproportionately with gold prices >$2,300/oz.\"\n    ],\n    \"failure_conditions\": [\n      \"Dilutive Financing: Inability to secure non-equity funding (JV, debt, stream) for construction causing >40% shareholder dilution.\",\n      \"Permitting Stagnation: Failure to obtain key environmental licenses (LP) in Brazil or Colombia within 24 months.\",\n      \"Gold Price Collapse: Sustained drop below $1,800/oz rendering large-scale, lower-grade projects uneconomic.\"\n    ]\n  },\n  \"market_data_provenance\": {\n    \"prepass_as_of_utc\": \"2024-06-15\",\n    \"prepass_source_urls\": [\n      \"Injected normalized_facts\"\n    ],\n    \"prepass_ticker\": \"GLDG\",\n    \"prepass_currency\": \"USD\",\n    \"override_notes\": [\n      \"Converted market cap/EV to AUD at 1.54 exchange rate for reporting consistency with rubric.\",\n      \"Used normalized_facts for USD share price ($1.46) and share count (209.8M).\"\n    ]\n  },\n  \"extended_analysis\": {\n    \"next_major_catalysts\": [\n      \"S\u00e3o Jorge DFS results\",\n      \"Potential spin-out or JV of Colombian assets\",\n      \"Gold Royalty Corp (GROY) dividend/equity appreciation\"\n    ],\n    \"sensitivity_analysis\": [\n      {\n        \"factor\": \"Gold Price\",\n        \"impact\": \"High: +/- $100/oz swings NPV by ~15-20%\"\n      },\n      {\n        \"factor\": \"Discount Rate\",\n        \"impact\": \"Moderate: 5% to 8% reduces NPV by ~25%\"\n      }\n    ],\n    \"market_context\": [\n      \"Junior developers trading at historic discount to spot gold.\",\n      \"M&A activity heating up in the Americas (e.g., BHP/Filo, Gold Fields/Osisko).\"\n    ],\n    \"commentary\": \"The company operates as a 'Resource Bank' or 'Project Generator'. It is not strictly a mine builder. Valuation should reflect the 'option value' of ounces in the ground plus the liquidity of its equity holdings (GROY, USGO).\",\n    \"dissenting_views\": [\n      \"Some peers (Response #4) incorrectly identified Almas as a primary asset; Almas was divested.\",\n      \"Disagreement on discount rates: 5% is standard for rubric but 8% may be more realistic for LatAm jurisdictional risk.\"\n    ],\n    \"peer_observations\": [\n      \"Response #1 provided best project-specific fidelity (S\u00e3o Jorge PFS parameters).\",\n      \"Response #2 correctly identified the broader portfolio value contribution.\"\n    ]\n  }\n}",
+        "structured_data": {
+          "analysis_type": "resources",
+          "ticker": "GLDG",
+          "company_name": "GoldMining Inc.",
+          "analysis_date": "2024-06-15",
+          "current_development_stage": "Pre-Feasibility (PFS) / Advanced Exploration",
+          "certainty_pct_24m": 55.0,
+          "market_data": {
+            "current_price": 1.46,
+            "market_cap_aud_m": 471.7,
+            "shares_outstanding_m": 209.8,
+            "enterprise_value_aud_m": 440.4,
+            "cash_aud_m": 31.0,
+            "debt_aud_m": 0.0
+          },
+          "projects": [
+            {
+              "project_name": "S\u00e3o Jorge (Brazil)",
+              "stage": "PFS",
+              "resource_moz": 2.0,
+              "grade_gt": 2.1,
+              "npv_aud_m": 271.0,
+              "source": "PFS Technical Report (Sept 2022)"
+            },
+            {
+              "project_name": "Titiribi (Colombia)",
+              "stage": "PEA",
+              "resource_moz": 2.14,
+              "grade_gt": 0.68,
+              "npv_aud_m": 463.0,
+              "source": "PEA Technical Report (2021)"
+            },
+            {
+              "project_name": "Cachoeira (Brazil)",
+              "stage": "PEA",
+              "resource_moz": 2.36,
+              "grade_gt": 1.05,
+              "npv_aud_m": 530.0,
+              "source": "PEA Technical Report (2022)"
+            }
+          ],
+          "total_risked_npv_aud_m": 1264.0,
+          "quality_score": {
+            "total": 61.0,
+            "breakdown": {
+              "jurisdiction": 17.0,
+              "infrastructure": 6.5,
+              "management": 12.0,
+              "development_stage": 3.75,
+              "funding": 8.0,
+              "certainty": 6.0,
+              "esg": 7.5
+            }
+          },
+          "value_score": {
+            "total": 85.0,
+            "breakdown": {
+              "npv_vs_market_cap": 18.0,
+              "ev_per_resource_oz": 20.0,
+              "exploration_upside": 20.0,
+              "cost_competitiveness": 12.0,
+              "ma_strategic_value": 15.0
+            }
+          },
+          "development_timeline": [
+            {
+              "milestone": "S\u00e3o Jorge DFS Completion",
+              "target_period": "Q1 2025",
+              "status": "planned",
+              "confidence_pct": 70.0
+            },
+            {
+              "milestone": "Environmental License (LP) Approval",
+              "target_period": "Q2 2025",
+              "status": "at risk",
+              "confidence_pct": 60.0
+            },
+            {
+              "milestone": "Project Financing (Construction)",
+              "target_period": "Q3-Q4 2025",
+              "status": "planned",
+              "confidence_pct": 40.0
+            }
+          ],
+          "headwinds_tailwinds": {
+            "quantitative": [
+              "Funding Gap >A$200M: Construction capex exceeds current cash (~A$31M) significantly, implying dilution risk.",
+              "Cash Burn Rate: ~$15M USD/year estimated burn limits runway to <24 months without financing."
+            ],
+            "qualitative": [
+              "Permitting Delays: Brazil/Colombia bureaucratic hurdles for environmental licenses (LP) often exceed timelines.",
+              "Strategic Optionality: High M&A appeal for mid-tier producers seeking established resource bases in the Americas."
+            ]
+          },
+          "price_targets": {
+            "current_price": 1.46,
+            "target_12m": 2.0,
+            "target_24m": 2.8,
+            "upside_12m_pct": 37.0,
+            "upside_24m_pct": 91.8,
+            "scenarios": {
+              "base": 2.0,
+              "bull": 2.6,
+              "bear": 1.1
+            }
+          },
+          "investment_recommendation": {
+            "rating": "BUY",
+            "conviction": "MEDIUM",
+            "summary": "GoldMining Inc. offers a deep value opportunity (trading <$20/oz EV) with a massive 20Moz+ resource base. While funding and permitting risks persist, the portfolio's option value on gold price and potential M&A make it a compelling speculative buy."
+          },
+          "investment_verdict": {
+            "top_reasons": [
+              "Extreme Undervaluation: EV/Resource oz is ~$20-30/oz vs peer average >$50/oz, providing a high margin of safety.",
+              "Strategic Asset Base: Control of large, scarce gold-copper porphyry systems (Titiribi, Whistler, La Mina) attractive to majors.",
+              "High Leverage to Gold: Project economics (NPV) expand disproportionately with gold prices >$2,300/oz."
+            ],
+            "failure_conditions": [
+              "Dilutive Financing: Inability to secure non-equity funding (JV, debt, stream) for construction causing >40% shareholder dilution.",
+              "Permitting Stagnation: Failure to obtain key environmental licenses (LP) in Brazil or Colombia within 24 months.",
+              "Gold Price Collapse: Sustained drop below $1,800/oz rendering large-scale, lower-grade projects uneconomic."
+            ]
+          },
+          "market_data_provenance": {
+            "prepass_as_of_utc": "2024-06-15",
+            "prepass_source_urls": [
+              "Injected normalized_facts"
+            ],
+            "prepass_ticker": "GLDG",
+            "prepass_currency": "USD",
+            "override_notes": [
+              "Converted market cap/EV to AUD at 1.54 exchange rate for reporting consistency with rubric.",
+              "Used normalized_facts for USD share price ($1.46) and share count (209.8M)."
+            ]
+          },
+          "extended_analysis": {
+            "next_major_catalysts": [
+              "S\u00e3o Jorge DFS results",
+              "Potential spin-out or JV of Colombian assets",
+              "Gold Royalty Corp (GROY) dividend/equity appreciation"
+            ],
+            "sensitivity_analysis": [
+              {
+                "factor": "Gold Price",
+                "impact": "High: +/- $100/oz swings NPV by ~15-20%"
+              },
+              {
+                "factor": "Discount Rate",
+                "impact": "Moderate: 5% to 8% reduces NPV by ~25%"
+              }
+            ],
+            "market_context": [
+              "Junior developers trading at historic discount to spot gold.",
+              "M&A activity heating up in the Americas (e.g., BHP/Filo, Gold Fields/Osisko)."
+            ],
+            "commentary": "The company operates as a 'Resource Bank' or 'Project Generator'. It is not strictly a mine builder. Valuation should reflect the 'option value' of ounces in the ground plus the liquidity of its equity holdings (GROY, USGO).",
+            "dissenting_views": [
+              "Some peers (Response #4) incorrectly identified Almas as a primary asset; Almas was divested.",
+              "Disagreement on discount rates: 5% is standard for rubric but 8% may be more realistic for LatAm jurisdictional risk."
+            ],
+            "peer_observations": [
+              "Response #1 provided best project-specific fidelity (S\u00e3o Jorge PFS parameters).",
+              "Response #2 correctly identified the broader portfolio value contribution."
+            ]
+          }
+        },
+        "parse_error": null,
+        "usage": {
+          "prompt_tokens": 4632,
+          "completion_tokens": 1697,
+          "total_tokens": 6329,
+          "cost": 0.001713,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "audio_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.001713,
+            "upstream_inference_prompt_cost": 0.0006948,
+            "upstream_inference_completions_cost": 0.0010182
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "finish_reason": "stop",
+        "provider": "OpenAI"
+      }
+    }
+  ]
+}

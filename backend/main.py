@@ -16,6 +16,8 @@ from .council import (
     stage1_collect_responses,
     stage1_collect_perplexity_research_responses,
     stage2_collect_rankings,
+    stage2_collect_revision_deltas,
+    apply_stage2_revision_deltas,
     stage3_synthesize_final,
     calculate_aggregate_rankings,
     _is_openrouter_compatible_model,
@@ -34,6 +36,7 @@ from .config import (
     RESEARCH_DEPTH,
     CHAIRMAN_MODEL,
     ENABLE_MARKET_FACTS_PREPASS,
+    STAGE2_REVISION_PASS_ENABLED,
     PROGRESS_LOGGING,
     SYSTEM_ENABLED,
     SYSTEM_SHUTDOWN_REASON,
@@ -348,6 +351,7 @@ async def send_message_stream(
                 selected_company_type,
                 selected_exchange,
                 selected_company_name,
+                include_rubric=False,
             )
             template_context = build_template_context_for_prompt(
                 selected_template_id,
@@ -467,13 +471,13 @@ async def send_message_stream(
                 stage1_effective_research_brief = stage1_research_brief
                 stage1_query_core = (content or "").strip()
                 if use_structured_analysis:
-                    rendered_rubric = loader.render_template_rubric(
+                    rendered_stage1_prompt = loader.render_stage1_query_prompt(
                         selected_template_id,
                         company_name=selected_company_name,
                         exchange=selected_exchange,
                     ).strip()
-                    if rendered_rubric:
-                        stage1_query_core = rendered_rubric
+                    if rendered_stage1_prompt:
+                        stage1_query_core = rendered_stage1_prompt
 
                 stage1_effective_query = prepend_market_facts_to_query(
                     stage1_query_core,
@@ -561,16 +565,37 @@ async def send_message_stream(
                 ranking_models=stage2_ranking_models,
             )
             aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
+            stage1_results_for_stage3 = stage1_results
+            stage2_revision_summary: Dict[str, Any] = {"enabled": False}
+            stage2_revision_results: List[Dict[str, Any]] = []
+            if STAGE2_REVISION_PASS_ENABLED:
+                yield f"data: {json.dumps({'type': 'stage2_revision_start'})}\n\n"
+                stage2_revision_results, stage2_revision_summary = await stage2_collect_revision_deltas(
+                    enhanced_context,
+                    stage1_results,
+                    stage2_results,
+                    label_to_model,
+                    revision_models=stage2_ranking_models,
+                )
+                stage1_results_for_stage3, apply_summary = apply_stage2_revision_deltas(
+                    stage1_results,
+                    stage2_revision_results,
+                )
+                stage2_revision_summary["apply"] = apply_summary
+                yield (
+                    "data: "
+                    f"{json.dumps({'type': 'stage2_revision_complete', 'data': stage2_revision_results, 'summary': stage2_revision_summary})}\n\n"
+                )
             yield (
                 "data: "
-                f"{json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings, 'council_mode': selected_council_mode, 'research_depth': selected_research_depth, 'ranking_models': stage2_ranking_models or [], 'chairman_model': stage3_chairman_model or CHAIRMAN_MODEL, 'template_id': selected_template_id, 'company_name': selected_company_name, 'company_type': selected_company_type, 'template_selection_source': template_selection_source, 'exchange': selected_exchange, 'exchange_selection_source': exchange_selection_source}})}\n\n"
+                f"{json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings, 'council_mode': selected_council_mode, 'research_depth': selected_research_depth, 'ranking_models': stage2_ranking_models or [], 'chairman_model': stage3_chairman_model or CHAIRMAN_MODEL, 'template_id': selected_template_id, 'company_name': selected_company_name, 'company_type': selected_company_type, 'template_selection_source': template_selection_source, 'exchange': selected_exchange, 'exchange_selection_source': exchange_selection_source, 'stage2_revision_pass_enabled': bool(STAGE2_REVISION_PASS_ENABLED), 'stage2_revision_summary': stage2_revision_summary}})}\n\n"
             )
 
             # Stage 3: Synthesize final answer (with optional structured analysis)
             yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
             stage3_result = await stage3_synthesize_final(
                 enhanced_context,
-                stage1_results,
+                stage1_results_for_stage3,
                 stage2_results,
                 label_to_model=label_to_model,
                 use_structured_analysis=use_structured_analysis,
@@ -593,7 +618,7 @@ async def send_message_stream(
             # Save complete assistant message with search/attachment metadata
             storage.add_assistant_message_with_metadata(
                 conversation_id,
-                stage1_results,
+                stage1_results_for_stage3,
                 stage2_results,
                 stage3_result,
                 search_results,

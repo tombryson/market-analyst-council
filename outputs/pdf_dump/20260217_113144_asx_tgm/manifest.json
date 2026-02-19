@@ -1,0 +1,95 @@
+{
+  "query": "ASX:Theta Gold Mines Limited latest announcements, investor presentations and quarterly reports",
+  "ticker": "ASX:TGM",
+  "depth": "deep",
+  "lookback_days": 365,
+  "generated_at_utc": "2026-02-17T11:31:47.449912+00:00",
+  "allowed_domains": [
+    "asx.com.au",
+    "marketindex.com.au",
+    "intelligentinvestor.com.au"
+  ],
+  "retrieved_sources": 12,
+  "selection_policy": {
+    "target_price_sensitive": 2,
+    "target_non_price_sensitive": 2,
+    "fallback_mode_when_zero_targets": 20,
+    "notes": [
+      "Price-sensitive marker sourced from IntelligentInvestor announcement popovers.",
+      "Non-price-sensitive prioritization boosts Appendix 4C/5B and dilution/funding signals.",
+      "If a bucket is short, backfill is taken from the opposite bucket."
+    ]
+  },
+  "target_files": 4,
+  "candidate_sources_considered": 8,
+  "candidate_pdfs_in_window": 54,
+  "selected_primary_candidates": 4,
+  "selected_primary_price_sensitive": 2,
+  "selected_primary_non_price_sensitive": 2,
+  "decode_queue_candidates": 16,
+  "written_price_sensitive": 2,
+  "written_non_price_sensitive": 2,
+  "written_files": [
+    {
+      "index": 1,
+      "file": "outputs/pdf_dump/20260217_113144_asx_tgm/01_2026-02-16_change_of_director_39_s_interest_notice_b_tang.md",
+      "title": "Change of Director&#39;s Interest Notice - B Tang",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260216/pdf/03056918.pdf",
+      "published_at": "2026-02-16",
+      "score": 6.3500000000000005,
+      "selection_bucket": "non_price_sensitive",
+      "ii_price_sensitive_marker": false,
+      "ii_key_points_count": 0,
+      "decoded_chars": 5394,
+      "page_count": 0
+    },
+    {
+      "index": 2,
+      "file": "outputs/pdf_dump/20260217_113144_asx_tgm/02_2026-02-13_cleansing_notice.md",
+      "title": "Cleansing Notice",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260213/pdf/03056355.pdf",
+      "published_at": "2026-02-13",
+      "score": 6.3500000000000005,
+      "selection_bucket": "non_price_sensitive",
+      "ii_price_sensitive_marker": false,
+      "ii_key_points_count": 0,
+      "decoded_chars": 2407,
+      "page_count": 0
+    },
+    {
+      "index": 3,
+      "file": "outputs/pdf_dump/20260217_113144_asx_tgm/03_2026-02-03_revised_feasibility_study_confirms_a_1_4b_free_cash_flow.md",
+      "title": "Revised Feasibility Study Confirms A$1.4B Free Cash Flow",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260203/pdf/03052340.pdf",
+      "published_at": "2026-02-03",
+      "score": 6.3500000000000005,
+      "selection_bucket": "price_sensitive",
+      "ii_price_sensitive_marker": true,
+      "ii_key_points_count": 8,
+      "decoded_chars": 310290,
+      "page_count": 0
+    },
+    {
+      "index": 4,
+      "file": "outputs/pdf_dump/20260217_113144_asx_tgm/04_2026-01-30_quarterly_activities_amp_cashflow_report_31_dec_39_25.md",
+      "title": "Quarterly Activities &amp; Cashflow Report - 31 Dec&#39;25",
+      "source_url": "https://www.intelligentinvestor.com.au/shares/asx-tgm/theta-gold-mines-limited/announcements",
+      "pdf_url": "https://www.aspecthuntley.com.au/asxdata/20260130/pdf/03051246.pdf",
+      "published_at": "2026-01-30",
+      "score": 6.3500000000000005,
+      "selection_bucket": "price_sensitive",
+      "ii_price_sensitive_marker": true,
+      "ii_key_points_count": 7,
+      "decoded_chars": 43854,
+      "page_count": 0
+    }
+  ],
+  "failed_files": [],
+  "worker_summary_markdown": "outputs/pdf_dump/20260217_113144_asx_tgm/announcement_summaries.md",
+  "worker_summary_json": "outputs/pdf_dump/20260217_113144_asx_tgm/announcement_summaries.json",
+  "injection_bundle_json": "outputs/pdf_dump/20260217_113144_asx_tgm/injection_bundle.json",
+  "injection_bundle_markdown": "outputs/pdf_dump/20260217_113144_asx_tgm/injection_bundle.md"
+}

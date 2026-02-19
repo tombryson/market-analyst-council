@@ -1,0 +1,538 @@
+{
+  "created_at": "2026-02-19T03:00:46.413699",
+  "artifacts_count": 1,
+  "chairman_model": "google/gemini-3-pro-preview",
+  "chairman_timeout_seconds": 420.0,
+  "chairman_max_output_tokens": 16000,
+  "jsonifier_model": "openai/gpt-4o-mini",
+  "results": [
+    {
+      "source_artifact": "/Users/Toms_Macbook/Projects/llm-council/outputs/quality_ausgold_dual_chairman_pplx3_20260218_152501.json",
+      "selection": {
+        "template_id": "gold_miner",
+        "template_name": "Gold Miner",
+        "company_type": "gold_miner",
+        "company_name": "Ausgold Limited",
+        "exchange": "asx",
+        "exchange_selection_source": "explicit_exchange",
+        "exchange_assumptions": "Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.",
+        "selection_source": "explicit_template"
+      },
+      "chairman_model": "google/gemini-3-pro-preview",
+      "jsonifier_model": "openai/gpt-4o-mini",
+      "label_to_model": {
+        "Response A": "openai/gpt-5.1",
+        "Response B": "google/gemini-3-pro-preview",
+        "Response C": "anthropic/claude-sonnet-4-5"
+      },
+      "stage3_result": {
+        "model": "google/gemini-3-pro-preview",
+        "response": "<executive_summary>\nAusgold Limited (ASX: AUC) is a Western Australian gold developer focused on the 3.04 Moz Katanning Gold Project (KGP). The company recently completed a Definitive Feasibility Study (DFS) in April 2024 and executed a 10-for-1 share consolidation in November 2024, aiming to position itself for development and institutional investment.\n\nThe KGP is a robust open-pit project with an 11-year mine life, projecting average annual production of ~105koz (peaking at ~136koz in early years). With a DFS-defined All-In Sustaining Cost (AISC) of A$1,747/oz, the project generates substantial margins at current spot gold prices (>A$4,000/oz), far exceeding the DFS base case of A$3,000/oz.\n\nHowever, Ausgold faces a specific \"development value trap.\" While the unrisked NPV at spot prices (~A$1.1B) suggests upside, the company trades at a relatively high EV/Resource (~A$180/oz) compared to earlier-stage peers, yet faces a significant funding hurdle (~A$296M pre-production capex) relative to its A$553M market cap. The investment thesis hinges on the successful execution of a financing package (debt/equity mix) in 2025 without excessive dilution.\n\n**Verdict:** HOLD / Speculative BUY. The asset is high-quality and jurisdictionally safe, but the valuation is not currently \"deep value\" relative to the financing risk ahead.\n</executive_summary>\n\n<quality_and_value_scoring>\n**Quality Score: 71/100**\n*   **Jurisdiction (20%): 100** - Western Australia (Tier 1).\n*   **Infrastructure (10%): 90** - Excellent access to grid power (SWIS), sealed roads, and local towns (Katanning).\n*   **Management (15%): 90** - Strengthened board (Geoff Jones) specifically for the development phase.\n*   **Development Stage (15%): 40** - DFS complete; entering permitting/financing.\n*   **Funding (20%): 40** - Funding gap (>A$50M) is the primary risk; capex ~A$300M vs cash <A$20M.\n*   **Certainty (10%): 70** - High technical certainty (DFS level); moderate financing certainty.\n*   **ESG (10%): 80** - Access to grid power enables lower carbon intensity; standard WA compliance.\n\n**Value Score: 60/100**\n*   **NPV vs Market Cap (30%): 60** - Unrisked Spot NPV (~A$1.1B) is ~2.0x Market Cap (~A$553M). Risked NPV is <1x.\n*   **EV/Resource oz (20%): 40** - EV ~A$540M / 3.04 Moz \u2248 A$177/oz. (Expensive bucket >A$150/oz).\n*   **Exploration Upside (20%): 80** - 4,000km\u00b2 land package with identified regional targets.\n*   **Cost Competitiveness (15%): 80** - AISC A$1,747/oz fits the A$1,500-2,000 competitive bucket.\n*   **M&A/Strategic Value (15%): 80** - High scarcity value for >3Moz assets in WA near infrastructure.\n</quality_and_value_scoring>\n\n<price_targets_and_scenarios>\n**Current Price:** A$1.01 (Normalized)\n\n**12-Month Targets (Feb 2027)**\n*   **Bear Case: A$0.75** - Gold drops <A$3,000/oz; financing delayed or results in heavy (>40%) equity dilution; FID postponed.\n*   **Base Case: A$1.35** - FID Achieved; Debt/Equity package secured (e.g., 60/40 split); Gold holds >A$3,500/oz. Re-rates as construction begins.\n*   **Bull Case: A$1.85** - Gold >A$4,000/oz; M&A premium (takeover target); or strategic partner funds capex at asset level, minimizing dilution.\n\n**24-Month Targets (Feb 2028)**\n*   **Bear Case: A$0.90** - Construction cost blowouts (>30%); delays in ramp-up; gold price correction.\n*   **Base Case: A$2.10** - Successful commissioning; transition to producer status; market values cash flow multiples (typically 0.8x-1.0x NAV).\n*   **Bull Case: A$2.90** - Production beats DFS specs; aggressive exploration expands mine life; gold super-cycle (>A$4,500/oz).\n</price_targets_and_scenarios>\n\n<development_timeline>\n*   **Permitting & Approvals** | H1 2025 | Confidence: High (80%)\n*   **Project Financing (Debt/Equity)** | Mid-2025 | Confidence: Medium (60%)\n*   **Final Investment Decision (FID)** | Q3 2025 | Confidence: Medium (60%)\n*   **Construction Start** | H2 2025 | Confidence: Medium (55%)\n*   **First Gold Pour** | H2 2026 | Confidence: Low (45%)\n\n**Certainty for 24-month goals:** 55% (Primary bottleneck is financing execution in current market).\n</development_timeline>\n\n<headwinds_tailwinds>\n**Quantitative Tailwinds**\n1.  **Gold Price Leverage:** Spot price (~A$4,150/oz) is ~38% higher than DFS Base Case (A$3,000/oz), adding >A$500M to project pre-tax cash flows.\n2.  **Reserve Conversion:** High 1.28 Moz Probable Ore Reserve (from 3.04 Moz Resource) underpins a solid 11-year initial mine life.\n\n**Quantitative Headwinds**\n1.  **Capex vs. Valuation:** A$296M Pre-production Capex represents ~54% of current Market Cap, implying significant dilution or leverage risk.\n2.  **Valuation Premium:** Trading at ~A$180/EV oz is not \"cheap\" for a developer; success is partially priced in.\n\n**Qualitative Tailwinds**\n1.  **Strategic Scarcity:** Few undeveloped, open-pit, >100kozpa projects exist in Tier 1 WA, making AUC a prime M&A target for mid-tier producers.\n2.  **Infrastructure:** Proximity to grid and towns reduces operational complexity and labor cost pressures (FIFO vs. DIDO).\n\n**Qualitative Headwinds**\n1.  **Cost Inflation:** WA construction sector remains tight; risk of capital cost blowout post-DFS is material.\n2.  **Permitting Timelines:** WA EPA approval processes have slowed for greenfield projects, potential for timeline slippage.\n</headwinds_tailwinds>\n\n<dissenting_views>\nWhile the consensus views the project technically sound, a \"Sell/Avoid\" perspective (Response #2) argues that the valuation is disconnected from the *risked* NAV. Given the project is pre-financing, applying a standard 0.40 DFS stage multiplier to the NPV implies the stock is trading at or above its risk-adjusted fair value. Without a sustained gold bull market or M&A event, organic upside may be limited until construction de-risks the asset.\n</dissenting_views>\n\n<investment_verdict>\n**Rating: HOLD / Speculative BUY**\n**Conviction:** Medium\n\nAusgold has graduated from \"explorer\" to \"developer,\" a phase often characterized by share price stagnation (the \"Lassonde Curve\" valley) as the market awaits funding dilution. The asset is high quality, but the entry point is not distressed.\n\n**Top 3 Reasons for Success (Bull Case)**\n1.  **Margin Expansion:** At spot prices, the project payback is <12 months, making it highly attractive to debt providers, potentially minimizing equity dilution.\n2.  **Corporate Appeal:** It fits the perfect \"bolt-on\" criteria for regional majors (Regis, Ramelius, Gold Road) needing reserve replacement.\n3.  **Technical De-risking:** Simple metallurgy (CIL, gravity) and open-pit geometry minimize technical ramp-up risks compared to complex refractory or underground projects.\n\n**Top 3 Failure Conditions (Bear Case)**\n1.  **Capital Blowout:** If capex revises from A$296M to >A$400M due to inflation, the IRR collapses and financing becomes difficult.\n2.  **Gold Price Correction:** A return to A$3,000/oz (DFS base case) removes the current valuation buffer, leaving the stock fully valued or overvalued.\n3.  **Dilution Spiral:** If the company is forced to raise >A$100M in equity at a discount, EPS accretion will be severely hampered.\n</investment_verdict>\n\n<data_gaps_and_assumptions>\n**Data Provenance & Market Data:**\n*   **Price:** A$1.01 (Normalized facts; reflects Nov 2024 10:1 consolidation).\n*   **Market Cap:** A$553M.\n*   **Project Data:** Sourced from **Definitive Feasibility Study (April 2024)** as cited in Response #1.\n*   **Gold Price:** Assumed **A$3,800/oz** for conservative valuation (Spot is ~A$4,150; DFS used A$3,000).\n\n**NPV Analysis (Katanning Gold Project):**\n*   **Resource/Reserve:** 36.4Mt Mined / 1.14 g/t / 90% Recovery (DFS Reserves).\n*   **Mine Life:** 11 years.\n*   **Production:** ~105koz avg (LOM).\n*   **Capex:** A$296M (DFS).\n*   **AISC:** A$1,747/oz (DFS).\n*   **Scenario:** At A$3,800/oz Au, Unrisked Post-Tax NPV (5%) is estimated at ~A$950M.\n*   **Stage Multiplier:** 0.40 (DFS Stage).\n*   **Risked NPV:** ~A$380M. (Current Market Cap of A$553M suggests market is pricing in ~A$0.60 multiplier or higher gold prices/acquisition premium).\n</data_gaps_and_assumptions>",
+        "structured_data": {
+          "analysis_type": "resources",
+          "ticker": "AUC",
+          "company_name": "Ausgold Limited",
+          "analysis_date": "2026-02-19T03:00:21.678261",
+          "current_development_stage": "Definitive Feasibility Study complete; entering permitting/financing",
+          "certainty_pct_24m": 55,
+          "market_data": {
+            "current_price": 1.01,
+            "market_cap_aud_m": 553,
+            "shares_outstanding_m": 547.859741,
+            "enterprise_value_aud_m": 540,
+            "cash_aud_m": 20,
+            "debt_aud_m": null
+          },
+          "projects": [
+            {
+              "name": "Katanning Gold Project",
+              "resource": 3.04,
+              "mine_life_years": 11,
+              "aisc_aud_per_oz": 1747,
+              "average_annual_production_koz": 105,
+              "peak_production_koz": 136,
+              "capex_aud_m": 296
+            }
+          ],
+          "total_risked_npv_aud_m": 380,
+          "quality_score": {
+            "total": 71,
+            "breakdown": {
+              "jurisdiction": 100,
+              "infrastructure": 90,
+              "management": 90,
+              "development_stage": 40,
+              "funding": 40,
+              "certainty": 70,
+              "esg": 80
+            }
+          },
+          "value_score": {
+            "total": 60,
+            "breakdown": {
+              "npv_vs_market_cap": 60,
+              "ev_resource": 40,
+              "exploration_upside": 80,
+              "cost_competitiveness": 80,
+              "ma_strategic_value": 80
+            }
+          },
+          "development_timeline": [
+            {
+              "milestone": "Permitting & Approvals",
+              "target_period": "H1 2025",
+              "status": "planned",
+              "confidence_pct": 80
+            },
+            {
+              "milestone": "Project Financing (Debt/Equity)",
+              "target_period": "Mid-2025",
+              "status": "planned",
+              "confidence_pct": 60
+            },
+            {
+              "milestone": "Final Investment Decision (FID)",
+              "target_period": "Q3 2025",
+              "status": "planned",
+              "confidence_pct": 60
+            },
+            {
+              "milestone": "Construction Start",
+              "target_period": "H2 2025",
+              "status": "planned",
+              "confidence_pct": 55
+            },
+            {
+              "milestone": "First Gold Pour",
+              "target_period": "H2 2026",
+              "status": "planned",
+              "confidence_pct": 45
+            }
+          ],
+          "headwinds_tailwinds": {
+            "quantitative": [
+              "Gold Price Leverage",
+              "Reserve Conversion",
+              "Capex vs. Valuation",
+              "Valuation Premium"
+            ],
+            "qualitative": [
+              "Strategic Scarcity",
+              "Infrastructure",
+              "Cost Inflation",
+              "Permitting Timelines"
+            ]
+          },
+          "price_targets": {
+            "current_price": 1.01,
+            "target_12m": null,
+            "target_24m": null,
+            "upside_12m_pct": null,
+            "upside_24m_pct": null,
+            "scenarios": {
+              "base": 1.35,
+              "bull": 1.85,
+              "bear": 0.75
+            },
+            "scenario_drivers": {
+              "12m": {
+                "base": [
+                  "FID Achieved",
+                  "Debt/Equity package secured",
+                  "Gold holds >A$3,500/oz"
+                ],
+                "bull": [
+                  "Gold >A$4,000/oz",
+                  "M&A premium",
+                  "strategic partner funds capex"
+                ],
+                "bear": [
+                  "Gold drops <A$3,000/oz",
+                  "financing delayed",
+                  "FID postponed"
+                ]
+              },
+              "24m": {
+                "base": [
+                  "Successful commissioning",
+                  "transition to producer status",
+                  "market values cash flow multiples"
+                ],
+                "bull": [
+                  "Production beats DFS specs",
+                  "aggressive exploration",
+                  "gold super-cycle >A$4,500/oz"
+                ],
+                "bear": [
+                  "Construction cost blowouts >30%",
+                  "delays in ramp-up",
+                  "gold price correction"
+                ]
+              }
+            }
+          },
+          "investment_recommendation": {
+            "rating": "HOLD / Speculative BUY",
+            "conviction": "MEDIUM",
+            "summary": "The asset is high-quality and jurisdictionally safe, but the valuation is not currently 'deep value' relative to the financing risk ahead."
+          },
+          "investment_verdict": {
+            "top_reasons": [
+              "Margin Expansion",
+              "Corporate Appeal",
+              "Technical De-risking"
+            ],
+            "failure_conditions": [
+              "Capital Blowout",
+              "Gold Price Correction",
+              "Dilution Spiral"
+            ]
+          },
+          "market_data_provenance": {
+            "prepass_as_of_utc": "2024-11-01T00:00:00Z",
+            "prepass_source_urls": [],
+            "prepass_ticker": "AUC",
+            "prepass_currency": "AUD",
+            "override_notes": []
+          },
+          "extended_analysis": {
+            "next_major_catalysts": [],
+            "sensitivity_analysis": [],
+            "market_context": [],
+            "commentary": "The investment thesis hinges on the successful execution of a financing package in 2025.",
+            "dissenting_views": [
+              "While the consensus views the project technically sound, a 'Sell/Avoid' perspective argues that the valuation is disconnected from the risked NAV."
+            ],
+            "peer_observations": []
+          },
+          "council_metadata": {
+            "resolved_company_name": "Ausgold Limited",
+            "top_ranked_models": [
+              "google/gemini-3-pro-preview (avg rank: 1.00)",
+              "openai/gpt-5.1 (avg rank: 2.00)",
+              "anthropic/claude-sonnet-4-5 (avg rank: 3.00)"
+            ],
+            "market_facts_validation": {
+              "override_allowed": false,
+              "aligned_fields": [
+                "shares_outstanding_m"
+              ],
+              "corrected_fields": [],
+              "unresolved_mismatches": []
+            },
+            "deterministic_finance_lane": {
+              "schema": "deterministic_finance_lane_v1",
+              "generated_at": "2026-02-18T04:38:21.951714",
+              "status": "partial",
+              "project_stage": "dfs",
+              "verified_fields": {
+                "project_stage": {
+                  "value": "dfs",
+                  "unit": "categorical",
+                  "source_id": "openai/gpt-5.1:S1",
+                  "url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vlblbmnlvf47.pdf",
+                  "published_at": "2026-01-27",
+                  "confidence": 0.7200000000000001,
+                  "model": "openai/gpt-5.1"
+                },
+                "stage_multiplier": {
+                  "value": 0.4,
+                  "unit": "multiplier",
+                  "source_id": "openai/gpt-5.1:S1",
+                  "url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vlblbmnlvf47.pdf",
+                  "published_at": "2026-01-27",
+                  "confidence": 0.7100000000000001,
+                  "model": "openai/gpt-5.1"
+                },
+                "irr_pct": {
+                  "value": 92.0,
+                  "unit": "pct",
+                  "source_id": "openai/gpt-5.1:S2",
+                  "url": "https://announcements.asx.com.au/asxpdf/20260116/pdf/06v9w3kwyjx3xm.pdf",
+                  "published_at": "2026-01-16",
+                  "confidence": 0.74,
+                  "model": "openai/gpt-5.1"
+                },
+                "aisc_usd_per_oz": {
+                  "value": 2252.0,
+                  "unit": "usd_per_oz",
+                  "source_id": "openai/gpt-5.1:S2",
+                  "url": "https://announcements.asx.com.au/asxpdf/20260116/pdf/06v9w3kwyjx3xm.pdf",
+                  "published_at": "2026-01-16",
+                  "confidence": 0.74,
+                  "model": "openai/gpt-5.1"
+                },
+                "market_cap_aud_m": {
+                  "value": 553.3383331852024,
+                  "unit": "aud_m",
+                  "source_id": "normalized_facts_prepass",
+                  "url": "",
+                  "published_at": "",
+                  "confidence": 0.99,
+                  "model": "system"
+                }
+              },
+              "derived_metrics": {
+                "risked_npv_aud_m": null,
+                "risked_npv_usd_m": null,
+                "npv_market_cap_ratio": null,
+                "npv_market_cap_ratio_basis": ""
+              },
+              "score_components": {
+                "value_npv_vs_market_cap_score": null,
+                "value_cost_competitiveness_score_proxy": 60.0,
+                "quality_stage_score_component": 40.0,
+                "quality_funding_score_component": null
+              },
+              "market_facts_baseline": {
+                "used": true,
+                "market_cap_aud_m": 553.3383331852024,
+                "currency": "AUD"
+              },
+              "calculation_trace": [
+                "risked_npv = post_tax_npv * stage_multiplier",
+                "npv_market_cap_ratio = risked_npv_aud_m / market_cap_aud_m",
+                "npv_vs_market_cap_score thresholds: >3x=100, 2-3x=80, 1-2x=60, <1x=40"
+              ],
+              "missing_critical_fields": [
+                "post_tax_npv_aud_m"
+              ]
+            },
+            "claim_ledger_counts": {
+              "raw_claims": 75,
+              "resolved_fields": 4,
+              "conflicts": 2
+            },
+            "normalization": {
+              "chairman_output_style": "text_xml",
+              "chairman_json_parse_error": "No JSON found in response: Expecting value: line 1 column 1 (char 0)",
+              "jsonifier_used": true,
+              "jsonifier_model": "openai/gpt-4o-mini",
+              "jsonifier_timeout_seconds": 180.0,
+              "jsonifier_max_output_tokens": 12000,
+              "jsonifier_parse_error": null,
+              "jsonifier_response_length": 4583
+            }
+          },
+          "company": "Ausgold Limited"
+        },
+        "parse_error": null,
+        "normalization": {
+          "chairman_output_style": "text_xml",
+          "chairman_json_parse_error": "No JSON found in response: Expecting value: line 1 column 1 (char 0)",
+          "jsonifier_used": true,
+          "jsonifier_model": "openai/gpt-4o-mini",
+          "jsonifier_timeout_seconds": 180.0,
+          "jsonifier_max_output_tokens": 12000,
+          "jsonifier_parse_error": null,
+          "jsonifier_response_length": 4583
+        }
+      },
+      "stage3_jsonified": {
+        "model": "openai/gpt-4o-mini",
+        "response": "{\n  \"analysis_type\": \"resources\",\n  \"ticker\": \"AUC\",\n  \"company_name\": \"Ausgold Limited\",\n  \"analysis_date\": \"2026-02-19T03:00:21.678261\",\n  \"current_development_stage\": \"Definitive Feasibility Study complete; entering permitting/financing\",\n  \"certainty_pct_24m\": 55,\n  \"market_data\": {\n    \"current_price\": 1.01,\n    \"market_cap_aud_m\": 553,\n    \"shares_outstanding_m\": 547.859741,\n    \"enterprise_value_aud_m\": 540,\n    \"cash_aud_m\": 20,\n    \"debt_aud_m\": null\n  },\n  \"projects\": [\n    {\n      \"name\": \"Katanning Gold Project\",\n      \"resource\": 3.04,\n      \"mine_life_years\": 11,\n      \"aisc_aud_per_oz\": 1747,\n      \"average_annual_production_koz\": 105,\n      \"peak_production_koz\": 136,\n      \"capex_aud_m\": 296\n    }\n  ],\n  \"total_risked_npv_aud_m\": 380,\n  \"quality_score\": {\n    \"total\": 71,\n    \"breakdown\": {\n      \"jurisdiction\": 100,\n      \"infrastructure\": 90,\n      \"management\": 90,\n      \"development_stage\": 40,\n      \"funding\": 40,\n      \"certainty\": 70,\n      \"esg\": 80\n    }\n  },\n  \"value_score\": {\n    \"total\": 60,\n    \"breakdown\": {\n      \"npv_vs_market_cap\": 60,\n      \"ev_resource\": 40,\n      \"exploration_upside\": 80,\n      \"cost_competitiveness\": 80,\n      \"ma_strategic_value\": 80\n    }\n  },\n  \"development_timeline\": [\n    {\n      \"milestone\": \"Permitting & Approvals\",\n      \"target_period\": \"H1 2025\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 80\n    },\n    {\n      \"milestone\": \"Project Financing (Debt/Equity)\",\n      \"target_period\": \"Mid-2025\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 60\n    },\n    {\n      \"milestone\": \"Final Investment Decision (FID)\",\n      \"target_period\": \"Q3 2025\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 60\n    },\n    {\n      \"milestone\": \"Construction Start\",\n      \"target_period\": \"H2 2025\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 55\n    },\n    {\n      \"milestone\": \"First Gold Pour\",\n      \"target_period\": \"H2 2026\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 45\n    }\n  ],\n  \"headwinds_tailwinds\": {\n    \"quantitative\": [\n      \"Gold Price Leverage\",\n      \"Reserve Conversion\",\n      \"Capex vs. Valuation\",\n      \"Valuation Premium\"\n    ],\n    \"qualitative\": [\n      \"Strategic Scarcity\",\n      \"Infrastructure\",\n      \"Cost Inflation\",\n      \"Permitting Timelines\"\n    ]\n  },\n  \"price_targets\": {\n    \"current_price\": 1.01,\n    \"target_12m\": null,\n    \"target_24m\": null,\n    \"upside_12m_pct\": null,\n    \"upside_24m_pct\": null,\n    \"scenarios\": {\n      \"base\": 1.35,\n      \"bull\": 1.85,\n      \"bear\": 0.75\n    },\n    \"scenario_drivers\": {\n      \"12m\": {\n        \"base\": [\n          \"FID Achieved\",\n          \"Debt/Equity package secured\",\n          \"Gold holds >A$3,500/oz\"\n        ],\n        \"bull\": [\n          \"Gold >A$4,000/oz\",\n          \"M&A premium\",\n          \"strategic partner funds capex\"\n        ],\n        \"bear\": [\n          \"Gold drops <A$3,000/oz\",\n          \"financing delayed\",\n          \"FID postponed\"\n        ]\n      },\n      \"24m\": {\n        \"base\": [\n          \"Successful commissioning\",\n          \"transition to producer status\",\n          \"market values cash flow multiples\"\n        ],\n        \"bull\": [\n          \"Production beats DFS specs\",\n          \"aggressive exploration\",\n          \"gold super-cycle >A$4,500/oz\"\n        ],\n        \"bear\": [\n          \"Construction cost blowouts >30%\",\n          \"delays in ramp-up\",\n          \"gold price correction\"\n        ]\n      }\n    }\n  },\n  \"investment_recommendation\": {\n    \"rating\": \"HOLD / Speculative BUY\",\n    \"conviction\": \"MEDIUM\",\n    \"summary\": \"The asset is high-quality and jurisdictionally safe, but the valuation is not currently 'deep value' relative to the financing risk ahead.\"\n  },\n  \"investment_verdict\": {\n    \"top_reasons\": [\n      \"Margin Expansion\",\n      \"Corporate Appeal\",\n      \"Technical De-risking\"\n    ],\n    \"failure_conditions\": [\n      \"Capital Blowout\",\n      \"Gold Price Correction\",\n      \"Dilution Spiral\"\n    ]\n  },\n  \"market_data_provenance\": {\n    \"prepass_as_of_utc\": \"2024-11-01T00:00:00Z\",\n    \"prepass_source_urls\": [],\n    \"prepass_ticker\": \"AUC\",\n    \"prepass_currency\": \"AUD\",\n    \"override_notes\": []\n  },\n  \"extended_analysis\": {\n    \"next_major_catalysts\": [],\n    \"sensitivity_analysis\": [],\n    \"market_context\": [],\n    \"commentary\": \"The investment thesis hinges on the successful execution of a financing package in 2025.\",\n    \"dissenting_views\": [\n      \"While the consensus views the project technically sound, a 'Sell/Avoid' perspective argues that the valuation is disconnected from the risked NAV.\"\n    ],\n    \"peer_observations\": []\n  }\n}",
+        "structured_data": {
+          "analysis_type": "resources",
+          "ticker": "AUC",
+          "company_name": "Ausgold Limited",
+          "analysis_date": "2026-02-19T03:00:21.678261",
+          "current_development_stage": "Definitive Feasibility Study complete; entering permitting/financing",
+          "certainty_pct_24m": 55,
+          "market_data": {
+            "current_price": 1.01,
+            "market_cap_aud_m": 553,
+            "shares_outstanding_m": 547.859741,
+            "enterprise_value_aud_m": 540,
+            "cash_aud_m": 20,
+            "debt_aud_m": null
+          },
+          "projects": [
+            {
+              "name": "Katanning Gold Project",
+              "resource": 3.04,
+              "mine_life_years": 11,
+              "aisc_aud_per_oz": 1747,
+              "average_annual_production_koz": 105,
+              "peak_production_koz": 136,
+              "capex_aud_m": 296
+            }
+          ],
+          "total_risked_npv_aud_m": 380,
+          "quality_score": {
+            "total": 71,
+            "breakdown": {
+              "jurisdiction": 100,
+              "infrastructure": 90,
+              "management": 90,
+              "development_stage": 40,
+              "funding": 40,
+              "certainty": 70,
+              "esg": 80
+            }
+          },
+          "value_score": {
+            "total": 60,
+            "breakdown": {
+              "npv_vs_market_cap": 60,
+              "ev_resource": 40,
+              "exploration_upside": 80,
+              "cost_competitiveness": 80,
+              "ma_strategic_value": 80
+            }
+          },
+          "development_timeline": [
+            {
+              "milestone": "Permitting & Approvals",
+              "target_period": "H1 2025",
+              "status": "planned",
+              "confidence_pct": 80
+            },
+            {
+              "milestone": "Project Financing (Debt/Equity)",
+              "target_period": "Mid-2025",
+              "status": "planned",
+              "confidence_pct": 60
+            },
+            {
+              "milestone": "Final Investment Decision (FID)",
+              "target_period": "Q3 2025",
+              "status": "planned",
+              "confidence_pct": 60
+            },
+            {
+              "milestone": "Construction Start",
+              "target_period": "H2 2025",
+              "status": "planned",
+              "confidence_pct": 55
+            },
+            {
+              "milestone": "First Gold Pour",
+              "target_period": "H2 2026",
+              "status": "planned",
+              "confidence_pct": 45
+            }
+          ],
+          "headwinds_tailwinds": {
+            "quantitative": [
+              "Gold Price Leverage",
+              "Reserve Conversion",
+              "Capex vs. Valuation",
+              "Valuation Premium"
+            ],
+            "qualitative": [
+              "Strategic Scarcity",
+              "Infrastructure",
+              "Cost Inflation",
+              "Permitting Timelines"
+            ]
+          },
+          "price_targets": {
+            "current_price": 1.01,
+            "target_12m": null,
+            "target_24m": null,
+            "upside_12m_pct": null,
+            "upside_24m_pct": null,
+            "scenarios": {
+              "base": 1.35,
+              "bull": 1.85,
+              "bear": 0.75
+            },
+            "scenario_drivers": {
+              "12m": {
+                "base": [
+                  "FID Achieved",
+                  "Debt/Equity package secured",
+                  "Gold holds >A$3,500/oz"
+                ],
+                "bull": [
+                  "Gold >A$4,000/oz",
+                  "M&A premium",
+                  "strategic partner funds capex"
+                ],
+                "bear": [
+                  "Gold drops <A$3,000/oz",
+                  "financing delayed",
+                  "FID postponed"
+                ]
+              },
+              "24m": {
+                "base": [
+                  "Successful commissioning",
+                  "transition to producer status",
+                  "market values cash flow multiples"
+                ],
+                "bull": [
+                  "Production beats DFS specs",
+                  "aggressive exploration",
+                  "gold super-cycle >A$4,500/oz"
+                ],
+                "bear": [
+                  "Construction cost blowouts >30%",
+                  "delays in ramp-up",
+                  "gold price correction"
+                ]
+              }
+            }
+          },
+          "investment_recommendation": {
+            "rating": "HOLD / Speculative BUY",
+            "conviction": "MEDIUM",
+            "summary": "The asset is high-quality and jurisdictionally safe, but the valuation is not currently 'deep value' relative to the financing risk ahead."
+          },
+          "investment_verdict": {
+            "top_reasons": [
+              "Margin Expansion",
+              "Corporate Appeal",
+              "Technical De-risking"
+            ],
+            "failure_conditions": [
+              "Capital Blowout",
+              "Gold Price Correction",
+              "Dilution Spiral"
+            ]
+          },
+          "market_data_provenance": {
+            "prepass_as_of_utc": "2024-11-01T00:00:00Z",
+            "prepass_source_urls": [],
+            "prepass_ticker": "AUC",
+            "prepass_currency": "AUD",
+            "override_notes": []
+          },
+          "extended_analysis": {
+            "next_major_catalysts": [],
+            "sensitivity_analysis": [],
+            "market_context": [],
+            "commentary": "The investment thesis hinges on the successful execution of a financing package in 2025.",
+            "dissenting_views": [
+              "While the consensus views the project technically sound, a 'Sell/Avoid' perspective argues that the valuation is disconnected from the risked NAV."
+            ],
+            "peer_observations": []
+          }
+        },
+        "parse_error": null,
+        "usage": {
+          "prompt_tokens": 5104,
+          "completion_tokens": 1311,
+          "total_tokens": 6415,
+          "cost": 0.0015522,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "audio_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0015522,
+            "upstream_inference_prompt_cost": 0.0007656,
+            "upstream_inference_completions_cost": 0.0007866
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "finish_reason": "stop",
+        "provider": "OpenAI"
+      }
+    }
+  ]
+}

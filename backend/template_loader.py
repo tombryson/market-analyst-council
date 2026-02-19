@@ -285,6 +285,47 @@ PREALLOCATED_EXCHANGES: List[Dict[str, Any]] = [
             "Appendix 5B/5C, and investor presentations. Market data in AUD by default unless the "
             "company reports otherwise."
         ),
+        # Prepass retrieval profile for PDF dump / injection-bundle workers.
+        "retrieval_params": {
+            "max_sources_default": 30,
+            "allowed_domain_suffixes": [
+                "asx.com.au",
+                "marketindex.com.au",
+                "intelligentinvestor.com.au",
+                "wcsecure.weblink.com.au",
+                "aspecthuntley.com.au",
+            ],
+            "lookback_days_default": 365,
+            "target_price_sensitive_default": 10,
+            "target_non_price_sensitive_default": 10,
+            "price_sensitive_strategy": "ii_popover_markers",
+            "material_filing_tokens": [
+                "price-sensitive asx announcement",
+                "appendix 4c",
+                "appendix 5b",
+                "appendix 5c",
+                "quarterly",
+                "annual report",
+                "investor presentation",
+                "feasibility study",
+                "dfs",
+                "pfs",
+                "funding",
+                "loan facility",
+                "resource update",
+                "project update",
+                "first gold",
+                "gold pour",
+            ],
+            "low_signal_notice_tokens": [
+                "cleansing notice",
+                "appendix 2a",
+                "appendix 3b",
+                "appendix 3c",
+                "application for quotation of securities",
+                "notice of annual general meeting",
+            ],
+        },
     },
     {
         "id": "nyse",
@@ -298,6 +339,49 @@ PREALLOCATED_EXCHANGES: List[Dict[str, Any]] = [
             "Exchange profile: NYSE (United States). Prefer SEC filings (10-K/10-Q/8-K), "
             "official earnings releases, and investor presentations. Market data in USD by default."
         ),
+        # Preliminary WIP profile for NYSE source collection/injection.
+        "retrieval_params": {
+            "max_sources_default": 40,
+            "allowed_domain_suffixes": [
+                "sec.gov",
+                "sec.report",
+                "nyse.com",
+                "businesswire.com",
+                "globenewswire.com",
+                "prnewswire.com",
+                "stockanalysis.com",
+                "marketwatch.com",
+            ],
+            "lookback_days_default": 365,
+            "target_price_sensitive_default": 10,
+            "target_non_price_sensitive_default": 10,
+            "price_sensitive_strategy": "sec_material_filing_tokens",
+            "material_filing_tokens": [
+                "form 8-k",
+                "8-k",
+                "form 10-q",
+                "10-q",
+                "form 10-k",
+                "10-k",
+                "form 20-f",
+                "20-f",
+                "form 6-k",
+                "6-k",
+                "def 14a",
+                "earnings release",
+                "investor presentation",
+                "guidance",
+                "material definitive agreement",
+            ],
+            "low_signal_notice_tokens": [
+                "form 3",
+                "form 4",
+                "form 5",
+                "schedule 13g",
+                "13g/a",
+                "section 16 filing",
+            ],
+        },
     },
     {
         "id": "nasdaq",
@@ -311,6 +395,49 @@ PREALLOCATED_EXCHANGES: List[Dict[str, Any]] = [
             "Exchange profile: NASDAQ (United States). Prefer SEC filings and official investor "
             "materials. Market data in USD by default."
         ),
+        # Preliminary WIP profile for NASDAQ source collection/injection.
+        "retrieval_params": {
+            "max_sources_default": 40,
+            "allowed_domain_suffixes": [
+                "sec.gov",
+                "sec.report",
+                "nasdaq.com",
+                "businesswire.com",
+                "globenewswire.com",
+                "prnewswire.com",
+                "stockanalysis.com",
+                "marketwatch.com",
+            ],
+            "lookback_days_default": 365,
+            "target_price_sensitive_default": 10,
+            "target_non_price_sensitive_default": 10,
+            "price_sensitive_strategy": "sec_material_filing_tokens",
+            "material_filing_tokens": [
+                "form 8-k",
+                "8-k",
+                "form 10-q",
+                "10-q",
+                "form 10-k",
+                "10-k",
+                "form 20-f",
+                "20-f",
+                "form 6-k",
+                "6-k",
+                "def 14a",
+                "earnings release",
+                "investor presentation",
+                "guidance",
+                "material definitive agreement",
+            ],
+            "low_signal_notice_tokens": [
+                "form 3",
+                "form 4",
+                "form 5",
+                "schedule 13g",
+                "13g/a",
+                "section 16 filing",
+            ],
+        },
     },
     {
         "id": "tsx",
@@ -376,6 +503,15 @@ PREALLOCATED_EXCHANGES: List[Dict[str, Any]] = [
             "Exchange profile: unknown. Infer filing sources from company domicile and exchange references "
             "in primary documents; do not assume ASX-specific formats by default."
         ),
+        "retrieval_params": {
+            "allowed_domain_suffixes": [],
+            "lookback_days_default": 365,
+            "target_price_sensitive_default": 0,
+            "target_non_price_sensitive_default": 20,
+            "price_sensitive_strategy": "none",
+            "material_filing_tokens": [],
+            "low_signal_notice_tokens": [],
+        },
     },
 ]
 
@@ -475,6 +611,24 @@ class TemplateLoader:
                 }
             )
         return exchanges
+
+    def get_exchange_retrieval_params(self, exchange: Optional[str]) -> Dict[str, Any]:
+        """Return retrieval-profile params for the selected exchange."""
+        normalized = self.normalize_exchange(exchange) or "unknown"
+        fallback_entry = next(
+            (item for item in PREALLOCATED_EXCHANGES if item.get("id") == "unknown"),
+            {},
+        )
+        fallback = dict(fallback_entry.get("retrieval_params", {}) or {})
+        entry = next(
+            (item for item in PREALLOCATED_EXCHANGES if item.get("id") == normalized),
+            None,
+        )
+        selected = dict((entry or {}).get("retrieval_params", {}) or {})
+        merged = dict(fallback)
+        merged.update(selected)
+        merged["exchange"] = normalized
+        return merged
 
     def normalize_company_type(self, company_type: Optional[str]) -> Optional[str]:
         """Normalize company type input into a known company type id."""
@@ -806,6 +960,32 @@ class TemplateLoader:
         if max_chars > 0:
             rubric = rubric[:max_chars]
         return rubric.strip()
+
+    def render_stage1_query_prompt(
+        self,
+        template_id: str,
+        company_name: Optional[str] = None,
+        exchange: Optional[str] = None,
+        max_chars: int = 0,
+    ) -> str:
+        """
+        Render the Stage 1 task prompt with placeholder substitutions applied.
+
+        Priority:
+        1) `stage1_focus_prompt` (preferred concise retrieval prompt)
+        2) `rubric` (fallback for templates without a dedicated Stage 1 prompt)
+        """
+        template = self.get_template(template_id) or {}
+        prompt = str(template.get("stage1_focus_prompt") or template.get("rubric") or "").strip()
+        if not prompt:
+            return ""
+        if company_name:
+            prompt = prompt.replace("[Company Name]", company_name)
+        if exchange:
+            prompt = prompt.replace("[Exchange]", exchange.upper())
+        if max_chars > 0:
+            prompt = prompt[:max_chars]
+        return prompt.strip()
 
     def auto_detect_template(
         self,

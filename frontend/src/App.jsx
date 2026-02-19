@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
+import GanttMappingDemo from './components/GanttMappingDemo';
 import { api } from './api';
 import './App.css';
 
-function App() {
+function CouncilApp() {
   const [conversations, setConversations] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
@@ -332,6 +333,17 @@ function App() {
       />
     </div>
   );
+}
+
+function App() {
+  const path =
+    typeof window !== 'undefined'
+      ? window.location.pathname.replace(/\/+$/, '')
+      : '';
+  if (path === '/gantt-demo') {
+    return <GanttMappingDemo />;
+  }
+  return <CouncilApp />;
 }
 
 export default App;

@@ -1,0 +1,145 @@
+{
+  "query": "NYSE: Paramount Gold Nevada Corp latest SEC filings and investor presentations",
+  "ticker": "NYSE:PZG",
+  "exchange": "nyse",
+  "depth": "basic",
+  "lookback_days": 365,
+  "generated_at_utc": "2026-02-18T07:06:37.763110+00:00",
+  "exchange_retrieval_profile": {
+    "allowed_domain_suffixes": [
+      "sec.gov",
+      "nyse.com",
+      "businesswire.com",
+      "globenewswire.com",
+      "prnewswire.com",
+      "stockanalysis.com",
+      "marketwatch.com"
+    ],
+    "lookback_days_default": 365,
+    "target_price_sensitive_default": 8,
+    "target_non_price_sensitive_default": 12,
+    "price_sensitive_strategy": "sec_material_filing_tokens",
+    "material_filing_tokens": [
+      "form 8-k",
+      "8-k",
+      "form 10-q",
+      "10-q",
+      "form 10-k",
+      "10-k",
+      "form 20-f",
+      "20-f",
+      "form 6-k",
+      "6-k",
+      "def 14a",
+      "earnings release",
+      "investor presentation",
+      "guidance",
+      "material definitive agreement"
+    ],
+    "low_signal_notice_tokens": [
+      "form 3",
+      "form 4",
+      "form 5",
+      "schedule 13g",
+      "13g/a",
+      "section 16 filing"
+    ],
+    "exchange": "nyse"
+  },
+  "us_fallback_chain": {
+    "enabled": true,
+    "exchange": "nyse",
+    "tier_used": "tier4_existing_perplexity",
+    "attempts": [
+      {
+        "tier": 1,
+        "name": "sec_data_api",
+        "status": "failed",
+        "added": 0,
+        "error": "ticker_map_http_403"
+      },
+      {
+        "tier": 2,
+        "name": "sec_atom_feed",
+        "status": "failed",
+        "added": 0,
+        "error": "atom_http_403"
+      },
+      {
+        "tier": 3,
+        "name": "newswire_fallback",
+        "status": "failed",
+        "added": 0,
+        "error": "no_newswire_sources"
+      },
+      {
+        "tier": 4,
+        "name": "existing_perplexity_allowed_domains",
+        "status": "success",
+        "added": 3,
+        "error": ""
+      }
+    ]
+  },
+  "allowed_domains": [
+    "sec.gov",
+    "nyse.com",
+    "businesswire.com",
+    "globenewswire.com",
+    "prnewswire.com",
+    "stockanalysis.com",
+    "marketwatch.com"
+  ],
+  "retrieved_sources": 6,
+  "selection_policy": {
+    "target_price_sensitive": 8,
+    "target_non_price_sensitive": 12,
+    "fallback_mode_when_zero_targets": 20,
+    "notes": [
+      "Exchange profile applied: nyse.",
+      "Price-sensitive strategy: sec_material_filing_tokens.",
+      "Price-sensitive marker sourced from exchange material-filing token heuristics.",
+      "If a bucket is short, backfill is taken from the opposite bucket.",
+      "US fallback chain tier used: tier4_existing_perplexity."
+    ]
+  },
+  "target_files": 20,
+  "candidate_sources_considered": 3,
+  "candidate_pdfs_in_window": 1,
+  "selected_primary_candidates": 1,
+  "selected_primary_price_sensitive": 0,
+  "selected_primary_non_price_sensitive": 1,
+  "decode_queue_candidates": 1,
+  "written_price_sensitive": 0,
+  "written_non_price_sensitive": 0,
+  "written_files": [],
+  "failed_files": [
+    {
+      "index": 1,
+      "title": "EDGAR Filing Documents for 0001193125-25-289799 - SEC.gov",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/1629210/000119312525289799/0001193125-25-289799-index.html",
+      "pdf_url": "https://www.sec.gov/Archives/edgar/data/1629210/000119312525289799/0001193125-25-289799-index.html",
+      "selection_bucket": "non_price_sensitive",
+      "price_sensitive_marker": false,
+      "ii_price_sensitive_marker": false,
+      "error": "http_403"
+    }
+  ],
+  "worker_settings": {
+    "model": "openai/gpt-4o-mini",
+    "max_key_points": 30,
+    "concurrency": 2,
+    "timeout_seconds": 180.0,
+    "hybrid_vision_enabled": true,
+    "hybrid_vision_model": "openai/gpt-4o-mini",
+    "hybrid_vision_max_pages": 50,
+    "hybrid_vision_page_batch_size": 4,
+    "hybrid_vision_max_page_facts": 12,
+    "hybrid_vision_timeout_seconds": 180.0,
+    "hybrid_vision_max_tokens": 1200
+  },
+  "worker_summary_markdown": "",
+  "worker_summary_json": "",
+  "injection_bundle_json": "",
+  "injection_bundle_markdown": ""
+}

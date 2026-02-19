@@ -90,6 +90,27 @@ COUNCIL_MODELS = _COUNCIL_MODELS or [
 
 # Chairman model - synthesizes final response
 CHAIRMAN_MODEL = os.getenv("CHAIRMAN_MODEL", "google/gemini-3-pro-preview").strip()
+CHAIRMAN_TIMEOUT_SECONDS = _get_float("CHAIRMAN_TIMEOUT_SECONDS", 300.0)
+# Explicit Stage 3 completion budget for chairman calls.
+# Set to 0 only if you intentionally want provider-default limits.
+CHAIRMAN_MAX_OUTPUT_TOKENS = _get_int("CHAIRMAN_MAX_OUTPUT_TOKENS", 16000)
+# Chairman output style:
+# - text_xml (default): chairman writes structured plain text with XML-style tags
+# - json: chairman writes JSON directly
+CHAIRMAN_OUTPUT_STYLE = os.getenv("CHAIRMAN_OUTPUT_STYLE", "text_xml").strip().lower()
+# Secondary JSON normalizer model (used when chairman output is non-JSON or malformed).
+CHAIRMAN_JSONIFIER_MODEL = os.getenv(
+    "CHAIRMAN_JSONIFIER_MODEL",
+    "openai/gpt-4o-mini",
+).strip()
+CHAIRMAN_JSONIFIER_TIMEOUT_SECONDS = _get_float(
+    "CHAIRMAN_JSONIFIER_TIMEOUT_SECONDS",
+    180.0,
+)
+CHAIRMAN_JSONIFIER_MAX_OUTPUT_TOKENS = _get_int(
+    "CHAIRMAN_JSONIFIER_MAX_OUTPUT_TOKENS",
+    12000,
+)
 
 
 # Feature flag to route retrieval through backend/research service
@@ -263,6 +284,12 @@ PERPLEXITY_STAGE1_EXECUTION_MODE = os.getenv(
     "staggered",
 ).strip().lower()
 PERPLEXITY_STAGE1_STAGGER_SECONDS = _get_float("PERPLEXITY_STAGE1_STAGGER_SECONDS", 2.0)
+# Attachment-context cap for Stage 1.
+# 0 = no truncation (provider/model limits still apply server-side).
+PERPLEXITY_STAGE1_ATTACHMENT_CONTEXT_MAX_CHARS = _get_int(
+    "PERPLEXITY_STAGE1_ATTACHMENT_CONTEXT_MAX_CHARS",
+    0,
+)
 # Multi-wave retrieval orchestration (planner + gap-filling waves)
 PERPLEXITY_STAGE1_MULTI_WAVE_ENABLED = _get_bool(
     "PERPLEXITY_STAGE1_MULTI_WAVE_ENABLED",
@@ -432,6 +459,18 @@ PERPLEXITY_STAGE1_OPENAI_BASE_REASONING_EFFORT = os.getenv(
 PERPLEXITY_STAGE1_OPENAI_BASE_DOWNGRADE_HIGH_REASONING = _get_bool(
     "PERPLEXITY_STAGE1_OPENAI_BASE_DOWNGRADE_HIGH_REASONING",
     default=False,
+)
+STAGE2_REVISION_PASS_ENABLED = _get_bool(
+    "STAGE2_REVISION_PASS_ENABLED",
+    default=True,
+)
+STAGE2_REVISION_PASS_TIMEOUT_SECONDS = _get_float(
+    "STAGE2_REVISION_PASS_TIMEOUT_SECONDS",
+    120.0,
+)
+STAGE2_REVISION_PASS_MAX_OUTPUT_TOKENS = _get_int(
+    "STAGE2_REVISION_PASS_MAX_OUTPUT_TOKENS",
+    1200,
 )
 ENABLE_SOURCE_DECODING = _get_bool("ENABLE_SOURCE_DECODING", default=True)
 SOURCE_DECODING_MAX_PER_MODEL = _get_int("SOURCE_DECODING_MAX_PER_MODEL", 10)

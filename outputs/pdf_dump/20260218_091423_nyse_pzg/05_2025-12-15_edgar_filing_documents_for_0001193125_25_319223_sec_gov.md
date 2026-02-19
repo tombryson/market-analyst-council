@@ -1,0 +1,235 @@
+# PDF Dump: EDGAR Filing Documents for 0001193125-25-319223 - SEC.gov
+
+- exchange: nyse
+- source_url: https://www.sec.gov/Archives/edgar/data/1629210/0001193125-25-319223-index.html
+- pdf_url: https://www.sec.gov/Archives/edgar/data/1629210/0001193125-25-319223-index.html
+- domain: www.sec.gov
+- published_at: 2025-12-15
+- score: 9.200000000000001
+- selection_bucket: non_price_sensitive
+- discovery_tier: 4
+- discovery_method: tier4_existing_perplexity
+- price_sensitive_marker: False
+- price_sensitive_confidence: 0.950
+- price_sensitive_reason_codes: no_strong_signal
+- ii_price_sensitive_marker: False
+- ii_key_points_count: 0
+- downloaded_at_utc: 2026-02-18T09:14:26.579141+00:00
+- page_count: 0
+- decoded_chars: 1737
+- content_type: text/html
+
+---
+
+## Price Sensitivity Layers
+
+```json
+{
+  "explicit": {
+    "hit": false,
+    "signals": []
+  },
+  "form": {
+    "form": "",
+    "weight": 0.0
+  },
+  "keyword": {
+    "positive_hits": [],
+    "negative_hits": []
+  },
+  "model": {
+    "applied": false,
+    "model": "",
+    "is_price_sensitive": null,
+    "confidence": 0.0,
+    "reason_codes": [],
+    "brief_reason": ""
+  }
+}
+```
+
+## Full Decoded Text
+
+EDGAR Filing Documen s o 0001193125-25-319223 
+
+- 
+
+- 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+- 
+ 
+ 
+ 
+ 
+ 
+- 
+ 
+ SEC.go 
+ 
+ 
+ 
+- 
+ EDGAR 
+ 
+ 
+
+ 
+ 
+- 
+			 La es Filings 
+ 
+ 
+- 
+ Filings sea ch ools 
+ 
+ 
+ 
+ Filing De ail 
+ 
+ 
+
+
+ 
+ 
+ 
+ 
+- SEC Home » 
+ 
+- Company Sea ch » 
+ 
+- Cu en Page 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ Fo m 8-K - Cu en epo : 
+ 
+ 
+ SEC Accession No. 0001193125-25-319223
+ 
+ 
+ 
+ 
+ 
+ Filing Da e 
+ 2025-12-15 
+ Accep ed 
+ 2025-12-15 16:15:24 
+ Documen s 
+ 11 
+ 
+ 
+ Pe iod o Repo 
+ 2025-12-11 
+ 
+ 
+ I ems 
+ I em 5.02: Depa u e o Di ec o s o Ce ain O ice s; Elec ion o Di ec o s; Appoin men o Ce ain O ice s: Compensa o y A angemen s o Ce ain O ice s I em 5.07: Submission o Ma e s o a Vo e o Secu i y Holde s I em 9.01: Financial S a emen s and Exhibi s 
+ 
+ 
+ 
+ 
+ 
+   In e ac i e Da a 
+ 
+ 
+ 
+ 
+ 
+ Documen Fo ma Files 
+ 
+ 
+ Seq 
+ Desc ip ion 
+ Documen 
+ Type 
+ Size 
+ 
+ 
+ 1 
+ 8-K 
+ pzg-20251211.h m    iXBRL 
+ 8-K 
+ 115925 
+ 
+ 
+ 2 
+ EX-10.1 
+ pzg-ex10_1.h m 
+ EX-10.1 
+ 234107 
+ 
+ 
+   
+ Comple e submission ex ile 
+ 0001193125-25-319223. x 
+   
+ 491964 
+ 
+ 	
+ 
+ 
+ 
+ 
+ Da a Files 
+ 
+ 
+ Seq 
+ Desc ip ion 
+ Documen 
+ Type 
+ Size 
+ 
+ 
+ 3 
+ XBRL TAXONOMY EXTENSION SCHEMA WITH EMBEDDED LINKBASES DOCUMENT 
+ pzg-20251211.xsd 
+ EX-101.SCH 
+ 23921 
+ 
+ 
+ 13 
+ EXTRACTED XBRL INSTANCE DOCUMENT 
+ pzg-20251211_h m.xml 
+ XML 
+ 4528 
+ 
+ 	
+ 
+ 
+ 
+ 
+ 
+ Mailing Add ess
+ 665 ANDERSON STREET 
+ 
+WINNEMUCCA NV 
+89445 
+ 
+ Business Add ess
+ 665 ANDERSON STREET 
+ 
+WINNEMUCCA NV 
+89445 
+ (775) 625-3600 
+ 
+ 
+ Pa amoun Gold Ne ada Co p. (File )
+ CIK : 0001629210 (see all company ilings) 
+ EIN. : 980138393 | S a e o Inco p.: NV | Fiscal Yea End: 0630 Type: 8-K | Ac : 34 | File No.: 001-36908 | Film No.: 251571773 SIC : 1000 Me al Mining (CF O ice: 01 Ene gy & T anspo a ion)

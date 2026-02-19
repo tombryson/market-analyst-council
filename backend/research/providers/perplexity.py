@@ -706,9 +706,12 @@ class PerplexityResearchProvider(ResearchProvider):
             if depth == "deep":
                 return active_preset
             if active_preset == "deep-research":
-                return "search"
+                # Some accounts/models reject `preset=search` with 400 invalid_request,
+                # while accepting `deep-research`. Keep the explicit preset intact.
+                return "deep-research"
             return active_preset
-        return "deep-research" if depth == "deep" else "search"
+        # Prefer deep-research as a safer default across model/account variants.
+        return "deep-research"
 
     def _build_tools(
         self,

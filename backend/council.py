@@ -34,6 +34,7 @@ from .config import (
     PERPLEXITY_API_URL,
     PERPLEXITY_STAGE1_EXECUTION_MODE,
     PERPLEXITY_STAGE1_STAGGER_SECONDS,
+    PERPLEXITY_STAGE1_ATTACHMENT_CONTEXT_MAX_CHARS,
     PERPLEXITY_STAGE1_MULTI_WAVE_ENABLED,
     PERPLEXITY_STAGE1_MULTI_WAVE_MAX_WAVES,
     PERPLEXITY_STAGE1_MULTI_WAVE_GAP_QUERY_LIMIT,
@@ -77,6 +78,9 @@ from .config import (
     PERPLEXITY_STAGE1_OPENAI_BASE_MAX_STEPS,
     PERPLEXITY_STAGE1_OPENAI_BASE_REASONING_EFFORT,
     PERPLEXITY_STAGE1_OPENAI_BASE_DOWNGRADE_HIGH_REASONING,
+    STAGE2_REVISION_PASS_ENABLED,
+    STAGE2_REVISION_PASS_TIMEOUT_SECONDS,
+    STAGE2_REVISION_PASS_MAX_OUTPUT_TOKENS,
     PERPLEXITY_PRESET_STRATEGY,
     PERPLEXITY_PRESET_DEEP,
     PERPLEXITY_PRESET_ADVANCED,
@@ -374,8 +378,7 @@ def _infer_exchange_from_ticker(ticker: str) -> str:
 
 def _expected_domains_for_exchange(exchange: str) -> List[str]:
     """Exchange-primary domains for missing-data diagnostics."""
-    key = (exchange or "").strip().upper()
-    mapping = {
+    fallback_map = {
         "ASX": ["asx.com.au", "marketindex.com.au", "wcsecure.weblink.com.au"],
         "NYSE": ["sec.gov"],
         "NASDAQ": ["sec.gov"],
@@ -384,7 +387,42 @@ def _expected_domains_for_exchange(exchange: str) -> List[str]:
         "LSE": ["londonstockexchange.com", "investegate.co.uk"],
         "AIM": ["londonstockexchange.com", "investegate.co.uk"],
     }
-    return mapping.get(key, [])
+
+    key = (exchange or "").strip()
+    key_upper = key.upper()
+    try:
+        from .template_loader import get_template_loader
+
+        loader = get_template_loader()
+        normalized = loader.normalize_exchange(key) or loader.normalize_exchange(key_upper)
+        if not normalized and key_upper:
+            alias_map = {
+                "ASX": "asx",
+                "NYSE": "nyse",
+                "NASDAQ": "nasdaq",
+                "TSX": "tsx",
+                "TSXV": "tsxv",
+                "LSE": "lse",
+                "AIM": "aim",
+            }
+            normalized = alias_map.get(key_upper)
+        if normalized:
+            params = loader.get_exchange_retrieval_params(normalized)
+            suffixes = [
+                str(item).strip().lower()
+                for item in (params.get("allowed_domain_suffixes", []) or [])
+                if str(item).strip()
+            ]
+            deduped: List[str] = []
+            for item in suffixes:
+                if item not in deduped:
+                    deduped.append(item)
+            if deduped:
+                return deduped
+    except Exception:
+        pass
+
+    return fallback_map.get(key_upper, [])
 
 
 def _has_expected_source_domain(results: List[Dict[str, Any]], expected_domains: List[str]) -> bool:
@@ -6366,8 +6404,16 @@ async def stage1_collect_perplexity_research_responses(
             f"compliance_markers={marker_count}, critical_sections={critical_count}"
         )
 
-    # Keep attachment context bounded to avoid runaway token growth.
-    bounded_attachment_context = attachment_context[:12000] if attachment_context else ""
+    # Optional attachment-context cap (0 = no truncation).
+    bounded_attachment_context = attachment_context or ""
+    attachment_cap = int(PERPLEXITY_STAGE1_ATTACHMENT_CONTEXT_MAX_CHARS)
+    if attachment_cap > 0 and len(bounded_attachment_context) > attachment_cap:
+        _progress_log(
+            "Stage1 attachment context truncated: "
+            f"original_chars={len(bounded_attachment_context)} "
+            f"cap={attachment_cap}"
+        )
+        bounded_attachment_context = bounded_attachment_context[:attachment_cap]
     research_query = user_query
     if bounded_attachment_context:
         research_query = (
@@ -6401,17 +6447,18 @@ async def stage1_collect_perplexity_research_responses(
         - openrouter pool models -> OpenRouter API
         """
         model_key = str(model or "").strip()
+        # Route Gemini second-pass analysis via OpenRouter when available.
+        # This avoids recurring short/truncated non-search outputs observed on
+        # Perplexity non-search second-pass calls for large prompts.
+        if (
+            OPENROUTER_API_KEY
+            and model_key.lower().startswith("google/")
+            and _is_openrouter_compatible_model(model_key)
+        ):
+            return "openrouter"
         if not mixed_mode_enabled:
             # In non-mixed Perplexity execution, keep retrieval on Perplexity but
-            # route Gemini second-pass analysis through OpenRouter by default.
-            # Perplexity non-search Responses for Gemini are currently prone to
-            # partial payloads on large prompts.
-            if (
-                OPENROUTER_API_KEY
-                and model_key.lower().startswith("google/")
-                and _is_openrouter_compatible_model(model_key)
-            ):
-                return "openrouter"
+            # route second-pass analysis through Perplexity by default.
             return "perplexity"
         if model_key in perplexity_model_set:
             return "perplexity"
@@ -7586,6 +7633,388 @@ Now provide your evaluation and ranking:"""
     return stage2_results, label_to_model
 
 
+def _parse_json_object_from_text(text: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """Extract a JSON object from model text output using permissive fallbacks."""
+    payload = (text or "").strip()
+    if not payload:
+        return None, "empty_response"
+
+    try:
+        parsed = json.loads(payload)
+        if isinstance(parsed, dict):
+            return parsed, None
+    except json.JSONDecodeError:
+        pass
+
+    fenced = re.search(r"```json\s*(\{[\s\S]*?\})\s*```", payload, re.IGNORECASE)
+    if fenced:
+        try:
+            parsed = json.loads(fenced.group(1))
+            if isinstance(parsed, dict):
+                return parsed, None
+        except json.JSONDecodeError:
+            pass
+
+    # Last fallback: scan for first decodable JSON object in the text.
+    decoder = json.JSONDecoder()
+    for idx, char in enumerate(payload):
+        if char != "{":
+            continue
+        try:
+            candidate, _ = decoder.raw_decode(payload[idx:])
+            if isinstance(candidate, dict):
+                return candidate, None
+        except json.JSONDecodeError:
+            continue
+
+    return None, "no_json_object_found"
+
+
+def _coerce_bool(value: Any) -> Optional[bool]:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "yes", "1"}:
+            return True
+        if lowered in {"false", "no", "0"}:
+            return False
+    return None
+
+
+def _coerce_float(value: Any) -> Optional[float]:
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        token = value.strip().replace("%", "")
+        try:
+            return float(token)
+        except ValueError:
+            return None
+    return None
+
+
+def _normalize_stage2_revision_delta(raw: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """Normalize revision payload returned by a model.
+
+    This parser is intentionally permissive:
+    - accepts missing/implicit changed flag
+    - accepts notes-only payloads
+    - only rejects truly empty/unusable payloads
+    """
+    changed = _coerce_bool(raw.get("changed"))
+    reason_text = str(raw.get("reason", "") or "").strip()
+    revision_notes = str(
+        raw.get("revision_notes")
+        or raw.get("notes")
+        or raw.get("summary")
+        or reason_text
+        or ""
+    ).strip()
+
+    normalized: Dict[str, Any] = {
+        "changed": False,
+        "reason": reason_text,
+        "revision_notes": revision_notes,
+        "changes": raw.get("changes") if isinstance(raw.get("changes"), list) else [],
+        "updated_scores": raw.get("updated_scores") if isinstance(raw.get("updated_scores"), dict) else {},
+        "updated_price_targets": (
+            raw.get("updated_price_targets")
+            if isinstance(raw.get("updated_price_targets"), dict)
+            else {}
+        ),
+        "updated_observations": (
+            [str(item).strip() for item in (raw.get("updated_observations") or []) if str(item).strip()]
+            if isinstance(raw.get("updated_observations"), list)
+            else []
+        ),
+        "evidence_refs": raw.get("evidence_refs") if isinstance(raw.get("evidence_refs"), list) else [],
+        "confidence": None,
+    }
+
+    if not normalized["updated_scores"] and isinstance(raw.get("scores"), dict):
+        normalized["updated_scores"] = dict(raw.get("scores") or {})
+    if not normalized["updated_price_targets"] and isinstance(raw.get("price_targets"), dict):
+        normalized["updated_price_targets"] = dict(raw.get("price_targets") or {})
+
+    confidence = _coerce_float(raw.get("confidence"))
+    if confidence is not None:
+        if confidence > 1.0 and confidence <= 100.0:
+            confidence = confidence / 100.0
+        if 0.0 <= confidence <= 1.0:
+            normalized["confidence"] = round(confidence, 4)
+
+    updated_scores = normalized["updated_scores"]
+    if updated_scores:
+        for key in ("quality", "value"):
+            if key not in updated_scores:
+                continue
+            score = _coerce_float(updated_scores.get(key))
+            if score is None or score < 0 or score > 100:
+                updated_scores.pop(key, None)
+            else:
+                updated_scores[key] = round(float(score), 2)
+
+    inferred_changed = bool(
+        normalized["changes"]
+        or normalized["updated_scores"]
+        or normalized["updated_price_targets"]
+        or normalized["updated_observations"]
+        or normalized["revision_notes"]
+    )
+    if changed is None:
+        normalized["changed"] = inferred_changed
+    else:
+        normalized["changed"] = changed
+
+    if not inferred_changed and not reason_text:
+        return None, "empty_revision_payload"
+    return normalized, None
+
+
+def _extract_changed_flag_from_text(text: str) -> Optional[bool]:
+    payload = str(text or "")
+    m = re.search(r"(?im)^\s*CHANGED\s*:\s*(YES|NO|TRUE|FALSE|1|0)\s*$", payload)
+    if m:
+        token = m.group(1).strip().lower()
+        return token in {"yes", "true", "1"}
+    m2 = re.search(r'(?i)"changed"\s*:\s*(true|false)', payload)
+    if m2:
+        return m2.group(1).lower() == "true"
+    return None
+
+
+def _extract_revision_notes_from_text(text: str) -> str:
+    payload = str(text or "").strip()
+    if not payload:
+        return ""
+    m = re.search(r"(?is)REVISION_NOTES\s*:\s*(.+)$", payload)
+    if m:
+        return m.group(1).strip()
+    # Strip code fences when present.
+    fence = re.search(r"(?is)```(?:json)?\s*(.+?)\s*```", payload)
+    if fence:
+        return fence.group(1).strip()
+    return payload
+
+
+def _build_stage2_revision_prompt(
+    *,
+    enhanced_context: str,
+    own_label: str,
+    responses_text: str,
+    aggregate_rankings: List[Dict[str, Any]],
+) -> str:
+    ranking_lines: List[str] = []
+    for i, item in enumerate(aggregate_rankings or [], start=1):
+        ranking_lines.append(
+            f"{i}. {item.get('model')} (avg_rank={item.get('average_rank')})"
+        )
+    ranking_block = "\n".join(ranking_lines) if ranking_lines else "(none)"
+
+    return f"""You are re-evaluating your own Stage 1 analysis after seeing peer model outputs.
+
+You authored: {own_label}
+
+Original question/context:
+{enhanced_context}
+
+Peer outputs (anonymized):
+{responses_text}
+
+Stage 2 aggregate ranking by model:
+{ranking_block}
+
+Task:
+1) Decide whether peer responses reveal material points you missed.
+2) If yes, propose only incremental updates to your prior conclusions.
+3) If no, keep unchanged.
+4) Keep your output short.
+
+Output format (strict plain text):
+CHANGED: YES or NO
+REVISION_NOTES:
+- short bullet
+- short bullet
+OPTIONAL_UPDATES:
+- quality: <value or unchanged>
+- value: <value or unchanged>
+- target_12m: <value/range or unchanged>
+- target_24m: <value/range or unchanged>
+
+Rules:
+- Max 10 bullets total.
+- If no material change: CHANGED: NO and one short note.
+- Prefer concrete evidence references to peer responses.
+- Do not restate your full report.
+"""
+
+
+async def stage2_collect_revision_deltas(
+    enhanced_context: str,
+    stage1_results: List[Dict[str, Any]],
+    stage2_results: List[Dict[str, Any]],
+    label_to_model: Dict[str, str],
+    revision_models: Optional[List[str]] = None,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    Stage 2.5 (WIP): ask each model to self-revise after peer review.
+
+    If delta JSON is malformed/invalid, the caller should keep the previous Stage 1
+    output unchanged.
+    """
+    labels = [chr(65 + i) for i in range(len(stage1_results))]
+    model_to_label = {
+        result.get("model", ""): f"Response {label}"
+        for label, result in zip(labels, stage1_results)
+    }
+    def _clip(text: str, limit: int = 1800) -> str:
+        payload = str(text or "").strip()
+        if len(payload) <= limit:
+            return payload
+        return payload[:limit].rstrip() + "\n...[TRUNCATED FOR REVISION PASS]"
+
+    responses_text = "\n\n".join(
+        f"Response {label}:\n{_clip(result.get('response', ''))}"
+        for label, result in zip(labels, stage1_results)
+    )
+    aggregate = calculate_aggregate_rankings(stage2_results, label_to_model)
+    targets = [m for m in (revision_models or [r.get("model") for r in stage1_results]) if m]
+    timeout = float(STAGE2_REVISION_PASS_TIMEOUT_SECONDS)
+    max_tokens = int(STAGE2_REVISION_PASS_MAX_OUTPUT_TOKENS)
+
+    async def _run_one(model: str) -> Dict[str, Any]:
+        own_label = model_to_label.get(model, "")
+        prompt = _build_stage2_revision_prompt(
+            enhanced_context=enhanced_context,
+            own_label=own_label,
+            responses_text=responses_text,
+            aggregate_rankings=aggregate,
+        )
+        response = await query_model(
+            model,
+            [{"role": "user", "content": prompt}],
+            timeout=timeout,
+            max_tokens=max_tokens,
+        )
+        raw_text = (response or {}).get("content", "") if response else ""
+        parsed, parse_error = _parse_json_object_from_text(raw_text)
+        normalized = None
+        normalize_error = None
+        if parsed is not None:
+            normalized, normalize_error = _normalize_stage2_revision_delta(parsed)
+        # Fallback: accept non-empty plain-text revision notes even when JSON fails.
+        if normalized is None and str(raw_text or "").strip():
+            fallback_changed = _extract_changed_flag_from_text(raw_text)
+            fallback_notes = _extract_revision_notes_from_text(raw_text)
+            normalized = {
+                "changed": bool(fallback_changed) if fallback_changed is not None else bool(fallback_notes),
+                "reason": "",
+                "revision_notes": fallback_notes,
+                "changes": [],
+                "updated_scores": {},
+                "updated_price_targets": {},
+                "updated_observations": [],
+                "evidence_refs": [],
+                "confidence": None,
+            }
+            normalize_error = parse_error or "non_json_fallback_used"
+            parse_error = None
+        accepted = normalized is not None
+        return {
+            "model": model,
+            "own_label": own_label,
+            "prompt_chars": len(prompt),
+            "response_chars": len(raw_text or ""),
+            "accepted": accepted,
+            "changed": bool((normalized or {}).get("changed")) if accepted else False,
+            "delta_json": normalized,
+            "parse_error": None if accepted else (parse_error or normalize_error),
+            "decode_warning": normalize_error if accepted else None,
+            "raw_response": raw_text,
+        }
+
+    _progress_log(
+        "Stage2.5 revision pass start: "
+        f"models={targets}, timeout={timeout:.1f}s, max_output_tokens={max_tokens}"
+    )
+    tasks = [_run_one(model) for model in targets]
+    results = await asyncio.gather(*tasks)
+    accepted = sum(1 for row in results if row.get("accepted"))
+    changed = sum(1 for row in results if row.get("accepted") and row.get("changed"))
+    summary = {
+        "enabled": True,
+        "models_attempted": list(targets),
+        "models_succeeded": [row.get("model") for row in results if row.get("raw_response")],
+        "accepted_count": int(accepted),
+        "changed_count": int(changed),
+        "parse_failed_count": int(sum(1 for row in results if not row.get("accepted"))),
+    }
+    _progress_log(
+        "Stage2.5 revision pass done: "
+        f"accepted={accepted}/{len(targets)}, changed={changed}"
+    )
+    return results, summary
+
+
+def apply_stage2_revision_deltas(
+    stage1_results: List[Dict[str, Any]],
+    revision_results: List[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    Apply accepted Stage 2.5 deltas to Stage 1 responses.
+
+    Safe behavior: if revision payload is not accepted, keep original Stage 1 response.
+    """
+    accepted_by_model: Dict[str, Dict[str, Any]] = {}
+    for row in revision_results or []:
+        if not row.get("accepted"):
+            continue
+        model = str(row.get("model") or "").strip()
+        if not model:
+            continue
+        accepted_by_model[model] = row
+
+    updated: List[Dict[str, Any]] = []
+    changed_models: List[str] = []
+    notes_applied_models: List[str] = []
+    for item in stage1_results or []:
+        row = dict(item or {})
+        model = str(row.get("model") or "").strip()
+        accepted = accepted_by_model.get(model)
+        if not accepted:
+            updated.append(row)
+            continue
+        delta = accepted.get("delta_json") or {}
+        raw_response = str(accepted.get("raw_response") or "").strip()
+        if not raw_response:
+            updated.append(row)
+            continue
+        block = (
+            "\n\n[STAGE2_REVISION_NOTES]\n"
+            f"{raw_response}\n"
+        )
+        row["response"] = f"{str(row.get('response') or '').rstrip()}{block}"
+        notes_applied_models.append(model)
+        if bool((delta or {}).get("changed")):
+            changed_models.append(model)
+        updated.append(row)
+
+    summary = {
+        "models_total": len(stage1_results or []),
+        "revisions_received": len(revision_results or []),
+        "revisions_applied": len(notes_applied_models),
+        "revision_notes_applied_models": notes_applied_models,
+        "models_changed": changed_models,
+        "models_unchanged_due_to_parse_or_validation": [
+            str(row.get("model") or "")
+            for row in (revision_results or [])
+            if not row.get("accepted")
+        ],
+    }
+    return updated, summary
+
+
 async def stage3_synthesize_final(
     enhanced_context: str,
     stage1_results: List[Dict[str, Any]],
@@ -7844,10 +8273,27 @@ async def run_full_council(
     # Calculate aggregate rankings
     aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
 
+    stage1_results_for_stage3 = stage1_results
+    stage2_revision_results: List[Dict[str, Any]] = []
+    stage2_revision_summary: Dict[str, Any] = {"enabled": False}
+    if STAGE2_REVISION_PASS_ENABLED:
+        stage2_revision_results, stage2_revision_summary = await stage2_collect_revision_deltas(
+            enhanced_context,
+            stage1_results,
+            stage2_results,
+            label_to_model,
+            revision_models=[item.get("model") for item in stage1_results if item.get("model")],
+        )
+        stage1_results_for_stage3, apply_summary = apply_stage2_revision_deltas(
+            stage1_results,
+            stage2_revision_results,
+        )
+        stage2_revision_summary["apply"] = apply_summary
+
     # Stage 3: Synthesize final answer (with optional structured analysis)
     stage3_result = await stage3_synthesize_final(
         enhanced_context,
-        stage1_results,
+        stage1_results_for_stage3,
         stage2_results,
         label_to_model=label_to_model,
         use_structured_analysis=use_structured_analysis,
@@ -7861,7 +8307,10 @@ async def run_full_council(
     # Prepare metadata
     metadata = {
         "label_to_model": label_to_model,
-        "aggregate_rankings": aggregate_rankings
+        "aggregate_rankings": aggregate_rankings,
+        "stage2_revision_pass_enabled": bool(STAGE2_REVISION_PASS_ENABLED),
+        "stage2_revision_summary": stage2_revision_summary,
+        "stage2_revision_results": stage2_revision_results,
     }
 
-    return stage1_results, stage2_results, stage3_result, metadata
+    return stage1_results_for_stage3, stage2_results, stage3_result, metadata

@@ -1,0 +1,588 @@
+{
+  "source_artifact": "/Users/Toms_Macbook/Projects/llm-council/outputs/quality_ausgold_dual_chairman_pplx3_20260218_152501.json",
+  "chairman_model": "openai/gpt-5.2",
+  "query_model_override": {
+    "max_tokens": 16000
+  },
+  "label_to_model": {
+    "Response A": "openai/gpt-5.1",
+    "Response B": "google/gemini-3-pro-preview",
+    "Response C": "anthropic/claude-sonnet-4-5"
+  },
+  "stage3_result": {
+    "model": "openai/gpt-5.2",
+    "response": "{\n  \"analysis_type\": \"resources\",\n  \"ticker\": \"ASX:AUC\",\n  \"company_name\": \"Ausgold Limited\",\n  \"analysis_date\": \"2026-02-18\",\n  \"current_development_stage\": \"Definitive Feasibility Study (DFS) complete; progressing optimisation, approvals/permitting, and financing toward FID\",\n  \"certainty_pct_24m\": 60.0,\n  \"market_data\": {\n    \"current_price\": 1.0099999904632568,\n    \"market_cap_aud_m\": 553.3383331852024,\n    \"shares_outstanding_m\": 547.859741,\n    \"enterprise_value_aud_m\": 553.3383331852024,\n    \"cash_aud_m\": null,\n    \"debt_aud_m\": null\n  },\n  \"projects\": [\n    {\n      \"project_name\": \"Katanning Gold Project (KGP) - 100% owned\",\n      \"jurisdiction\": \"Western Australia, Australia\",\n      \"stage_multiplier\": 0.4,\n      \"npv_model\": {\n        \"npv_template_inputs\": {\n          \"resource_tonnes_mt\": {\n            \"value_used\": 36.4,\n            \"source_url\": \"https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf\",\n            \"document_date\": \"2025-06-30\",\n            \"estimate_tag\": \"ESTIMATE\",\n            \"estimate_justification\": \"Ore-reserve/mining-inventory tonnes were not extractable from the provided excerpt; value carried forward from council synthesis as representative DFS mine-plan ore tonnes.\"\n          },\n          \"grade_gpt\": {\n            \"value_used\": 1.14,\n            \"source_url\": \"https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf\",\n            \"document_date\": \"2025-06-30\",\n            \"estimate_tag\": \"ESTIMATE\",\n            \"estimate_justification\": \"Reserve grade not extractable from excerpt; carried forward from council synthesis as representative DFS reserve grade.\"\n          },\n          \"recovery_fraction\": {\n            \"value_used\": 0.9,\n            \"source_url\": \"https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf\",\n            \"document_date\": \"2025-06-30\",\n            \"estimate_tag\": \"ESTIMATE\",\n            \"estimate_justification\": \"Metallurgical recovery not extractable from excerpt; assumed 90% consistent with typical WA CIL performance and council synthesis.\"\n          },\n          \"mine_life_years\": {\n            \"value_used\": 11,\n            \"source_url\": \"https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf\",\n            \"document_date\": \"2025-06-30\",\n            \"estimate_tag\": \"ESTIMATE\",\n            \"estimate_justification\": \"Mine life not extractable from excerpt; carried forward from council synthesis as representative DFS mine life.\"\n          },\n          \"aisc_aud_per_oz\": {\n            \"value_used\": 2252.0,\n            \"source_url\": \"https://investorpa.com/announcement-pdf/20260116/245660.pdf\",\n            \"document_date\": \"2026-01-16\",\n            \"estimate_tag\": \"ESTIMATE\",\n            \"estimate_justification\": \"Verified ledger indicated 'AISC 2252' but currency field was ambiguous in extraction; assumed AUD consistent with ASX reporting and rubric currency.\"\n          },\n          \"capex_aud_m\": {\n            \"value_used\": 320.0,\n            \"source_url\": \"https://api.investi.com.au/api/announcements/auc/fe121bfd-e09.pdf\",\n            \"document_date\": \"2025-12-16\",\n            \"estimate_tag\": \"ESTIMATE\",\n            \"estimate_justification\": \"DFS Update excerpt states total funding requirement ~A$354m; initial capex not explicitly extractable, so model uses A$320m as a proxy for initial capex within total funding envelope.\"\n          },\n          \"discount_rate\": {\n            \"value_used\": 0.05,\n            \"source_url\": \"rubric\",\n            \"document_date\": \"2026-02-18\",\n            \"estimate_tag\": \"NO\",\n            \"estimate_justification\": \"\"\n          },\n          \"current_gold_price_aud_per_oz\": {\n            \"value_used\": 4150.0,\n            \"source_url\": \"N/A\",\n            \"document_date\": \"2026-02-18\",\n            \"estimate_tag\": \"ESTIMATE\",\n            \"estimate_justification\": \"No primary gold spot source provided in evidence pack; used a reasonable Feb-2026 AUD spot approximation for sensitivity-consistent valuation.\"\n          },\n          \"royalty_rate_fraction\": {\n            \"value_used\": 0.05,\n            \"source_url\": \"rubric default\",\n            \"document_date\": \"2026-02-18\",\n            \"estimate_tag\": \"NO\",\n            \"estimate_justification\": \"\"\n          },\n          \"tax_rate_fraction\": {\n            \"value_used\": 0.3,\n            \"source_url\": \"rubric default (Australia corporate tax assumption)\",\n            \"document_date\": \"2026-02-18\",\n            \"estimate_tag\": \"NO\",\n            \"estimate_justification\": \"\"\n          },\n          \"sustaining_capex_aud_m_per_yr\": {\n            \"value_used\": 22.0,\n            \"source_url\": \"N/A\",\n            \"document_date\": \"2026-02-18\",\n            \"estimate_tag\": \"ESTIMATE\",\n            \"estimate_justification\": \"Sustaining capex not available from excerpts; estimated at ~7% of initial capex per rubric guidance (5\u201310%).\"\n          },\n          \"working_capital_pct_revenue\": {\n            \"value_used\": 0.05,\n            \"source_url\": \"rubric\",\n            \"document_date\": \"2026-02-18\",\n            \"estimate_tag\": \"NO\",\n            \"estimate_justification\": \"\"\n          },\n          \"ramp_up_years\": {\n            \"value_used\": 1,\n            \"source_url\": \"rubric\",\n            \"document_date\": \"2026-02-18\",\n            \"estimate_tag\": \"NO\",\n            \"estimate_justification\": \"\"\n          }\n        },\n        \"derived_operating_metrics\": {\n          \"recovered_ounces_moz\": 1.201,\n          \"full_annual_production_koz\": 109.2,\n          \"ramp_adjusted_avg_production_factor\": 0.9545,\n          \"effective_annual_production_koz\": 104.3,\n          \"annual_revenue_aud_m\": 432.8,\n          \"annual_royalty_aud_m\": 21.6,\n          \"annual_aisc_costs_aud_m\": 234.9,\n          \"annual_margin_before_sustaining_aud_m\": 176.3\n        },\n        \"dcf_assumptions_and_timeline\": {\n          \"year_0\": \"\u2212Capex \u2212 working capital (5% of first full-year revenue proxy)\",\n          \"year_1\": \"50% ramp production (assumed proportional revenue/cost/sustaining)\",\n          \"years_2_to_final\": \"100% production; sustaining capex each year; tax on (pre-tax CF \u2212 depreciation)\",\n          \"final_year\": \"+ working capital recovery\"\n        },\n        \"dcf_outputs\": {\n          \"depreciation_aud_m_per_yr\": 29.09,\n          \"pre_tax_cf_full_production_aud_m_per_yr\": 154.3,\n          \"tax_full_production_aud_m_per_yr\": 37.6,\n          \"after_tax_cf_full_production_aud_m_per_yr\": 116.7,\n          \"after_tax_cf_year_1_aud_m\": 58.4,\n          \"initial_working_capital_aud_m\": 21.6,\n          \"project_npv5_post_tax_aud_m\": 493.0,\n          \"risked_npv_aud_m\": 197.2\n        },\n        \"notes\": [\n          \"AISC input is the highest-uncertainty driver due to ambiguity in extracted AISC currency/unit; NPV should be treated as illustrative until DFS Update tables are directly parsed.\",\n          \"Gold price used is an estimated spot; the company\u2019s DFS/DFS Update likely uses a lower long-term price deck (not extractable from provided excerpts).\"\n        ]\n      },\n      \"resource_and_reserve_context\": {\n        \"resource_koz\": {\n          \"value_used\": 2440,\n          \"source_url\": \"https://investorpa.com/announcement-pdf/20260116/245660.pdf\",\n          \"document_date\": \"2026-01-16\",\n          \"estimate_tag\": \"NO\",\n          \"estimate_justification\": \"Quarterly report refers to '2.44Moz Katanning Gold Project' in narrative highlights.\"\n        }\n      }\n    }\n  ],\n  \"total_risked_npv_aud_m\": 197.2,\n  \"quality_score\": {\n    \"total\": 69.25,\n    \"breakdown\": {\n      \"jurisdiction\": {\n        \"weight\": 0.2,\n        \"score\": 100.0,\n        \"weighted_score\": 20.0,\n        \"value_used\": \"Tier 1 (Western Australia)\",\n        \"source_url\": \"https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf\",\n        \"document_date\": \"2025-06-30\",\n        \"estimate_tag\": \"NO\",\n        \"estimate_justification\": \"\"\n      },\n      \"infrastructure\": {\n        \"weight\": 0.1,\n        \"score\": 90.0,\n        \"weighted_score\": 9.0,\n        \"value_used\": \"Excellent/near established regional infrastructure (roads, grid proximity implied by regional setting)\",\n        \"source_url\": \"https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf\",\n        \"document_date\": \"2025-06-30\",\n        \"estimate_tag\": \"ESTIMATE\",\n        \"estimate_justification\": \"Specific infrastructure details not extractable from excerpt; scored per typical WA regional development context referenced by council.\"\n      },\n      \"management_quality\": {\n        \"weight\": 0.15,\n        \"score\": 85.0,\n        \"weighted_score\": 12.75,\n        \"value_used\": \"Experienced developer team (development-phase execution focus)\",\n        \"source_url\": \"https://investorpa.com/announcement-pdf/20260116/245660.pdf\",\n        \"document_date\": \"2026-01-16\",\n        \"estimate_tag\": \"ESTIMATE\",\n        \"estimate_justification\": \"No quantified track-record metrics in excerpts; score reflects council synthesis of board/management strengthening for development.\"\n      },\n      \"development_stage\": {\n        \"weight\": 0.15,\n        \"score\": 40.0,\n        \"weighted_score\": 6.0,\n        \"value_used\": \"DFS complete\",\n        \"source_url\": \"https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf\",\n        \"document_date\": \"2025-06-30\",\n        \"estimate_tag\": \"NO\",\n        \"estimate_justification\": \"\"\n      },\n      \"funding_chance_funding_gap\": {\n        \"weight\": 0.2,\n        \"score\": 40.0,\n        \"weighted_score\": 8.0,\n        \"value_used\": \"Funding requirement ~A$354m (gap > A$50m)\",\n        \"source_url\": \"https://api.investi.com.au/api/announcements/auc/fe121bfd-e09.pdf\",\n        \"document_date\": \"2025-12-16\",\n        \"estimate_tag\": \"NO\",\n        \"estimate_justification\": \"\"\n      },\n      \"certainty_12_month_goals\": {\n        \"weight\": 0.1,\n        \"score\": 75.0,\n        \"weighted_score\": 7.5,\n        \"value_used\": \"12-month goals: approvals progress + drilling/resource upgrade + financing pathway\",\n        \"source_url\": \"https://announcements.asx.com.au/asxpdf/20260127/pdf/06vlblbmnlvf47.pdf\",\n        \"document_date\": \"2026-01-27\",\n        \"estimate_tag\": \"ESTIMATE\",\n        \"estimate_justification\": \"Execution probability is a judgment call; drilling momentum is evidenced, but financing timing remains uncertain.\"\n      },\n      \"esg_credentials\": {\n        \"weight\": 0.1,\n        \"score\": 80.0,\n        \"weighted_score\": 8.0,\n        \"value_used\": \"WA compliance framework; early development-stage ESG record\",\n        \"source_url\": \"https://investorpa.com/announcement-pdf/20260116/245660.pdf\",\n        \"document_date\": \"2026-01-16\",\n        \"estimate_tag\": \"ESTIMATE\",\n        \"estimate_justification\": \"No explicit ESG KPIs extracted; score reflects jurisdictional standards and typical permitting pathway.\"\n      }\n    },\n    \"formula_check\": \"0.2*100 + 0.1*90 + 0.15*85 + 0.15*40 + 0.2*40 + 0.1*75 + 0.1*80 = 69.25\"\n  },\n  \"value_score\": {\n    \"total\": 54.0,\n    \"breakdown\": {\n      \"npv_vs_market_cap\": {\n        \"weight\": 0.3,\n        \"score\": 40.0,\n        \"weighted_score\": 12.0,\n        \"value_used\": {\n          \"risked_npv_aud_m\": 197.2,\n          \"market_cap_aud_m\": 553.3383331852024,\n          \"ratio\": 0.356\n        },\n        \"source_urls\": [\n          \"https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf\",\n          \"https://api.investi.com.au/api/announcements/auc/fe121bfd-e09.pdf\"\n        ],\n        \"document_dates\": [\n          \"2025-06-30\",\n          \"2025-12-16\"\n        ],\n        \"estimate_tag\": \"ESTIMATE\",\n        \"estimate_justification\": \"Risked NPV is model-derived with estimated gold price, capex split, and sustaining capex; market cap from normalized_facts.\"\n      },\n      \"ev_per_resource_oz\": {\n        \"weight\": 0.2,\n        \"score\": 40.0,\n        \"weighted_score\": 8.0,\n        \"value_used\": {\n          \"enterprise_value_aud_m\": 553.3383331852024,\n          \"resource_moz\": 2.44,\n          \"ev_per_oz_aud\": 226.8\n        },\n        \"source_urls\": [\n          \"normalized_facts\",\n          \"https://investorpa.com/announcement-pdf/20260116/245660.pdf\"\n        ],\n        \"document_dates\": [\n          \"2026-02-18\",\n          \"2026-01-16\"\n        ],\n        \"estimate_tag\": \"ESTIMATE\",\n        \"estimate_justification\": \"EV assumed equal to market cap due to missing cash/debt; resource ounces referenced from quarterly narrative.\"\n      },\n      \"exploration_upside\": {\n        \"weight\": 0.2,\n        \"score\": 80.0,\n        \"weighted_score\": 16.0,\n        \"value_used\": \"25\u201350% upside potential (district-scale land position + ongoing drilling)\",\n        \"source_url\": \"https://announcements.asx.com.au/asxpdf/20260127/pdf/06vlblbmnlvf47.pdf\",\n        \"document_date\": \"2026-01-27\",\n        \"estimate_tag\": \"ESTIMATE\",\n        \"estimate_justification\": \"No quantified target inventory extracted; score reflects active infill/step-out drilling and council synthesis of belt-scale position.\"\n      },\n      \"cost_competitiveness\": {\n        \"weight\": 0.15,\n        \"score\": 60.0,\n        \"weighted_score\": 9.0,\n        \"value_used\": {\n          \"aisc_aud_per_oz\": 2252.0,\n          \"bucket\": \"A$2,000\u20132,500/oz\"\n        },\n        \"source_url\": \"https://investorpa.com/announcement-pdf/20260116/245660.pdf\",\n        \"document_date\": \"2026-01-16\",\n        \"estimate_tag\": \"ESTIMATE\",\n        \"estimate_justification\": \"AISC value extracted as '2252' with ambiguous unit/currency; treated as AUD for rubric scoring.\"\n      },\n      \"ma_strategic_value\": {\n        \"weight\": 0.15,\n        \"score\": 80.0,\n        \"weighted_score\": 12.0,\n        \"value_used\": \"Moderate-High strategic value (multi-Moz WA development asset)\",\n        \"source_url\": \"https://investorpa.com/announcement-pdf/20260116/245660.pdf\",\n        \"document_date\": \"2026-01-16\",\n        \"estimate_tag\": \"ESTIMATE\",\n        \"estimate_justification\": \"No explicit strategic process disclosed; scoring reflects asset scarcity and council consensus.\"\n      }\n    },\n    \"formula_check\": \"0.3*40 + 0.2*40 + 0.2*80 + 0.15*60 + 0.15*80 = 54.0\"\n  },\n  \"development_timeline\": [\n    {\n      \"milestone\": \"DFS completed (baseline DFS)\",\n      \"target_period\": \"Achieved (Jun 2025)\",\n      \"status\": \"achieved\",\n      \"confidence_pct\": 95.0\n    },\n    {\n      \"milestone\": \"Updated DFS optimisation/refresh (post land acquisition / re-optimisation)\",\n      \"target_period\": \"Achieved (Dec 2025)\",\n      \"status\": \"achieved\",\n      \"confidence_pct\": 90.0\n    },\n    {\n      \"milestone\": \"Infill + step-out drilling program to improve confidence / extend mineralisation\",\n      \"target_period\": \"H1-H2 2026\",\n      \"status\": \"current\",\n      \"confidence_pct\": 75.0\n    },\n    {\n      \"milestone\": \"Approvals/permitting progression (environmental & mining approvals pathway)\",\n      \"target_period\": \"H2 2026 - H1 2027\",\n      \"status\": \"planned\",\n      \"confidence_pct\": 65.0\n    },\n    {\n      \"milestone\": \"Project financing package (equity + debt/alternative financing) and Final Investment Decision (FID)\",\n      \"target_period\": \"H1-H2 2027\",\n      \"status\": \"at risk\",\n      \"confidence_pct\": 55.0\n    },\n    {\n      \"milestone\": \"Construction commencement (subject to FID/financing)\",\n      \"target_period\": \"H2 2027\",\n      \"status\": \"at risk\",\n      \"confidence_pct\": 50.0\n    }\n  ],\n  \"headwinds_tailwinds\": {\n    \"quantitative\": [\n      \"Tailwind: Gold price leverage. Threshold: sustained AUD gold > A$4,000/oz meaningfully improves cash margins; sustained < A$3,200/oz would compress project NPV and financing appetite (model uses A$4,150/oz ESTIMATE).\",\n      \"Headwind: Funding requirement. DFS Update indicates funding in the order of ~A$354m; if financing is delayed beyond H2 2027, expected dilution/schedule slippage increases (threshold: >12 months delay to FID typically drives material re-rate down for pre-build developers).\",\n      \"Headwind: Cost/AISC sensitivity. If AISC is truly ~A$2,252/oz (assumed from extracted '2252'), margin per ounce at A$4,150 is ~A$1,690 pre-royalty; if AISC rises above A$2,500/oz (threshold), rubric cost score drops to 40 and NPV declines materially.\",\n      \"Tailwind: Resource scale. KGP referenced at ~2.44Moz; if MRE grows >3.0Moz (threshold +23%), EV/oz would fall and strategic interest typically increases.\"\n    ],\n    \"qualitative\": [\n      \"Tailwind: Tier-1 jurisdiction (Western Australia) supports permitting/operating confidence and generally better financing terms than higher-risk jurisdictions.\",\n      \"Tailwind: Strategic/M&A optionality for mid-tier WA producers seeking pipeline ounces; scarcity of de-risked, multi-Moz open-pit projects near infrastructure.\",\n      \"Headwind: Financing structure risk (debt capacity, hedging requirements, equity dilution). A large equity component at prices below intrinsic NAV can impair per-share upside even if project NPV is robust.\",\n      \"Headwind: Execution risk transitioning from study to build (EPC, schedule, commissioning). Any capex escalation vs financing plan is punitive (threshold: >15% capex overrun typically triggers re-rating and/or recapitalisation).\"\n    ]\n  },\n  \"price_targets\": {\n    \"current_price\": 1.0099999904632568,\n    \"target_12m\": 1.2,\n    \"target_24m\": 1.7,\n    \"upside_12m_pct\": 18.811882253674694,\n    \"upside_24m_pct\": 68.31683431748654,\n    \"scenarios\": {\n      \"base_12m\": 1.2,\n      \"bull_12m\": 1.7,\n      \"bear_12m\": 0.8,\n      \"base_24m\": 1.7,\n      \"bull_24m\": 2.6,\n      \"bear_24m\": 1.0\n    },\n    \"scenario_drivers\": {\n      \"base\": [\n        \"Financing pathway materially advanced (term sheets/mandates) and approvals on track; no major capex/AISC negative revision vs DFS Update.\",\n        \"AUD gold remains supportive (>=A$3,700/oz).\"\n      ],\n      \"bull\": [\n        \"Financing closed and FID achieved within 24 months; construction commences; market re-rates toward development-stage multiples.\",\n        \"AUD gold >=A$4,200/oz and/or incremental resource/reserve growth.\"\n      ],\n      \"bear\": [\n        \"Financing delayed >12 months and/or heavy equity dilution at depressed price; capex escalates >15% or AISC drifts toward/above A$2,500/oz.\",\n        \"AUD gold retraces to <=A$3,200/oz.\"\n      ]\n    }\n  },\n  \"investment_recommendation\": {\n    \"rating\": \"HOLD\",\n    \"conviction\": \"MEDIUM\",\n    \"summary\": \"DFS-stage WA gold developer with meaningful upside if financing/FID milestones are achieved, but current valuation already implies substantial success; funding quantum and cost assumptions are the dominant swing factors.\"\n  },\n  \"investment_verdict\": {\n    \"top_reasons\": [\n      \"Tier-1 jurisdiction (WA) and DFS completion reduce geological/study risk versus earlier-stage peers.\",\n      \"Material leverage to AUD gold price; DFS Update highlights significant funding requirement but high gold can improve financeability and returns.\",\n      \"Ongoing drilling and optimisation create pathways to reserve/resource growth and potential strategic interest.\"\n    ],\n    \"failure_conditions\": [\n      \"Financing cannot be secured on acceptable terms (excessive dilution/hedging) or is delayed materially beyond H2 2027.\",\n      \"Capex or operating cost inflation drives AISC >A$2,500/oz or initial capex >~A$400m (thresholds that would impair valuation and financing).\",\n      \"Sustained AUD gold price downturn to <A$3,200/oz reduces margins and lender appetite, forcing re-scope or delay.\"\n    ]\n  },\n  \"market_data_provenance\": {\n    \"prepass_as_of_utc\": \"2026-02-18T04:25:02.845464+00:00\",\n    \"prepass_source_urls\": [\n      \"https://finance.yahoo.com/quote/AUC.AX\"\n    ],\n    \"prepass_ticker\": \"ASX:AUC\",\n    \"prepass_currency\": \"AUD\",\n    \"override_notes\": [\n      \"Used injected normalized_facts for current_price, market_cap, shares_outstanding, currency. Enterprise value not provided; EV approximated as market cap due to missing cash/debt (ESTIMATE).\"\n    ]\n  },\n  \"extended_analysis\": {\n    \"next_major_catalysts\": [\n      \"Further drill results (infill + step-out) and any resource/reserve updates (2026). Source example: https://announcements.asx.com.au/asxpdf/20260127/pdf/06vlblbmnlvf47.pdf (2026-01-27).\",\n      \"Permitting/approvals milestones and any material updates to execution strategy (2026-2027).\",\n      \"Financing package announcements (debt mandates, hedging, strategic partner) and FID timing (2027).\"\n    ],\n    \"sensitivity_analysis\": [\n      {\n        \"driver\": \"AUD gold price (A$/oz)\",\n        \"base_assumption\": 4150.0,\n        \"down_case\": 3600.0,\n        \"up_case\": 4500.0,\n        \"directional_impact\": \"High: +/\u2212A$100/oz moves annual revenue by ~A$10.4m (using ~104 koz/yr effective production) before royalty/tax; NPV is highly sensitive.\"\n      },\n      {\n        \"driver\": \"AISC (A$/oz)\",\n        \"base_assumption\": 2252.0,\n        \"down_case\": 2000.0,\n        \"up_case\": 2500.0,\n        \"directional_impact\": \"High: +/\u2212A$100/oz changes annual AISC cost by ~A$10.4m; also changes rubric cost bucket (<=2,000 score 80; >2,500 score 40).\"\n      },\n      {\n        \"driver\": \"Initial capex (A$m)\",\n        \"base_assumption\": 320.0,\n        \"down_case\": 290.0,\n        \"up_case\": 400.0,\n        \"directional_impact\": \"High: upfront capex materially shifts NPV and drives financing dilution risk; >15% overrun is a key re-rating risk.\"\n      },\n      {\n        \"driver\": \"Financing timing\",\n        \"base_assumption\": \"FID/financing by H2 2027\",\n        \"down_case\": \"12+ month delay\",\n        \"up_case\": \"FID by H1 2027\",\n        \"directional_impact\": \"High: delays increase holding costs, compress market multiple, and can force equity at lower prices.\"\n      }\n    ],\n    \"market_context\": [\n      \"DFS Update explicitly flags funding requirement magnitude (~A$354m), which is the dominant near-term valuation overhang for a pre-build developer. Source: https://api.investi.com.au/api/announcements/auc/fe121bfd-e09.pdf (2025-12-16).\",\n      \"Recent equity raises (e.g., placement disclosed) indicate ability to access capital markets, but large project financing remains a step-change. Source: https://announcements.asx.com.au/asxpdf/20250710/pdf/06lnsn93zvftj0.pdf (2025-07-10).\"\n    ],\n    \"commentary\": \"Valuation is primarily a function of (1) the credibility of updated DFS economics, (2) cost/AISC realism under WA inflation, and (3) financing structure. Because key DFS Update tables (capex split, AISC currency/unit, and base-case NPV at the company\u2019s long-term price deck) were not fully extractable from the evidence pack excerpts, the DCF presented is an explicit-but-illustrative model with conservative stage-risking (DFS multiplier 0.40) and clearly tagged estimates.\",\n    \"dissenting_views\": [\n      \"One council view treated Ausgold as pre-PFS/scoping and concluded material overvaluation at A$1.01 (SELL). This conflicts with multiple filings indicating DFS completion (June 2025) and an updated DFS (Dec 2025).\",\n      \"Another council view was bullish (BUY) based on high spot AUD gold and an older/lower AISC assumption (~A$1,747/oz) and capex (~A$296m). Using the more recent extracted AISC figure (~2,252, assumed AUD) and higher funding requirement reduces modeled NPV and raises execution risk.\"\n    ],\n    \"peer_observations\": [\n      \"Consensus across higher-ranked responses: flagship asset is Katanning; company is DFS-stage; key bottleneck is funding/financing and potential dilution.\",\n      \"Council highlighted that AUD gold price is materially above typical DFS long-term assumptions, creating strong leverage but also making valuation highly sensitive to gold retracement.\",\n      \"Multiple responses flagged EV/Resource-oz as elevated relative to rubric thresholds, requiring successful execution/financing for a re-rate.\"\n    ]\n  }\n}",
+    "structured_data": {
+      "analysis_type": "resources",
+      "ticker": "AUC",
+      "company_name": "Ausgold Limited",
+      "analysis_date": "2026-02-18T04:59:40.879240",
+      "current_development_stage": "Definitive Feasibility Study (DFS) complete; progressing optimisation, approvals/permitting, and financing toward FID",
+      "certainty_pct_24m": 60.0,
+      "market_data": {
+        "current_price": 1.0099999904632568,
+        "market_cap_aud_m": 553.3383331852024,
+        "shares_outstanding_m": 547.859741,
+        "enterprise_value_aud_m": 553.3383331852024,
+        "cash_aud_m": null,
+        "debt_aud_m": null
+      },
+      "projects": [
+        {
+          "project_name": "Katanning Gold Project (KGP) - 100% owned",
+          "jurisdiction": "Western Australia, Australia",
+          "stage_multiplier": 0.4,
+          "npv_model": {
+            "npv_template_inputs": {
+              "resource_tonnes_mt": {
+                "value_used": 36.4,
+                "source_url": "https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf",
+                "document_date": "2025-06-30",
+                "estimate_tag": "ESTIMATE",
+                "estimate_justification": "Ore-reserve/mining-inventory tonnes were not extractable from the provided excerpt; value carried forward from council synthesis as representative DFS mine-plan ore tonnes."
+              },
+              "grade_gpt": {
+                "value_used": 1.14,
+                "source_url": "https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf",
+                "document_date": "2025-06-30",
+                "estimate_tag": "ESTIMATE",
+                "estimate_justification": "Reserve grade not extractable from excerpt; carried forward from council synthesis as representative DFS reserve grade."
+              },
+              "recovery_fraction": {
+                "value_used": 0.9,
+                "source_url": "https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf",
+                "document_date": "2025-06-30",
+                "estimate_tag": "ESTIMATE",
+                "estimate_justification": "Metallurgical recovery not extractable from excerpt; assumed 90% consistent with typical WA CIL performance and council synthesis."
+              },
+              "mine_life_years": {
+                "value_used": 11,
+                "source_url": "https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf",
+                "document_date": "2025-06-30",
+                "estimate_tag": "ESTIMATE",
+                "estimate_justification": "Mine life not extractable from excerpt; carried forward from council synthesis as representative DFS mine life."
+              },
+              "aisc_aud_per_oz": {
+                "value_used": 2252.0,
+                "source_url": "https://investorpa.com/announcement-pdf/20260116/245660.pdf",
+                "document_date": "2026-01-16",
+                "estimate_tag": "ESTIMATE",
+                "estimate_justification": "Verified ledger indicated 'AISC 2252' but currency field was ambiguous in extraction; assumed AUD consistent with ASX reporting and rubric currency."
+              },
+              "capex_aud_m": {
+                "value_used": 320.0,
+                "source_url": "https://api.investi.com.au/api/announcements/auc/fe121bfd-e09.pdf",
+                "document_date": "2025-12-16",
+                "estimate_tag": "ESTIMATE",
+                "estimate_justification": "DFS Update excerpt states total funding requirement ~A$354m; initial capex not explicitly extractable, so model uses A$320m as a proxy for initial capex within total funding envelope."
+              },
+              "discount_rate": {
+                "value_used": 0.05,
+                "source_url": "rubric",
+                "document_date": "2026-02-18",
+                "estimate_tag": "NO",
+                "estimate_justification": ""
+              },
+              "current_gold_price_aud_per_oz": {
+                "value_used": 4150.0,
+                "source_url": "N/A",
+                "document_date": "2026-02-18",
+                "estimate_tag": "ESTIMATE",
+                "estimate_justification": "No primary gold spot source provided in evidence pack; used a reasonable Feb-2026 AUD spot approximation for sensitivity-consistent valuation."
+              },
+              "royalty_rate_fraction": {
+                "value_used": 0.05,
+                "source_url": "rubric default",
+                "document_date": "2026-02-18",
+                "estimate_tag": "NO",
+                "estimate_justification": ""
+              },
+              "tax_rate_fraction": {
+                "value_used": 0.3,
+                "source_url": "rubric default (Australia corporate tax assumption)",
+                "document_date": "2026-02-18",
+                "estimate_tag": "NO",
+                "estimate_justification": ""
+              },
+              "sustaining_capex_aud_m_per_yr": {
+                "value_used": 22.0,
+                "source_url": "N/A",
+                "document_date": "2026-02-18",
+                "estimate_tag": "ESTIMATE",
+                "estimate_justification": "Sustaining capex not available from excerpts; estimated at ~7% of initial capex per rubric guidance (5\u201310%)."
+              },
+              "working_capital_pct_revenue": {
+                "value_used": 0.05,
+                "source_url": "rubric",
+                "document_date": "2026-02-18",
+                "estimate_tag": "NO",
+                "estimate_justification": ""
+              },
+              "ramp_up_years": {
+                "value_used": 1,
+                "source_url": "rubric",
+                "document_date": "2026-02-18",
+                "estimate_tag": "NO",
+                "estimate_justification": ""
+              }
+            },
+            "derived_operating_metrics": {
+              "recovered_ounces_moz": 1.201,
+              "full_annual_production_koz": 109.2,
+              "ramp_adjusted_avg_production_factor": 0.9545,
+              "effective_annual_production_koz": 104.3,
+              "annual_revenue_aud_m": 432.8,
+              "annual_royalty_aud_m": 21.6,
+              "annual_aisc_costs_aud_m": 234.9,
+              "annual_margin_before_sustaining_aud_m": 176.3
+            },
+            "dcf_assumptions_and_timeline": {
+              "year_0": "\u2212Capex \u2212 working capital (5% of first full-year revenue proxy)",
+              "year_1": "50% ramp production (assumed proportional revenue/cost/sustaining)",
+              "years_2_to_final": "100% production; sustaining capex each year; tax on (pre-tax CF \u2212 depreciation)",
+              "final_year": "+ working capital recovery"
+            },
+            "dcf_outputs": {
+              "depreciation_aud_m_per_yr": 29.09,
+              "pre_tax_cf_full_production_aud_m_per_yr": 154.3,
+              "tax_full_production_aud_m_per_yr": 37.6,
+              "after_tax_cf_full_production_aud_m_per_yr": 116.7,
+              "after_tax_cf_year_1_aud_m": 58.4,
+              "initial_working_capital_aud_m": 21.6,
+              "project_npv5_post_tax_aud_m": 493.0,
+              "risked_npv_aud_m": 197.2
+            },
+            "notes": [
+              "AISC input is the highest-uncertainty driver due to ambiguity in extracted AISC currency/unit; NPV should be treated as illustrative until DFS Update tables are directly parsed.",
+              "Gold price used is an estimated spot; the company\u2019s DFS/DFS Update likely uses a lower long-term price deck (not extractable from provided excerpts)."
+            ]
+          },
+          "resource_and_reserve_context": {
+            "resource_koz": {
+              "value_used": 2440,
+              "source_url": "https://investorpa.com/announcement-pdf/20260116/245660.pdf",
+              "document_date": "2026-01-16",
+              "estimate_tag": "NO",
+              "estimate_justification": "Quarterly report refers to '2.44Moz Katanning Gold Project' in narrative highlights."
+            }
+          }
+        }
+      ],
+      "total_risked_npv_aud_m": 197.2,
+      "quality_score": {
+        "total": 69.25,
+        "breakdown": {
+          "jurisdiction": {
+            "weight": 0.2,
+            "score": 100.0,
+            "weighted_score": 20.0,
+            "value_used": "Tier 1 (Western Australia)",
+            "source_url": "https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf",
+            "document_date": "2025-06-30",
+            "estimate_tag": "NO",
+            "estimate_justification": ""
+          },
+          "infrastructure": {
+            "weight": 0.1,
+            "score": 90.0,
+            "weighted_score": 9.0,
+            "value_used": "Excellent/near established regional infrastructure (roads, grid proximity implied by regional setting)",
+            "source_url": "https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf",
+            "document_date": "2025-06-30",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "Specific infrastructure details not extractable from excerpt; scored per typical WA regional development context referenced by council."
+          },
+          "management_quality": {
+            "weight": 0.15,
+            "score": 85.0,
+            "weighted_score": 12.75,
+            "value_used": "Experienced developer team (development-phase execution focus)",
+            "source_url": "https://investorpa.com/announcement-pdf/20260116/245660.pdf",
+            "document_date": "2026-01-16",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "No quantified track-record metrics in excerpts; score reflects council synthesis of board/management strengthening for development."
+          },
+          "development_stage": {
+            "weight": 0.15,
+            "score": 40.0,
+            "weighted_score": 6.0,
+            "value_used": "DFS complete",
+            "source_url": "https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf",
+            "document_date": "2025-06-30",
+            "estimate_tag": "NO",
+            "estimate_justification": ""
+          },
+          "funding_chance_funding_gap": {
+            "weight": 0.2,
+            "score": 40.0,
+            "weighted_score": 8.0,
+            "value_used": "Funding requirement ~A$354m (gap > A$50m)",
+            "source_url": "https://api.investi.com.au/api/announcements/auc/fe121bfd-e09.pdf",
+            "document_date": "2025-12-16",
+            "estimate_tag": "NO",
+            "estimate_justification": ""
+          },
+          "certainty_12_month_goals": {
+            "weight": 0.1,
+            "score": 75.0,
+            "weighted_score": 7.5,
+            "value_used": "12-month goals: approvals progress + drilling/resource upgrade + financing pathway",
+            "source_url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vlblbmnlvf47.pdf",
+            "document_date": "2026-01-27",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "Execution probability is a judgment call; drilling momentum is evidenced, but financing timing remains uncertain."
+          },
+          "esg_credentials": {
+            "weight": 0.1,
+            "score": 80.0,
+            "weighted_score": 8.0,
+            "value_used": "WA compliance framework; early development-stage ESG record",
+            "source_url": "https://investorpa.com/announcement-pdf/20260116/245660.pdf",
+            "document_date": "2026-01-16",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "No explicit ESG KPIs extracted; score reflects jurisdictional standards and typical permitting pathway."
+          }
+        },
+        "formula_check": "0.2*100 + 0.1*90 + 0.15*85 + 0.15*40 + 0.2*40 + 0.1*75 + 0.1*80 = 69.25"
+      },
+      "value_score": {
+        "total": 54.0,
+        "breakdown": {
+          "npv_vs_market_cap": {
+            "weight": 0.3,
+            "score": 40.0,
+            "weighted_score": 12.0,
+            "value_used": {
+              "risked_npv_aud_m": 197.2,
+              "market_cap_aud_m": 553.3383331852024,
+              "ratio": 0.356
+            },
+            "source_urls": [
+              "https://announcements.asx.com.au/asxpdf/20250630/pdf/06l7d5txq4z0wx.pdf",
+              "https://api.investi.com.au/api/announcements/auc/fe121bfd-e09.pdf"
+            ],
+            "document_dates": [
+              "2025-06-30",
+              "2025-12-16"
+            ],
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "Risked NPV is model-derived with estimated gold price, capex split, and sustaining capex; market cap from normalized_facts."
+          },
+          "ev_per_resource_oz": {
+            "weight": 0.2,
+            "score": 40.0,
+            "weighted_score": 8.0,
+            "value_used": {
+              "enterprise_value_aud_m": 553.3383331852024,
+              "resource_moz": 2.44,
+              "ev_per_oz_aud": 226.8
+            },
+            "source_urls": [
+              "normalized_facts",
+              "https://investorpa.com/announcement-pdf/20260116/245660.pdf"
+            ],
+            "document_dates": [
+              "2026-02-18",
+              "2026-01-16"
+            ],
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "EV assumed equal to market cap due to missing cash/debt; resource ounces referenced from quarterly narrative."
+          },
+          "exploration_upside": {
+            "weight": 0.2,
+            "score": 80.0,
+            "weighted_score": 16.0,
+            "value_used": "25\u201350% upside potential (district-scale land position + ongoing drilling)",
+            "source_url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vlblbmnlvf47.pdf",
+            "document_date": "2026-01-27",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "No quantified target inventory extracted; score reflects active infill/step-out drilling and council synthesis of belt-scale position."
+          },
+          "cost_competitiveness": {
+            "weight": 0.15,
+            "score": 60.0,
+            "weighted_score": 9.0,
+            "value_used": {
+              "aisc_aud_per_oz": 2252.0,
+              "bucket": "A$2,000\u20132,500/oz"
+            },
+            "source_url": "https://investorpa.com/announcement-pdf/20260116/245660.pdf",
+            "document_date": "2026-01-16",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "AISC value extracted as '2252' with ambiguous unit/currency; treated as AUD for rubric scoring."
+          },
+          "ma_strategic_value": {
+            "weight": 0.15,
+            "score": 80.0,
+            "weighted_score": 12.0,
+            "value_used": "Moderate-High strategic value (multi-Moz WA development asset)",
+            "source_url": "https://investorpa.com/announcement-pdf/20260116/245660.pdf",
+            "document_date": "2026-01-16",
+            "estimate_tag": "ESTIMATE",
+            "estimate_justification": "No explicit strategic process disclosed; scoring reflects asset scarcity and council consensus."
+          }
+        },
+        "formula_check": "0.3*40 + 0.2*40 + 0.2*80 + 0.15*60 + 0.15*80 = 54.0"
+      },
+      "development_timeline": [
+        {
+          "milestone": "DFS completed (baseline DFS)",
+          "target_period": "Achieved (Jun 2025)",
+          "status": "achieved",
+          "confidence_pct": 95.0
+        },
+        {
+          "milestone": "Updated DFS optimisation/refresh (post land acquisition / re-optimisation)",
+          "target_period": "Achieved (Dec 2025)",
+          "status": "achieved",
+          "confidence_pct": 90.0
+        },
+        {
+          "milestone": "Infill + step-out drilling program to improve confidence / extend mineralisation",
+          "target_period": "H1-H2 2026",
+          "status": "current",
+          "confidence_pct": 75.0
+        },
+        {
+          "milestone": "Approvals/permitting progression (environmental & mining approvals pathway)",
+          "target_period": "H2 2026 - H1 2027",
+          "status": "planned",
+          "confidence_pct": 65.0
+        },
+        {
+          "milestone": "Project financing package (equity + debt/alternative financing) and Final Investment Decision (FID)",
+          "target_period": "H1-H2 2027",
+          "status": "at risk",
+          "confidence_pct": 55.0
+        },
+        {
+          "milestone": "Construction commencement (subject to FID/financing)",
+          "target_period": "H2 2027",
+          "status": "at risk",
+          "confidence_pct": 50.0
+        }
+      ],
+      "headwinds_tailwinds": {
+        "quantitative": [
+          "Tailwind: Gold price leverage. Threshold: sustained AUD gold > A$4,000/oz meaningfully improves cash margins; sustained < A$3,200/oz would compress project NPV and financing appetite (model uses A$4,150/oz ESTIMATE).",
+          "Headwind: Funding requirement. DFS Update indicates funding in the order of ~A$354m; if financing is delayed beyond H2 2027, expected dilution/schedule slippage increases (threshold: >12 months delay to FID typically drives material re-rate down for pre-build developers).",
+          "Headwind: Cost/AISC sensitivity. If AISC is truly ~A$2,252/oz (assumed from extracted '2252'), margin per ounce at A$4,150 is ~A$1,690 pre-royalty; if AISC rises above A$2,500/oz (threshold), rubric cost score drops to 40 and NPV declines materially.",
+          "Tailwind: Resource scale. KGP referenced at ~2.44Moz; if MRE grows >3.0Moz (threshold +23%), EV/oz would fall and strategic interest typically increases."
+        ],
+        "qualitative": [
+          "Tailwind: Tier-1 jurisdiction (Western Australia) supports permitting/operating confidence and generally better financing terms than higher-risk jurisdictions.",
+          "Tailwind: Strategic/M&A optionality for mid-tier WA producers seeking pipeline ounces; scarcity of de-risked, multi-Moz open-pit projects near infrastructure.",
+          "Headwind: Financing structure risk (debt capacity, hedging requirements, equity dilution). A large equity component at prices below intrinsic NAV can impair per-share upside even if project NPV is robust.",
+          "Headwind: Execution risk transitioning from study to build (EPC, schedule, commissioning). Any capex escalation vs financing plan is punitive (threshold: >15% capex overrun typically triggers re-rating and/or recapitalisation)."
+        ]
+      },
+      "price_targets": {
+        "current_price": 1.0099999904632568,
+        "target_12m": 1.2,
+        "target_24m": 1.7,
+        "upside_12m_pct": 18.811882253674693,
+        "upside_24m_pct": 68.31683431748654,
+        "scenarios": {
+          "base_12m": 1.2,
+          "bull_12m": 1.7,
+          "bear_12m": 0.8,
+          "base_24m": 1.7,
+          "bull_24m": 2.6,
+          "bear_24m": 1.0
+        },
+        "scenario_drivers": {
+          "base": [
+            "Financing pathway materially advanced (term sheets/mandates) and approvals on track; no major capex/AISC negative revision vs DFS Update.",
+            "AUD gold remains supportive (>=A$3,700/oz)."
+          ],
+          "bull": [
+            "Financing closed and FID achieved within 24 months; construction commences; market re-rates toward development-stage multiples.",
+            "AUD gold >=A$4,200/oz and/or incremental resource/reserve growth."
+          ],
+          "bear": [
+            "Financing delayed >12 months and/or heavy equity dilution at depressed price; capex escalates >15% or AISC drifts toward/above A$2,500/oz.",
+            "AUD gold retraces to <=A$3,200/oz."
+          ]
+        }
+      },
+      "investment_recommendation": {
+        "rating": "HOLD",
+        "conviction": "MEDIUM",
+        "summary": "DFS-stage WA gold developer with meaningful upside if financing/FID milestones are achieved, but current valuation already implies substantial success; funding quantum and cost assumptions are the dominant swing factors."
+      },
+      "investment_verdict": {
+        "top_reasons": [
+          "Tier-1 jurisdiction (WA) and DFS completion reduce geological/study risk versus earlier-stage peers.",
+          "Material leverage to AUD gold price; DFS Update highlights significant funding requirement but high gold can improve financeability and returns.",
+          "Ongoing drilling and optimisation create pathways to reserve/resource growth and potential strategic interest."
+        ],
+        "failure_conditions": [
+          "Financing cannot be secured on acceptable terms (excessive dilution/hedging) or is delayed materially beyond H2 2027.",
+          "Capex or operating cost inflation drives AISC >A$2,500/oz or initial capex >~A$400m (thresholds that would impair valuation and financing).",
+          "Sustained AUD gold price downturn to <A$3,200/oz reduces margins and lender appetite, forcing re-scope or delay."
+        ]
+      },
+      "market_data_provenance": {
+        "prepass_as_of_utc": "2026-02-18T04:25:02.845464+00:00",
+        "prepass_source_urls": [
+          "https://finance.yahoo.com/quote/AUC.AX"
+        ],
+        "prepass_ticker": "ASX:AUC",
+        "prepass_currency": "AUD",
+        "override_notes": [
+          "Used injected normalized_facts for current_price, market_cap, shares_outstanding, currency. Enterprise value not provided; EV approximated as market cap due to missing cash/debt (ESTIMATE)."
+        ]
+      },
+      "extended_analysis": {
+        "next_major_catalysts": [
+          "Further drill results (infill + step-out) and any resource/reserve updates (2026). Source example: https://announcements.asx.com.au/asxpdf/20260127/pdf/06vlblbmnlvf47.pdf (2026-01-27).",
+          "Permitting/approvals milestones and any material updates to execution strategy (2026-2027).",
+          "Financing package announcements (debt mandates, hedging, strategic partner) and FID timing (2027)."
+        ],
+        "sensitivity_analysis": [
+          {
+            "driver": "AUD gold price (A$/oz)",
+            "base_assumption": 4150.0,
+            "down_case": 3600.0,
+            "up_case": 4500.0,
+            "directional_impact": "High: +/\u2212A$100/oz moves annual revenue by ~A$10.4m (using ~104 koz/yr effective production) before royalty/tax; NPV is highly sensitive."
+          },
+          {
+            "driver": "AISC (A$/oz)",
+            "base_assumption": 2252.0,
+            "down_case": 2000.0,
+            "up_case": 2500.0,
+            "directional_impact": "High: +/\u2212A$100/oz changes annual AISC cost by ~A$10.4m; also changes rubric cost bucket (<=2,000 score 80; >2,500 score 40)."
+          },
+          {
+            "driver": "Initial capex (A$m)",
+            "base_assumption": 320.0,
+            "down_case": 290.0,
+            "up_case": 400.0,
+            "directional_impact": "High: upfront capex materially shifts NPV and drives financing dilution risk; >15% overrun is a key re-rating risk."
+          },
+          {
+            "driver": "Financing timing",
+            "base_assumption": "FID/financing by H2 2027",
+            "down_case": "12+ month delay",
+            "up_case": "FID by H1 2027",
+            "directional_impact": "High: delays increase holding costs, compress market multiple, and can force equity at lower prices."
+          }
+        ],
+        "market_context": [
+          "DFS Update explicitly flags funding requirement magnitude (~A$354m), which is the dominant near-term valuation overhang for a pre-build developer. Source: https://api.investi.com.au/api/announcements/auc/fe121bfd-e09.pdf (2025-12-16).",
+          "Recent equity raises (e.g., placement disclosed) indicate ability to access capital markets, but large project financing remains a step-change. Source: https://announcements.asx.com.au/asxpdf/20250710/pdf/06lnsn93zvftj0.pdf (2025-07-10)."
+        ],
+        "commentary": "Valuation is primarily a function of (1) the credibility of updated DFS economics, (2) cost/AISC realism under WA inflation, and (3) financing structure. Because key DFS Update tables (capex split, AISC currency/unit, and base-case NPV at the company\u2019s long-term price deck) were not fully extractable from the evidence pack excerpts, the DCF presented is an explicit-but-illustrative model with conservative stage-risking (DFS multiplier 0.40) and clearly tagged estimates.",
+        "dissenting_views": [
+          "One council view treated Ausgold as pre-PFS/scoping and concluded material overvaluation at A$1.01 (SELL). This conflicts with multiple filings indicating DFS completion (June 2025) and an updated DFS (Dec 2025).",
+          "Another council view was bullish (BUY) based on high spot AUD gold and an older/lower AISC assumption (~A$1,747/oz) and capex (~A$296m). Using the more recent extracted AISC figure (~2,252, assumed AUD) and higher funding requirement reduces modeled NPV and raises execution risk."
+        ],
+        "peer_observations": [
+          "Consensus across higher-ranked responses: flagship asset is Katanning; company is DFS-stage; key bottleneck is funding/financing and potential dilution.",
+          "Council highlighted that AUD gold price is materially above typical DFS long-term assumptions, creating strong leverage but also making valuation highly sensitive to gold retracement.",
+          "Multiple responses flagged EV/Resource-oz as elevated relative to rubric thresholds, requiring successful execution/financing for a re-rate."
+        ]
+      },
+      "council_metadata": {
+        "resolved_company_name": "Ausgold Limited",
+        "top_ranked_models": [
+          "google/gemini-3-pro-preview (avg rank: 1.00)",
+          "openai/gpt-5.1 (avg rank: 2.00)",
+          "anthropic/claude-sonnet-4-5 (avg rank: 3.00)"
+        ],
+        "market_facts_validation": {
+          "override_allowed": true,
+          "aligned_fields": [],
+          "corrected_fields": [],
+          "unresolved_mismatches": []
+        },
+        "deterministic_finance_lane": {
+          "schema": "deterministic_finance_lane_v1",
+          "generated_at": "2026-02-18T04:38:21.951714",
+          "status": "partial",
+          "project_stage": "dfs",
+          "verified_fields": {
+            "project_stage": {
+              "value": "dfs",
+              "unit": "categorical",
+              "source_id": "openai/gpt-5.1:S1",
+              "url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vlblbmnlvf47.pdf",
+              "published_at": "2026-01-27",
+              "confidence": 0.7200000000000001,
+              "model": "openai/gpt-5.1"
+            },
+            "stage_multiplier": {
+              "value": 0.4,
+              "unit": "multiplier",
+              "source_id": "openai/gpt-5.1:S1",
+              "url": "https://announcements.asx.com.au/asxpdf/20260127/pdf/06vlblbmnlvf47.pdf",
+              "published_at": "2026-01-27",
+              "confidence": 0.7100000000000001,
+              "model": "openai/gpt-5.1"
+            },
+            "irr_pct": {
+              "value": 92.0,
+              "unit": "pct",
+              "source_id": "openai/gpt-5.1:S2",
+              "url": "https://announcements.asx.com.au/asxpdf/20260116/pdf/06v9w3kwyjx3xm.pdf",
+              "published_at": "2026-01-16",
+              "confidence": 0.74,
+              "model": "openai/gpt-5.1"
+            },
+            "aisc_usd_per_oz": {
+              "value": 2252.0,
+              "unit": "usd_per_oz",
+              "source_id": "openai/gpt-5.1:S2",
+              "url": "https://announcements.asx.com.au/asxpdf/20260116/pdf/06v9w3kwyjx3xm.pdf",
+              "published_at": "2026-01-16",
+              "confidence": 0.74,
+              "model": "openai/gpt-5.1"
+            },
+            "market_cap_aud_m": {
+              "value": 553.3383331852024,
+              "unit": "aud_m",
+              "source_id": "normalized_facts_prepass",
+              "url": "",
+              "published_at": "",
+              "confidence": 0.99,
+              "model": "system"
+            }
+          },
+          "derived_metrics": {
+            "risked_npv_aud_m": null,
+            "risked_npv_usd_m": null,
+            "npv_market_cap_ratio": null,
+            "npv_market_cap_ratio_basis": ""
+          },
+          "score_components": {
+            "value_npv_vs_market_cap_score": null,
+            "value_cost_competitiveness_score_proxy": 60.0,
+            "quality_stage_score_component": 40.0,
+            "quality_funding_score_component": null
+          },
+          "market_facts_baseline": {
+            "used": true,
+            "market_cap_aud_m": 553.3383331852024,
+            "currency": "AUD"
+          },
+          "calculation_trace": [
+            "risked_npv = post_tax_npv * stage_multiplier",
+            "npv_market_cap_ratio = risked_npv_aud_m / market_cap_aud_m",
+            "npv_vs_market_cap_score thresholds: >3x=100, 2-3x=80, 1-2x=60, <1x=40"
+          ],
+          "missing_critical_fields": [
+            "post_tax_npv_aud_m"
+          ]
+        },
+        "claim_ledger_counts": {
+          "raw_claims": 75,
+          "resolved_fields": 4,
+          "conflicts": 2
+        }
+      },
+      "company": "Ausgold Limited"
+    },
+    "parse_error": null
+  }
+}
