@@ -23,6 +23,34 @@ from .config import (
 )
 from .template_loader import PREALLOCATED_COMPANY_TYPES, get_template_loader
 
+GENERIC_COMPANY_TYPE_KEYWORDS = {
+    "mine",
+    "mining",
+    "minerals",
+    "metals",
+    "resource",
+    "resources",
+    "reserve",
+    "reserves",
+    "project",
+    "projects",
+    "production",
+    "producer",
+    "jorc",
+    "aisc",
+    "cash cost",
+    "commodity",
+}
+
+COMMODITY_MINER_TYPES = {
+    "gold_miner",
+    "silver_miner",
+    "uranium_miner",
+    "copper_miner",
+    "lithium_miner",
+    "bauxite_miner",
+}
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -48,8 +76,19 @@ def _build_allowed_company_types() -> List[Dict[str, str]]:
 
 def _score_text_against_company_types(text: str) -> Dict[str, Any]:
     corpus = str(text or "").lower()
-    scores: Dict[str, int] = {}
+    scores: Dict[str, float] = {}
     matched_keywords: Dict[str, List[str]] = {}
+    score_details: Dict[str, Dict[str, float]] = {}
+
+    def _keyword_present(keyword: str) -> bool:
+        kw = str(keyword or "").strip().lower()
+        if not kw:
+            return False
+        normalized = re.sub(r"\s+", " ", kw)
+        if normalized in {"au", "ag", "cu", "li"}:
+            return bool(re.search(rf"(?<![a-z0-9]){re.escape(normalized)}(?![a-z0-9])", corpus))
+        pattern = re.escape(normalized).replace(r"\ ", r"\s+")
+        return bool(re.search(rf"(?<![a-z0-9]){pattern}(?![a-z0-9])", corpus))
 
     for entry in PREALLOCATED_COMPANY_TYPES:
         company_type_id = str(entry.get("id") or "").strip()
@@ -58,7 +97,9 @@ def _score_text_against_company_types(text: str) -> Dict[str, Any]:
         if company_type_id == "general_equity":
             continue
 
-        score = 0
+        score = 0.0
+        specific_score = 0.0
+        generic_score = 0.0
         matches: List[str] = []
         keywords = list(entry.get("detection_keywords", []) or [])
         keywords.extend(entry.get("aliases", []) or [])
@@ -70,17 +111,33 @@ def _score_text_against_company_types(text: str) -> Dict[str, Any]:
             if not kw or kw in seen:
                 continue
             seen.add(kw)
-            if kw in corpus:
-                score += 2 if " " in kw else 1
+            if _keyword_present(kw):
+                normalized_kw = re.sub(r"\s+", " ", kw)
+                if normalized_kw in GENERIC_COMPANY_TYPE_KEYWORDS:
+                    weight = 0.4
+                    generic_score += weight
+                else:
+                    weight = 2.5 if (" " in normalized_kw or len(normalized_kw) > 5) else 1.5
+                    specific_score += weight
+                score += weight
                 matches.append(kw)
 
         if score > 0:
             scores[company_type_id] = score
             matched_keywords[company_type_id] = matches
+            score_details[company_type_id] = {
+                "specific": round(specific_score, 3),
+                "generic": round(generic_score, 3),
+                "total": round(score, 3),
+            }
 
-    ranked: List[Tuple[str, int]] = sorted(
+    ranked: List[Tuple[str, float]] = sorted(
         scores.items(),
-        key=lambda kv: kv[1],
+        key=lambda kv: (
+            kv[1],
+            score_details.get(kv[0], {}).get("specific", 0.0),
+            -score_details.get(kv[0], {}).get("generic", 0.0),
+        ),
         reverse=True,
     )
     if not ranked:
@@ -89,10 +146,12 @@ def _score_text_against_company_types(text: str) -> Dict[str, Any]:
             "confidence": 0.0,
             "scores": {},
             "matched_keywords": {},
+            "score_details": {},
+            "ranked": [],
         }
 
     best_type, best_score = ranked[0]
-    second_score = ranked[1][1] if len(ranked) > 1 else 0
+    second_score = ranked[1][1] if len(ranked) > 1 else 0.0
     # Confidence heuristic: score strength + margin from runner-up.
     confidence = min(
         0.98,
@@ -104,6 +163,16 @@ def _score_text_against_company_types(text: str) -> Dict[str, Any]:
         "confidence": round(confidence, 3),
         "scores": scores,
         "matched_keywords": matched_keywords,
+        "score_details": score_details,
+        "ranked": [
+            {
+                "company_type": company_type,
+                "score": round(score, 3),
+                "specific_score": score_details.get(company_type, {}).get("specific", 0.0),
+                "generic_score": score_details.get(company_type, {}).get("generic", 0.0),
+            }
+            for company_type, score in ranked
+        ],
     }
 
 
@@ -256,7 +325,24 @@ async def _detect_via_tavily(
     scored = _score_text_against_company_types("\n".join(combined_parts))
     selected = scored.get("selected_company_type")
     confidence = float(scored.get("confidence") or 0.0)
+    ranked = scored.get("ranked") or []
+    ambiguous_top_match = False
+    if len(ranked) >= 2:
+        top = ranked[0] or {}
+        runner_up = ranked[1] or {}
+        top_type = str(top.get("company_type") or "").strip()
+        runner_type = str(runner_up.get("company_type") or "").strip()
+        top_score = float(top.get("score") or 0.0)
+        runner_score = float(runner_up.get("score") or 0.0)
+        if (
+            top_type in COMMODITY_MINER_TYPES
+            and runner_type in COMMODITY_MINER_TYPES
+            and (top_score - runner_score) < 1.0
+        ):
+            ambiguous_top_match = True
     applied = bool(selected and confidence >= float(COMPANY_TYPE_DETECTION_MIN_CONFIDENCE))
+    if ambiguous_top_match:
+        applied = False
     status = "ok" if applied else "low_confidence"
     return {
         "status": status,
@@ -268,6 +354,9 @@ async def _detect_via_tavily(
         "applied": applied,
         "scores": scored.get("scores", {}),
         "matched_keywords": scored.get("matched_keywords", {}),
+        "score_details": scored.get("score_details", {}),
+        "ranked": ranked,
+        "ambiguous_top_match": ambiguous_top_match,
         "sources": rows[: max(1, int(COMPANY_TYPE_DETECTION_MAX_RESULTS))],
     }
 
@@ -388,6 +477,26 @@ async def detect_company_type_via_api(
     }
     if not ENABLE_COMPANY_TYPE_API_DETECTION:
         base.update({"status": "disabled"})
+        return base
+
+    loader = get_template_loader()
+    assigned_type = loader.detect_company_type(
+        user_query=user_query,
+        ticker=ticker,
+        minimum_score=10**9,
+    )
+    if assigned_type:
+        base.update(
+            {
+                "status": "assigned",
+                "provider": "assignment",
+                "selected_company_type": assigned_type,
+                "candidate_company_type": assigned_type,
+                "confidence": 1.0,
+                "minimum_confidence": float(COMPANY_TYPE_DETECTION_MIN_CONFIDENCE),
+                "applied": True,
+            }
+        )
         return base
 
     if provider == "perplexity":
