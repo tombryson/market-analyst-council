@@ -1,56 +1,53 @@
-id: "pharma_biotech"
-name: "Pharmaceutical & Biotech"
-description: "Comprehensive investment analysis for pharmaceutical and biotechnology companies with pipeline-stage assets"
-category: "pharma"
+id: "silver_miner"
+name: "Silver Miner"
+description: "Comprehensive investment analysis for silver mining companies (supports polymetallic adjustments)"
+category: "resources"
 version: "1.1"
 author: "LLM Council"
 company_types:
-  - pharma_biotech
-  - medtech
+  - silver_miner
+  - polymetallic_silver_miner
 
 template_behavior:
-  commodity_profile: "none"
-  supplementary_sector_label: "pharmaceutical and biotech sector"
+  commodity_profile: "silver"
+  supplementary_sector_label: "silver mining sector"
   cashflow_schema:
     mode: "auto"
     min_reporting_periods: 3
     require_operating_cashflow: true
     detection_max_sources: 28
   stage1_research_lanes:
-    - "Run a dedicated sector lane (pharma/biotech): capture 2-4 recent sources on regulatory/pipeline backdrop (peer readout calendar, FDA/EMA policy signals, payer/reimbursement pressure, sector financing window) and tie each point to scenario assumptions."
+    - "Run a dedicated sector-macro lane (silver): capture 2-4 recent sources on silver market drivers (industrial demand, PV/electronics demand, mine supply disruptions, gold/silver ratio regime) and tie each macro point to scenario assumptions."
   stage3_scoring_factors:
     quality:
-      - "Regulatory Environment"
-      - "Scientific & Manufacturing Capability"
+      - "Jurisdiction"
+      - "Infrastructure"
       - "Management"
-      - "Pipeline Maturity"
-      - "Cash Runway/Funding"
-      - "Clinical & Ethical Standards"
+      - "Development Stage"
+      - "Funding"
+      - "ESG"
     value:
-      - "rNPV vs Market Cap"
-      - "EV / Risk-Adjusted Peak Sales"
-      - "Pipeline Optionality"
-      - "Competitive Position"
-      - "Strategic Value"
+      - "NPV vs Market Cap"
+      - "EV/Resource oz"
+      - "Exploration Upside"
+      - "Cost Competitiveness"
+      - "M&A Strategic Value"
 
-# Auto-detection keywords
+# Auto-detection keywords (if template not explicitly selected)
 auto_detect_keywords:
-  - "drug"
-  - "clinical trial"
-  - "phase 1"
-  - "phase 2"
-  - "phase 3"
-  - "fda"
-  - "ema"
-  - "pipeline"
-  - "pharmaceutical"
-  - "biotech"
-  - "indication"
-  - "patient"
-  - "therapy"
-  - "treatment"
-  - "nda"
-  - "bla"
+  - "silver"
+  - "ag"
+  - "mineral"
+  - "resource"
+  - "reserve"
+  - "mining"
+  - "ore"
+  - "jorc"
+  - "pfs"
+  - "dfs"
+  - "feasibility"
+  - "aisc"
+  - "ounce"
 
 # Expected inputs
 inputs:
@@ -72,20 +69,19 @@ output_schema:
     - investment_recommendation
 
   structure:
-    analysis_type: "pharma"
+    analysis_type: "resources"
     ticker: "string"
     company_name: "string"
     analysis_date: "ISO-8601"
     market_data:
       current_price: "float"
-      market_cap_m: "float"
+      market_cap_aud_m: "float"
       shares_outstanding_m: "float"
-      enterprise_value_m: "float"
-      cash_m: "float"
-      debt_m: "float"
-      currency: "string"
-    pipeline: "array"
-    total_rnpv_m: "float"
+      enterprise_value_aud_m: "float"
+      cash_aud_m: "float"
+      debt_aud_m: "float"
+    projects: "array"
+    total_risked_npv_aud_m: "float"
     quality_score:
       total: "float (0-100)"
       breakdown: "object"
@@ -114,42 +110,39 @@ verification_schema:
     sections:
       timelines_deadlines:
         keywords:
-          - "timeline"
+          - "first silver"
+          - "silver pour"
           - "milestone"
-          - "readout"
-          - "filing"
-          - "approval"
-          - "launch"
-          - "phase 1"
-          - "phase 2"
-          - "phase 3"
-          - "phase 4"
+          - "timeline"
           - "q1"
           - "q2"
           - "q3"
           - "q4"
+          - "target"
       financing_deals:
         keywords:
-          - "cash"
-          - "runway"
           - "facility"
-          - "financing"
-          - "placement"
+          - "loan"
           - "debt"
-          - "partnership"
-          - "licensing"
-          - "milestone payment"
+          - "capital raise"
+          - "placement"
+          - "financing"
+          - "offtake"
+          - "funded"
+          - "cash"
       project_economics:
         keywords:
-          - "rnpv"
-          - "peak sales"
-          - "net sales"
-          - "revenue"
-          - "gross margin"
-          - "cogs"
-          - "sg&a"
-          - "royalty"
-          - "cost"
+          - "npv"
+          - "irr"
+          - "aisc"
+          - "ageq"
+          - "capex"
+          - "opex"
+          - "mine life"
+          - "production"
+          - "resource"
+          - "reserve"
+          - "grade"
       market_share_structure:
         keywords:
           - "market cap"
@@ -164,7 +157,7 @@ verification_schema:
           - "director"
           - "ceo"
           - "cfo"
-          - "chief medical officer"
+          - "executive"
           - "insider ownership"
           - "governance"
           - "track record"
@@ -172,61 +165,48 @@ verification_schema:
           - "resignation"
       operational_objectives:
         keywords:
-          - "enrollment"
-          - "trial"
-          - "endpoint"
-          - "protocol"
-          - "manufacturing"
-          - "gmp"
-          - "commercial launch"
+          - "commissioning"
+          - "ramp-up"
+          - "development"
+          - "stockpile"
+          - "processing"
+          - "guidance"
       risks_constraints:
         keywords:
           - "risk"
           - "headwind"
           - "delay"
-          - "safety"
+          - "dilution"
+          - "permit"
           - "regulatory"
-          - "competition"
-          - "patent"
+          - "execution"
       catalysts_tailwinds:
         keywords:
-          - "catalyst"
           - "tailwind"
+          - "catalyst"
           - "upside"
-          - "readout"
-          - "approval"
-          - "partner"
-          - "licensing"
+          - "drilling"
+          - "resource growth"
+          - "strategic"
     timeline_terms:
-      - "timeline"
+      - "first silver"
+      - "silver pour"
+      - "first ore"
+      - "stockpile"
+      - "processing"
       - "milestone"
-      - "readout"
-      - "filing"
-      - "approval"
-      - "launch"
-      - "phase 1"
-      - "phase 2"
-      - "phase 3"
-      - "phase 4"
+      - "timeline"
       - "q1"
       - "q2"
       - "q3"
       - "q4"
     timeline_focus_terms:
-      - "readout"
-      - "filing"
-      - "approval"
-      - "launch"
-      - "enrollment"
-    conflict:
-      field: "pipeline_milestone_window"
-      terms:
-        - "readout"
-        - "filing"
-        - "approval"
-        - "launch"
-      max_shift_quarters: 3
-      resolution_rule: "prefer newest dated primary-source pipeline milestone guidance"
+      - "milestone"
+      - "timeline"
+      - "commissioning"
+      - "production"
+      - "ramp-up"
+      - "target"
   compliance:
     section_markers:
       quality_score:
@@ -234,9 +214,6 @@ verification_schema:
         critical: true
       value_score:
         markers: ["value score", "value_score"]
-        critical: true
-      pipeline:
-        markers: ["pipeline", "drug candidate", "phase 1", "phase 2", "phase 3"]
         critical: true
       price_targets:
         markers: ["12-month", "24-month", "price target", "price_targets", "probability-weighted", "prob_weighted_target_24m", "scenario probabilities"]

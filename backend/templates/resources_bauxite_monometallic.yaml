@@ -1,0 +1,235 @@
+id: bauxite_miner
+name: Bauxite Miner
+description: Investment analysis for bauxite and alumina mining/refining companies
+category: resources
+version: '1.0'
+author: LLM Council
+company_types:
+- bauxite_miner
+- polymetallic_bauxite_miner
+template_behavior:
+  commodity_profile: none
+  supplementary_sector_label: bauxite and alumina sector
+  cashflow_schema:
+    mode: auto
+    min_reporting_periods: 3
+    require_operating_cashflow: true
+    detection_max_sources: 28
+  stage1_research_lanes:
+  - 'Run a dedicated sector-macro lane (bauxite/alumina): capture 2-4 recent sources on alumina/aluminium pricing, refinery
+    utilization, freight/energy costs, Chinese demand, and supply disruptions; tie each point to scenario assumptions.'
+  stage3_scoring_factors:
+    quality:
+    - Jurisdiction
+    - Infrastructure
+    - Management
+    - Development Stage
+    - Funding
+    - ESG
+    value:
+    - NPV vs Market Cap
+    - EV/Resource tonne
+    - Expansion Upside
+    - Cost Competitiveness
+    - Strategic Value
+auto_detect_keywords:
+- bauxite
+- alumina
+- aluminium
+- aluminum
+- refinery
+- smelter feed
+- resource
+- reserve
+- mine
+- mining
+- grade
+- recovery
+- cash cost
+- aisc
+- pfs
+- dfs
+inputs:
+- ticker
+- company_name
+- market_data
+- pdf_documents
+output_schema:
+  type: object
+  required_fields:
+  - analysis_type
+  - ticker
+  - company_name
+  - quality_score
+  - value_score
+  - price_targets
+  - investment_recommendation
+  structure:
+    analysis_type: resources
+    ticker: string
+    company_name: string
+    analysis_date: ISO-8601
+    market_data:
+      current_price: float
+      market_cap_aud_m: float
+      shares_outstanding_m: float
+      enterprise_value_aud_m: float
+      cash_aud_m: float
+      debt_aud_m: float
+    projects: array
+    total_risked_npv_aud_m: float
+    quality_score:
+      total: float (0-100)
+      breakdown: object
+    value_score:
+      total: float (0-100)
+      breakdown: object
+    price_targets:
+      current_price: float
+      target_12m: float
+      target_24m: float
+      upside_12m_pct: float
+      upside_24m_pct: float
+      scenario_targets: object
+      scenario_probabilities: object
+      prob_weighted_target_12m: float
+      prob_weighted_target_24m: float
+    development_timeline: array
+    thesis_map: object
+    dissenting_views: string or array
+    management_competition_assessment:
+      management_quality: string
+      competition_positioning: string
+      decision_relevance: string
+    verification_required_fields: array
+    investment_recommendation:
+      rating: BUY/HOLD/SELL
+      conviction: HIGH/MEDIUM/LOW
+      summary: string
+verification_schema:
+  fact_digest:
+    sections:
+      timelines_deadlines:
+        keywords:
+        - first production
+        - commissioning
+        - ramp-up
+        - milestone
+        - timeline
+        - q1
+        - q2
+        - q3
+        - q4
+        - target
+      financing_deals:
+        keywords:
+        - facility
+        - loan
+        - debt
+        - placement
+        - capital raise
+        - runway
+        - funding
+        - cash
+      project_economics:
+        keywords:
+        - npv
+        - irr
+        - capex
+        - opex
+        - c1
+        - cash cost
+        - aisc
+        - recovery
+        - grade
+        - throughput
+      market_share_structure:
+        keywords:
+        - market cap
+        - enterprise value
+        - shares
+        - share price
+        - valuation
+      management_governance:
+        keywords:
+        - management
+        - board
+        - ceo
+        - cfo
+        - insider
+        - governance
+      operational_objectives:
+        keywords:
+        - production
+        - resource
+        - reserve
+        - drilling
+        - expansion
+      risks_constraints:
+        keywords:
+        - risk
+        - headwind
+        - delay
+        - inflation
+        - permitting
+        - commodity price
+      catalysts_tailwinds:
+        keywords:
+        - tailwind
+        - catalyst
+        - upside
+        - resource upgrade
+        - funding close
+        - construction progress
+    timeline_terms:
+    - first production
+    - commissioning
+    - ramp-up
+    - milestone
+    - timeline
+    - q1
+    - q2
+    - q3
+    - q4
+    timeline_focus_terms:
+    - first production
+    - commissioning
+    - ramp-up
+    - funding
+    - construction
+    conflict:
+      field: production_target_window
+      terms:
+      - first production
+      - commissioning
+      - ramp-up
+      max_shift_quarters: 3
+      resolution_rule: prefer newest dated primary-source project guidance
+  compliance:
+    section_markers:
+      quality_score:
+        markers:
+        - quality score
+        - quality_score
+        critical: true
+      value_score:
+        markers:
+        - value score
+        - value_score
+        critical: true
+      price_targets:
+        markers:
+        - 12-month
+        - 24-month
+        - price target
+        - price_targets
+        - probability-weighted
+        - scenario probabilities
+        critical: true
+      development_timeline:
+        markers:
+        - development timeline
+        - timeline
+        - milestone
+        - development_timeline
+        critical: true

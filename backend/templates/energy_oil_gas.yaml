@@ -1,0 +1,276 @@
+id: "energy_oil_gas"
+name: "Energy (Oil/Gas)"
+description: "Comprehensive investment analysis for upstream and integrated oil/gas companies"
+category: "energy"
+version: "1.0"
+author: "LLM Council"
+company_types:
+  - energy_oil_gas
+
+template_behavior:
+  commodity_profile: "oil_gas"
+  supplementary_sector_label: "oil and gas sector"
+  cashflow_schema:
+    mode: "auto"
+    min_reporting_periods: 3
+    require_operating_cashflow: true
+    detection_max_sources: 28
+  stage1_research_lanes:
+    - "Run a dedicated sector-macro lane (energy): capture 2-4 recent sources on oil/gas market drivers (Brent/WTI/Henry Hub trend, OPEC+ policy, geopolitical supply risks such as Middle East/Hormuz, inventories/demand) and tie each macro point to scenario assumptions."
+  stage3_scoring_factors:
+    quality:
+      - "Jurisdiction"
+      - "Asset Quality"
+      - "Cost Position"
+      - "Management"
+      - "Funding/Balance Sheet"
+    value:
+      - "NAV vs Market Cap"
+      - "EV/2P Reserves"
+      - "EV/Production"
+      - "FCF Yield at Strip"
+      - "Strategic Value"
+
+# Auto-detection keywords
+auto_detect_keywords:
+  - "oil"
+  - "gas"
+  - "boe"
+  - "barrels"
+  - "mmboe"
+  - "2p reserves"
+  - "proved reserves"
+  - "production"
+  - "lifting cost"
+  - "breakeven"
+  - "hedge book"
+  - "drilling"
+  - "fpso"
+  - "lng"
+
+# Expected inputs
+inputs:
+  - ticker
+  - company_name
+  - market_data
+  - pdf_documents
+
+# JSON output schema
+output_schema:
+  type: "object"
+  required_fields:
+    - analysis_type
+    - ticker
+    - company_name
+    - quality_score
+    - value_score
+    - price_targets
+    - investment_recommendation
+
+  structure:
+    analysis_type: "energy_oil_gas"
+    ticker: "string"
+    company_name: "string"
+    analysis_date: "ISO-8601"
+    market_data:
+      current_price: "float"
+      market_cap_m: "float"
+      shares_outstanding_m: "float"
+      enterprise_value_m: "float"
+      cash_m: "float"
+      debt_m: "float"
+      currency: "string"
+    assets: "array"
+    total_risked_nav_m: "float"
+    quality_score:
+      total: "float (0-100)"
+      breakdown: "object"
+    value_score:
+      total: "float (0-100)"
+      breakdown: "object"
+    price_targets:
+      current_price: "float"
+      target_12m: "float"
+      target_24m: "float"
+      upside_12m_pct: "float"
+      upside_24m_pct: "float"
+      scenario_targets: "object"
+      scenario_probabilities: "object"
+      prob_weighted_target_12m: "float"
+      prob_weighted_target_24m: "float"
+    development_timeline: "array"
+    monitoring_watchlist: "object"
+    thesis_map: "object"
+    dissenting_views: "string or array"
+    management_competition_assessment:
+      management_quality: "string"
+      competition_positioning: "string"
+      decision_relevance: "string"
+    verification_required_fields: "array"
+    investment_recommendation:
+      rating: "BUY/HOLD/SELL"
+      conviction: "HIGH/MEDIUM/LOW"
+      summary: "string"
+
+verification_schema:
+  fact_digest:
+    sections:
+      timelines_deadlines:
+        keywords:
+          - "first production"
+          - "start-up"
+          - "startup"
+          - "drilling campaign"
+          - "spud"
+          - "fpid"
+          - "final investment decision"
+          - "listing"
+          - "uplisting"
+          - "dual listing"
+          - "adr"
+          - "nyse"
+          - "nasdaq"
+          - "h1"
+          - "h2"
+          - "q1"
+          - "q2"
+          - "q3"
+          - "q4"
+          - "timeline"
+          - "milestone"
+      financing_deals:
+        keywords:
+          - "facility"
+          - "rbl"
+          - "reserve based lending"
+          - "loan"
+          - "bond"
+          - "capital raise"
+          - "placement"
+          - "farm-out"
+          - "joint venture"
+          - "cash"
+          - "runway"
+      project_economics:
+        keywords:
+          - "npv"
+          - "irr"
+          - "breakeven"
+          - "opex"
+          - "capex"
+          - "lifting cost"
+          - "netback"
+          - "decline rate"
+          - "production"
+          - "reserves"
+      market_share_structure:
+        keywords:
+          - "market cap"
+          - "enterprise value"
+          - "shares"
+          - "share price"
+          - "valuation"
+          - "multiple"
+      management_governance:
+        keywords:
+          - "management"
+          - "board"
+          - "director"
+          - "ceo"
+          - "cfo"
+          - "insider ownership"
+          - "capital discipline"
+          - "governance"
+      operational_objectives:
+        keywords:
+          - "production guidance"
+          - "well count"
+          - "rig"
+          - "processing"
+          - "throughput"
+          - "uptime"
+          - "ramp-up"
+      risks_constraints:
+        keywords:
+          - "risk"
+          - "headwind"
+          - "delay"
+          - "cost inflation"
+          - "hedging"
+          - "regulatory"
+          - "permitting"
+          - "commodity price"
+          - "opec"
+          - "hormuz"
+          - "iran"
+          - "sanction"
+          - "inventory"
+          - "geopolitic"
+      catalysts_tailwinds:
+        keywords:
+          - "tailwind"
+          - "catalyst"
+          - "upside"
+          - "reserve upgrade"
+          - "flow test"
+          - "sanction"
+          - "deleveraging"
+          - "listing"
+          - "uplisting"
+          - "adr"
+          - "nyse"
+          - "nasdaq"
+          - "opec"
+          - "hormuz"
+          - "geopolitic"
+    timeline_terms:
+      - "first production"
+      - "startup"
+      - "fpid"
+      - "final investment decision"
+      - "milestone"
+      - "timeline"
+      - "listing"
+      - "uplisting"
+      - "dual listing"
+      - "adr"
+      - "nyse"
+      - "nasdaq"
+      - "h1"
+      - "h2"
+      - "q1"
+      - "q2"
+      - "q3"
+      - "q4"
+    timeline_focus_terms:
+      - "fpid"
+      - "startup"
+      - "first production"
+      - "guidance"
+      - "ramp-up"
+      - "listing"
+      - "uplisting"
+      - "adr"
+    conflict:
+      field: "production_target_window"
+      terms:
+        - "startup"
+        - "first production"
+        - "fpid"
+        - "guidance"
+      max_shift_quarters: 3
+      resolution_rule: "prefer newest dated primary-source production and project guidance"
+  compliance:
+    section_markers:
+      quality_score:
+        markers: ["quality score", "quality_score"]
+        critical: true
+      value_score:
+        markers: ["value score", "value_score"]
+        critical: true
+      price_targets:
+        markers: ["12-month", "24-month", "price target", "price_targets", "probability-weighted", "prob_weighted_target_24m", "scenario probabilities"]
+        critical: true
+      development_timeline:
+        markers: ["development timeline", "timeline", "milestone", "development_timeline", "listing", "uplisting", "adr"]
+        critical: true

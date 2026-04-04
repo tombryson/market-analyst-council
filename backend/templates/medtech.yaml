@@ -1,0 +1,253 @@
+id: medtech
+name: Medtech
+description: Investment analysis for medical device, diagnostics, and medtech platform companies
+category: healthcare
+version: '1.1'
+author: LLM Council
+company_types:
+- medtech
+template_behavior:
+  commodity_profile: none
+  supplementary_sector_label: medtech and medical devices sector
+  cashflow_schema:
+    mode: auto
+    min_reporting_periods: 3
+    require_operating_cashflow: true
+    detection_max_sources: 28
+  stage1_research_lanes:
+  - 'Run a dedicated sector lane (medtech): capture 2-4 recent sources on regulatory pathways (FDA/CE), reimbursement and
+    coding, hospital/procedure demand, and device competition; tie each point to scenario assumptions.'
+  stage3_scoring_factors:
+    quality:
+    - Regulatory & Quality Systems
+    - Clinical/Technical Evidence
+    - Management
+    - Commercial Execution
+    - Cash Runway/Funding
+    - Governance
+    value:
+    - Intrinsic Value vs Market Cap
+    - EV/Sales vs Growth
+    - Gross Margin & Cash Conversion
+    - Adoption Curve Optionality
+    - Strategic Value
+auto_detect_keywords:
+- medical device
+- diagnostic
+- medtech
+- fda 510(k)
+- de novo
+- pma
+- ce mark
+- reimbursement
+- procedure volume
+- installed base
+- instrument
+- consumables
+inputs:
+- ticker
+- company_name
+- market_data
+- pdf_documents
+output_schema:
+  type: object
+  required_fields:
+  - analysis_type
+  - ticker
+  - company_name
+  - quality_score
+  - value_score
+  - price_targets
+  - investment_recommendation
+  structure:
+    analysis_type: medtech
+    ticker: string
+    company_name: string
+    analysis_date: ISO-8601
+    market_data:
+      current_price: float
+      market_cap_m: float
+      shares_outstanding_m: float
+      enterprise_value_m: float
+      cash_m: float
+      debt_m: float
+      currency: string
+    pipeline: array
+    total_rnpv_m: float
+    quality_score:
+      total: float (0-100)
+      breakdown: object
+    value_score:
+      total: float (0-100)
+      breakdown: object
+    price_targets:
+      current_price: float
+      target_12m: float
+      target_24m: float
+      upside_12m_pct: float
+      upside_24m_pct: float
+    dissenting_views: string or array
+    management_competition_assessment:
+      management_quality: string
+      competition_positioning: string
+      decision_relevance: string
+    verification_required_fields: array
+    investment_recommendation:
+      rating: BUY/HOLD/SELL
+      conviction: HIGH/MEDIUM/LOW
+      summary: string
+verification_schema:
+  fact_digest:
+    sections:
+      timelines_deadlines:
+        keywords:
+        - timeline
+        - milestone
+        - readout
+        - filing
+        - approval
+        - launch
+        - phase 1
+        - phase 2
+        - phase 3
+        - phase 4
+        - q1
+        - q2
+        - q3
+        - q4
+      financing_deals:
+        keywords:
+        - cash
+        - runway
+        - facility
+        - financing
+        - placement
+        - debt
+        - partnership
+        - licensing
+        - milestone payment
+      project_economics:
+        keywords:
+        - rnpv
+        - peak sales
+        - net sales
+        - revenue
+        - gross margin
+        - cogs
+        - sg&a
+        - royalty
+        - cost
+      market_share_structure:
+        keywords:
+        - market cap
+        - enterprise value
+        - shares
+        - share price
+        - valuation
+      management_governance:
+        keywords:
+        - management
+        - board
+        - director
+        - ceo
+        - cfo
+        - chief medical officer
+        - insider ownership
+        - governance
+        - track record
+        - appointment
+        - resignation
+      operational_objectives:
+        keywords:
+        - enrollment
+        - trial
+        - endpoint
+        - protocol
+        - manufacturing
+        - gmp
+        - commercial launch
+      risks_constraints:
+        keywords:
+        - risk
+        - headwind
+        - delay
+        - safety
+        - regulatory
+        - competition
+        - patent
+      catalysts_tailwinds:
+        keywords:
+        - catalyst
+        - tailwind
+        - upside
+        - readout
+        - approval
+        - partner
+        - licensing
+    timeline_terms:
+    - timeline
+    - milestone
+    - readout
+    - filing
+    - approval
+    - launch
+    - phase 1
+    - phase 2
+    - phase 3
+    - phase 4
+    - q1
+    - q2
+    - q3
+    - q4
+    timeline_focus_terms:
+    - readout
+    - filing
+    - approval
+    - launch
+    - enrollment
+    conflict:
+      field: pipeline_milestone_window
+      terms:
+      - readout
+      - filing
+      - approval
+      - launch
+      max_shift_quarters: 3
+      resolution_rule: prefer newest dated primary-source pipeline milestone guidance
+  compliance:
+    section_markers:
+      quality_score:
+        markers:
+        - quality score
+        - quality_score
+        critical: true
+      value_score:
+        markers:
+        - value score
+        - value_score
+        critical: true
+      pipeline:
+        markers:
+        - pipeline
+        - drug candidate
+        - phase 1
+        - phase 2
+        - phase 3
+        critical: true
+      price_targets:
+        markers:
+        - 12-month
+        - 24-month
+        - price target
+        - price_targets
+        - probability-weighted
+        - prob_weighted_target_24m
+        - scenario probabilities
+        critical: true
+      development_timeline:
+        markers:
+        - development timeline
+        - timeline
+        - milestone
+        - development_timeline
+        critical: true

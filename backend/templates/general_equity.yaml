@@ -1,0 +1,130 @@
+id: "general_equity"
+name: "General Equity"
+description: "Cross-sector investment analysis template for listed equities when no specialist sector template is selected"
+category: "general"
+version: "1.0"
+author: "LLM Council"
+company_types:
+  - general_equity
+
+template_behavior:
+  commodity_profile: "none"
+  supplementary_sector_label: "public equity sector"
+  cashflow_schema:
+    mode: "auto"
+    min_reporting_periods: 3
+    require_operating_cashflow: true
+    detection_max_sources: 28
+  stage1_research_lanes:
+    - "Run a compact sector-context lane (2-4 sources) on the company’s immediate industry backdrop: demand, pricing power, cost pressure, and funding conditions; tie each point to scenario assumptions."
+  stage3_scoring_factors:
+    quality:
+      - "Market Position"
+      - "Operating Quality"
+      - "Management"
+      - "Execution"
+      - "Balance Sheet"
+      - "Governance"
+    value:
+      - "Intrinsic Value vs Market Cap"
+      - "Cash-Flow Yield"
+      - "Relative Multiple"
+      - "Growth Quality"
+      - "Strategic Value"
+
+auto_detect_keywords:
+  - "guidance"
+  - "revenue"
+  - "ebitda"
+  - "cash flow"
+  - "balance sheet"
+  - "valuation"
+
+inputs:
+  - ticker
+  - company_name
+  - market_data
+  - pdf_documents
+
+output_schema:
+  type: "object"
+  required_fields:
+    - analysis_type
+    - ticker
+    - company_name
+    - quality_score
+    - value_score
+    - price_targets
+    - investment_recommendation
+  structure:
+    analysis_type: "general_equity"
+    ticker: "string"
+    company_name: "string"
+    analysis_date: "ISO-8601"
+    market_data:
+      current_price: "float"
+      market_cap_m: "float"
+      shares_outstanding_m: "float"
+      enterprise_value_m: "float"
+      currency: "string"
+    quality_score:
+      total: "float (0-100)"
+      breakdown: "object"
+    value_score:
+      total: "float (0-100)"
+      breakdown: "object"
+    price_targets:
+      current_price: "float"
+      scenario_targets: "object"
+      scenario_probabilities: "object"
+      prob_weighted_target_12m: "float"
+      prob_weighted_target_24m: "float"
+    development_timeline: "array"
+    thesis_map: "object"
+    management_competition_assessment: "object"
+    verification_required_fields: "array"
+    investment_recommendation:
+      rating: "BUY/HOLD/SELL"
+      conviction: "HIGH/MEDIUM/LOW"
+      summary: "string"
+
+verification_schema:
+  fact_digest:
+    sections:
+      timelines_deadlines:
+        keywords: ["timeline", "milestone", "guidance", "q1", "q2", "q3", "q4", "h1", "h2", "fy"]
+      financing_deals:
+        keywords: ["facility", "debt", "placement", "buyback", "dividend", "cash", "runway"]
+      project_economics:
+        keywords: ["revenue", "ebitda", "cash flow", "margin", "capex", "opex", "valuation"]
+      market_share_structure:
+        keywords: ["market cap", "enterprise value", "share price", "shares", "multiple"]
+      management_governance:
+        keywords: ["management", "board", "ceo", "cfo", "governance", "insider"]
+      operational_objectives:
+        keywords: ["growth", "margin", "product", "expansion", "efficiency"]
+      risks_constraints:
+        keywords: ["risk", "headwind", "execution", "funding", "regulatory", "competition"]
+      catalysts_tailwinds:
+        keywords: ["catalyst", "tailwind", "upside", "guidance upgrade", "margin expansion"]
+    timeline_terms: ["q1", "q2", "q3", "q4", "h1", "h2", "fy", "guidance", "milestone"]
+    timeline_focus_terms: ["guidance", "margin", "cash flow", "funding", "execution"]
+    conflict:
+      field: "guidance_window"
+      terms: ["guidance", "target", "milestone", "timeline"]
+      max_shift_quarters: 2
+      resolution_rule: "prefer newest dated primary-source guidance"
+  compliance:
+    section_markers:
+      quality_score:
+        markers: ["quality score", "quality_score"]
+        critical: true
+      value_score:
+        markers: ["value score", "value_score"]
+        critical: true
+      price_targets:
+        markers: ["12-month", "24-month", "price target", "price_targets", "probability-weighted", "scenario probabilities"]
+        critical: true
+      development_timeline:
+        markers: ["development timeline", "timeline", "milestone", "development_timeline"]
+        critical: true

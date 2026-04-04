@@ -1,0 +1,214 @@
+id: insurance
+name: Insurance
+description: Investment analysis for insurers and insurance brokers
+category: financials
+version: '1.0'
+author: LLM Council
+company_types:
+- insurance
+template_behavior:
+  commodity_profile: none
+  supplementary_sector_label: insurance sector
+  cashflow_schema:
+    mode: auto
+    min_reporting_periods: 3
+    require_operating_cashflow: true
+    detection_max_sources: 28
+  stage1_research_lanes:
+  - 'Run a dedicated sector lane (insurance): capture 2-4 recent sources on pricing cycle, claims inflation, catastrophe exposure,
+    reserve trends, and investment income backdrop; tie each point to scenario assumptions.'
+  stage3_scoring_factors:
+    quality:
+    - Regulatory Environment
+    - Underwriting Quality
+    - Management
+    - Reserve Adequacy
+    - Capital & Liquidity
+    - Governance
+    value:
+    - Intrinsic Value vs Market Cap
+    - P/B vs ROE
+    - Earnings Power vs Price
+    - Capital Return Capacity
+    - Strategic Value
+auto_detect_keywords:
+- insurance
+- premium
+- combined ratio
+- loss ratio
+- expense ratio
+- reserve adequacy
+- underwriting
+- reinsurance
+- catastrophe
+- solvency
+inputs:
+- ticker
+- company_name
+- market_data
+- pdf_documents
+output_schema:
+  type: object
+  required_fields:
+  - analysis_type
+  - ticker
+  - company_name
+  - quality_score
+  - value_score
+  - price_targets
+  - investment_recommendation
+  structure:
+    analysis_type: financials
+    ticker: string
+    company_name: string
+    analysis_date: ISO-8601
+    market_data:
+      current_price: float
+      market_cap_m: float
+      shares_outstanding_m: float
+      enterprise_value_m: float
+      currency: string
+    quality_score:
+      total: float (0-100)
+      breakdown: object
+    value_score:
+      total: float (0-100)
+      breakdown: object
+    price_targets:
+      current_price: float
+      scenario_targets: object
+      scenario_probabilities: object
+      prob_weighted_target_12m: float
+      prob_weighted_target_24m: float
+    development_timeline: array
+    thesis_map: object
+    management_competition_assessment: object
+    verification_required_fields: array
+    investment_recommendation:
+      rating: BUY/HOLD/SELL
+      conviction: HIGH/MEDIUM/LOW
+      summary: string
+verification_schema:
+  fact_digest:
+    sections:
+      timelines_deadlines:
+        keywords:
+        - timeline
+        - guidance
+        - quarter
+        - half-year
+        - full-year
+        - target
+      financing_deals:
+        keywords:
+        - capital
+        - liquidity
+        - funding
+        - deposit
+        - facility
+        - issuance
+        - buyback
+        - dividend
+      project_economics:
+        keywords:
+        - nim
+        - net interest margin
+        - roe
+        - roa
+        - combined ratio
+        - loss ratio
+        - expense ratio
+        - provision
+      market_share_structure:
+        keywords:
+        - market cap
+        - book value
+        - share price
+        - shares
+        - valuation
+        - p/b
+        - p/e
+      management_governance:
+        keywords:
+        - management
+        - board
+        - ceo
+        - cfo
+        - governance
+        - risk committee
+      operational_objectives:
+        keywords:
+        - loan growth
+        - premium growth
+        - cost-to-income
+        - underwriting
+        - margin
+      risks_constraints:
+        keywords:
+        - credit loss
+        - default
+        - funding pressure
+        - capital shortfall
+        - regulatory
+        - rate risk
+      catalysts_tailwinds:
+        keywords:
+        - capital return
+        - margin expansion
+        - provision normalization
+        - rating upgrade
+        - cost-out
+    timeline_terms:
+    - q1
+    - q2
+    - q3
+    - q4
+    - h1
+    - h2
+    - fy
+    - guidance
+    - target
+    timeline_focus_terms:
+    - guidance
+    - capital return
+    - margin
+    - provisions
+    - combined ratio
+    conflict:
+      field: guidance_window
+      terms:
+      - guidance
+      - target
+      - outlook
+      - capital return
+      max_shift_quarters: 2
+      resolution_rule: prefer newest dated primary filing guidance
+  compliance:
+    section_markers:
+      quality_score:
+        markers:
+        - quality score
+        - quality_score
+        critical: true
+      value_score:
+        markers:
+        - value score
+        - value_score
+        critical: true
+      price_targets:
+        markers:
+        - 12-month
+        - 24-month
+        - price target
+        - price_targets
+        - probability-weighted
+        - scenario probabilities
+        critical: true
+      development_timeline:
+        markers:
+        - development timeline
+        - timeline
+        - milestone
+        - guidance
+        - development_timeline
+        critical: true
