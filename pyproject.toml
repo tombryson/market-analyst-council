@@ -15,4 +15,5 @@ dependencies = [
     "python-multipart>=0.0.6",
     "pyyaml>=6.0.3",
     "yfinance>=1.1.0",
+    "liteparse>=1.2.0",
 ]

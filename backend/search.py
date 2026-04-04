@@ -4,13 +4,12 @@ import httpx
 import re
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from html import unescape
 from .config import TAVILY_API_KEY, MAX_SEARCH_RESULTS
 from .openrouter import query_model
-from .pdf_processor import process_pdf_attachment, save_attachment
-import uuid
 
 
-EXCHANGE_PREFIXES = ("ASX", "NYSE", "NASDAQ", "TSX", "TSXV", "LSE", "AIM")
+EXCHANGE_PREFIXES = ("ASX", "NYSE", "NASDAQ", "TSX", "TSXV", "LSE", "AIM", "CSE", "JSE")
 SUFFIX_TO_EXCHANGE = {
     "AX": "ASX",
     "N": "NYSE",
@@ -19,6 +18,8 @@ SUFFIX_TO_EXCHANGE = {
     "TO": "TSX",
     "V": "TSXV",
     "L": "LSE",
+    "CN": "CSE",
+    "JO": "JSE",
 }
 EXCHANGE_TO_YAHOO_SUFFIX = {
     "ASX": ".AX",
@@ -28,6 +29,8 @@ EXCHANGE_TO_YAHOO_SUFFIX = {
     "TSXV": ".V",
     "LSE": ".L",
     "AIM": ".L",
+    "CSE": ".CN",
+    "JSE": ".JO",
 }
 
 
@@ -188,10 +191,12 @@ def classify_asx_announcement(title: str, url: str) -> tuple[str, int]:
         'notice of annual general meeting', 'notice of agm',  # Just the notice, not presentation
         'trading halt', 'pause in trading', 'voluntary suspension',
         'cleansing notice', 'section 708a', 's708a',
-        'becoming a substantial holder', 'ceasing to be substantial',
-        'change to substantial', 'notification of interest',
+        'becoming a substantial holder', 'ceasing to be substantial', 'ceasing to be a substantial holder',
+        'change to substantial', 'change in substantial holding', 'notification of interest',
         'disclosure of interest', 'initial director',
-        'security purchase plan', 'spp results'
+        'security purchase plan', 'spp results',
+        'application for quotation of securities',
+        'notification regarding unquoted securities',
     ]
 
     # Check ignore first
@@ -213,75 +218,130 @@ def classify_asx_announcement(title: str, url: str) -> tuple[str, int]:
     return ('routine', 3)
 
 
-async def scrape_marketindex_announcements(ticker: str) -> List[Dict[str, Any]]:
+def _clean_html_text(fragment: str) -> str:
+    text = unescape(str(fragment or ""))
+    text = re.sub(r"(?is)<script[^>]*>.*?</script>", " ", text)
+    text = re.sub(r"(?is)<style[^>]*>.*?</style>", " ", text)
+    text = re.sub(r"(?is)<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def _extract_marketindex_row_date(fragment: str) -> str:
+    text = _clean_html_text(fragment)
+    if not text:
+        return ""
+    patterns = [
+        r"\b(\d{4}-\d{2}-\d{2})\b",
+        r"\b(\d{2}/\d{2}/\d{4})\b",
+        r"\b(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})\b",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if not match:
+            continue
+        raw = match.group(1).strip()
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d %b %Y", "%d %B %Y"):
+            try:
+                return datetime.strptime(raw, fmt).strftime("%Y-%m-%d")
+            except Exception:
+                continue
+    return ""
+
+
+async def scrape_marketindex_announcements(ticker: str, max_results: int = 80) -> List[Dict[str, Any]]:
     """
-    Scrape announcements from marketindex.com.au for a given ticker.
+    Scrape ASX announcement PDFs from the Market Index ticker page.
 
-    Args:
-        ticker: ASX ticker code (e.g., "BML")
-
-    Returns:
-        List of announcement dicts with title, url, date, priority
+    This restores the legacy deterministic ASX lane:
+    Market Index ticker page -> direct ASX PDF links -> announcement ranking.
     """
-    url = f"https://www.marketindex.com.au/asx/{ticker.lower()}"
-    print(f"Scraping announcements from: {url}")
+    parsed = _parse_ticker(ticker)
+    symbol = str(parsed.get("symbol", "") or "").strip().upper()
+    if not symbol:
+        symbol = str(ticker or "").strip().upper().replace("ASX:", "")
+    if not symbol:
+        return []
 
+    url = f"https://www.marketindex.com.au/asx/{symbol.lower()}"
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/126.0.0.0 Safari/537.36"
+            )
         }
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, headers=headers) as client:
             response = await client.get(url)
-
             if response.status_code != 200:
-                print(f"Failed to fetch marketindex page: {response.status_code}")
+                print(f"Failed to fetch Market Index page for {symbol}: {response.status_code}")
                 return []
 
-            html = response.text
+            html = str(response.text or "")
+            if not html.strip():
+                return []
 
-            # Parse HTML to extract announcements
-            # Look for ASX announcement links (they typically point to asx.com.au PDFs)
-            announcements = []
+            matches = list(
+                re.finditer(
+                    r'(?is)<a[^>]+href=["\'](https://(?:www\.)?asx\.com\.au/asxpdf/[^"\']+\.pdf)["\'][^>]*>(.*?)</a>',
+                    html,
+                )
+            )
+            if not matches:
+                matches = list(
+                    re.finditer(
+                        r'(?is)<a[^>]+href=["\'](https://announcements\.asx\.com\.au/asxpdf/[^"\']+\.pdf)["\'][^>]*>(.*?)</a>',
+                        html,
+                    )
+                )
 
-            # Simple regex-based extraction (could use BeautifulSoup for robustness)
-            # Look for links to ASX PDFs
-            import re
+            announcements: List[Dict[str, Any]] = []
+            seen_urls: set[str] = set()
+            for match in matches:
+                pdf_url = str(match.group(1) or "").strip()
+                if not pdf_url or pdf_url in seen_urls:
+                    continue
+                seen_urls.add(pdf_url)
 
-            # Pattern for ASX PDF links
-            pdf_pattern = r'href="(https://www\.asx\.com\.au/asxpdf/[^"]+\.pdf)"[^>]*>([^<]+)</a>'
-            matches = re.findall(pdf_pattern, html)
+                title = _clean_html_text(match.group(2))
+                if not title:
+                    title = pdf_url.rsplit("/", 1)[-1]
 
-            for pdf_url, title in matches:
-                title = title.strip()
+                window_start = max(0, match.start() - 600)
+                window_end = min(len(html), match.end() + 600)
+                context_window = html[window_start:window_end]
+                published_at = _extract_marketindex_row_date(context_window)
                 category, priority = classify_asx_announcement(title, pdf_url)
 
-                announcements.append({
-                    'title': title,
-                    'url': pdf_url,
-                    'category': category,
-                    'priority': priority
-                })
+                announcements.append(
+                    {
+                        "title": title,
+                        "url": pdf_url,
+                        "published_at": published_at,
+                        "category": category,
+                        "priority": priority,
+                    }
+                )
 
-            # Sort by priority (1 is highest)
-            announcements.sort(key=lambda x: x['priority'])
-
-            print(f"Found {len(announcements)} announcements for {ticker}")
-            print(f"  - Critical: {sum(1 for a in announcements if a['priority'] == 1)}")
-            print(f"  - Important: {sum(1 for a in announcements if a['priority'] == 2)}")
-            print(f"  - Routine: {sum(1 for a in announcements if a['priority'] == 3)}")
-            print(f"  - Ignored: {sum(1 for a in announcements if a['priority'] == 4)}")
-
-            return announcements
-
+            announcements.sort(
+                key=lambda item: (
+                    1 if str(item.get("published_at", "")).strip() else 0,
+                    str(item.get("published_at", "")).strip(),
+                    -int(item.get("priority", 99) or 99),
+                ),
+                reverse=True,
+            )
+            return announcements[: max(1, int(max_results))]
     except Exception as e:
-        print(f"Error scraping marketindex for {ticker}: {e}")
+        print(f"Error scraping Market Index for {symbol}: {e}")
         return []
 
 
 def extract_ticker_from_query(query: str) -> Optional[str]:
     """
     Extract exchange-prefixed ticker code from user query.
-    Supports ASX/NYSE/NASDAQ/TSX/TSXV/LSE/AIM patterns.
+    Supports ASX/NYSE/NASDAQ/TSX/TSXV/LSE/AIM/CSE/JSE patterns.
 
     Args:
         query: User query text
@@ -295,7 +355,7 @@ def extract_ticker_from_query(query: str) -> Optional[str]:
 
     # Highest priority: PREFIX:SYMBOL, no spaces in symbol.
     prefixed = re.search(
-        r"\b(ASX|NYSE|NASDAQ|TSXV?|LSE|AIM)\s*:\s*([A-Z0-9.\-]{1,12})\b",
+        r"\b(ASX|NYSE|NASDAQ|TSXV?|LSE|AIM|CSE|JSE)\s*:\s*([A-Z0-9.\-]{1,12})\b",
         text,
         re.IGNORECASE,
     )
@@ -311,7 +371,7 @@ def extract_ticker_from_query(query: str) -> Optional[str]:
             return f"{exchange}:{symbol}"
 
     # Secondary: SYMBOL.SUFFIX notation.
-    with_suffix = re.search(r"\b([A-Z][A-Z0-9]{0,10})\.(AX|TO|V|N|O|Q|L)\b", text, re.IGNORECASE)
+    with_suffix = re.search(r"\b([A-Z][A-Z0-9]{0,10})\.(AX|TO|V|N|O|Q|L|CN|JO)\b", text, re.IGNORECASE)
     if with_suffix:
         symbol = with_suffix.group(1).upper()
         suffix = with_suffix.group(2).upper()
@@ -321,7 +381,7 @@ def extract_ticker_from_query(query: str) -> Optional[str]:
 
     # Tertiary: PREFIX SYMBOL (without colon)
     spaced = re.search(
-        r"\b(ASX|NYSE|NASDAQ|TSXV?|LSE|AIM)\s+([A-Z0-9]{1,6})\b",
+        r"\b(ASX|NYSE|NASDAQ|TSXV?|LSE|AIM|CSE|JSE)\s+([A-Z0-9]{1,6})\b",
         text,
         re.IGNORECASE,
     )
@@ -403,11 +463,25 @@ async def perform_financial_search(ticker: str) -> Dict[str, Any]:
                 f"{symbol} {exchange_label} NI 43-101 technical report",
             ]
         )
+    elif exchange == "CSE":
+        search_queries.extend(
+            [
+                f"site:thecse.com {symbol} issuer filings",
+                f"site:sedarplus.ca {symbol} filing NI 43-101",
+            ]
+        )
     elif exchange in {"LSE", "AIM"}:
         search_queries.extend(
             [
                 f"site:londonstockexchange.com {symbol} RNS",
                 f"site:investegate.co.uk {symbol} RNS announcement",
+            ]
+        )
+    elif exchange == "JSE":
+        search_queries.extend(
+            [
+                f"site:jse.co.za {symbol} SENS announcement",
+                f"{symbol} JSE annual report production update",
             ]
         )
     else:
@@ -468,7 +542,7 @@ def _parse_ticker(ticker: str) -> Dict[str, str]:
             exchange = prefix
             symbol = rest
     elif "." in raw:
-        match = re.fullmatch(r"([A-Z][A-Z0-9]{0,10})\.(AX|TO|V|N|O|Q|L)", raw)
+        match = re.fullmatch(r"([A-Z][A-Z0-9]{0,10})\.(AX|TO|V|N|O|Q|L|CN|JO)", raw)
         if match:
             symbol = match.group(1).upper()
             exchange = SUFFIX_TO_EXCHANGE.get(match.group(2).upper(), "")
@@ -492,48 +566,6 @@ def _parse_ticker(ticker: str) -> Dict[str, str]:
         "display_ticker": display_ticker,
         "yahoo_ticker": yahoo_ticker,
     }
-
-
-async def download_and_process_pdf(url: str, context: str) -> Optional[Dict[str, Any]]:
-    """
-    Download a PDF from URL and process it.
-
-    Args:
-        url: URL to PDF file
-        context: Context for the PDF (company name, etc.)
-
-    Returns:
-        Processed PDF information
-    """
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(url)
-
-            if response.status_code != 200:
-                return None
-
-            # Save to temp location
-            temp_id = str(uuid.uuid4())
-            filename = url.split('/')[-1] or f"{context.replace(' ', '_')}.pdf"
-
-            file_path = await save_attachment(
-                response.content,
-                "temp_search",
-                temp_id,
-                filename
-            )
-
-            # Process PDF
-            processed = await process_pdf_attachment(file_path, filename)
-            processed['source_url'] = url
-
-            return processed
-
-    except Exception as e:
-        print(f"PDF download error: {e}")
-        return None
-
-
 
 
 def format_search_results_for_prompt(search_results: Dict[str, Any]) -> str:

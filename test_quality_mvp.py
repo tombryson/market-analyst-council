@@ -12,11 +12,17 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Dict, List, Optional, Tuple
+
+from backend.prepass_utils import (
+    normalize_retrieval_query_seed as _normalize_retrieval_query_seed,
+)
+from backend.prepass_utils import tail_text as _tail_text
 
 
 def _progress(message: str) -> None:
@@ -48,86 +54,433 @@ def _ensure_pymupdf_runtime() -> None:
         sys.exit(1)
 
 
-def _build_injection_bundle_attachment_context(
-    *,
-    bundle_path: str,
-    max_docs: int,
-    max_chars: int,
-) -> Tuple[str, Dict[str, Any]]:
-    path = Path(str(bundle_path or "")).expanduser().resolve()
+def _sanitize_ticker_for_dir(ticker: str) -> str:
+    text = str(ticker or "").strip().lower()
+    text = re.sub(r"[^a-z0-9]+", "_", text)
+    return text.strip("_") or "unknown"
+
+
+SUPPLEMENTARY_CONTEXT_MAX_CHARS = 12000
+SUPPLEMENTARY_CONTEXT_ALLOWED_EXTENSIONS = {".pdf", ".md", ".txt", ".json"}
+
+
+async def _load_supplementary_context(path_value: str) -> str:
+    path = Path(str(path_value or "").strip())
     if not path.exists() or not path.is_file():
-        raise FileNotFoundError(f"Injection bundle not found: {path}")
+        raise RuntimeError(f"Supplementary context file not found: {path}")
 
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    suffix = path.suffix.lower()
+    if suffix not in SUPPLEMENTARY_CONTEXT_ALLOWED_EXTENSIONS:
+        return ""
+
+    extracted_text = ""
+    if suffix == ".pdf":
+        from backend.pdf_processor import process_pdf_attachment
+
+        processed = await process_pdf_attachment(str(path), path.name)
+        if str(processed.get("status") or "").strip().lower() != "success":
+            raise RuntimeError(
+                f"Failed to process supplementary PDF: {path} ({processed.get('error') or 'unknown error'})"
+            )
+        extracted_text = str(processed.get("full_text") or processed.get("summary") or "").strip()
+    else:
+        try:
+            extracted_text = path.read_text(encoding="utf-8").strip()
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to read supplementary context file: {path} ({exc})"
+            ) from exc
+        if suffix == ".json" and extracted_text:
+            try:
+                extracted_text = json.dumps(
+                    json.loads(extracted_text),
+                    indent=2,
+                    ensure_ascii=False,
+                )
+            except Exception:
+                pass
+
+    if not extracted_text:
+        return ""
+
+    bounded_text = extracted_text[:SUPPLEMENTARY_CONTEXT_MAX_CHARS].strip()
+    if len(extracted_text) > SUPPLEMENTARY_CONTEXT_MAX_CHARS:
+        bounded_text += "\n\n[Supplementary document truncated]"
+
+    return (
+        "SUPPLEMENTARY USER-PROVIDED DOCUMENT\n"
+        "Use this as optional additional context only.\n"
+        "Do not treat it as higher priority than filings, market facts, or company announcements.\n"
+        f"Filename: {path.name}\n\n"
+        f"{bounded_text}"
+    )
+
+
+def _manifest_count(value: Any) -> int:
+    """Accept either a count scalar or a detailed collection in manifest fields."""
+    if value is None:
+        return 0
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return 0
+        try:
+            return int(float(text))
+        except Exception:
+            return 0
+    if isinstance(value, (list, tuple, set, dict)):
+        return len(value)
+    return 0
+
+
+def _flatten_bundle_milestone(item: Any) -> str:
+    if isinstance(item, dict):
+        milestone = str(item.get("milestone", "")).strip()
+        target_window = str(item.get("target_window", "")).strip()
+        direction = str(item.get("direction", "")).strip()
+        parts = [part for part in [milestone, target_window, direction] if part]
+        return " | ".join(parts).strip()
+    return str(item or "").strip()
+
+
+def _build_source_rows_from_injection_bundle(
+    bundle_path: Path,
+    *,
+    max_sources: int = 24,
+    max_chars_per_source: int = 1600,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    payload = json.loads(bundle_path.read_text(encoding="utf-8"))
     docs = list(payload.get("docs", []) or [])
-    total_docs = len(docs)
-    if int(max_docs) > 0:
-        docs = docs[: int(max_docs)]
-
-    lines: List[str] = [
-        "EXTERNAL PREPASS INJECTION BUNDLE (STRICT, USER-PROVIDED)",
-        "Use these points as high-priority evidence alongside live retrieval.",
-        "",
-    ]
-    for idx, row in enumerate(docs, 1):
-        if not isinstance(row, dict):
-            continue
-        lines.append(
-            f"[D{idx}] {row.get('title', '')} | {row.get('published_at', '')} "
-            f"| importance={row.get('importance_score', '')}"
-        )
-        one_line = str(row.get("one_line", "")).strip()
+    docs_sorted = sorted(
+        [doc for doc in docs if isinstance(doc, dict)],
+        key=lambda row: (
+            1 if bool(row.get("price_sensitive", False)) else 0,
+            int(row.get("importance_score", 0) or 0),
+            str(row.get("published_at", "")),
+        ),
+        reverse=True,
+    )
+    rows: List[Dict[str, Any]] = []
+    max_sources_safe = max(1, int(max_sources))
+    max_chars_safe = max(300, int(max_chars_per_source))
+    for idx, doc in enumerate(docs_sorted[:max_sources_safe], 1):
+        lines: List[str] = []
+        one_line = str(doc.get("one_line", "")).strip()
         if one_line:
-            lines.append(f"- Summary: {one_line}")
-
-        for item in list(row.get("key_points", []) or [])[:10]:
-            text = str(item).strip()
+            lines.append(one_line)
+        key_facts_paragraph = str(doc.get("key_facts_paragraph", "")).strip()
+        if key_facts_paragraph:
+            lines.append(key_facts_paragraph)
+        for point in list(doc.get("key_points", []) or [])[:20]:
+            text = str(point or "").strip()
             if text:
-                lines.append(f"- Key: {text}")
-        for item in list(row.get("timeline_milestones", []) or [])[:4]:
-            if isinstance(item, dict):
-                milestone = str(item.get("milestone", "")).strip()
-                target = str(item.get("target_window", "")).strip()
-                direction = str(item.get("direction", "")).strip()
-                if milestone or target:
-                    lines.append(
-                        f"- Timeline: {milestone} | target={target} | direction={direction}"
-                    )
-            else:
-                text = str(item).strip()
-                if text:
-                    lines.append(f"- Timeline: {text}")
-        for item in list(row.get("catalysts_next_12m", []) or [])[:4]:
-            text = str(item).strip()
+                lines.append(f"- {text}")
+        for point in list(doc.get("timeline_milestones", []) or [])[:10]:
+            text = _flatten_bundle_milestone(point)
+            if text:
+                lines.append(f"- Timeline: {text}")
+        for point in list(doc.get("catalysts_next_12m", []) or [])[:8]:
+            text = str(point or "").strip()
             if text:
                 lines.append(f"- Catalyst: {text}")
-        for item in list(row.get("risks_headwinds", []) or [])[:4]:
-            text = str(item).strip()
+        for point in list(doc.get("capital_structure", []) or [])[:8]:
+            text = str(point or "").strip()
+            if text:
+                lines.append(f"- Capital: {text}")
+        for point in list(doc.get("risks_headwinds", []) or [])[:8]:
+            text = str(point or "").strip()
             if text:
                 lines.append(f"- Risk: {text}")
-        lines.append("")
 
-    raw = "\n".join(lines).strip()
-    cap = int(max_chars)
-    truncated = False
-    if cap > 0:
-        trimmed = raw[:cap]
-        if len(raw) > cap:
-            truncated = True
-            trimmed = trimmed.rstrip() + "\n\n[TRUNCATED DUE TO MAX CHARS]"
-    else:
-        trimmed = raw
+        excerpt = "\n".join(lines).strip()
+        if not excerpt:
+            continue
+        if len(excerpt) > max_chars_safe:
+            excerpt = excerpt[: max_chars_safe - 3].rstrip() + "..."
+
+        importance_score = int(doc.get("importance_score", 0) or 0)
+        # Convert worker importance into the same rough signal range used by
+        # second-pass material scoring.
+        material_signal_score = max(0, min(8, int(round(importance_score / 12.5))))
+        rows.append(
+            {
+                "source_id": f"S{len(rows) + 1}",
+                "title": str(doc.get("title", "")).strip() or f"Bundled Source {idx}",
+                "url": str(doc.get("pdf_url", "")).strip() or str(doc.get("url", "")).strip(),
+                "published_at": str(doc.get("published_at", "")).strip(),
+                "decode_status": "prepass_bundle",
+                "decoded": True,
+                "excerpt": excerpt,
+                "material_signal_score": material_signal_score,
+                "bundle_importance_score": importance_score,
+                "bundle_price_sensitive": bool(doc.get("price_sensitive", False)),
+            }
+        )
 
     meta = {
-        "bundle_path": str(path),
-        "total_docs_in_bundle": int(total_docs),
-        "docs_included": int(len(docs)),
-        "raw_chars": int(len(raw)),
-        "included_chars": int(len(trimmed)),
-        "max_chars": int(cap),
-        "truncated": bool(truncated),
+        "bundle_path": str(bundle_path),
+        "generated_at_utc": str(payload.get("generated_at_utc", "")),
+        "docs_in_bundle": int(len(docs)),
+        "rows_built": int(len(rows)),
+        "min_importance_score": int(
+            ((payload.get("injection_policy", {}) or {}).get("min_importance_score", 0) or 0)
+        ),
+        "kept_for_injection": int(payload.get("kept_for_injection", 0) or 0),
+        "dropped_as_unimportant": int(payload.get("dropped_as_unimportant", 0) or 0),
+        "dropped_below_importance_threshold": int(
+            payload.get("dropped_below_importance_threshold", 0) or 0
+        ),
+        "selection_counts": payload.get("selection_counts", {}) or {},
+        "selection_audit_high_importance_dropped_count": int(
+            len(
+                (
+                    (payload.get("selection_audit", {}) or {}).get(
+                        "high_importance_dropped",
+                        [],
+                    )
+                    or []
+                )
+            )
+        ),
     }
-    return trimmed, meta
+    return rows, meta
+
+
+def _find_recent_bundle_path(
+    *,
+    repo_root: Path,
+    ticker: str,
+    max_age_hours: int = 24,
+) -> Optional[Path]:
+    ticker_norm = str(ticker or "").strip().upper()
+    if not ticker_norm:
+        return None
+    cutoff = datetime.utcnow() - timedelta(hours=max(1, int(max_age_hours)))
+    candidates: List[Tuple[datetime, Path]] = []
+
+    roots: List[Path] = []
+    prepass_root_raw = str(os.getenv("ANALYSIS_PREPASS_DIR", "")).strip()
+    jobs_root_raw = str(os.getenv("ANALYSIS_JOBS_DIR", "")).strip()
+    if prepass_root_raw:
+        roots.append(Path(prepass_root_raw))
+    if jobs_root_raw:
+        roots.append(Path(jobs_root_raw) / "prepass")
+    roots.append(repo_root / "outputs" / "pdf_dump")
+
+    seen_roots = set()
+    for pdf_dump_root in roots:
+        try:
+            resolved_root = pdf_dump_root.resolve()
+        except Exception:
+            resolved_root = pdf_dump_root
+        root_key = str(resolved_root)
+        if root_key in seen_roots or not resolved_root.exists():
+            continue
+        seen_roots.add(root_key)
+        for manifest_path in resolved_root.glob("*/manifest.json"):
+            try:
+                payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            manifest_ticker = str(payload.get("ticker", "")).strip().upper()
+            if manifest_ticker != ticker_norm:
+                continue
+            generated_raw = str(payload.get("generated_at_utc", "")).strip()
+            if not generated_raw:
+                continue
+            try:
+                generated = datetime.fromisoformat(generated_raw.replace("Z", "+00:00")).replace(
+                    tzinfo=None
+                )
+            except Exception:
+                continue
+            if generated < cutoff:
+                continue
+            bundle_path_raw = str(payload.get("injection_bundle_json", "")).strip()
+            if bundle_path_raw:
+                bundle_path_candidate = Path(bundle_path_raw)
+                bundle_path = (
+                    bundle_path_candidate.resolve()
+                    if bundle_path_candidate.is_absolute()
+                    else (repo_root / bundle_path_candidate).resolve()
+                )
+            else:
+                bundle_path = (manifest_path.parent / "injection_bundle.json").resolve()
+            if bundle_path.exists() and bundle_path.is_file():
+                candidates.append((generated, bundle_path))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    return candidates[0][1]
+
+
+def _prepass_output_root(repo_root: Path) -> Path:
+    prepass_root_raw = str(os.getenv("ANALYSIS_PREPASS_DIR", "")).strip()
+    if prepass_root_raw:
+        root = Path(prepass_root_raw)
+    else:
+        jobs_root_raw = str(os.getenv("ANALYSIS_JOBS_DIR", "")).strip()
+        if jobs_root_raw:
+            root = Path(jobs_root_raw) / "prepass"
+        else:
+            root = repo_root / "outputs" / "pdf_dump"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _prepare_primary_injection_bundle(
+    *,
+    repo_root: Path,
+    ticker: str,
+    company_name: str,
+    query_hint: str,
+    exchange: str,
+    exchange_retrieval_params: Optional[Dict[str, Any]] = None,
+    reuse_recent_bundle: bool = False,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    if reuse_recent_bundle:
+        recent_bundle = _find_recent_bundle_path(
+            repo_root=repo_root,
+            ticker=ticker,
+            max_age_hours=24,
+        )
+        if recent_bundle is not None:
+            rows, meta = _build_source_rows_from_injection_bundle(recent_bundle)
+            meta["strategy"] = "reused_recent_bundle"
+            return rows, meta
+
+    uv = shutil.which("uv")
+    if not uv:
+        raise RuntimeError(
+            "Required bundle prepass needs `uv`, but it was not found in PATH."
+        )
+    output_dir = (
+        _prepass_output_root(repo_root)
+        / f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{_sanitize_ticker_for_dir(ticker)}_auto"
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    query_seed = _normalize_retrieval_query_seed(
+        company_name=company_name,
+        query_hint=query_hint,
+        ticker=ticker,
+    )
+    retrieval_query = (
+        f"Latest material filings, announcements, and investor updates for {query_seed}"
+    )
+    retrieval_params = dict(exchange_retrieval_params or {})
+    normalized_exchange = str(exchange or "").strip().lower()
+    target_price_sensitive = int(retrieval_params.get("target_price_sensitive_default", 10) or 10)
+    target_non_price_sensitive = int(
+        retrieval_params.get("target_non_price_sensitive_default", 10) or 10
+    )
+    if (target_price_sensitive + target_non_price_sensitive) < 20:
+        target_non_price_sensitive = max(
+            target_non_price_sensitive,
+            20 - max(0, target_price_sensitive),
+        )
+    # Canadian exchanges require a wider filing net due weaker broad-search coverage.
+    if normalized_exchange in {"tsx", "tsxv", "cse"}:
+        target_price_sensitive = max(target_price_sensitive, 15)
+        target_non_price_sensitive = max(target_non_price_sensitive, 15)
+    top_default = max(1, target_price_sensitive + target_non_price_sensitive)
+    max_sources_default = int(retrieval_params.get("max_sources_default", 0) or 0)
+    lookback_days_default = int(retrieval_params.get("lookback_days_default", 0) or 0)
+
+    cmd = [
+        uv,
+        "run",
+        "python",
+        "test_perplexity_pdf_dump.py",
+        "--query",
+        retrieval_query,
+        "--ticker",
+        str(ticker),
+        "--output-dir",
+        str(output_dir),
+        "--depth",
+        "deep",
+        "--top",
+        str(top_default),
+        "--target-price-sensitive",
+        str(target_price_sensitive),
+        "--target-non-price-sensitive",
+        str(target_non_price_sensitive),
+    ]
+    if max_sources_default > 0:
+        cmd.extend(["--max-sources", str(max_sources_default)])
+    if lookback_days_default > 0:
+        cmd.extend(["--lookback-days", str(lookback_days_default)])
+    if str(exchange or "").strip():
+        cmd.extend(["--exchange", str(exchange).strip().lower()])
+    _progress("Primary injection prepass start (pdf dump + worker summaries)")
+    proc = subprocess.run(
+        cmd,
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+    )
+    stdout = str(proc.stdout or "")
+    stderr = str(proc.stderr or "")
+    (output_dir / "prepass_subprocess.stdout.log").write_text(stdout, encoding="utf-8")
+    (output_dir / "prepass_subprocess.stderr.log").write_text(stderr, encoding="utf-8")
+    if proc.returncode != 0:
+        raise RuntimeError(
+            "Primary injection prepass failed. "
+            f"rc={proc.returncode} "
+            f"output_dir={output_dir} "
+            f"stderr_tail={_tail_text(stderr)} "
+            f"stdout_tail={_tail_text(stdout)}"
+        )
+    manifest_path = output_dir / "manifest.json"
+    if not manifest_path.exists():
+        raise RuntimeError(
+            f"Primary injection prepass completed but manifest not found: {manifest_path}"
+        )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    bundle_path_raw = str(manifest.get("injection_bundle_json", "")).strip()
+    if bundle_path_raw:
+        bundle_path_candidate = Path(bundle_path_raw)
+        bundle_path = (
+            bundle_path_candidate.resolve()
+            if bundle_path_candidate.is_absolute()
+            else (repo_root / bundle_path_candidate).resolve()
+        )
+    else:
+        bundle_path = (output_dir / "injection_bundle.json").resolve()
+    if not bundle_path.exists() or not bundle_path.is_file():
+        raise RuntimeError(
+            f"Primary injection prepass completed but injection bundle missing: {bundle_path}"
+        )
+    rows, meta = _build_source_rows_from_injection_bundle(bundle_path)
+    meta["strategy"] = "built_fresh_bundle"
+    meta["output_dir"] = str(output_dir)
+    meta["prepass_top"] = top_default
+    meta["prepass_target_price_sensitive"] = target_price_sensitive
+    meta["prepass_target_non_price_sensitive"] = target_non_price_sensitive
+    meta["prepass_max_sources"] = max_sources_default
+    meta["prepass_lookback_days"] = lookback_days_default
+    meta["prepass_retrieved_sources"] = _manifest_count(
+        manifest.get("retrieved_sources", 0)
+    )
+    meta["prepass_candidate_sources_considered"] = _manifest_count(
+        manifest.get("candidate_sources_considered", 0)
+    )
+    meta["prepass_candidate_allowlisted_sources"] = _manifest_count(
+        manifest.get("candidate_allowlisted_sources", 0)
+    )
+    meta["prepass_candidate_pdfs_in_window"] = _manifest_count(
+        manifest.get("candidate_pdfs_in_window", 0)
+    )
+    meta["prepass_selected_primary_candidates"] = _manifest_count(
+        manifest.get("selected_primary_candidates", 0)
+    )
+    meta["prepass_written_files"] = _manifest_count(manifest.get("written_files", 0))
+    return rows, meta
+
 
 def _print_header(args: argparse.Namespace, selection: Dict[str, Any]) -> None:
     print("=" * 90)
@@ -186,6 +539,18 @@ def _print_stage1(metadata: Dict[str, Any]) -> None:
             f"max_output_tokens={metadata.get('stage1_second_pass_max_output_tokens')} "
             f"reasoning_effort={metadata.get('stage1_second_pass_reasoning_effort')}"
         )
+        prepass_supplied = metadata.get("stage1_prepass_source_rows_supplied")
+        if prepass_supplied is None:
+            prepass_supplied = metadata.get("stage1_source_rows_override_supplied")
+        prepass_count = metadata.get("stage1_prepass_source_rows_count")
+        if prepass_count is None:
+            prepass_count = metadata.get("stage1_source_rows_override_count")
+        if prepass_supplied is not None:
+            print(
+                "Second-pass prepass source rows: "
+                f"supplied={prepass_supplied} "
+                f"count={prepass_count}"
+            )
         if metadata.get("stage1_timeline_guard_enabled") is not None:
             print(
                 "Timeline guard settings: "
@@ -244,6 +609,12 @@ def _print_stage1(metadata: Dict[str, Any]) -> None:
         )
         if metadata.get("stage1_shared_retrieval_error"):
             print(f"Shared retrieval fallback reason: {metadata.get('stage1_shared_retrieval_error')}")
+    if metadata.get("stage1_prepass_authoritative_mode") is not None:
+        print(
+            "Authoritative prepass mode: "
+            f"enabled={metadata.get('stage1_prepass_authoritative_mode')} "
+            f"prepass_rows={metadata.get('stage1_prepass_source_rows_count')}"
+        )
     if metadata.get("stage1_openai_guardrails_enabled") is not None:
         print(
             "OpenAI pass-1 guardrails: "
@@ -263,6 +634,11 @@ def _print_stage1(metadata: Dict[str, Any]) -> None:
             "critical_sections="
             f"{metadata.get('stage1_verification_critical_sections')}"
         )
+        if metadata.get("stage1_verification_required_sections") is not None:
+            print(
+                "Verification required sections: "
+                f"{metadata.get('stage1_verification_required_sections')}"
+            )
     for run in metadata.get("per_model_research_runs", []):
         model = run.get("model", "unknown")
         result = run.get("result", {})
@@ -306,6 +682,30 @@ def _print_stage1(metadata: Dict[str, Any]) -> None:
                         "retry_recommended="
                         f"{provider_meta.get('stage1_second_pass_compliance_retry_recommended')}"
                     )
+                    hard_fail_reasons = (
+                        provider_meta.get("stage1_second_pass_compliance_hard_fail_reasons") or []
+                    )
+                    soft_fail_reasons = (
+                        provider_meta.get("stage1_second_pass_compliance_soft_fail_reasons") or []
+                    )
+                    warning_reasons = (
+                        provider_meta.get("stage1_second_pass_compliance_warning_reasons") or []
+                    )
+                    if hard_fail_reasons:
+                        print(
+                            "  second_pass_compliance_hard_fail_reasons: "
+                            + " | ".join(hard_fail_reasons[:6])
+                        )
+                    if soft_fail_reasons:
+                        print(
+                            "  second_pass_compliance_soft_fail_reasons: "
+                            + " | ".join(soft_fail_reasons[:6])
+                        )
+                    if warning_reasons:
+                        print(
+                            "  second_pass_compliance_warning_reasons: "
+                            + " | ".join(warning_reasons[:6])
+                        )
             if provider_meta.get("stage1_second_pass_timeline_guard_passed") is not None:
                 print(
                     "  second_pass_timeline_guard: "
@@ -533,16 +933,108 @@ def _extract_named_score(response: str, label: str) -> Optional[float]:
             except (TypeError, ValueError):
                 continue
 
+    # Heading + nearby section fallback:
+    # Handles formats like:
+    #   "## 1) Quality Score" + next line "**Score: 69 / 100**"
+    #   table totals with "Rounded: 77/100"
+    lines = text.splitlines()
+    heading_re = re.compile(rf"(?i)\b{label}\s*score\b")
+    other_label = "value" if label.lower() == "quality" else "quality"
+    other_heading_re = re.compile(rf"(?i)\b{other_label}\s*score\b")
+    nearby_score_re = re.compile(
+        r"(?i)\bscore\b\s*[:=]\s*\*{0,2}\s*([0-9]{1,3}(?:\.[0-9]+)?)\s*/\s*100\b"
+    )
+    rounded_re = re.compile(
+        r"(?i)\brounded\b\s*[:=]?\s*\*{0,2}\s*([0-9]{1,3}(?:\.[0-9]+)?)\s*/\s*100\b"
+    )
+    for idx, line in enumerate(lines):
+        if not heading_re.search(line):
+            continue
+        end_idx = min(len(lines), idx + 40)
+        for probe in range(idx + 1, end_idx):
+            if other_heading_re.search(lines[probe]):
+                end_idx = probe
+                break
+        section = "\n".join(lines[idx:end_idx])
+        for regex in (nearby_score_re, rounded_re):
+            for m in regex.finditer(section):
+                try:
+                    value = float(m.group(1))
+                    if 0 <= value <= 100:
+                        candidates.append(value)
+                except (TypeError, ValueError):
+                    continue
+
     if candidates:
         # Prefer the latest mention in the response (often the final roll-up total).
         return candidates[-1]
     return None
 
 
+def _merge_supplementary_source_rows(
+    primary_rows: List[Dict[str, Any]],
+    supplementary_rows: List[Dict[str, Any]],
+    *,
+    insert_after: int = 10,
+) -> List[Dict[str, Any]]:
+    if not supplementary_rows:
+        return list(primary_rows or [])
+    primary = list(primary_rows or [])
+    cutoff = max(0, int(insert_after))
+    return primary[:cutoff] + list(supplementary_rows) + primary[cutoff:]
+
+
+_STAGE1_SECTION_PATTERNS: Dict[str, re.Pattern] = {
+    "quality_score": re.compile(r"(?i)\bquality[_\s-]*score\b"),
+    "value_score": re.compile(r"(?i)\bvalue[_\s-]*score\b"),
+    "price_targets": re.compile(
+        r"(?i)\b12[-\s]*month\b|\b24[-\s]*month\b|\bprice[_\s-]*target"
+    ),
+    "development_timeline": re.compile(
+        r"(?i)\bdevelopment[_\s-]*timeline\b|\btimeline\b|\bmilestone"
+    ),
+    "certainty": re.compile(r"(?i)\bcertainty\b|\bconfidence\b"),
+    "headwinds_tailwinds": re.compile(r"(?i)\bheadwind\b|\btailwind"),
+    "thesis_map": re.compile(r"(?i)\bthesis[_\s-]*map\b|\bbull\b|\bbase\b|\bbear\b"),
+    "investment_verdict": re.compile(r"(?i)\binvestment[_\s-]*verdict\b|\brating\b|\bconviction\b"),
+}
+
+
+def _resolve_required_stage1_sections(metadata: Dict[str, Any]) -> List[str]:
+    configured = metadata.get("stage1_verification_critical_sections", []) or []
+    normalized = [
+        str(item or "").strip().lower()
+        for item in configured
+        if str(item or "").strip()
+    ]
+    if normalized:
+        return list(dict.fromkeys(normalized))
+    # Conservative fallback aligned with current gold_miner compliance.
+    return [
+        "quality_score",
+        "value_score",
+        "price_targets",
+        "development_timeline",
+        "certainty",
+        "headwinds_tailwinds",
+        "thesis_map",
+        "investment_verdict",
+    ]
+
+
+def _detect_stage1_section_presence(response: str) -> Dict[str, bool]:
+    text = response or ""
+    detected: Dict[str, bool] = {}
+    for section, pattern in _STAGE1_SECTION_PATTERNS.items():
+        detected[section] = bool(pattern.search(text))
+    return detected
+
+
 def _build_stage1_model_audit(
     stage1_results: List[Dict[str, Any]],
     metadata: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
+    required_sections = _resolve_required_stage1_sections(metadata)
     by_model = {item.get("model"): item for item in stage1_results}
     audits: List[Dict[str, Any]] = []
     for run in metadata.get("per_model_research_runs", []):
@@ -551,21 +1043,46 @@ def _build_stage1_model_audit(
         provider_meta = result.get("provider_metadata", {}) or {}
         response = (by_model.get(model, {}) or {}).get("response", "") or ""
         response_type = _classify_response_type(response)
+        section_presence = _detect_stage1_section_presence(response)
 
         quality_score = _extract_named_score(response, "quality")
         value_score = _extract_named_score(response, "value")
-        has_price_targets = bool(
-            re.search(r"(?i)\b12[-\s]*month\b|\b24[-\s]*month\b|\bprice\s*target", response)
-        )
-        has_timeline = bool(re.search(r"(?i)\bdevelopment\s+timeline\b|\bmilestone", response))
-        has_certainty = bool(re.search(r"(?i)\bcertainty\b|\bconfidence", response))
+        has_price_targets = bool(section_presence.get("price_targets"))
+        has_timeline = bool(section_presence.get("development_timeline"))
+        has_certainty = bool(section_presence.get("certainty"))
+        has_thesis_map = bool(section_presence.get("thesis_map"))
+        has_headwinds_tailwinds = bool(section_presence.get("headwinds_tailwinds"))
+        has_investment_verdict = bool(section_presence.get("investment_verdict"))
 
         second_pass_success = provider_meta.get("stage1_second_pass_success")
         compliance_rating = (provider_meta.get("stage1_second_pass_compliance_rating") or "").lower()
         compliance_score = provider_meta.get("stage1_second_pass_compliance_score")
         citation_gate_passed = provider_meta.get("stage1_second_pass_citation_gate_passed")
+        compliance_fail_reasons = list(
+            provider_meta.get("stage1_second_pass_compliance_fail_reasons", []) or []
+        )
+        compliance_warning_reasons = list(
+            provider_meta.get("stage1_second_pass_compliance_warning_reasons", []) or []
+        )
+        compliance_hard_fail_reasons = list(
+            provider_meta.get("stage1_second_pass_compliance_hard_fail_reasons", []) or []
+        )
+        compliance_soft_fail_reasons = list(
+            provider_meta.get("stage1_second_pass_compliance_soft_fail_reasons", []) or []
+        )
+        gate_critical_missing_sections = [
+            str(item or "").strip().lower()
+            for item in (provider_meta.get("stage1_second_pass_rubric_critical_missing_sections", []) or [])
+            if str(item or "").strip()
+        ]
         second_pass_error = provider_meta.get("stage1_second_pass_error")
         second_pass_warning = provider_meta.get("stage1_second_pass_warning")
+        missing_required_sections = [
+            section for section in required_sections if not section_presence.get(section, False)
+        ]
+        for section in gate_critical_missing_sections:
+            if section not in missing_required_sections:
+                missing_required_sections.append(section)
 
         reasons: List[str] = []
         if response_type in {"empty", "fallback_research_log", "json_malformed"}:
@@ -578,16 +1095,38 @@ def _build_stage1_model_audit(
             reasons.append("compliance_rating=amber")
         if citation_gate_passed is False:
             reasons.append("citation_gate_failed")
-        if quality_score is None:
+        if missing_required_sections:
+            reasons.append(
+                "missing_required_sections=" + ",".join(sorted(set(missing_required_sections)))
+            )
+        if quality_score is None and "quality_score" in required_sections:
             reasons.append("missing_quality_score")
-        if value_score is None:
+        if value_score is None and "value_score" in required_sections:
             reasons.append("missing_value_score")
-        if not has_price_targets:
+        if not has_price_targets and "price_targets" in required_sections:
             reasons.append("missing_price_targets")
-        if not has_timeline:
+        if not has_timeline and "development_timeline" in required_sections:
             reasons.append("missing_timeline")
-        if not has_certainty:
+        if not has_certainty and "certainty" in required_sections:
             reasons.append("missing_certainty")
+        if not has_thesis_map and "thesis_map" in required_sections:
+            reasons.append("missing_thesis_map")
+        if not has_headwinds_tailwinds and "headwinds_tailwinds" in required_sections:
+            reasons.append("missing_headwinds_tailwinds")
+        if not has_investment_verdict and "investment_verdict" in required_sections:
+            reasons.append("missing_investment_verdict")
+        if compliance_hard_fail_reasons:
+            reasons.append(
+                "hard_fail_reasons=" + "|".join(compliance_hard_fail_reasons[:4])
+            )
+        elif compliance_soft_fail_reasons:
+            reasons.append(
+                "soft_fail_reasons=" + "|".join(compliance_soft_fail_reasons[:4])
+            )
+        if compliance_warning_reasons:
+            reasons.append(
+                "warning_reasons=" + "|".join(compliance_warning_reasons[:4])
+            )
         if second_pass_error:
             reasons.append(f"second_pass_error={second_pass_error}")
         if second_pass_warning:
@@ -597,16 +1136,14 @@ def _build_stage1_model_audit(
             second_pass_success is False
             or response_type in {"empty", "fallback_research_log", "json_malformed"}
             or compliance_rating == "red"
+            or bool(compliance_hard_fail_reasons)
         ):
             recommendation = "remove"
         elif (
             compliance_rating == "amber"
             or citation_gate_passed is False
-            or quality_score is None
-            or value_score is None
-            or not has_price_targets
-            or not has_timeline
-            or not has_certainty
+            or bool(compliance_soft_fail_reasons)
+            or bool(missing_required_sections)
         ):
             recommendation = "watch"
         else:
@@ -623,10 +1160,19 @@ def _build_stage1_model_audit(
                 "has_price_targets": has_price_targets,
                 "has_timeline": has_timeline,
                 "has_certainty": has_certainty,
+                "has_thesis_map": has_thesis_map,
+                "has_headwinds_tailwinds": has_headwinds_tailwinds,
+                "has_investment_verdict": has_investment_verdict,
+                "required_sections": list(required_sections),
+                "missing_required_sections": list(missing_required_sections),
                 "second_pass_success": second_pass_success,
                 "second_pass_attempts": provider_meta.get("stage1_second_pass_attempts"),
                 "compliance_rating": compliance_rating or None,
                 "compliance_score": compliance_score,
+                "compliance_fail_reasons": compliance_fail_reasons,
+                "compliance_warning_reasons": compliance_warning_reasons,
+                "compliance_hard_fail_reasons": compliance_hard_fail_reasons,
+                "compliance_soft_fail_reasons": compliance_soft_fail_reasons,
                 "rubric_coverage_pct": provider_meta.get("stage1_second_pass_rubric_coverage_pct"),
                 "numeric_citation_pct": provider_meta.get("stage1_second_pass_citation_numeric_citation_pct"),
                 "citation_count": provider_meta.get("stage1_second_pass_citation_count"),
@@ -668,8 +1214,23 @@ def _print_stage1_model_audit(stage1_model_audit: List[Dict[str, Any]]) -> None:
             f"value={row.get('value_score_detected')} "
             f"price_targets={row.get('has_price_targets')} "
             f"timeline={row.get('has_timeline')} "
-            f"certainty={row.get('has_certainty')}"
+            f"certainty={row.get('has_certainty')} "
+            f"thesis_map={row.get('has_thesis_map')} "
+            f"headwinds_tailwinds={row.get('has_headwinds_tailwinds')} "
+            f"investment_verdict={row.get('has_investment_verdict')}"
         )
+        missing_required = row.get("missing_required_sections") or []
+        if missing_required:
+            print(f"  missing_required_sections: {', '.join(missing_required)}")
+        hard_fails = row.get("compliance_hard_fail_reasons") or []
+        soft_fails = row.get("compliance_soft_fail_reasons") or []
+        warnings = row.get("compliance_warning_reasons") or []
+        if hard_fails:
+            print(f"  compliance_hard_fail_reasons: {' | '.join(hard_fails[:6])}")
+        if soft_fails:
+            print(f"  compliance_soft_fail_reasons: {' | '.join(soft_fails[:6])}")
+        if warnings:
+            print(f"  compliance_warning_reasons: {' | '.join(warnings[:6])}")
         reasons = row.get("reasons") or []
         if reasons:
             print(f"  reasons: {' | '.join(reasons[:6])}")
@@ -699,6 +1260,8 @@ def _print_stage2_revision(
         f"attempted={len(stage2_revision_summary.get('models_attempted', []) or [])} "
         f"accepted={stage2_revision_summary.get('accepted_count', 0)} "
         f"changed={stage2_revision_summary.get('changed_count', 0)} "
+        f"no_amendment={stage2_revision_summary.get('no_amendment_count', 0)} "
+        f"empty_response={stage2_revision_summary.get('empty_response_count', 0)} "
         f"parse_failed={stage2_revision_summary.get('parse_failed_count', 0)}"
     )
     apply_summary = stage2_revision_summary.get("apply") or {}
@@ -709,11 +1272,14 @@ def _print_stage2_revision(
             f"{apply_summary.get('models_total', 0)}"
         )
     for row in stage2_revision_results or []:
+        parse_error = row.get("parse_error") or "none"
+        if parse_error == "empty_response":
+            parse_error = "no_amendment(empty_response)"
         print(
             f"  - {row.get('model')}: "
             f"accepted={row.get('accepted')} "
             f"changed={row.get('changed')} "
-            f"parse_error={row.get('parse_error') or 'none'} "
+            f"parse_error={parse_error} "
             f"response_chars={row.get('response_chars', 0)}"
         )
 
@@ -783,6 +1349,7 @@ def _print_stage3(stage3_result: Dict[str, Any], *, title: str = "STAGE 3") -> N
             f"value_total={value.get('total', 'n/a')}"
         )
 
+
     # Keep compatibility with financial_quality_mvp fields.
     if structured.get("confidence_pct") is not None:
         print(f"Confidence (%): {structured.get('confidence_pct')}")
@@ -804,13 +1371,16 @@ def _print_stage3(stage3_result: Dict[str, Any], *, title: str = "STAGE 3") -> N
     if timeline:
         print("Development Timeline (top 3):")
         for item in timeline[:3]:
-            print(
-                "  - "
-                f"{item.get('milestone', 'milestone')} | "
-                f"{item.get('target_period', 'period')} | "
-                f"status={item.get('status', 'n/a')} | "
-                f"confidence={item.get('confidence_pct', 'n/a')}"
-            )
+            if isinstance(item, dict):
+                print(
+                    "  - "
+                    f"{item.get('milestone', 'milestone')} | "
+                    f"{item.get('target_period', 'period')} | "
+                    f"status={item.get('status', 'n/a')} | "
+                    f"confidence={item.get('confidence_pct', 'n/a')}"
+                )
+            else:
+                print(f"  - {item}")
 
     ht = structured.get("headwinds_tailwinds", {}) or {}
     q_hw = (ht.get("quantitative") or [])[:3]
@@ -837,6 +1407,17 @@ def _print_stage3(stage3_result: Dict[str, Any], *, title: str = "STAGE 3") -> N
             print("  Failure conditions:")
             for item in failures[:3]:
                 print(f"    - {item}")
+
+    analyst_document = stage3_result.get("analyst_document") or {}
+    analyst_model = str(analyst_document.get("model") or "").strip()
+    analyst_content = str(analyst_document.get("content_markdown") or "").strip()
+    if analyst_content:
+        print(
+            "Analyst Memo: "
+            f"model={analyst_model or 'n/a'} "
+            f"chars={len(analyst_content)} "
+            f"stage1_rows={len(analyst_document.get('stage1_reference_rows') or [])}"
+        )
 
     extended = structured.get("extended_analysis", {}) or {}
     if extended:
@@ -872,6 +1453,103 @@ def _print_stage3(stage3_result: Dict[str, Any], *, title: str = "STAGE 3") -> N
         print("Missing information:")
         for item in missing[:5]:
             print(f"  - {item}")
+
+
+def _write_stage3_memo_files(
+    *,
+    dump_json_path: str,
+    stage3_result_primary: Dict[str, Any],
+    stage3_result_secondary: Optional[Dict[str, Any]],
+) -> List[str]:
+    base_path = Path(dump_json_path).expanduser().resolve()
+    out_paths: List[str] = []
+    rows: List[Tuple[str, Optional[Dict[str, Any]]]] = [
+        ("primary", stage3_result_primary),
+        ("secondary", stage3_result_secondary),
+    ]
+    for label, row in rows:
+        if not row:
+            continue
+        model = str(row.get("model") or "chairman")
+        structured = row.get("structured_data") if isinstance(row.get("structured_data"), dict) else {}
+        company_title = str(
+            structured.get("company_name")
+            or structured.get("company")
+            or "Company"
+        ).strip()
+        chairman_document = row.get("chairman_document") or {}
+        content = str(
+            chairman_document.get("content")
+            or row.get("response")
+            or ""
+        ).strip()
+        if not content:
+            continue
+        model_slug = re.sub(r"[^a-zA-Z0-9]+", "_", model).strip("_").lower()
+        memo_path = base_path.parent / f"{base_path.stem}.stage3_{label}_{model_slug}.md"
+        lines = [f"# Chairman Synthesis: {company_title}", "", content, ""]
+        memo_path.write_text("\n".join(lines), encoding="utf-8")
+        out_paths.append(str(memo_path))
+
+        analyst_document = row.get("analyst_document") or {}
+        analyst_content = str(analyst_document.get("content_markdown") or "").strip()
+        if analyst_content:
+            analyst_model = str(analyst_document.get("model") or "analyst")
+            analyst_slug = re.sub(r"[^a-zA-Z0-9]+", "_", analyst_model).strip("_").lower()
+            analyst_path = (
+                base_path.parent
+                / f"{base_path.stem}.stage3_{label}_analyst_{analyst_slug}.md"
+            )
+            analyst_lines = [
+                "# Stage 3 Analyst Memo",
+                "",
+                f"- run_artifact: `{base_path.name}`",
+                f"- chairman: `{model}`",
+                f"- analyst_model: `{analyst_model}`",
+                f"- generated_utc: `{analyst_document.get('generated_utc') or datetime.utcnow().isoformat() + 'Z'}`",
+                "",
+                "## Memo",
+                "",
+                analyst_content,
+                "",
+            ]
+            if analyst_content.lstrip().startswith("#"):
+                analyst_lines = [analyst_content, ""]
+            else:
+                analyst_lines = [f"# Investment Analysis: {company_title}", "", analyst_content, ""]
+            analyst_path.write_text("\n".join(analyst_lines), encoding="utf-8")
+            out_paths.append(str(analyst_path))
+    return out_paths
+
+
+def _dump_json_atomic(path: Path, payload: Dict[str, Any]) -> None:
+    """Atomically write JSON payload to disk."""
+    path = path.expanduser().resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_text(
+        json.dumps(payload, indent=2, default=str),
+        encoding="utf-8",
+    )
+    tmp_path.replace(path)
+
+
+def _write_stage_checkpoint(
+    *,
+    dump_json_path: Optional[str],
+    stage_name: str,
+    payload: Dict[str, Any],
+) -> Optional[Path]:
+    """Persist a durable checkpoint for each completed stage."""
+    if not dump_json_path:
+        return None
+    base_path = Path(dump_json_path).expanduser().resolve()
+    # Keep checkpoints out of top-level outputs so one canonical run artifact remains
+    # for UI listing and downstream tooling.
+    checkpoint_dir = base_path.parent / "checkpoints" / base_path.stem
+    checkpoint_path = checkpoint_dir / f"{stage_name}.checkpoint.json"
+    _dump_json_atomic(checkpoint_path, payload)
+    return checkpoint_path
 
 
 def _build_stage3_comparison(
@@ -992,6 +1670,89 @@ def _print_stage3_comparison(stage3_comparison: Dict[str, Any]) -> None:
     )
 
 
+def _market_facts_audit_summary(payload: Dict[str, Any] | None) -> Dict[str, Any]:
+    facts = payload or {}
+    normalized = facts.get("normalized_facts") or {}
+    core_present = [
+        key
+        for key in ("current_price", "market_cap", "shares_outstanding", "enterprise_value", "currency")
+        if normalized.get(key) is not None
+    ]
+    commodity_suffixes = (
+        "_price_usd_lb",
+        "_price_aud_lb",
+        "_price_usd_oz",
+        "_price_aud_oz",
+        "_price_usd_kg",
+        "_price_aud_kg",
+        "_price_usd_bbl",
+        "_price_aud_bbl",
+        "_price_usd_mmbtu",
+        "_price_aud_mmbtu",
+    )
+    commodity_present = [
+        key
+        for key, value in normalized.items()
+        if value is not None and any(key.endswith(suffix) for suffix in commodity_suffixes)
+    ]
+    return {
+        "status": facts.get("status"),
+        "reason": facts.get("reason"),
+        "commodity_profile": normalized.get("commodity_profile"),
+        "core_fields_present": core_present,
+        "commodity_fields_present": commodity_present,
+        "source_count": len(facts.get("source_urls") or []),
+    }
+
+
+def _prepass_audit_summary(meta: Dict[str, Any] | None) -> Dict[str, Any]:
+    payload = meta or {}
+    return {
+        "strategy": payload.get("strategy"),
+        "bundle_path": payload.get("bundle_path"),
+        "generated_at_utc": payload.get("generated_at_utc"),
+        "docs_in_bundle": payload.get("docs_in_bundle"),
+        "rows_built": payload.get("rows_built"),
+        "kept_for_injection": payload.get("kept_for_injection"),
+        "prepass_retrieved_sources": payload.get("prepass_retrieved_sources"),
+        "prepass_selected_primary_candidates": payload.get("prepass_selected_primary_candidates"),
+        "selection_counts": payload.get("selection_counts") or {},
+    }
+
+
+def _selection_audit_summary(selection: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "template_id": selection.get("template_id"),
+        "company_type": selection.get("company_type"),
+        "company_name": selection.get("company_name"),
+        "exchange": selection.get("exchange"),
+        "selection_source": selection.get("selection_source"),
+        "exchange_selection_source": selection.get("exchange_selection_source"),
+    }
+
+
+def _build_input_audit_payload(
+    *,
+    selection: Dict[str, Any],
+    stage1_research_brief: str,
+    market_facts_query_prefix: str,
+    market_facts: Dict[str, Any] | None,
+    injection_bundle_meta: Dict[str, Any] | None,
+    injection_source_rows_count: int,
+) -> Dict[str, Any]:
+    return {
+        "selection": selection,
+        "selection_summary": _selection_audit_summary(selection),
+        "stage1_research_brief": stage1_research_brief,
+        "market_facts_query_prefix": market_facts_query_prefix,
+        "market_facts": market_facts or {},
+        "market_facts_summary": _market_facts_audit_summary(market_facts),
+        "primary_injection_bundle_meta": injection_bundle_meta,
+        "primary_injection_source_rows_count": int(injection_source_rows_count),
+        "prepass_summary": _prepass_audit_summary(injection_bundle_meta),
+    }
+
+
 def _print_input_audit(
     selection: Dict[str, Any],
     effective_query: str,
@@ -1000,12 +1761,15 @@ def _print_input_audit(
     market_facts: Dict[str, Any] | None,
     market_facts_query_prefix: str,
     injection_bundle_meta: Dict[str, Any] | None,
-    injection_bundle_context: str,
+    injection_source_rows_count: int,
 ) -> None:
+
     print("\nINPUT AUDIT")
     print("-" * 90)
     print("Selection:")
     print(json.dumps(selection, indent=2))
+    print("\nSelection Summary:")
+    print(json.dumps(_selection_audit_summary(selection), indent=2))
     print("\nEffective Query (template/user query before market-facts prefix):")
     print(effective_query)
     print("\nStage 1 Query Sent (with minimal market-facts prefix):")
@@ -1016,10 +1780,13 @@ def _print_input_audit(
     print(market_facts_query_prefix or "(none)")
     print("\nMarket Facts Object:")
     print(json.dumps(market_facts or {}, indent=2))
-    print("\nInjection Bundle Meta:")
+    print("\nMarket Facts Summary:")
+    print(json.dumps(_market_facts_audit_summary(market_facts), indent=2))
+    print("\nPrimary Injection Bundle Meta:")
     print(json.dumps(injection_bundle_meta or {}, indent=2))
-    print("\nInjection Bundle Context Sent As Attachment Context:")
-    print(injection_bundle_context or "(none)")
+    print("\nPrimary Injection Summary:")
+    print(json.dumps(_prepass_audit_summary(injection_bundle_meta), indent=2))
+    print(f"\nPrimary Injection Source Rows Prepared: {int(injection_source_rows_count)}")
 
 
 def _print_provider_request_audit(
@@ -1056,41 +1823,33 @@ async def _run(args: argparse.Namespace) -> None:
     from backend.config import STAGE2_REVISION_PASS_ENABLED
     from backend.config import PERPLEXITY_API_URL, PERPLEXITY_COUNCIL_MODELS, MAX_SOURCES
     from backend.main import build_enhanced_context
+    from backend.search import extract_ticker_from_query
     from backend.market_facts import (
         gather_market_facts_prepass,
         format_market_facts_query_prefix,
         prepend_market_facts_to_query,
     )
-    from backend.company_type_detector import detect_company_type_via_api
     from backend.research.providers.perplexity import PerplexityResearchProvider
     from backend.template_loader import get_template_loader, resolve_template_selection
 
-    detected_company_type_payload: Dict[str, Any] = {}
-    detected_company_type = None
-    if not args.company_type:
-        detected_company_type_payload = await detect_company_type_via_api(
-            user_query=args.query or "",
-            ticker=args.ticker,
-            company_name=None,
-            exchange=args.exchange,
-        )
-        candidate = str(
-            detected_company_type_payload.get("selected_company_type") or ""
-        ).strip()
-        if candidate:
-            detected_company_type = candidate
+    # Resolve ticker before any downstream stage. Silent no-ticker runs are not
+    # allowed when deterministic market-facts prepass is enabled.
+    effective_ticker = str(args.ticker or "").strip()
+    if not effective_ticker:
+        inferred_ticker = extract_ticker_from_query(args.query or "")
+        if inferred_ticker:
+            effective_ticker = inferred_ticker
+            _progress(f"Inferred ticker from query: {effective_ticker}")
+    if effective_ticker:
+        args.ticker = effective_ticker
 
     selection = resolve_template_selection(
         user_query=args.query or "",
-        ticker=args.ticker,
+        ticker=effective_ticker,
         explicit_template_id=args.template_id,
-        company_type=(args.company_type or detected_company_type),
+        company_type=args.company_type,
         exchange=args.exchange,
     )
-    if detected_company_type_payload:
-        selection["company_type_detection"] = detected_company_type_payload
-        if detected_company_type and not args.company_type:
-            selection["selection_source"] = "api_company_type_detected"
     selected_template_id = selection["template_id"]
     selected_company_name = selection.get("company_name")
     selected_company_type = selection.get("company_type")
@@ -1098,11 +1857,17 @@ async def _run(args: argparse.Namespace) -> None:
     loader = get_template_loader()
     use_structured_analysis = loader.is_structured_template(selected_template_id)
 
-    effective_query = loader.render_stage1_query_prompt(
+    effective_query = loader.render_template_rubric(
         selected_template_id,
         company_name=selected_company_name,
         exchange=selected_exchange,
     )
+    if not effective_query:
+        effective_query = loader.render_stage1_query_prompt(
+            selected_template_id,
+            company_name=selected_company_name,
+            exchange=selected_exchange,
+        )
     if not effective_query:
         raise ValueError(
             f"Template '{selected_template_id}' has no Stage 1 prompt to use as query."
@@ -1128,38 +1893,68 @@ async def _run(args: argparse.Namespace) -> None:
     _print_header(args, selection)
 
     market_facts = None
-    if ENABLE_MARKET_FACTS_PREPASS and args.ticker:
+    if ENABLE_MARKET_FACTS_PREPASS:
+        if not effective_ticker:
+            raise ValueError(
+                "Market facts prepass is enabled but ticker is unresolved. "
+                "Provide --ticker EXCHANGE:SYMBOL (e.g., ASX:BRK) or include a parseable ticker in the query."
+            )
         _progress("Market facts prepass start")
         market_facts = await gather_market_facts_prepass(
-            ticker=args.ticker,
+            ticker=effective_ticker,
             company_name=selected_company_name,
             exchange=selected_exchange,
+            template_id=selected_template_id,
+            company_type=selected_company_type,
         )
-        if market_facts:
-            print(f"Market facts status: {market_facts.get('status')}")
-            market_facts_text = format_market_facts_query_prefix(market_facts)
-            if market_facts_text:
-                print("Market facts prepass prepared; minimal normalized_facts block will be prepended to Stage 1 query.")
+        market_status = str((market_facts or {}).get("status") or "").strip().lower()
+        market_facts_text = format_market_facts_query_prefix(market_facts)
+        print(f"Market facts status: {market_status or 'unknown'}")
+        if market_status in {"skipped", "error", "empty"} or not market_facts_text:
+            reason = str((market_facts or {}).get("reason") or "").strip()
+            raise RuntimeError(
+                "Market facts prepass failed or returned no injectable normalized_facts. "
+                f"status={market_status or 'unknown'} reason={reason or 'n/a'}"
+            )
+        print(
+            "Market facts prepass prepared; minimal normalized_facts block will be prepended to Stage 1 query."
+        )
+        _progress("Market facts prepass done")
 
     stage1_effective_research_brief = stage1_research_brief
+    supplementary_context_file = str(args.supplementary_context_file or "").strip()
+    if supplementary_context_file:
+        supplementary_text = await _load_supplementary_context(supplementary_context_file)
+        if supplementary_text:
+            stage1_effective_research_brief = (
+                f"{stage1_effective_research_brief}\n\n{supplementary_text}".strip()
+            )
     market_facts_query_prefix = format_market_facts_query_prefix(market_facts)
     stage1_effective_query = prepend_market_facts_to_query(effective_query, market_facts)
-    injection_bundle_context = ""
+    injection_bundle_rows: List[Dict[str, Any]] = []
     injection_bundle_meta: Dict[str, Any] = {}
-    if args.injection_bundle_json:
-        _progress("External injection bundle load start")
-        injection_bundle_context, injection_bundle_meta = _build_injection_bundle_attachment_context(
-            bundle_path=str(args.injection_bundle_json),
-            max_docs=int(args.injection_max_docs),
-            max_chars=int(args.injection_max_chars),
+    if args.dry_run_input:
+        injection_bundle_meta = {"strategy": "skipped_dry_run"}
+    else:
+        repo_root = Path(__file__).resolve().parent
+        injection_bundle_rows, injection_bundle_meta = _prepare_primary_injection_bundle(
+            repo_root=repo_root,
+            ticker=effective_ticker,
+            company_name=str(selected_company_name or ""),
+            query_hint=(args.query or selected_company_name or effective_ticker),
+            exchange=str(selected_exchange or args.exchange or ""),
+            exchange_retrieval_params=loader.get_exchange_retrieval_params(selected_exchange),
+            reuse_recent_bundle=bool(args.reuse_recent_bundle),
         )
+        if not injection_bundle_rows:
+            raise RuntimeError(
+                "Primary injection bundle produced zero source rows; refusing to run Stage 1 with junk/empty evidence."
+            )
         _progress(
-            "External injection bundle loaded: "
-            f"docs={injection_bundle_meta.get('docs_included', 0)} "
-            f"raw_chars={injection_bundle_meta.get('raw_chars', 0)} "
-            f"chars={injection_bundle_meta.get('included_chars', 0)} "
-            f"max_chars={injection_bundle_meta.get('max_chars', 0)} "
-            f"truncated={injection_bundle_meta.get('truncated', False)}"
+            "Primary injection bundle ready: "
+            f"rows={len(injection_bundle_rows)} "
+            f"strategy={injection_bundle_meta.get('strategy', 'unknown')} "
+            f"path={injection_bundle_meta.get('bundle_path', '')}"
         )
 
     _print_input_audit(
@@ -1170,7 +1965,7 @@ async def _run(args: argparse.Namespace) -> None:
         market_facts=market_facts,
         market_facts_query_prefix=market_facts_query_prefix,
         injection_bundle_meta=injection_bundle_meta,
-        injection_bundle_context=injection_bundle_context,
+        injection_source_rows_count=len(injection_bundle_rows),
     )
 
     if args.dry_run_input:
@@ -1180,7 +1975,7 @@ async def _run(args: argparse.Namespace) -> None:
         models = [item.strip() for item in PERPLEXITY_COUNCIL_MODELS if item.strip()]
         prompt = provider._build_prompt(
             user_query=stage1_effective_query,
-            ticker=args.ticker,
+            ticker=effective_ticker,
             depth=depth,
             max_sources=max_sources,
             research_brief=stage1_effective_research_brief,
@@ -1206,8 +2001,8 @@ async def _run(args: argparse.Namespace) -> None:
     stage1_start = perf_counter()
     stage1_results, metadata = await stage1_collect_perplexity_research_responses(
         user_query=stage1_effective_query,
-        ticker=args.ticker,
-        attachment_context=injection_bundle_context,
+        ticker=effective_ticker,
+        prepass_source_rows=injection_bundle_rows,
         depth="deep",
         research_brief=stage1_effective_research_brief,
         template_id=selected_template_id,
@@ -1217,6 +2012,29 @@ async def _run(args: argparse.Namespace) -> None:
     _print_stage1(metadata)
     stage1_model_audit = _build_stage1_model_audit(stage1_results, metadata)
     _print_stage1_model_audit(stage1_model_audit)
+    checkpoint_input_audit = _build_input_audit_payload(
+        selection=selection,
+        stage1_research_brief=stage1_effective_research_brief,
+        market_facts_query_prefix=market_facts_query_prefix,
+        market_facts=market_facts,
+        injection_bundle_meta=injection_bundle_meta,
+        injection_source_rows_count=len(injection_bundle_rows),
+    )
+    stage1_checkpoint = _write_stage_checkpoint(
+        dump_json_path=args.dump_json,
+        stage_name="stage1",
+        payload={
+            "effective_query": effective_query,
+            "stage1_query_sent": stage1_effective_query,
+            "input_audit": checkpoint_input_audit,
+            "stage1_results": stage1_results,
+            "stage1_model_audit": stage1_model_audit,
+            "metadata": metadata,
+            "selection": selection,
+        },
+    )
+    if stage1_checkpoint:
+        print(f"Saved checkpoint to: {stage1_checkpoint}")
 
     if not stage1_results:
         print("\nNo Stage 1 responses generated. Stopping.")
@@ -1227,14 +2045,7 @@ async def _run(args: argparse.Namespace) -> None:
             payload = {
                 "effective_query": effective_query,
                 "stage1_query_sent": stage1_effective_query,
-                "input_audit": {
-                    "selection": selection,
-                    "stage1_research_brief": stage1_effective_research_brief,
-                    "market_facts_query_prefix": market_facts_query_prefix,
-                    "market_facts": market_facts or {},
-                    "injection_bundle_meta": injection_bundle_meta,
-                    "injection_bundle_context": injection_bundle_context,
-                },
+                "input_audit": checkpoint_input_audit,
                 "stage1_results": stage1_results,
                 "stage1_model_audit": stage1_model_audit,
                 "stage2_results": [],
@@ -1242,8 +2053,7 @@ async def _run(args: argparse.Namespace) -> None:
                 "metadata": metadata,
                 "selection": selection,
             }
-            with open(args.dump_json, "w") as f:
-                json.dump(payload, f, indent=2)
+            _dump_json_atomic(Path(args.dump_json), payload)
             print(f"\nSaved JSON output to: {args.dump_json}")
         _progress(f"Run complete in {perf_counter() - total_start:.1f}s")
         print("\nStage 1-only test complete.")
@@ -1274,6 +2084,23 @@ async def _run(args: argparse.Namespace) -> None:
     aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
     _progress(f"Stage 2 done in {perf_counter() - stage2_start:.1f}s")
     _print_stage2(stage2_results, aggregate_rankings)
+    stage2_checkpoint = _write_stage_checkpoint(
+        dump_json_path=args.dump_json,
+        stage_name="stage2",
+        payload={
+            "effective_query": effective_query,
+            "selection": selection,
+            "input_audit": checkpoint_input_audit,
+            "stage1_results": stage1_results,
+            "stage1_model_audit": stage1_model_audit,
+            "metadata": metadata,
+            "stage2_results": stage2_results,
+            "stage2_aggregate_rankings": aggregate_rankings,
+            "label_to_model": label_to_model,
+        },
+    )
+    if stage2_checkpoint:
+        print(f"Saved checkpoint to: {stage2_checkpoint}")
 
     revision_mode = (args.stage2_revision_pass or "auto").strip().lower()
     revision_enabled = (
@@ -1304,6 +2131,26 @@ async def _run(args: argparse.Namespace) -> None:
             f"{perf_counter() - stage2_revision_start:.1f}s"
         )
     _print_stage2_revision(stage2_revision_summary, stage2_revision_results)
+    stage25_checkpoint = _write_stage_checkpoint(
+        dump_json_path=args.dump_json,
+        stage_name="stage2_5",
+        payload={
+            "effective_query": effective_query,
+            "selection": selection,
+            "input_audit": checkpoint_input_audit,
+            "stage1_results": stage1_results,
+            "stage1_results_for_stage3": stage1_results_for_stage3,
+            "stage1_model_audit": stage1_model_audit,
+            "metadata": metadata,
+            "stage2_results": stage2_results,
+            "stage2_revision_results": stage2_revision_results,
+            "stage2_revision_summary": stage2_revision_summary,
+            "stage2_aggregate_rankings": aggregate_rankings,
+            "label_to_model": label_to_model,
+        },
+    )
+    if stage25_checkpoint:
+        print(f"Saved checkpoint to: {stage25_checkpoint}")
 
     _progress("Stage 3 start")
     stage3_primary_start = perf_counter()
@@ -1314,7 +2161,7 @@ async def _run(args: argparse.Namespace) -> None:
         label_to_model=label_to_model,
         use_structured_analysis=use_structured_analysis,
         template_id=selected_template_id,
-        ticker=args.ticker,
+        ticker=effective_ticker,
         company_name=selected_company_name,
         exchange=selected_exchange,
         chairman_model=primary_chairman_model,
@@ -1323,7 +2170,32 @@ async def _run(args: argparse.Namespace) -> None:
     )
     stage3_primary_elapsed = perf_counter() - stage3_primary_start
     _progress(f"Stage 3 primary done in {stage3_primary_elapsed:.1f}s")
-    _print_stage3(stage3_result_primary, title="STAGE 3 (PRIMARY CHAIRMAN)")
+
+    stage3_primary_checkpoint = _write_stage_checkpoint(
+        dump_json_path=args.dump_json,
+        stage_name="stage3_primary",
+        payload={
+            "effective_query": effective_query,
+            "selection": selection,
+            "input_audit": checkpoint_input_audit,
+            "stage1_results_for_stage3": stage1_results_for_stage3,
+            "stage2_results": stage2_results,
+            "stage2_aggregate_rankings": aggregate_rankings,
+            "stage2_revision_results": stage2_revision_results,
+            "stage2_revision_summary": stage2_revision_summary,
+            "label_to_model": label_to_model,
+            "stage3_primary_model": primary_chairman_model,
+            "stage3_result_primary": stage3_result_primary,
+            "metadata": metadata,
+        },
+    )
+    if stage3_primary_checkpoint:
+        print(f"Saved checkpoint to: {stage3_primary_checkpoint}")
+
+    try:
+        _print_stage3(stage3_result_primary, title="STAGE 3 (PRIMARY CHAIRMAN)")
+    except Exception as exc:
+        print(f"[warn] Stage 3 primary print failed: {exc}")
 
     stage3_result_secondary: Dict[str, Any] | None = None
     stage3_secondary_elapsed: Optional[float] = None
@@ -1337,7 +2209,7 @@ async def _run(args: argparse.Namespace) -> None:
             label_to_model=label_to_model,
             use_structured_analysis=use_structured_analysis,
             template_id=selected_template_id,
-            ticker=args.ticker,
+            ticker=effective_ticker,
             company_name=selected_company_name,
             exchange=selected_exchange,
             chairman_model=secondary_chairman_model,
@@ -1346,17 +2218,28 @@ async def _run(args: argparse.Namespace) -> None:
         )
         stage3_secondary_elapsed = perf_counter() - stage3_secondary_start
         _progress(f"Stage 3 secondary done in {stage3_secondary_elapsed:.1f}s")
-        _print_stage3(stage3_result_secondary, title="STAGE 3 (SECONDARY CHAIRMAN)")
+        try:
+            _print_stage3(stage3_result_secondary, title="STAGE 3 (SECONDARY CHAIRMAN)")
+        except Exception as exc:
+            print(f"[warn] Stage 3 secondary print failed: {exc}")
 
     stage3_comparison = _build_stage3_comparison(
         stage3_result_primary,
         stage3_result_secondary,
     )
-    _print_stage3_comparison(stage3_comparison)
+    try:
+        _print_stage3_comparison(stage3_comparison)
+    except Exception as exc:
+        print(f"[warn] Stage 3 comparison print failed: {exc}")
 
     stage3_result = stage3_result_primary
 
     if args.dump_json:
+        stage3_memo_files = _write_stage3_memo_files(
+            dump_json_path=args.dump_json,
+            stage3_result_primary=stage3_result_primary,
+            stage3_result_secondary=stage3_result_secondary,
+        )
         payload = {
             "effective_query": effective_query,
             "stage1_query_sent": stage1_effective_query,
@@ -1365,13 +2248,14 @@ async def _run(args: argparse.Namespace) -> None:
                 "stage1_research_brief": stage1_effective_research_brief,
                 "market_facts_query_prefix": market_facts_query_prefix,
                 "market_facts": market_facts or {},
-                "injection_bundle_meta": injection_bundle_meta,
-                "injection_bundle_context": injection_bundle_context,
+                "primary_injection_bundle_meta": injection_bundle_meta,
+                "primary_injection_source_rows_count": len(injection_bundle_rows),
             },
             "stage1_results": stage1_results,
             "stage1_results_for_stage3": stage1_results_for_stage3,
             "stage1_model_audit": stage1_model_audit,
             "stage2_results": stage2_results,
+            "stage2_aggregate_rankings": aggregate_rankings,
             "stage2_revision_results": stage2_revision_results,
             "stage2_revision_summary": stage2_revision_summary,
             "stage3_primary_model": primary_chairman_model,
@@ -1385,13 +2269,22 @@ async def _run(args: argparse.Namespace) -> None:
             "stage3_result_primary": stage3_result_primary,
             "stage3_result_secondary": stage3_result_secondary,
             "stage3_comparison": stage3_comparison,
+            "stage3_memo_files": stage3_memo_files,
             "stage3_result": stage3_result,
             "metadata": metadata,
             "selection": selection,
         }
-        with open(args.dump_json, "w") as f:
-            json.dump(payload, f, indent=2)
+        _dump_json_atomic(Path(args.dump_json), payload)
         print(f"\nSaved JSON output to: {args.dump_json}")
+        for memo_path in stage3_memo_files:
+            print(f"Saved Stage 3 memo to: {memo_path}")
+        final_checkpoint = _write_stage_checkpoint(
+            dump_json_path=args.dump_json,
+            stage_name="stage3_full",
+            payload=payload,
+        )
+        if final_checkpoint:
+            print(f"Saved checkpoint to: {final_checkpoint}")
 
     _progress(f"Run complete in {perf_counter() - total_start:.1f}s")
     print("\nMVP quality test complete.")
@@ -1454,24 +2347,6 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--injection-bundle-json",
-        type=str,
-        default=None,
-        help="Optional path to a prebuilt injection_bundle.json to pass into Stage 1 attachment context.",
-    )
-    parser.add_argument(
-        "--injection-max-docs",
-        type=int,
-        default=0,
-        help="Optional cap for docs from injection bundle (0=all in file order).",
-    )
-    parser.add_argument(
-        "--injection-max-chars",
-        type=int,
-        default=0,
-        help="Max chars from injection bundle context sent to Stage 1 attachment context (0=no truncation).",
-    )
-    parser.add_argument(
         "--dump-json",
         type=str,
         default=None,
@@ -1498,9 +2373,23 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--reuse-recent-bundle",
+        action="store_true",
+        help=(
+            "Reuse a recent injection bundle (<=24h) for the same ticker. "
+            "Default behavior is fresh prepass for each run."
+        ),
+    )
+    parser.add_argument(
         "--diagnostic-mode",
         action="store_true",
         help="Allow Stage 1 execution while SYSTEM_ENABLED=false (audit-only).",
+    )
+    parser.add_argument(
+        "--supplementary-context-file",
+        type=str,
+        default=None,
+        help="Optional supplementary document (.pdf, .md, .txt, .json) appended to the Stage 1 research brief.",
     )
     return parser
 

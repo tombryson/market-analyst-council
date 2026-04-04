@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 import httpx
 
 from .base import ResearchProvider
+from ...reasoning import build_reasoning_payload, normalize_reasoning_effort
 from ...config import (
     PERPLEXITY_API_KEY,
     PERPLEXITY_API_URL,
@@ -41,6 +42,26 @@ from ...config import (
     SOURCE_DECODING_MAX_CHARS,
     SOURCE_DECODING_TIMEOUT_SECONDS,
     PROGRESS_LOGGING,
+)
+
+EXCHANGE_TO_YAHOO_SUFFIX = {
+    "ASX": ".AX",
+    "NYSE": "",
+    "NASDAQ": "",
+    "TSX": ".TO",
+    "TSXV": ".V",
+    "LSE": ".L",
+    "AIM": ".L",
+}
+
+NON_ISSUER_DOMAIN_HINTS = (
+    "wikipedia.org",
+    "investing.com",
+    "marketwatch.com",
+    "finance.yahoo.com",
+    "stockanalysis.com",
+    "marketindex.com.au",
+    "intelligentinvestor.com.au",
 )
 
 
@@ -79,6 +100,99 @@ class PerplexityResearchProvider(ResearchProvider):
         self.stream_enabled = bool(PERPLEXITY_STREAM_ENABLED)
         self.search_mode = str(PERPLEXITY_SEARCH_MODE or "standard").strip().lower()
         self.legacy_tool_filter_fallback = bool(PERPLEXITY_USE_LEGACY_TOOL_FILTER_FALLBACK)
+        self._official_site_cache: Dict[str, Dict[str, str]] = {}
+
+    def _ticker_to_yahoo_symbol(self, ticker: str) -> str:
+        raw = str(ticker or "").strip().upper()
+        if not raw:
+            return ""
+        if ":" not in raw:
+            return raw
+        exchange, symbol = raw.split(":", 1)
+        exchange = exchange.strip().upper()
+        symbol = symbol.strip().upper()
+        if not symbol:
+            return ""
+        suffix = EXCHANGE_TO_YAHOO_SUFFIX.get(exchange, "")
+        return f"{symbol}{suffix}"
+
+    def _normalize_domain(self, value: str) -> str:
+        host = urlparse(str(value or "")).hostname or ""
+        host = host.strip().lower()
+        if host.startswith("www."):
+            host = host[4:]
+        return host
+
+    def _resolve_official_issuer_site_sync(self, ticker: Optional[str]) -> Dict[str, str]:
+        raw_ticker = str(ticker or "").strip().upper()
+        if not raw_ticker:
+            return {}
+        cached = self._official_site_cache.get(raw_ticker)
+        if cached is not None:
+            return cached
+
+        yahoo_symbol = self._ticker_to_yahoo_symbol(raw_ticker)
+        if not yahoo_symbol:
+            self._official_site_cache[raw_ticker] = {}
+            return {}
+
+        website = ""
+        try:
+            profile_url = (
+                f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/"
+                f"{yahoo_symbol}?modules=assetProfile"
+            )
+            with httpx.Client(timeout=10.0) as client:
+                response = client.get(profile_url)
+            if response.status_code < 400:
+                payload = response.json()
+                result = (
+                    ((payload or {}).get("quoteSummary") or {}).get("result") or []
+                )
+                if isinstance(result, list) and result:
+                    asset_profile = (result[0] or {}).get("assetProfile") or {}
+                    if isinstance(asset_profile, dict):
+                        website = str(asset_profile.get("website") or "").strip()
+        except Exception as exc:
+            self._log(
+                f"official_site yahoo_profile warning ticker={raw_ticker} yahoo={yahoo_symbol} err={exc}"
+            )
+
+        if not website:
+            try:
+                import yfinance as yf  # type: ignore
+
+                info = yf.Ticker(yahoo_symbol).get_info() or {}
+                website = str(info.get("website") or "").strip()
+            except Exception as exc:
+                self._log(
+                    f"official_site resolve warning ticker={raw_ticker} yahoo={yahoo_symbol} err={exc}"
+                )
+        if not website:
+            self._official_site_cache[raw_ticker] = {}
+            return {}
+
+        if website.startswith("//"):
+            website = f"https:{website}"
+        elif not website.startswith(("http://", "https://")):
+            website = f"https://{website}"
+
+        domain = self._normalize_domain(website)
+        if not domain:
+            self._official_site_cache[raw_ticker] = {}
+            return {}
+        if any(domain == bad or domain.endswith(f".{bad}") for bad in NON_ISSUER_DOMAIN_HINTS):
+            self._official_site_cache[raw_ticker] = {}
+            return {}
+
+        resolved = {
+            "ticker": raw_ticker,
+            "yahoo_symbol": yahoo_symbol,
+            "website_url": website,
+            "website_domain": domain,
+        }
+        self._official_site_cache[raw_ticker] = resolved
+        return resolved
 
     async def gather(
         self,
@@ -106,7 +220,7 @@ class PerplexityResearchProvider(ResearchProvider):
             if isinstance(max_output_tokens_override, int) and max_output_tokens_override > 0
             else int(self.max_output_tokens)
         )
-        effective_reasoning_effort = (
+        effective_reasoning_effort = normalize_reasoning_effort(
             str(reasoning_effort_override).strip().lower()
             if isinstance(reasoning_effort_override, str) and reasoning_effort_override.strip()
             else str(self.reasoning_effort).strip().lower()
@@ -120,7 +234,7 @@ class PerplexityResearchProvider(ResearchProvider):
             f"gather start model={selected_model} depth={depth} "
             f"max_sources={max_sources} max_steps={effective_max_steps} "
             f"max_output_tokens={token_cap_log} "
-            f"reasoning_effort={effective_reasoning_effort or 'none'} "
+            f"reasoning_effort={effective_reasoning_effort} "
             f"stream={self.stream_enabled} search_mode={self.search_mode} "
             f"timeout={self.timeout_seconds}s"
         )
@@ -133,12 +247,19 @@ class PerplexityResearchProvider(ResearchProvider):
                 "provider": self.name,
             }
 
+        official_site = await asyncio.to_thread(self._resolve_official_issuer_site_sync, ticker)
+        preferred_domains: List[str] = []
+        official_domain = str(official_site.get("website_domain") or "").strip().lower()
+        if official_domain:
+            preferred_domains.append(official_domain)
+
         prompt = self._build_prompt(
             user_query=user_query,
             ticker=ticker,
             depth=depth,
             max_sources=max_sources,
             research_brief=research_brief,
+            official_site_domain=official_domain,
         )
         decode_query_context = "\n".join(
             [
@@ -156,6 +277,7 @@ class PerplexityResearchProvider(ResearchProvider):
             max_output_tokens_override=effective_max_output_tokens,
             reasoning_effort_override=effective_reasoning_effort,
             preset_override=preset_override,
+            preferred_domains=preferred_domains,
         )
 
         headers = {
@@ -163,7 +285,7 @@ class PerplexityResearchProvider(ResearchProvider):
             "Content-Type": "application/json",
         }
 
-        reasoning_retry_applied = "none"
+        reasoning_retry_applied = "unchanged"
         request_attempts = 0
         stream_mode_used = False
         stream_event_count = 0
@@ -172,6 +294,7 @@ class PerplexityResearchProvider(ResearchProvider):
         stream_empty_retry_applied = False
         legacy_tool_filter_retry_applied = False
         timeout_retry_applied = "none"
+        transport_retry_applied = "none"
 
         async def _post_once(client: httpx.AsyncClient, req_payload: Dict[str, Any]) -> Dict[str, Any]:
             nonlocal request_attempts
@@ -310,8 +433,23 @@ class PerplexityResearchProvider(ResearchProvider):
             return "invalid request" in text or "\"invalid_request\"" in text
 
         request_start = perf_counter()
+
+        async def _request_heartbeat() -> None:
+            while True:
+                await asyncio.sleep(15.0)
+                self._log(
+                    f"api waiting model={selected_model} "
+                    f"elapsed={perf_counter() - request_start:.1f}s attempts={request_attempts} "
+                    f"stream={bool(payload.get('stream'))}"
+                )
+
+        heartbeat_task: Optional[asyncio.Task[Any]] = None
         try:
             async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+                self._log(
+                    f"api request start model={selected_model} stream={bool(payload.get('stream'))}"
+                )
+                heartbeat_task = asyncio.create_task(_request_heartbeat())
                 try:
                     data = await _post_request(client, payload)
                     self._log(
@@ -356,14 +494,19 @@ class PerplexityResearchProvider(ResearchProvider):
 
                         retry_payload = copy.deepcopy(payload)
                         retry_reasoning = retry_payload.get("reasoning")
-                        retry_effort = (
+                        retry_effort = normalize_reasoning_effort(
                             retry_reasoning.get("effort")
                             if isinstance(retry_reasoning, dict)
-                            else None
+                            else "",
+                            default="low",
                         )
 
-                        if retry_effort and retry_effort != "low":
-                            retry_payload["reasoning"] = {"effort": "low"}
+                        if retry_effort != "low":
+                            retry_payload["reasoning"] = build_reasoning_payload(
+                                selected_model,
+                                "low",
+                                provider="perplexity",
+                            )
                             reasoning_retry_applied = "low"
                             self._log(
                                 f"api retry model={selected_model} reason=invalid_request "
@@ -383,15 +526,18 @@ class PerplexityResearchProvider(ResearchProvider):
                                 first_body = await _safe_response_text(retry_exc.response)
 
                         if (not retried) and ("reasoning" in retry_payload):
-                            retry_payload.pop("reasoning", None)
+                            retry_payload["reasoning"] = {
+                                "enabled": True,
+                                "effort": "low",
+                            }
                             reasoning_retry_applied = (
-                                "dropped_after_low_failed"
+                                "enabled_low_after_low_failed"
                                 if reasoning_retry_applied == "low"
-                                else "dropped"
+                                else "enabled_low"
                             )
                             self._log(
                                 f"api retry model={selected_model} reason=invalid_request "
-                                "fallback_reasoning=off"
+                                "fallback_reasoning=enabled_low"
                             )
                             try:
                                 data = await _post_request(client, retry_payload)
@@ -410,6 +556,30 @@ class PerplexityResearchProvider(ResearchProvider):
                             raise first_exc
                     else:
                         raise first_exc
+                except (httpx.RemoteProtocolError, httpx.ReadError, httpx.ConnectError) as transport_exc:
+                    retry_payload = copy.deepcopy(payload)
+                    retry_tags: List[str] = []
+                    if bool(retry_payload.get("stream")):
+                        retry_payload.pop("stream", None)
+                        retry_tags.append("stream_off")
+                    else:
+                        retry_tags.append("same_payload")
+
+                    transport_retry_applied = "+".join(retry_tags)
+                    self._log(
+                        f"api transport_error model={selected_model} "
+                        f"type={type(transport_exc).__name__} "
+                        f"elapsed={perf_counter() - request_start:.1f}s "
+                        f"retry={transport_retry_applied}"
+                    )
+                    await asyncio.sleep(1.0)
+                    data = await _post_request(client, retry_payload)
+                    payload = retry_payload
+                    self._log(
+                        f"api retry success model={selected_model} status=200 "
+                        f"elapsed={perf_counter() - request_start:.1f}s attempts={request_attempts} "
+                        f"transport_retry={transport_retry_applied}"
+                    )
         except httpx.TimeoutException:
             timeout_elapsed = perf_counter() - request_start
             self._log(
@@ -521,6 +691,9 @@ class PerplexityResearchProvider(ResearchProvider):
                 "result_count": 0,
                 "provider": self.name,
             }
+        finally:
+            if heartbeat_task is not None:
+                heartbeat_task.cancel()
 
         raw_summary = self._extract_content(data)
         source_candidates = self._extract_source_candidates(data, raw_summary)
@@ -626,7 +799,9 @@ class PerplexityResearchProvider(ResearchProvider):
                 "stream_empty_retry_applied": bool(stream_empty_retry_applied),
                 "legacy_tool_filter_retry_applied": bool(legacy_tool_filter_retry_applied),
                 "timeout_retry_applied": timeout_retry_applied,
+                "transport_retry_applied": transport_retry_applied,
                 "reasoning_retry_applied": reasoning_retry_applied,
+                "official_issuer_site": official_site,
                 "reasoning_effort_applied": (
                     payload.get("reasoning", {}).get("effort")
                     if isinstance(payload.get("reasoning"), dict)
@@ -645,6 +820,7 @@ class PerplexityResearchProvider(ResearchProvider):
         max_output_tokens_override: Optional[int] = None,
         reasoning_effort_override: Optional[str] = None,
         preset_override: Optional[str] = None,
+        preferred_domains: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Build Responses API payload with preset + explicit tool controls."""
         selected_model = model_override.strip() if model_override else self.model
@@ -658,7 +834,7 @@ class PerplexityResearchProvider(ResearchProvider):
             if isinstance(max_output_tokens_override, int) and max_output_tokens_override > 0
             else int(self.max_output_tokens)
         )
-        reasoning_effort = (
+        reasoning_effort = normalize_reasoning_effort(
             str(reasoning_effort_override).strip().lower()
             if isinstance(reasoning_effort_override, str) and reasoning_effort_override.strip()
             else str(self.reasoning_effort).strip().lower()
@@ -672,6 +848,7 @@ class PerplexityResearchProvider(ResearchProvider):
                 depth=depth,
                 max_sources=max_sources,
                 use_filters=True,
+                preferred_domains=preferred_domains,
             ),
         }
         if max_output_tokens > 0:
@@ -687,8 +864,11 @@ class PerplexityResearchProvider(ResearchProvider):
         if search_type:
             payload["search_type"] = search_type
 
-        if reasoning_effort in {"low", "medium", "high"}:
-            payload["reasoning"] = {"effort": reasoning_effort}
+        payload["reasoning"] = build_reasoning_payload(
+            selected_model,
+            reasoning_effort,
+            provider="perplexity",
+        )
 
         return payload
 
@@ -719,6 +899,7 @@ class PerplexityResearchProvider(ResearchProvider):
         max_sources: int,
         *,
         use_filters: bool,
+        preferred_domains: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """Build explicit tool settings for research runs."""
         tools: List[Dict[str, Any]] = []
@@ -733,12 +914,16 @@ class PerplexityResearchProvider(ResearchProvider):
                 "max_tokens_per_page": max(256, PERPLEXITY_MAX_TOKENS_PER_PAGE),
             }
             if use_filters:
-                filters = self._build_web_search_filters()
+                filters = self._build_web_search_filters(preferred_domains=preferred_domains)
                 if filters:
                     web_search["filters"] = filters
             else:
-                if PERPLEXITY_ALLOWED_DOMAINS:
-                    web_search["allowed_domains"] = PERPLEXITY_ALLOWED_DOMAINS
+                merged_allowed_domains = self._merge_allowed_domains(
+                    PERPLEXITY_ALLOWED_DOMAINS,
+                    preferred_domains or [],
+                )
+                if merged_allowed_domains:
+                    web_search["allowed_domains"] = merged_allowed_domains
                 if PERPLEXITY_BLOCKED_DOMAINS:
                     web_search["blocked_domains"] = PERPLEXITY_BLOCKED_DOMAINS
                 if PERPLEXITY_SEARCH_AFTER_DATE_FILTER:
@@ -752,13 +937,36 @@ class PerplexityResearchProvider(ResearchProvider):
 
         return tools
 
-    def _build_web_search_filters(self) -> Dict[str, Any]:
+    def _merge_allowed_domains(self, base: List[str], extra: List[str]) -> List[str]:
+        merged: List[str] = []
+        seen: set[str] = set()
+        for value in (base or []) + (extra or []):
+            domain = str(value or "").strip().lower()
+            if not domain:
+                continue
+            if domain.startswith("http://") or domain.startswith("https://"):
+                domain = self._normalize_domain(domain)
+            if not domain or domain in seen:
+                continue
+            merged.append(domain)
+            seen.add(domain)
+        return merged
+
+    def _build_web_search_filters(
+        self,
+        *,
+        preferred_domains: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
         """Build documented `tools[].filters` payload for web search tool."""
         filters: Dict[str, Any] = {}
 
         domain_filters: List[str] = []
-        if PERPLEXITY_ALLOWED_DOMAINS:
-            domain_filters.extend([item for item in PERPLEXITY_ALLOWED_DOMAINS if item])
+        merged_allowed_domains = self._merge_allowed_domains(
+            PERPLEXITY_ALLOWED_DOMAINS,
+            preferred_domains or [],
+        )
+        if merged_allowed_domains:
+            domain_filters.extend([item for item in merged_allowed_domains if item])
         if PERPLEXITY_BLOCKED_DOMAINS:
             domain_filters.extend([f"-{item}" for item in PERPLEXITY_BLOCKED_DOMAINS if item])
 
@@ -904,6 +1112,7 @@ class PerplexityResearchProvider(ResearchProvider):
         depth: str,
         max_sources: int,
         research_brief: str = "",
+        official_site_domain: str = "",
     ) -> str:
         ticker_line = (
             f"Ticker focus: {ticker}\n"
@@ -921,6 +1130,12 @@ class PerplexityResearchProvider(ResearchProvider):
                 "\nAnalysis framework and scoring requirements to honor:\n"
                 f"{research_brief.strip()}\n"
             )
+        official_site_block = ""
+        if official_site_domain:
+            official_site_block = (
+                f"Official issuer website focus: prioritize {official_site_domain} "
+                "for company-issued updates, investor materials, and announcements.\n"
+            )
 
         return (
             "Research the user question with strong source coverage.\n"
@@ -929,11 +1144,15 @@ class PerplexityResearchProvider(ResearchProvider):
             f"Target source count: up to {max_sources}.\n"
             "Prioritize primary sources first (exchange filings, official announcements, "
             "company investor documents). Use secondary commentary only when needed.\n\n"
+            f"{official_site_block}"
             "Avoid low-information legal/admin notices unless directly relevant to the user task "
             "(examples: 708A cleansing notices, Appendix 2A/3B/3C quotation notices).\n"
             "Do not optimize for latest notice recency alone; prioritize valuation-relevant filings even if slightly older.\n"
             "Prefer valuation-relevant filings/materials (DFS/PFS/FS, quarterly/annual reports, "
             "investor/corporate presentations, project/funding updates).\n\n"
+            "Run a dedicated management/governance research lane: gather evidence on board and executive track records, "
+            "prior operating outcomes, insider ownership/alignment, leadership changes, and governance controversies.\n"
+            "If management evidence is limited, state explicit unknowns and what primary filings would close the gap.\n\n"
             f"{brief_block}\n"
             f"User question: {user_query}\n\n"
             "Output:\n"

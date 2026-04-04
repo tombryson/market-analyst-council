@@ -1,0 +1,28 @@
+app = "llm-council-analysis"
+primary_region = "syd"
+
+[build]
+  dockerfile = "Dockerfile.analysis"
+
+[env]
+  PORT = "8001"
+  ENV_PRECEDENCE = "file"
+  ANALYSIS_JOBS_DIR = "/data/jobs"
+
+[http_service]
+  internal_port = 8001
+  force_https = true
+  # Keep machine alive for long-running in-process analysis jobs.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 1024
+
+[mounts]
+  source = "llm_council_analysis_data"
+  destination = "/data"

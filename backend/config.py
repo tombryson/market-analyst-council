@@ -5,31 +5,42 @@ from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 
 # Load env files deterministically:
-# 1) .env (base, required source of truth)
+# 1) .env (base)
 # 2) .env.<ENV_PROFILE> (optional profile overlay)
-# 3) .env.local (optional machine-local override)
+# 3) .env.local (optional machine-local overlay)
 #
-# This keeps settings file-driven while still supporting environment variants.
-# If ENV_PROFILE is provided by the parent process, preserve it.
+# Precedence is controlled by ENV_PRECEDENCE:
+# - env  (default): parent-process env vars override file values.
+# - file: .env/.env.<profile>/.env.local override parent-process env vars.
 _preloaded_env_profile = os.getenv("ENV_PROFILE", "").strip().lower()
 _base_env_path = find_dotenv(".env", usecwd=True)
 if _base_env_path:
-    load_dotenv(_base_env_path, override=True)
+    # Bootstrap pass so ENV_PRECEDENCE/ENV_PROFILE can come from .env when unset.
+    load_dotenv(_base_env_path, override=False)
 _base_env_dir = (
     Path(_base_env_path).resolve().parent
     if _base_env_path
     else Path.cwd().resolve()
 )
+_env_precedence = os.getenv("ENV_PRECEDENCE", "env").strip().lower()
+if _env_precedence not in {"env", "file"}:
+    _env_precedence = "env"
+_files_override_parent = _env_precedence == "file"
 
+if _base_env_path and _files_override_parent:
+    # Re-apply base values with file precedence semantics.
+    load_dotenv(_base_env_path, override=True)
+
+ENV_PRECEDENCE = _env_precedence
 ENV_PROFILE = _preloaded_env_profile or os.getenv("ENV_PROFILE", "").strip().lower()
 if ENV_PROFILE:
     _profile_path = _base_env_dir / f".env.{ENV_PROFILE}"
     if _profile_path.exists():
-        load_dotenv(_profile_path, override=True)
+        load_dotenv(_profile_path, override=_files_override_parent)
 
 _local_env_path = _base_env_dir / ".env.local"
 if _local_env_path.exists():
-    load_dotenv(_local_env_path, override=True)
+    load_dotenv(_local_env_path, override=_files_override_parent)
 
 # OpenRouter API key
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -79,17 +90,46 @@ def _get_csv(name: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+# LlamaParse API settings
+LLAMAPARSE_API_KEY = os.getenv("LLAMAPARSE_API_KEY", "").strip()
+LLAMAPARSE_API_URL = os.getenv(
+    "LLAMAPARSE_API_URL",
+    "https://api.cloud.llamaindex.ai/api/v2/parse",
+).strip()
+LLAMAPARSE_UPLOAD_URL = os.getenv(
+    "LLAMAPARSE_UPLOAD_URL",
+    "https://api.cloud.llamaindex.ai/api/v2/parse/upload",
+).strip()
+LLAMAPARSE_TIER = os.getenv("LLAMAPARSE_TIER", "agentic").strip().lower()
+LLAMAPARSE_VERSION = os.getenv("LLAMAPARSE_VERSION", "latest").strip()
+LLAMAPARSE_COST_OPTIMIZER_ENABLED = _get_bool(
+    "LLAMAPARSE_COST_OPTIMIZER_ENABLED",
+    default=True,
+)
+LLAMAPARSE_TIMEOUT_SECONDS = _get_float("LLAMAPARSE_TIMEOUT_SECONDS", 240.0)
+LLAMAPARSE_POLL_INTERVAL_SECONDS = _get_float(
+    "LLAMAPARSE_POLL_INTERVAL_SECONDS",
+    2.0,
+)
+
+# LiteParse settings
+LITEPARSE_OCR_ENABLED = _get_bool("LITEPARSE_OCR_ENABLED", default=False)
+LITEPARSE_TIMEOUT_SECONDS = _get_float("LITEPARSE_TIMEOUT_SECONDS", 240.0)
+
+
 # Council members - list of OpenRouter model identifiers
 _COUNCIL_MODELS = _get_csv("COUNCIL_MODELS")
 COUNCIL_MODELS = _COUNCIL_MODELS or [
-    "openai/gpt-5.2",
-    "google/gemini-3-pro-preview",
-    "anthropic/claude-opus-4.6",
-    "x-ai/grok-4.1-fast",
+    "minimax/minimax-m2.7",
+    "x-ai/grok-4.20",
+    "qwen/qwen3.6-plus:free",
+    "z-ai/glm-5-turbo",
+    "google/gemma-4-26b-a4b-it",
+    "moonshotai/kimi-k2.5",
 ]
 
 # Chairman model - synthesizes final response
-CHAIRMAN_MODEL = os.getenv("CHAIRMAN_MODEL", "google/gemini-3-pro-preview").strip()
+CHAIRMAN_MODEL = os.getenv("CHAIRMAN_MODEL", "google/gemini-3.1-pro-preview").strip()
 CHAIRMAN_TIMEOUT_SECONDS = _get_float("CHAIRMAN_TIMEOUT_SECONDS", 300.0)
 # Explicit Stage 3 completion budget for chairman calls.
 # Set to 0 only if you intentionally want provider-default limits.
@@ -101,8 +141,9 @@ CHAIRMAN_OUTPUT_STYLE = os.getenv("CHAIRMAN_OUTPUT_STYLE", "text_xml").strip().l
 # Secondary JSON normalizer model (used when chairman output is non-JSON or malformed).
 CHAIRMAN_JSONIFIER_MODEL = os.getenv(
     "CHAIRMAN_JSONIFIER_MODEL",
-    "openai/gpt-4o-mini",
+    "google/gemini-3.1-flash-lite-preview",
 ).strip()
+CHAIRMAN_JSONIFY_ALWAYS = _get_bool("CHAIRMAN_JSONIFY_ALWAYS", default=True)
 CHAIRMAN_JSONIFIER_TIMEOUT_SECONDS = _get_float(
     "CHAIRMAN_JSONIFIER_TIMEOUT_SECONDS",
     180.0,
@@ -110,6 +151,70 @@ CHAIRMAN_JSONIFIER_TIMEOUT_SECONDS = _get_float(
 CHAIRMAN_JSONIFIER_MAX_OUTPUT_TOKENS = _get_int(
     "CHAIRMAN_JSONIFIER_MAX_OUTPUT_TOKENS",
     12000,
+)
+# Human-readable Stage 3 memo (market-analyst style) derived from chairman output.
+STAGE3_ANALYST_MEMO_ENABLED = _get_bool("STAGE3_ANALYST_MEMO_ENABLED", default=True)
+STAGE3_ANALYST_MEMO_MODEL = os.getenv(
+    "STAGE3_ANALYST_MEMO_MODEL",
+    "google/gemini-3.1-flash-lite-preview",
+).strip()
+STAGE3_ANALYST_MEMO_TIMEOUT_SECONDS = _get_float(
+    "STAGE3_ANALYST_MEMO_TIMEOUT_SECONDS",
+    180.0,
+)
+STAGE3_ANALYST_MEMO_MAX_OUTPUT_TOKENS = _get_int(
+    "STAGE3_ANALYST_MEMO_MAX_OUTPUT_TOKENS",
+    5000,
+)
+
+# Stage 1 reference-table parser (for analyst memo): use model-to-model extraction
+# instead of regex heuristics when enabled.
+STAGE1_REFERENCE_PARSER_ENABLED = _get_bool(
+    "STAGE1_REFERENCE_PARSER_ENABLED",
+    default=True,
+)
+STAGE1_REFERENCE_PARSER_MODEL = os.getenv(
+    "STAGE1_REFERENCE_PARSER_MODEL",
+    "google/gemini-3.1-flash-lite-preview",
+).strip()
+STAGE1_REFERENCE_PARSER_TIMEOUT_SECONDS = _get_float(
+    "STAGE1_REFERENCE_PARSER_TIMEOUT_SECONDS",
+    90.0,
+)
+STAGE1_REFERENCE_PARSER_MAX_OUTPUT_TOKENS = _get_int(
+    "STAGE1_REFERENCE_PARSER_MAX_OUTPUT_TOKENS",
+    900,
+)
+STAGE1_REFERENCE_PARSER_CONCURRENCY = _get_int(
+    "STAGE1_REFERENCE_PARSER_CONCURRENCY",
+    3,
+)
+
+# Stage 1 truncation checker: lightweight post-response adjudicator used to
+# decide whether a second-pass answer was genuinely cut off.
+STAGE1_TRUNCATION_CHECKER_ENABLED = _get_bool(
+    "STAGE1_TRUNCATION_CHECKER_ENABLED",
+    default=True,
+)
+STAGE1_TRUNCATION_CHECKER_MODEL = os.getenv(
+    "STAGE1_TRUNCATION_CHECKER_MODEL",
+    "google/gemini-3.1-flash-lite-preview",
+).strip()
+STAGE1_TRUNCATION_CHECKER_TIMEOUT_SECONDS = _get_float(
+    "STAGE1_TRUNCATION_CHECKER_TIMEOUT_SECONDS",
+    35.0,
+)
+STAGE1_TRUNCATION_CHECKER_MAX_OUTPUT_TOKENS = _get_int(
+    "STAGE1_TRUNCATION_CHECKER_MAX_OUTPUT_TOKENS",
+    220,
+)
+STAGE1_TRUNCATION_CHECKER_REASONING_EFFORT = os.getenv(
+    "STAGE1_TRUNCATION_CHECKER_REASONING_EFFORT",
+    "low",
+).strip().lower()
+STAGE1_TRUNCATION_CHECKER_MIN_CONFIDENCE_PCT = _get_float(
+    "STAGE1_TRUNCATION_CHECKER_MIN_CONFIDENCE_PCT",
+    90.0,
 )
 
 
@@ -199,9 +304,9 @@ COUNCIL_EXECUTION_MODE = os.getenv("COUNCIL_EXECUTION_MODE", "local").strip().lo
 # Note: Perplexity model IDs can differ from OpenRouter IDs (e.g. xai/... vs x-ai/...).
 _PERPLEXITY_COUNCIL_MODELS = _get_csv("PERPLEXITY_COUNCIL_MODELS")
 PERPLEXITY_COUNCIL_MODELS = _PERPLEXITY_COUNCIL_MODELS or [
-    "openai/gpt-5.1",
-    "google/gemini-3-pro-preview",
-    "sonar-pro",
+    "openai/gpt-5.4",
+    "google/gemini-3.1-pro-preview",
+    "anthropic/claude-sonnet-4-6",
 ]
 PERPLEXITY_STAGE1_MIXED_MODE_ENABLED = _get_bool(
     "PERPLEXITY_STAGE1_MIXED_MODE_ENABLED",
@@ -226,13 +331,40 @@ TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 ENABLE_SEARCH_BY_DEFAULT = True
 MAX_SEARCH_RESULTS = 5
 
+# xAI API (supplementary sector news brief lane)
+XAI_API_KEY = os.getenv("XAI_API_KEY")
+XAI_API_URL = os.getenv(
+    "XAI_API_URL",
+    "https://api.x.ai/v1/responses",
+).strip()
+STAGE1_SUPPLEMENTARY_XAI_MODEL = os.getenv(
+    "STAGE1_SUPPLEMENTARY_XAI_MODEL",
+    "grok-4-1-fast-reasoning",
+).strip()
+STAGE1_SUPPLEMENTARY_XAI_TIMEOUT_SECONDS = _get_float(
+    "STAGE1_SUPPLEMENTARY_XAI_TIMEOUT_SECONDS",
+    90.0,
+)
+STAGE1_SUPPLEMENTARY_XAI_MAX_TOKENS = _get_int(
+    "STAGE1_SUPPLEMENTARY_XAI_MAX_TOKENS",
+    700,
+)
+STAGE1_SUPPLEMENTARY_XAI_TEMPERATURE = _get_float(
+    "STAGE1_SUPPLEMENTARY_XAI_TEMPERATURE",
+    0.2,
+)
+STAGE1_SUPPLEMENTARY_XAI_MAX_TOOL_ITERATIONS = _get_int(
+    "STAGE1_SUPPLEMENTARY_XAI_MAX_TOOL_ITERATIONS",
+    6,
+)
+
 # Perplexity API
 PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
 PERPLEXITY_API_URL = os.getenv(
     "PERPLEXITY_API_URL",
     "https://api.perplexity.ai/v1/responses",
 )
-PERPLEXITY_MODEL = os.getenv("PERPLEXITY_MODEL", "openai/gpt-5.1")
+PERPLEXITY_MODEL = os.getenv("PERPLEXITY_MODEL", "openai/gpt-5.4")
 PERPLEXITY_PRESET = os.getenv("PERPLEXITY_PRESET", "deep-research")
 PERPLEXITY_PRESET_STRATEGY = os.getenv(
     "PERPLEXITY_PRESET_STRATEGY",
@@ -375,6 +507,50 @@ PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_WORDS_PER_SOURCE = _get_int(
 PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_FACT_CHARS = _get_int(
     "PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_FACT_CHARS",
     420,
+)
+STAGE1_CASHFLOW_DETECTION_MAX_SOURCES = _get_int(
+    "STAGE1_CASHFLOW_DETECTION_MAX_SOURCES",
+    24,
+)
+STAGE1_CASHFLOW_CLASSIFIER_ENABLED = _get_bool(
+    "STAGE1_CASHFLOW_CLASSIFIER_ENABLED",
+    default=True,
+)
+STAGE1_CASHFLOW_CLASSIFIER_MODEL = os.getenv(
+    "STAGE1_CASHFLOW_CLASSIFIER_MODEL",
+    "google/gemini-3-flash-preview",
+).strip()
+STAGE1_CASHFLOW_CLASSIFIER_TIMEOUT_SECONDS = _get_float(
+    "STAGE1_CASHFLOW_CLASSIFIER_TIMEOUT_SECONDS",
+    35.0,
+)
+STAGE1_CASHFLOW_CLASSIFIER_MAX_OUTPUT_TOKENS = _get_int(
+    "STAGE1_CASHFLOW_CLASSIFIER_MAX_OUTPUT_TOKENS",
+    260,
+)
+STAGE1_CASHFLOW_CLASSIFIER_REASONING_EFFORT = os.getenv(
+    "STAGE1_CASHFLOW_CLASSIFIER_REASONING_EFFORT",
+    "low",
+).strip().lower()
+STAGE1_CASHFLOW_CLASSIFIER_MIN_CONFIDENCE_PCT = _get_float(
+    "STAGE1_CASHFLOW_CLASSIFIER_MIN_CONFIDENCE_PCT",
+    70.0,
+)
+PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_ENABLED = _get_bool(
+    "PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_ENABLED",
+    default=True,
+)
+PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_MAX_SOURCES = _get_int(
+    "PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_MAX_SOURCES",
+    3,
+)
+PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_RETRIEVAL_MAX_SOURCES = _get_int(
+    "PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_RETRIEVAL_MAX_SOURCES",
+    8,
+)
+PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_MAX_RECENCY_DAYS = _get_int(
+    "PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_MAX_RECENCY_DAYS",
+    180,
 )
 PERPLEXITY_STAGE1_TIMELINE_GUARD_ENABLED = _get_bool(
     "PERPLEXITY_STAGE1_TIMELINE_GUARD_ENABLED",

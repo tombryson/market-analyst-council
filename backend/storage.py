@@ -78,6 +78,31 @@ def save_conversation(conversation: Dict[str, Any]):
         json.dump(conversation, f, indent=2)
 
 
+def _default_loading_state() -> Dict[str, Any]:
+    return {
+        "search": False,
+        "evidence": False,
+        "attachments": False,
+        "stage1": False,
+        "stage2": False,
+        "stage3": False,
+        "stage1Progress": 0,
+        "stage1Completed": 0,
+        "stage1Total": 0,
+        "stage1Model": "",
+        "stage1Message": "",
+    }
+
+
+def _deep_merge_dict(target: Dict[str, Any], patch: Dict[str, Any]) -> Dict[str, Any]:
+    for key, value in (patch or {}).items():
+        if isinstance(value, dict) and isinstance(target.get(key), dict):
+            _deep_merge_dict(target[key], value)
+        else:
+            target[key] = value
+    return target
+
+
 def list_conversations() -> List[Dict[str, Any]]:
     """
     List all conversations (metadata only).
@@ -244,6 +269,59 @@ def add_user_message_with_metadata(
     save_conversation(conversation)
 
 
+def add_assistant_placeholder_message(
+    conversation_id: str,
+    metadata: Optional[Dict[str, Any]] = None,
+):
+    """
+    Persist a placeholder assistant message immediately so in-flight runs survive refreshes.
+    """
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    message = {
+        "role": "assistant",
+        "status": "running",
+        "stage1": None,
+        "stage2": None,
+        "stage3": None,
+        "search_results": None,
+        "evidence_pack": None,
+        "attachments_processed": None,
+        "metadata": dict(metadata or {}),
+        "loading": _default_loading_state(),
+    }
+    message["loading"]["stage1"] = True
+    message["loading"]["stage1Message"] = "Preparing analysis..."
+
+    conversation["messages"].append(message)
+    save_conversation(conversation)
+
+
+def update_last_assistant_message(
+    conversation_id: str,
+    patch: Dict[str, Any],
+):
+    """
+    Merge updates into the most recent assistant message.
+    """
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    for index in range(len(conversation["messages"]) - 1, -1, -1):
+        message = conversation["messages"][index]
+        if message.get("role") != "assistant":
+            continue
+        _deep_merge_dict(message, dict(patch or {}))
+        conversation["messages"][index] = message
+        save_conversation(conversation)
+        return
+
+    raise ValueError(f"No assistant message found for conversation {conversation_id}")
+
+
 def add_assistant_message_with_metadata(
     conversation_id: str,
     stage1: List[Dict[str, Any]],
@@ -267,12 +345,21 @@ def add_assistant_message_with_metadata(
     if conversation is None:
         raise ValueError(f"Conversation {conversation_id} not found")
 
+    existing_metadata = {}
+    if conversation["messages"] and conversation["messages"][-1].get("role") == "assistant":
+        existing_metadata = dict(conversation["messages"][-1].get("metadata") or {})
+
     message = {
         "role": "assistant",
+        "status": "complete",
         "stage1": stage1,
         "stage2": stage2,
-        "stage3": stage3
+        "stage3": stage3,
+        "loading": _default_loading_state(),
     }
+
+    if existing_metadata:
+        message["metadata"] = existing_metadata
 
     # Add optional metadata
     if search_results:
@@ -281,5 +368,8 @@ def add_assistant_message_with_metadata(
     if attachments_processed:
         message["attachments_processed"] = attachments_processed
 
-    conversation["messages"].append(message)
+    if conversation["messages"] and conversation["messages"][-1].get("role") == "assistant":
+        conversation["messages"][-1] = message
+    else:
+        conversation["messages"].append(message)
     save_conversation(conversation)

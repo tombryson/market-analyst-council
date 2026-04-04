@@ -1,8 +1,10 @@
 """OpenRouter API client for making LLM requests."""
 
+import asyncio
 import httpx
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
 from .config import OPENROUTER_API_KEY, OPENROUTER_API_URL
+from .reasoning import build_reasoning_payload, normalize_reasoning_effort
 
 
 async def query_model(
@@ -20,7 +22,7 @@ async def query_model(
         messages: List of message dicts with 'role' and 'content'
         timeout: Request timeout in seconds
         max_tokens: Optional completion token cap for the model response
-        reasoning_effort: Optional reasoning effort override (low|medium|high)
+        reasoning_effort: Optional reasoning effort override
 
     Returns:
         Response dict with 'content' and metadata, or None if failed.
@@ -36,9 +38,12 @@ async def query_model(
     }
     if isinstance(max_tokens, int) and max_tokens > 0:
         payload["max_tokens"] = int(max_tokens)
-    effort = str(reasoning_effort or "").strip().lower()
-    if effort in {"low", "medium", "high"}:
-        payload["reasoning"] = {"effort": effort}
+    effort = normalize_reasoning_effort(reasoning_effort)
+    payload["reasoning"] = build_reasoning_payload(
+        model=model,
+        effort=effort,
+        provider="openrouter",
+    )
 
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
@@ -90,7 +95,8 @@ async def query_model(
 
 async def query_models_parallel(
     models: List[str],
-    messages: List[Dict[str, str]]
+    messages: List[Dict[str, str]],
+    on_model_complete: Optional[Callable[[str, Optional[Dict[str, Any]], int, int], None]] = None,
 ) -> Dict[str, Optional[Dict[str, Any]]]:
     """
     Query multiple models in parallel.
@@ -102,13 +108,23 @@ async def query_models_parallel(
     Returns:
         Dict mapping model identifier to response dict (or None if failed)
     """
-    import asyncio
+    async def _run_model(model: str) -> tuple[str, Optional[Dict[str, Any]]]:
+        return model, await query_model(model, messages)
 
-    # Create tasks for all models
-    tasks = [query_model(model, messages) for model in models]
+    tasks = [asyncio.create_task(_run_model(model)) for model in models]
+    responses: Dict[str, Optional[Dict[str, Any]]] = {}
+    total = len(tasks)
+    completed = 0
 
-    # Wait for all to complete
-    responses = await asyncio.gather(*tasks)
+    for task in asyncio.as_completed(tasks):
+        model, response = await task
+        responses[model] = response
+        completed += 1
+        if on_model_complete is not None:
+            try:
+                on_model_complete(model, response, completed, total)
+            except Exception:
+                # Progress callbacks are advisory only; never fail the model run.
+                pass
 
-    # Map models to their responses
-    return {model: response for model, response in zip(models, responses)}
+    return responses

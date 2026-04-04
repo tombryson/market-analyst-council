@@ -906,8 +906,8 @@ def _expected_domains_for_exchange(exchange: str) -> List[str]:
         "ASX": ["asx.com.au", "marketindex.com.au", "wcsecure.weblink.com.au"],
         "NYSE": ["sec.gov"],
         "NASDAQ": ["sec.gov"],
-        "TSX": ["sedarplus.ca", "tsx.com"],
-        "TSXV": ["sedarplus.ca", "tsx.com"],
+        "TSX": ["globenewswire.com"],
+        "TSXV": ["globenewswire.com"],
         "LSE": ["londonstockexchange.com", "investegate.co.uk"],
         "AIM": ["londonstockexchange.com", "investegate.co.uk"],
     }

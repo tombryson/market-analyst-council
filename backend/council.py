@@ -4,13 +4,15 @@ import asyncio
 import copy
 import json
 import re
+import uuid
 import httpx
 from html import unescape
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, Callable
 from datetime import datetime
 from time import perf_counter
 from urllib.parse import urljoin, urlparse, parse_qs
 from .openrouter import query_models_parallel, query_model
+from .reasoning import build_reasoning_payload, normalize_reasoning_effort
 from .config import (
     OPENROUTER_API_KEY,
     COUNCIL_MODELS,
@@ -57,6 +59,30 @@ from .config import (
     PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_PER_SOURCE,
     PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_WORDS_PER_SOURCE,
     PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_FACT_CHARS,
+    STAGE1_CASHFLOW_DETECTION_MAX_SOURCES,
+    STAGE1_CASHFLOW_CLASSIFIER_ENABLED,
+    STAGE1_CASHFLOW_CLASSIFIER_MODEL,
+    STAGE1_CASHFLOW_CLASSIFIER_TIMEOUT_SECONDS,
+    STAGE1_CASHFLOW_CLASSIFIER_MAX_OUTPUT_TOKENS,
+    STAGE1_CASHFLOW_CLASSIFIER_REASONING_EFFORT,
+    STAGE1_CASHFLOW_CLASSIFIER_MIN_CONFIDENCE_PCT,
+    STAGE1_TRUNCATION_CHECKER_ENABLED,
+    STAGE1_TRUNCATION_CHECKER_MODEL,
+    STAGE1_TRUNCATION_CHECKER_TIMEOUT_SECONDS,
+    STAGE1_TRUNCATION_CHECKER_MAX_OUTPUT_TOKENS,
+    STAGE1_TRUNCATION_CHECKER_REASONING_EFFORT,
+    STAGE1_TRUNCATION_CHECKER_MIN_CONFIDENCE_PCT,
+    PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_ENABLED,
+    PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_MAX_SOURCES,
+    PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_RETRIEVAL_MAX_SOURCES,
+    PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_MAX_RECENCY_DAYS,
+    XAI_API_KEY,
+    XAI_API_URL,
+    STAGE1_SUPPLEMENTARY_XAI_MODEL,
+    STAGE1_SUPPLEMENTARY_XAI_TIMEOUT_SECONDS,
+    STAGE1_SUPPLEMENTARY_XAI_MAX_TOKENS,
+    STAGE1_SUPPLEMENTARY_XAI_TEMPERATURE,
+    STAGE1_SUPPLEMENTARY_XAI_MAX_TOOL_ITERATIONS,
     PERPLEXITY_STAGE1_TIMELINE_GUARD_ENABLED,
     PERPLEXITY_STAGE1_TIMELINE_GUARD_HARD_FAIL,
     PERPLEXITY_STAGE1_TIMELINE_DIGEST_MAX_ITEMS,
@@ -136,6 +162,12 @@ def _is_retryable_stage1_error(error_text: str) -> bool:
     return False
 
 
+def _is_gpt_5_4_model(model: str) -> bool:
+    """Return True when the model is GPT-5.4 and should default to low reasoning."""
+    key = str(model or "").strip().lower()
+    return key in {"openai/gpt-5.4", "gpt-5.4"} or key.endswith("/gpt-5.4")
+
+
 def _build_stage1_attempt_profile(
     model: str,
     attempt: int,
@@ -168,12 +200,16 @@ def _build_stage1_attempt_profile(
             if requested_output_tokens > 0
             else 0
         ),
-        "reasoning_effort": (base_reasoning_effort or "").strip().lower(),
+        "reasoning_effort": normalize_reasoning_effort(base_reasoning_effort),
     }
 
     model_key = (model or "").strip().lower()
     if not model_key.startswith("openai/"):
         return profile
+
+    gpt_54_low_default = _is_gpt_5_4_model(model)
+    if gpt_54_low_default:
+        profile["reasoning_effort"] = "low"
 
     if PERPLEXITY_STAGE1_OPENAI_BASE_GUARDRAILS_ENABLED:
         max_sources_cap = max(1, int(PERPLEXITY_STAGE1_OPENAI_BASE_MAX_SOURCES))
@@ -185,23 +221,30 @@ def _build_stage1_attempt_profile(
         if PERPLEXITY_STAGE1_OPENAI_BASE_GUARDRAILS_ENABLED:
             profile["name"] = "openai_base_guardrail"
             forced_effort = str(PERPLEXITY_STAGE1_OPENAI_BASE_REASONING_EFFORT or "").strip().lower()
-            if forced_effort in {"low", "medium", "high"}:
+            if forced_effort in {"xhigh", "high", "medium", "low", "minimal"} and not gpt_54_low_default:
                 profile["reasoning_effort"] = forced_effort
             elif (
                 PERPLEXITY_STAGE1_OPENAI_BASE_DOWNGRADE_HIGH_REASONING
                 and profile["reasoning_effort"] == "high"
+                and not gpt_54_low_default
             ):
                 profile["reasoning_effort"] = "medium"
+        if gpt_54_low_default:
+            profile["reasoning_effort"] = "low"
         return profile
 
-    base_effort = (base_reasoning_effort or "").strip().lower()
+    base_effort = normalize_reasoning_effort(base_reasoning_effort)
+    if gpt_54_low_default:
+        base_effort = "low"
 
     if attempt == 2:
         profile["name"] = "openai_retry_2"
         profile["max_sources"] = max(4, int(profile["max_sources"]) - 1)
         profile["max_steps"] = max(2, int(profile["max_steps"]) - 1)
         # Step down one level first: high -> medium -> low.
-        if base_effort == "high":
+        if base_effort == "xhigh":
+            profile["reasoning_effort"] = "high"
+        elif base_effort == "high":
             profile["reasoning_effort"] = "medium"
         elif base_effort == "medium":
             profile["reasoning_effort"] = "low"
@@ -382,8 +425,8 @@ def _expected_domains_for_exchange(exchange: str) -> List[str]:
         "ASX": ["asx.com.au", "marketindex.com.au", "wcsecure.weblink.com.au"],
         "NYSE": ["sec.gov"],
         "NASDAQ": ["sec.gov"],
-        "TSX": ["sedarplus.ca", "tsx.com"],
-        "TSXV": ["sedarplus.ca", "tsx.com"],
+        "TSX": ["globenewswire.com"],
+        "TSXV": ["globenewswire.com"],
         "LSE": ["londonstockexchange.com", "investegate.co.uk"],
         "AIM": ["londonstockexchange.com", "investegate.co.uk"],
     }
@@ -440,6 +483,411 @@ def _has_expected_source_domain(results: List[Dict[str, Any]], expected_domains:
         if any(domain in host for domain in expected):
             return True
     return False
+
+
+_SUPPLEMENTARY_MACRO_PROFILE_CONFIG: Dict[str, Dict[str, Any]] = {
+    "oil_gas": {
+        "sector_label": "oil and gas sector",
+        "query_focus": (
+            "Brent WTI Henry Hub trend, OPEC+ policy decisions, supply disruption risk "
+            "(Middle East/Strait of Hormuz), inventories and demand balance"
+        ),
+        "terms": [
+            "brent",
+            "wti",
+            "henry hub",
+            "opec",
+            "opec+",
+            "hormuz",
+            "strait of hormuz",
+            "inventory",
+            "inventories",
+            "oil demand",
+            "gas demand",
+            "supply disruption",
+        ],
+    },
+    "uranium": {
+        "sector_label": "uranium sector",
+        "query_focus": (
+            "U3O8 spot/term pricing, utility contracting cycle, reactor restart/build pipeline, "
+            "policy and fuel-cycle constraints"
+        ),
+        "terms": [
+            "u3o8",
+            "uranium spot",
+            "uranium term",
+            "utility contracting",
+            "reactor",
+            "nuclear build",
+            "enrichment",
+            "conversion",
+            "kazatomprom",
+            "cameco",
+        ],
+    },
+    "gold": {
+        "sector_label": "gold mining sector",
+        "query_focus": (
+            "gold market drivers: real yields, USD trend, central-bank demand, "
+            "safe-haven/geopolitical flows"
+        ),
+        "terms": [
+            "gold price",
+            "real yields",
+            "usd index",
+            "central bank gold",
+            "bullion demand",
+            "safe haven",
+            "geopolitical risk",
+        ],
+    },
+    "silver": {
+        "sector_label": "silver mining sector",
+        "query_focus": (
+            "silver market drivers: industrial/PV demand, mine supply, inventory trends, "
+            "gold-silver ratio regime"
+        ),
+        "terms": [
+            "silver price",
+            "gold silver ratio",
+            "pv demand",
+            "solar demand",
+            "industrial demand",
+            "silver inventory",
+            "mine supply",
+        ],
+    },
+    "copper": {
+        "sector_label": "copper mining sector",
+        "query_focus": (
+            "copper market drivers: demand cycle, inventories/TC-RC, supply disruptions, "
+            "grid/electrification demand"
+        ),
+        "terms": [
+            "copper price",
+            "lme copper",
+            "comex copper",
+            "inventory",
+            "treatment charges",
+            "tc/rc",
+            "supply disruption",
+            "china demand",
+            "electrification demand",
+        ],
+    },
+    "lithium": {
+        "sector_label": "lithium sector",
+        "query_focus": (
+            "lithium market drivers: spodumene/LCE pricing, conversion margins, EV demand, "
+            "inventory cycle and supply curtailments"
+        ),
+        "terms": [
+            "lithium price",
+            "spodumene",
+            "lce",
+            "carbonate",
+            "hydroxide",
+            "ev demand",
+            "battery demand",
+            "conversion margin",
+            "inventory cycle",
+        ],
+    },
+}
+
+def _resolve_template_commodity_profile(template_id: str) -> str:
+    """Resolve commodity profile from template behavior."""
+    key = str(template_id or "").strip()
+    if not key:
+        return ""
+    try:
+        from .template_loader import get_template_loader
+
+        loader = get_template_loader()
+        behavior = loader.get_template_behavior(key) or {}
+        profile = str(behavior.get("commodity_profile", "")).strip().lower()
+        return profile if profile in _SUPPLEMENTARY_MACRO_PROFILE_CONFIG else ""
+    except Exception:
+        return ""
+
+
+def _build_supplementary_macro_summary_prompt(*, sector_label: str) -> str:
+    """Build xAI prompt for supplementary macro context (single dense paragraph)."""
+    sector = str(sector_label or "").strip() or "sector"
+    return (
+        f"Provide one single-paragraph macro news brief for the [{sector}]. "
+        "Minimum 200 words (target 220-320 words). "
+        "Cover: the last week, the last month, the last year, and the 12-24 month forward outlook. "
+        "Include concrete levels where relevant (e.g., commodity prices, inventories, policy moves, supply disruptions) "
+        "and make reference to the broader macro environment including oil prices, inflation, interest rates, "
+        "and the four quadrant global macro framework. "
+        "Keep the paragraph decision-useful for scenario assumptions. "
+        "Output plain text only. Do NOT include URLs, citation markers, footnotes, source lists, markdown, or bullet points."
+    ).strip()
+
+
+def _sanitize_supplementary_macro_summary_text(text: str) -> str:
+    """Normalize xAI macro brief to plain-text paragraph with no citation/link artifacts."""
+    raw = str(text or "").strip()
+    if not raw:
+        return ""
+    cleaned = raw
+    # Drop markdown links -> keep anchor text only.
+    cleaned = re.sub(r"\[([^\]]+)\]\((https?://[^)]+)\)", r"\1", cleaned, flags=re.IGNORECASE)
+    # Drop explicit citation markers like [[1]] / [1].
+    cleaned = re.sub(r"\[\[\d+\]\]|\[\d+\]", "", cleaned)
+    # Drop raw URLs.
+    cleaned = re.sub(r"https?://\S+", "", cleaned, flags=re.IGNORECASE)
+    # Single paragraph.
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+async def _fetch_xai_supplementary_macro_summary(
+    *,
+    sector_label: str,
+    user_query: str,
+) -> Dict[str, Any]:
+    """Generate a single supplementary sector-macro paragraph via xAI."""
+    if not XAI_API_KEY:
+        return {
+            "attempted": False,
+            "success": False,
+            "error": "xai_api_key_missing",
+            "summary": "",
+            "prompt": "",
+            "http_status": 0,
+            "request_count": 0,
+            "tool_calls_count": 0,
+            "finish_reason": "",
+        }
+
+    prompt = _build_supplementary_macro_summary_prompt(sector_label=sector_label)
+    # Per requested behavior, send the exact sector prompt only.
+    input_text = prompt
+    tools: List[Dict[str, Any]] = [
+        {"type": "web_search"},
+        {"type": "x_search"},
+    ]
+
+    request_count = 0
+    tool_calls_count = 0
+    http_status = 0
+    finish_reason = ""
+    final_content = ""
+    timeout_seconds = max(20.0, float(STAGE1_SUPPLEMENTARY_XAI_TIMEOUT_SECONDS))
+    max_iterations = max(1, int(STAGE1_SUPPLEMENTARY_XAI_MAX_TOOL_ITERATIONS))
+    max_tokens = max(128, int(STAGE1_SUPPLEMENTARY_XAI_MAX_TOKENS))
+    temperature = max(0.0, min(1.5, float(STAGE1_SUPPLEMENTARY_XAI_TEMPERATURE)))
+    endpoint = str(XAI_API_URL or "https://api.x.ai/v1/responses").strip()
+
+    def _extract_responses_output_text(data: Dict[str, Any]) -> str:
+        direct = data.get("output_text")
+        if isinstance(direct, str) and direct.strip():
+            return direct.strip()
+        output = data.get("output")
+        texts: List[str] = []
+        if isinstance(output, list):
+            for item in output:
+                if not isinstance(item, dict):
+                    continue
+                item_text = item.get("text")
+                if isinstance(item_text, str) and item_text.strip():
+                    texts.append(item_text.strip())
+                content = item.get("content")
+                if isinstance(content, list):
+                    for part in content:
+                        if not isinstance(part, dict):
+                            continue
+                        txt = part.get("text")
+                        if isinstance(txt, str) and txt.strip():
+                            texts.append(txt.strip())
+        if not texts:
+            return ""
+        return texts[-1]
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+            for _ in range(max_iterations):
+                payload = {
+                    "model": str(STAGE1_SUPPLEMENTARY_XAI_MODEL or "grok-4-1-fast-reasoning").strip(),
+                    "input": input_text,
+                    "tools": tools,
+                    "max_output_tokens": max_tokens,
+                    "temperature": temperature,
+                }
+                request_count += 1
+                response = await client.post(
+                    endpoint,
+                    headers={
+                        "Authorization": f"Bearer {XAI_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                )
+                http_status = int(response.status_code)
+                if response.status_code >= 400:
+                    err_text = (response.text or "").strip()
+                    return {
+                        "attempted": True,
+                        "success": False,
+                        "error": f"xai_http_{response.status_code}:{err_text[:800]}",
+                        "summary": "",
+                        "prompt": prompt,
+                        "http_status": http_status,
+                        "request_count": request_count,
+                        "tool_calls_count": tool_calls_count,
+                        "finish_reason": finish_reason,
+                    }
+
+                data = response.json() if response.content else {}
+                finish_reason = str(
+                    (data.get("status") if isinstance(data, dict) else "") or ""
+                ).strip().lower()
+                output = (data.get("output") if isinstance(data, dict) else None) or []
+                if isinstance(output, list):
+                    tool_calls_count += len(
+                        [
+                            item
+                            for item in output
+                            if isinstance(item, dict)
+                            and str(item.get("type", "")).strip().lower().endswith("_call")
+                        ]
+                    )
+
+                content = _extract_responses_output_text(data if isinstance(data, dict) else {})
+                if content:
+                    final_content = content
+                    break
+    except Exception as exc:
+        return {
+            "attempted": True,
+            "success": False,
+            "error": str(exc).strip() or "xai_request_failed",
+            "summary": "",
+            "prompt": prompt,
+            "http_status": http_status,
+            "request_count": request_count,
+            "tool_calls_count": tool_calls_count,
+            "finish_reason": finish_reason,
+        }
+
+    normalized = _sanitize_supplementary_macro_summary_text(str(final_content or ""))
+    return {
+        "attempted": True,
+        "success": bool(normalized),
+        "error": "" if normalized else "xai_empty_response",
+        "summary": normalized,
+        "prompt": prompt,
+        "http_status": http_status,
+        "request_count": request_count,
+        "tool_calls_count": tool_calls_count,
+        "finish_reason": finish_reason,
+    }
+
+
+async def _collect_stage1_supplementary_macro_news(
+    *,
+    model: str,
+    user_query: str,
+    run: Dict[str, Any],
+    template_id: str,
+    existing_source_rows: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Build one xAI-generated supplementary macro paragraph without mutating core rows.
+
+    This lane is additive only. It injects summary text (not extra source rows).
+    """
+    if not PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_ENABLED:
+        return {
+            "enabled": False,
+            "used": False,
+            "commodity_profile": "",
+            "sector_label": "",
+            "summary_paragraph": "",
+            "sources": [],
+            "reason": "supplementary_news_disabled",
+        }
+
+    max_sources = max(0, int(PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_MAX_SOURCES))
+    if max_sources <= 0:
+        return {
+            "enabled": True,
+            "used": False,
+            "commodity_profile": "",
+            "sector_label": "",
+            "summary_paragraph": "",
+            "sources": [],
+            "reason": "max_sources_zero",
+        }
+
+    commodity_profile = _resolve_template_commodity_profile(template_id)
+    lane_cfg = _SUPPLEMENTARY_MACRO_PROFILE_CONFIG.get(commodity_profile, {})
+    sector_label = ""
+    query_focus = ""
+    try:
+        from .template_loader import get_template_loader
+
+        loader = get_template_loader()
+        behavior = loader.get_template_behavior(str(template_id or "").strip()) or {}
+        sector_label = str(behavior.get("supplementary_sector_label", "")).strip()
+        query_focus = str(behavior.get("supplementary_query_focus", "")).strip()
+    except Exception:
+        sector_label = ""
+        query_focus = ""
+    if not sector_label:
+        sector_label = str(lane_cfg.get("sector_label", "")).strip()
+    if not query_focus:
+        query_focus = str(lane_cfg.get("query_focus", "")).strip()
+    if not sector_label:
+        return {
+            "enabled": True,
+            "used": False,
+            "commodity_profile": commodity_profile,
+            "sector_label": sector_label,
+            "summary_paragraph": "",
+            "sources": [],
+            "reason": "no_sector_label",
+        }
+
+    summary_result = await _fetch_xai_supplementary_macro_summary(
+        sector_label=sector_label,
+        user_query=user_query,
+    )
+    summary_paragraph = str(summary_result.get("summary", "")).strip()
+    retrieval_error = str(summary_result.get("error", "")).strip()
+    retrieval_attempted = bool(summary_result.get("attempted", False))
+    retrieval_result_count = int(1 if summary_paragraph else 0)
+    reason = "ok" if summary_paragraph else "xai_summary_empty"
+    if retrieval_error and not summary_paragraph:
+        reason = f"xai_error:{retrieval_error}"
+
+    return {
+        "enabled": True,
+        "used": bool(summary_paragraph),
+        "commodity_profile": commodity_profile,
+        "sector_label": sector_label,
+        "query_focus": query_focus,
+        "summary_paragraph": summary_paragraph,
+        "summary_prompt": str(summary_result.get("prompt", "")),
+        "summary_model": str(STAGE1_SUPPLEMENTARY_XAI_MODEL or "grok-4-1-fast-reasoning"),
+        "summary_provider": "xai",
+        "summary_http_status": int(summary_result.get("http_status", 0) or 0),
+        "summary_request_count": int(summary_result.get("request_count", 0) or 0),
+        "summary_tool_calls_count": int(summary_result.get("tool_calls_count", 0) or 0),
+        "summary_finish_reason": str(summary_result.get("finish_reason", "")),
+        "sources": [],
+        "count": int(retrieval_result_count),
+        "reason": reason,
+        "retrieval_attempted": retrieval_attempted,
+        "retrieval_query": str(summary_result.get("prompt", "")),
+        "retrieval_result_count": int(retrieval_result_count),
+        "retrieval_error": retrieval_error,
+        "max_sources": int(max_sources),
+        "max_recency_days": int(max(7, int(PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_MAX_RECENCY_DAYS))),
+    }
 
 
 def _dedupe_model_ids(models: List[str]) -> List[str]:
@@ -577,9 +1025,9 @@ def _extract_perplexity_finish_reason(data: Dict[str, Any]) -> str:
 
 
 def _supports_perplexity_reasoning_payload(model: str) -> bool:
-    """Perplexity reasoning payload is only used for OpenAI-routed models."""
-    key = str(model or "").strip().lower()
-    return bool(key.startswith("openai/"))
+    """Reasoning payload is enabled for all routed models."""
+    _ = model
+    return True
 
 
 async def _query_model_via_perplexity(
@@ -613,15 +1061,16 @@ async def _query_model_via_perplexity(
         payload["stream"] = True
     if isinstance(max_tokens, int) and max_tokens > 0:
         payload["max_output_tokens"] = int(max_tokens)
-    effort = str(reasoning_effort or "").strip().lower()
+    effort = normalize_reasoning_effort(reasoning_effort)
     reasoning_payload_sent = False
-    reasoning_effort_effective = ""
-    if effort in {"low", "medium", "high"} and _supports_perplexity_reasoning_payload(
-        resolved_model or model
-    ):
-        payload["reasoning"] = {"effort": effort}
+    reasoning_effort_effective = effort
+    if _supports_perplexity_reasoning_payload(resolved_model or model):
+        payload["reasoning"] = build_reasoning_payload(
+            resolved_model or model,
+            effort,
+            provider="perplexity",
+        )
         reasoning_payload_sent = True
-        reasoning_effort_effective = effort
 
     def _is_invalid_request_400(exc: httpx.HTTPStatusError) -> bool:
         if exc.response is None or exc.response.status_code != 400:
@@ -718,16 +1167,19 @@ async def _query_model_via_perplexity(
             try:
                 data = await _perform_request(client, payload)
             except httpx.HTTPStatusError as exc:
-                # Some routed models reject specific reasoning-effort values
-                # with a generic 400 "invalid request". Retry once without
-                # reasoning so the model can still run.
+                # Some routed models reject specific reasoning payload shapes.
+                # Retry once with a conservative low-effort payload.
                 if _is_invalid_request_400(exc) and "reasoning" in payload:
                     retry_payload = dict(payload)
-                    retry_payload.pop("reasoning", None)
-                    reasoning_payload_sent = False
-                    reasoning_effort_effective = ""
+                    retry_payload["reasoning"] = build_reasoning_payload(
+                        resolved_model or model,
+                        "low",
+                        provider="perplexity",
+                    )
+                    reasoning_payload_sent = True
+                    reasoning_effort_effective = "low"
                     _progress_log(
-                        f"Perplexity second-pass retry without reasoning model={model} "
+                        f"Perplexity second-pass retry with low reasoning model={model} "
                         f"after 400 invalid_request"
                     )
                     data = await _perform_request(client, retry_payload)
@@ -1015,6 +1467,7 @@ _FACT_DIGEST_V2_SECTIONS = [
     "financing_deals",
     "project_economics",
     "market_share_structure",
+    "management_governance",
     "operational_objectives",
     "risks_constraints",
     "catalysts_tailwinds",
@@ -1073,6 +1526,19 @@ _FACT_DIGEST_V2_KEYWORDS = {
         "ev/oz",
         "multiple",
     ],
+    "management_governance": [
+        "management",
+        "board",
+        "director",
+        "ceo",
+        "cfo",
+        "executive",
+        "insider ownership",
+        "governance",
+        "track record",
+        "appointment",
+        "resignation",
+    ],
     "operational_objectives": [
         "objective",
         "guidance",
@@ -1113,6 +1579,7 @@ _FACT_DIGEST_V2_NARRATIVE_ORDER = [
     "financing_deals",
     "project_economics",
     "market_share_structure",
+    "management_governance",
     "operational_objectives",
     "risks_constraints",
     "catalysts_tailwinds",
@@ -1210,6 +1677,10 @@ def _default_stage1_verification_profile() -> Dict[str, Any]:
         "timeline_conflict_max_shift_quarters": 3,
         "compliance_section_markers": list(_STAGE1_RUBRIC_SECTION_MARKERS),
         "compliance_critical_sections": set(_STAGE1_RUBRIC_CRITICAL_SECTIONS),
+        "cashflow_schema_mode": "auto",
+        "cashflow_schema_min_reporting_periods": 3,
+        "cashflow_schema_require_operating_cashflow": True,
+        "cashflow_schema_detection_max_sources": int(STAGE1_CASHFLOW_DETECTION_MAX_SOURCES),
     }
 
 
@@ -1224,6 +1695,7 @@ def _build_stage1_verification_profile(template_id: Optional[str]) -> Dict[str, 
     template_data = loader.get_template(template_id) or {}
     verification = loader.get_verification_schema(template_id)
     profile["template_id"] = str(template_id)
+    template_behavior = loader.get_template_behavior(template_id) or {}
 
     fact_digest_cfg = verification.get("fact_digest", {}) if isinstance(verification, dict) else {}
     sections_cfg = fact_digest_cfg.get("sections", {})
@@ -1328,6 +1800,28 @@ def _build_stage1_verification_profile(template_id: Optional[str]) -> Dict[str, 
     if normalized_critical:
         profile["compliance_critical_sections"] = normalized_critical
 
+    cashflow_cfg = (
+        template_behavior.get("cashflow_schema", {})
+        if isinstance(template_behavior, dict)
+        else {}
+    )
+    if isinstance(cashflow_cfg, dict):
+        mode = str(cashflow_cfg.get("mode", "")).strip().lower()
+        if mode in {"disabled", "auto", "required"}:
+            profile["cashflow_schema_mode"] = mode
+        min_periods = cashflow_cfg.get("min_reporting_periods")
+        if isinstance(min_periods, (int, float)):
+            profile["cashflow_schema_min_reporting_periods"] = max(1, int(min_periods))
+        require_ocf = cashflow_cfg.get("require_operating_cashflow")
+        if isinstance(require_ocf, bool):
+            profile["cashflow_schema_require_operating_cashflow"] = bool(require_ocf)
+        detection_max_sources = cashflow_cfg.get("detection_max_sources")
+        if isinstance(detection_max_sources, (int, float)):
+            profile["cashflow_schema_detection_max_sources"] = max(
+                6,
+                int(detection_max_sources),
+            )
+
     return profile
 
 
@@ -1348,6 +1842,19 @@ def _keywords_for_gap_section(section_id: str, verification_profile: Dict[str, A
         "certainty": ["certainty", "probability", "risk to milestones"],
         "headwinds_tailwinds": ["headwind", "tailwind", "sensitivity", "threshold"],
         "npv_assessment": ["npv", "irr", "capex", "aisc", "mine life"],
+        "management_competition_assessment": [
+            "management",
+            "board",
+            "executive",
+            "ceo",
+            "cfo",
+            "insider ownership",
+            "governance",
+            "leadership changes",
+            "track record",
+            "competition",
+            "peer positioning",
+        ],
     }
     return fallback.get(sid, _markers_for_field_name(sid))
 
@@ -2756,6 +3263,368 @@ def _prepare_stage1_source_rows(
         )
 
     return rows
+
+
+def _infer_reporting_period_key(*, title: str, excerpt: str, published_at: str) -> Optional[str]:
+    """Infer a reporting-period key (e.g., 2025Q4, 2025FY, 2025H2) from source metadata."""
+    text = f"{title}\n{excerpt}".lower()
+    year_match = re.search(r"\b(20\d{2})\b", text)
+    year: Optional[int] = int(year_match.group(1)) if year_match else None
+    if year is None:
+        published_match = re.match(r"(\d{4})-(\d{2})-(\d{2})", str(published_at or "").strip())
+        if published_match:
+            year = int(published_match.group(1))
+            month = int(published_match.group(2))
+        else:
+            month = None
+    else:
+        month = None
+
+    quarter_match = re.search(r"\bq([1-4])\b", text)
+    if quarter_match and year is not None:
+        return f"{year}Q{quarter_match.group(1)}"
+
+    month_map = {
+        "jan": 1, "january": 1,
+        "feb": 2, "february": 2,
+        "mar": 3, "march": 3,
+        "apr": 4, "april": 4,
+        "may": 5,
+        "jun": 6, "june": 6,
+        "jul": 7, "july": 7,
+        "aug": 8, "august": 8,
+        "sep": 9, "sept": 9, "september": 9,
+        "oct": 10, "october": 10,
+        "nov": 11, "november": 11,
+        "dec": 12, "december": 12,
+    }
+    if month is None:
+        month_token = re.search(
+            r"\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+            r"jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|"
+            r"dec(?:ember)?)\b",
+            text,
+        )
+        if month_token:
+            month = month_map.get(month_token.group(1), None)
+
+    if any(token in text for token in ("half-year", "half year", "interim", "h1", "h2")):
+        if year is not None:
+            if "h1" in text:
+                return f"{year}H1"
+            if "h2" in text:
+                return f"{year}H2"
+            if month is not None:
+                return f"{year}H1" if month <= 6 else f"{year}H2"
+            return f"{year}H?"
+
+    if any(token in text for token in ("annual report", "full year", "fy", "10-k")):
+        if year is not None:
+            return f"{year}FY"
+
+    if any(token in text for token in ("quarterly", "quarter", "appendix 5b", "10-q", "cashflow report")):
+        if year is not None:
+            if month is not None:
+                quarter = ((month - 1) // 3) + 1
+                return f"{year}Q{quarter}"
+            return f"{year}Q?"
+
+    if year is not None:
+        return str(year)
+    return None
+
+
+def _detect_cashflow_schema_activation(
+    *,
+    source_rows: List[Dict[str, Any]],
+    mode: str,
+    min_reporting_periods: int,
+    require_operating_cashflow: bool,
+) -> Dict[str, Any]:
+    """
+    Determine whether cashflow schema should be enforced for Stage 1 output.
+
+    Modes:
+    - disabled: never enforce
+    - required: always enforce
+    - auto: enforce only when source evidence indicates operating-period cashflow reporting
+    """
+    normalized_mode = str(mode or "disabled").strip().lower()
+    if normalized_mode not in {"disabled", "auto", "required"}:
+        normalized_mode = "disabled"
+
+    if normalized_mode == "disabled":
+        return {
+            "active": False,
+            "reason": "mode_disabled",
+            "mode": normalized_mode,
+            "periods_detected": 0,
+            "reporting_period_keys_detected": [],
+            "rows_with_cashflow_terms": 0,
+            "rows_with_operating_cashflow_terms": 0,
+            "rows_with_forward_guidance_terms": 0,
+            "rows_with_reporting_terms": 0,
+        }
+    if normalized_mode == "required":
+        return {
+            "active": True,
+            "reason": "mode_required",
+            "mode": normalized_mode,
+            "periods_detected": 0,
+            "reporting_period_keys_detected": [],
+            "rows_with_cashflow_terms": 0,
+            "rows_with_operating_cashflow_terms": 0,
+            "rows_with_forward_guidance_terms": 0,
+            "rows_with_reporting_terms": 0,
+        }
+
+    periods = set()
+    reporting_period_keys = set()
+    rows_with_cashflow_terms = 0
+    rows_with_operating_cashflow_terms = 0
+    rows_with_forward_guidance_terms = 0
+    rows_with_reporting_terms = 0
+
+    cashflow_terms = (
+        "cashflow",
+        "cash flow",
+        "operating cash",
+        "free cash flow",
+        "fcf",
+        "ocf",
+        "cash receipts",
+        "appendix 5b",
+        "10-q",
+        "10-k",
+    )
+    operating_cashflow_terms = (
+        "operating cash flow",
+        "net operating cash flow",
+        "cash from operations",
+        "ocf",
+    )
+    forward_terms = (
+        "guidance",
+        "forecast",
+        "target",
+        "outlook",
+        "fy20",
+        "2026",
+        "2027",
+        "2028",
+        "2029",
+        "12m",
+        "24m",
+    )
+    reporting_terms = (
+        "quarterly",
+        "quarterly activities",
+        "cashflow report",
+        "cash flow report",
+        "appendix 5b",
+        "annual report",
+        "half-year",
+        "half year",
+        "interim report",
+        "10-q",
+        "10-k",
+        "form 10-q",
+        "form 10-k",
+        "results",
+    )
+
+    for row in (source_rows or []):
+        if not isinstance(row, dict):
+            continue
+        published = str(row.get("published_at", "")).strip()
+        m = re.match(r"(\d{4})[-/]", published)
+        if m:
+            periods.add(m.group(1))
+        title = str(row.get("title", "")).strip().lower()
+        excerpt = str(row.get("excerpt", "")).strip().lower()
+        blob = f"{title}\n{excerpt}"
+        has_reporting_term = any(term in blob for term in reporting_terms)
+        if has_reporting_term:
+            rows_with_reporting_terms += 1
+        if any(term in blob for term in cashflow_terms):
+            rows_with_cashflow_terms += 1
+        if any(term in blob for term in operating_cashflow_terms):
+            rows_with_operating_cashflow_terms += 1
+        if any(term in blob for term in forward_terms):
+            rows_with_forward_guidance_terms += 1
+        if has_reporting_term or any(term in blob for term in cashflow_terms):
+            period_key = _infer_reporting_period_key(
+                title=str(row.get("title", "")),
+                excerpt=str(row.get("excerpt", "")),
+                published_at=published,
+            )
+            if period_key:
+                reporting_period_keys.add(period_key)
+
+    min_periods = max(1, int(min_reporting_periods))
+    periods_detected = max(len(reporting_period_keys), len(periods))
+    period_gate = periods_detected >= min_periods
+    cashflow_gate = rows_with_cashflow_terms >= 2
+    operating_gate = (
+        rows_with_operating_cashflow_terms >= 1 if require_operating_cashflow else True
+    )
+    guidance_gate = rows_with_forward_guidance_terms >= 1
+
+    active = bool(period_gate and cashflow_gate and operating_gate and guidance_gate)
+    reason_parts = []
+    if period_gate:
+        reason_parts.append("periods_ok")
+    else:
+        reason_parts.append("periods_insufficient")
+    if cashflow_gate:
+        reason_parts.append("cashflow_terms_ok")
+    else:
+        reason_parts.append("cashflow_terms_insufficient")
+    if operating_gate:
+        reason_parts.append("operating_cashflow_ok")
+    else:
+        reason_parts.append("operating_cashflow_missing")
+    if guidance_gate:
+        reason_parts.append("forward_terms_ok")
+    else:
+        reason_parts.append("forward_terms_missing")
+
+    return {
+        "active": active,
+        "reason": ",".join(reason_parts),
+        "mode": normalized_mode,
+        "periods_detected": periods_detected,
+        "reporting_period_keys_detected": sorted(reporting_period_keys),
+        "rows_with_cashflow_terms": rows_with_cashflow_terms,
+        "rows_with_operating_cashflow_terms": rows_with_operating_cashflow_terms,
+        "rows_with_forward_guidance_terms": rows_with_forward_guidance_terms,
+        "rows_with_reporting_terms": rows_with_reporting_terms,
+    }
+
+
+def _build_cashflow_schema_contract_text() -> str:
+    """Additional mandatory section contract for cashflow-capable operating businesses."""
+    return (
+        "9) Cashflow Analysis (Historical / Current / Forward)\n"
+        "- Historical (minimum 3 reported periods): include Revenue, Operating Cash Flow, Capex, and Free Cash Flow where disclosed.\n"
+        "- Current period/run-rate: state latest reported cash, debt, and run-rate operating cash generation.\n"
+        "- Forward (12m and 24m): provide base/bull/bear cashflow bridge with explicit assumptions and key sensitivities.\n"
+        "- Each period assumption must be source-backed with [S#] or marked ESTIMATE with one-line rationale."
+    )
+
+
+async def _classify_cashflow_schema_with_agent(
+    *,
+    source_rows: List[Dict[str, Any]],
+    template_id: str,
+    mode: str,
+    min_reporting_periods: int,
+    require_operating_cashflow: bool,
+) -> Dict[str, Any]:
+    """Run a low-cost classifier agent to decide if cashflow schema should be active."""
+    if not STAGE1_CASHFLOW_CLASSIFIER_ENABLED:
+        return {"used": False, "reason": "classifier_disabled"}
+    if str(mode or "").strip().lower() != "auto":
+        return {"used": False, "reason": "mode_not_auto"}
+    if not OPENROUTER_API_KEY:
+        return {"used": False, "reason": "missing_openrouter_key"}
+    model = str(STAGE1_CASHFLOW_CLASSIFIER_MODEL or "").strip()
+    if not model:
+        return {"used": False, "reason": "missing_classifier_model"}
+
+    rows = []
+    for row in (source_rows or [])[:20]:
+        if not isinstance(row, dict):
+            continue
+        rows.append(
+            {
+                "source_id": str(row.get("source_id", "")),
+                "published_at": str(row.get("published_at", "")),
+                "title": _truncate_text_for_prompt(str(row.get("title", "")), 180),
+                "excerpt": _truncate_text_for_prompt(str(row.get("excerpt", "")), 280),
+            }
+        )
+    payload = {
+        "template_id": str(template_id or ""),
+        "mode": "auto",
+        "min_reporting_periods": int(max(1, min_reporting_periods)),
+        "require_operating_cashflow": bool(require_operating_cashflow),
+        "sources": rows,
+    }
+    prompt = (
+        "Classify whether this company should include a dedicated cashflow-analysis section "
+        "(historical/current/forward) in Stage-1 investment analysis.\n"
+        "Decision rules:\n"
+        "1) ACTIVE=true only if evidence supports a cashflow-capable operating business.\n"
+        "2) Require reported-period evidence (quarterly/half-year/annual or 10-Q/10-K style reporting) "
+        "and operating-cashflow signal.\n"
+        "3) If evidence is weak/ambiguous, set ACTIVE=false.\n\n"
+        "Return JSON only with this exact shape:\n"
+        "{"
+        "\"active\": <bool>, "
+        "\"confidence_pct\": <0-100 number>, "
+        "\"reason\": \"<short reason>\", "
+        "\"periods_detected_estimate\": <int>, "
+        "\"evidence\": [\"<max 3 short bullets>\"]"
+        "}\n\n"
+        "Input JSON:\n"
+        f"{json.dumps(payload, ensure_ascii=True, separators=(',', ':'))}"
+    )
+    response = await query_model(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        timeout=float(max(10.0, STAGE1_CASHFLOW_CLASSIFIER_TIMEOUT_SECONDS)),
+        max_tokens=int(max(120, STAGE1_CASHFLOW_CLASSIFIER_MAX_OUTPUT_TOKENS)),
+        reasoning_effort=str(STAGE1_CASHFLOW_CLASSIFIER_REASONING_EFFORT or "low"),
+    )
+    if not response:
+        return {
+            "used": False,
+            "reason": "classifier_no_response",
+            "model": model,
+        }
+    raw = str(response.get("content", "") or "")
+    parsed, parse_error = _parse_json_object_from_text(raw)
+    if not parsed:
+        return {
+            "used": False,
+            "reason": f"classifier_parse_failed:{parse_error or 'unknown'}",
+            "model": model,
+            "raw_preview": _truncate_text_for_prompt(raw, 240),
+        }
+    active = _coerce_bool(parsed.get("active"))
+    if active is None:
+        return {
+            "used": False,
+            "reason": "classifier_missing_active",
+            "model": model,
+            "raw_preview": _truncate_text_for_prompt(raw, 240),
+        }
+    confidence_raw = parsed.get("confidence_pct", 0)
+    try:
+        confidence = float(confidence_raw)
+    except Exception:
+        confidence = 0.0
+    periods_estimate_raw = parsed.get("periods_detected_estimate", 0)
+    try:
+        periods_estimate = int(periods_estimate_raw)
+    except Exception:
+        periods_estimate = 0
+    evidence = []
+    if isinstance(parsed.get("evidence"), list):
+        for item in parsed.get("evidence", [])[:3]:
+            snippet = _truncate_text_for_prompt(str(item or ""), 120)
+            if snippet:
+                evidence.append(snippet)
+    return {
+        "used": True,
+        "model": model,
+        "active": bool(active),
+        "confidence_pct": max(0.0, min(100.0, confidence)),
+        "reason": _truncate_text_for_prompt(str(parsed.get("reason", "")), 180),
+        "periods_detected_estimate": max(0, periods_estimate),
+        "evidence": evidence,
+    }
 
 
 def _infer_source_year(published: str, title: str, url: str) -> Optional[int]:
@@ -4654,19 +5523,96 @@ def _build_stage1_second_pass_prompt(
     evidence_appendix: str,
     timeline_digest: str,
     source_key_points_json: str = "",
+    supplementary_macro_news_json: str = "",
+    cashflow_schema_contract: str = "",
 ) -> str:
-    """Build minimal second-pass prompt: only user task payload."""
-    _ = (
-        research_brief,
-        run,
-        compact_fact_bundle_json,
-        fact_digest_json,
-        fact_pack_json,
-        evidence_appendix,
-        timeline_digest,
-        source_key_points_json,
+    """
+    Build second-pass prompt with injected evidence bundles.
+
+    The model must base analysis on provided evidence artifacts and cite [S#]
+    source ids for numeric claims.
+    """
+    task = (user_query or "").strip()
+    brief = _truncate_text_for_prompt((research_brief or "").strip(), 1800)
+    run_model = str(run.get("model", "")).strip()
+    run_ticker = str(run.get("ticker", "")).strip()
+    run_depth = str(run.get("depth", "")).strip()
+
+    requirements = (
+        "MANDATORY OUTPUT SECTIONS (use these exact section labels):\n"
+        "1) Quality Score\n"
+        "2) Value Score\n"
+        "3) Price Targets (12-month and 24-month)\n"
+        "4) Development Timeline\n"
+        "5) Certainty % (24 months)\n"
+        "6) Headwinds/Tailwinds\n"
+        "7) Thesis Map (bull/base/bear)\n"
+        "8) Investment Verdict\n\n"
+        "EVIDENCE AND CITATION RULES:\n"
+        "- Base analysis only on injected evidence below.\n"
+        "- Every key numeric claim must include at least one [S#] citation.\n"
+        "- Mark inferred values with ESTIMATE and one-line rationale.\n"
+        "- If evidence conflicts, prefer the newest dated primary source and state conflict."
     )
-    return f"{(user_query or '').strip()}".strip()
+    if cashflow_schema_contract.strip():
+        requirements = f"{requirements}\n\n{cashflow_schema_contract.strip()}"
+
+    evidence_blocks: List[str] = []
+    if source_key_points_json.strip():
+        evidence_blocks.append(
+            "SOURCE_KEY_POINTS_JSON:\n"
+            f"```json\n{source_key_points_json.strip()}\n```"
+        )
+    if supplementary_macro_news_json.strip():
+        evidence_blocks.append(
+            "SUPPLEMENTARY_NEWS_SEGMENT_JSON:\n"
+            f"```json\n{supplementary_macro_news_json.strip()}\n```"
+        )
+    if compact_fact_bundle_json.strip():
+        evidence_blocks.append(
+            "COMPACT_FACT_BUNDLE_JSON:\n"
+            f"```json\n{compact_fact_bundle_json.strip()}\n```"
+        )
+    if fact_digest_json.strip():
+        evidence_blocks.append(
+            "FACT_DIGEST_V2_JSON:\n"
+            f"```json\n{fact_digest_json.strip()}\n```"
+        )
+    if fact_pack_json.strip():
+        evidence_blocks.append(
+            "RUBRIC_FACT_PACK_JSON:\n"
+            f"```json\n{fact_pack_json.strip()}\n```"
+        )
+    if timeline_digest.strip():
+        evidence_blocks.append(
+            "TIMELINE_EVIDENCE_DIGEST:\n"
+            f"{timeline_digest.strip()}"
+        )
+    if evidence_appendix.strip():
+        evidence_blocks.append(
+            "EVIDENCE_APPENDIX:\n"
+            f"{evidence_appendix.strip()}"
+        )
+
+    prompt_parts: List[str] = [
+        "You are Stage 1 council analyst. Produce a complete investment analysis from injected evidence.",
+        (
+            "RUN CONTEXT:\n"
+            f"- Model: {run_model or 'unknown'}\n"
+            f"- Ticker: {run_ticker or 'unknown'}\n"
+            f"- Depth: {run_depth or 'unknown'}"
+        ),
+        f"USER TASK:\n{task}",
+    ]
+    if brief:
+        prompt_parts.append(f"RESEARCH BRIEF (CONDENSED):\n{brief}")
+    prompt_parts.append(requirements)
+    if evidence_blocks:
+        prompt_parts.append("INJECTED EVIDENCE BUNDLE:\n" + "\n\n".join(evidence_blocks))
+    prompt_parts.append(
+        "Return analysis now. Do not output a source log only; output full rubric-aligned analysis."
+    )
+    return "\n\n".join(part for part in prompt_parts if part.strip()).strip()
 
 
 def _extract_source_citations(text: str) -> List[str]:
@@ -4777,6 +5723,135 @@ def _stage1_response_looks_truncated(text: str) -> bool:
     return False
 
 
+async def _assess_stage1_truncation(
+    *,
+    model: str,
+    response_text: str,
+    output_tokens_used: int,
+    finish_reason: str,
+) -> Dict[str, Any]:
+    """Adjudicate premature truncation with strong evidence only."""
+    body = (response_text or "").strip()
+    if not body:
+        return {
+            "used": False,
+            "truncated": True,
+            "confidence_pct": 100.0,
+            "reason": "empty_response",
+        }
+
+    if _stage1_response_looks_truncated(body):
+        return {
+            "used": False,
+            "truncated": True,
+            "confidence_pct": 99.0,
+            "reason": "deterministic_high_confidence",
+        }
+
+    if not STAGE1_TRUNCATION_CHECKER_ENABLED:
+        return {
+            "used": False,
+            "truncated": False,
+            "confidence_pct": 0.0,
+            "reason": "checker_disabled_fail_open",
+        }
+    if not OPENROUTER_API_KEY:
+        return {
+            "used": False,
+            "truncated": False,
+            "confidence_pct": 0.0,
+            "reason": "missing_openrouter_key_fail_open",
+        }
+    checker_model = str(STAGE1_TRUNCATION_CHECKER_MODEL or "").strip()
+    if not checker_model:
+        return {
+            "used": False,
+            "truncated": False,
+            "confidence_pct": 0.0,
+            "reason": "missing_checker_model_fail_open",
+        }
+
+    payload = {
+        "model": str(model or ""),
+        "output_tokens_used": int(max(0, output_tokens_used)),
+        "finish_reason": str(finish_reason or "").strip(),
+        "response_chars": len(body),
+        "response_head_preview": _truncate_text_for_prompt(body[:1600], 1600),
+        "response_tail_preview": _truncate_text_for_prompt(body[-3200:], 3200),
+    }
+    prompt = (
+        "Decide whether this Stage-1 response was prematurely truncated.\n"
+        "Rules:\n"
+        "1) Set truncated=true only if confidence is very high the answer cut off early.\n"
+        "2) Long responses are not truncated just because they are long.\n"
+        "3) Focus mainly on the tail/end of the response.\n"
+        "4) If the ending looks complete enough, set truncated=false.\n\n"
+        "Return JSON only with this exact shape:\n"
+        "{"
+        "\"truncated\": <bool>, "
+        "\"confidence_pct\": <0-100 number>, "
+        "\"reason\": \"<short reason>\", "
+        "\"tail_looks_complete\": <bool>"
+        "}\n\n"
+        "Input JSON:\n"
+        f"{json.dumps(payload, ensure_ascii=True, separators=(',', ':'))}"
+    )
+    response = await query_model(
+        model=checker_model,
+        messages=[{"role": "user", "content": prompt}],
+        timeout=float(max(10.0, STAGE1_TRUNCATION_CHECKER_TIMEOUT_SECONDS)),
+        max_tokens=int(max(120, STAGE1_TRUNCATION_CHECKER_MAX_OUTPUT_TOKENS)),
+        reasoning_effort=str(STAGE1_TRUNCATION_CHECKER_REASONING_EFFORT or "low"),
+    )
+    if not response:
+        return {
+            "used": False,
+            "truncated": False,
+            "confidence_pct": 0.0,
+            "reason": "checker_no_response_fail_open",
+            "model": checker_model,
+        }
+    raw = str(response.get("content", "") or "")
+    parsed, parse_error = _parse_json_object_from_text(raw)
+    if not parsed:
+        return {
+            "used": False,
+            "truncated": False,
+            "confidence_pct": 0.0,
+            "reason": f"checker_parse_failed:{parse_error or 'unknown'}",
+            "model": checker_model,
+            "raw_preview": _truncate_text_for_prompt(raw, 220),
+        }
+    truncated = _coerce_bool(parsed.get("truncated"))
+    if truncated is None:
+        return {
+            "used": False,
+            "truncated": False,
+            "confidence_pct": 0.0,
+            "reason": "checker_missing_truncated_fail_open",
+            "model": checker_model,
+            "raw_preview": _truncate_text_for_prompt(raw, 220),
+        }
+    confidence = _coerce_float(parsed.get("confidence_pct"))
+    if confidence is None:
+        confidence = 0.0
+    min_confidence = max(
+        0.0,
+        min(100.0, float(STAGE1_TRUNCATION_CHECKER_MIN_CONFIDENCE_PCT)),
+    )
+    high_conf_truncated = bool(truncated and confidence >= min_confidence)
+    return {
+        "used": True,
+        "model": checker_model,
+        "truncated": high_conf_truncated,
+        "raw_truncated": bool(truncated),
+        "confidence_pct": float(confidence),
+        "reason": str(parsed.get("reason", "") or "").strip() or "checker_ok",
+        "tail_looks_complete": _coerce_bool(parsed.get("tail_looks_complete")),
+        "min_confidence_pct": min_confidence,
+    }
+
+
 _STAGE1_RUBRIC_SECTION_MARKERS = [
     ("quality_score", ["quality score", "quality_score"]),
     ("value_score", ["value score", "value_score"]),
@@ -4787,6 +5862,18 @@ _STAGE1_RUBRIC_SECTION_MARKERS = [
     ("development_timeline", ["development timeline", "timeline", "milestone"]),
     ("certainty", ["certainty", "certainty %", "certainty_pct"]),
     ("headwinds_tailwinds", ["headwind", "tailwind", "headwinds", "tailwinds"]),
+    (
+        "management_competition_assessment",
+        [
+            "management & competition",
+            "management_competition_assessment",
+            "management quality",
+            "governance",
+            "insider ownership",
+            "board",
+            "executive",
+        ],
+    ),
     ("npv_assessment", ["npv", "risked npv", "dcf"]),
 ]
 
@@ -4938,6 +6025,10 @@ def _evaluate_stage1_citation_gate(
             "compliance_rating": "green",
             "retry_recommended": False,
             "catastrophic_failure": False,
+            "compliance_fail_reasons": [],
+            "compliance_warning_reasons": [],
+            "compliance_hard_fail_reasons": [],
+            "compliance_soft_fail_reasons": [],
         }
 
     if not valid_ids:
@@ -4962,6 +6053,10 @@ def _evaluate_stage1_citation_gate(
             "compliance_rating": "green",
             "retry_recommended": False,
             "catastrophic_failure": False,
+            "compliance_fail_reasons": [],
+            "compliance_warning_reasons": [],
+            "compliance_hard_fail_reasons": [],
+            "compliance_soft_fail_reasons": [],
         }
 
     fail_reasons: List[str] = []
@@ -4990,6 +6085,8 @@ def _evaluate_stage1_citation_gate(
         reason = "|".join(fail_reasons + warning_reasons)
     elif warning_reasons:
         reason = "ok_warn:" + "|".join(warning_reasons)
+    hard_fail_reasons = list(fail_reasons) if catastrophic_failure else []
+    soft_fail_reasons = list(fail_reasons) if (fail_reasons and not catastrophic_failure) else []
 
     return {
         "enabled": True,
@@ -5012,6 +6109,10 @@ def _evaluate_stage1_citation_gate(
         "compliance_rating": compliance_rating,
         "retry_recommended": retry_recommended,
         "catastrophic_failure": catastrophic_failure,
+        "compliance_fail_reasons": list(fail_reasons),
+        "compliance_warning_reasons": list(warning_reasons),
+        "compliance_hard_fail_reasons": hard_fail_reasons,
+        "compliance_soft_fail_reasons": soft_fail_reasons,
     }
 
 
@@ -5060,6 +6161,8 @@ async def _run_stage1_second_pass_analysis(
     research_brief: str,
     run: Dict[str, Any],
     verification_profile: Optional[Dict[str, Any]] = None,
+    supplementary_macro_news_override: Optional[Dict[str, Any]] = None,
+    prepass_source_rows: Optional[List[Dict[str, Any]]] = None,
     analysis_provider: str = "openrouter",
 ) -> Dict[str, Any]:
     """
@@ -5068,7 +6171,11 @@ async def _run_stage1_second_pass_analysis(
     This pass reasons over locally decoded source excerpts and can route through
     either OpenRouter or Perplexity depending on stage-1 mixed-mode configuration.
     """
-    available_sources = len(run.get("results") or [])
+    available_sources = (
+        len(prepass_source_rows or [])
+        if prepass_source_rows
+        else len(run.get("results") or [])
+    )
     configured_sources = max(1, int(PERPLEXITY_STAGE1_SECOND_PASS_MAX_SOURCES))
     source_budget = max(configured_sources, min(max(1, int(MAX_SOURCES)), available_sources))
     profile = verification_profile or _default_stage1_verification_profile()
@@ -5091,23 +6198,218 @@ async def _run_stage1_second_pass_analysis(
         1,
         int(profile.get("timeline_conflict_max_shift_quarters", 3)),
     )
-    profile_section_markers = profile.get("compliance_section_markers") or _STAGE1_RUBRIC_SECTION_MARKERS
+    profile_section_markers = list(
+        profile.get("compliance_section_markers") or _STAGE1_RUBRIC_SECTION_MARKERS
+    )
     profile_critical_sections_raw = (
         profile.get("compliance_critical_sections") or _STAGE1_RUBRIC_CRITICAL_SECTIONS
     )
     profile_critical_sections = set(profile_critical_sections_raw)
     asx_deterministic_ingestion_summary: Dict[str, Any] = {}
+    using_prepass_source_rows = bool(prepass_source_rows)
+    prepass_source_rows_cleaned: List[Dict[str, Any]] = []
+    if using_prepass_source_rows:
+        current_year = datetime.utcnow().year
+        for row in (prepass_source_rows or []):
+            if not isinstance(row, dict):
+                continue
+            excerpt = str(row.get("excerpt", "")).strip()
+            if not excerpt:
+                continue
+            source_year = _infer_source_year(
+                str(row.get("published_at", "")).strip(),
+                str(row.get("title", "")).strip(),
+                str(row.get("url", "")).strip(),
+            )
+            if (
+                source_year is not None
+                and source_year <= (current_year - 3)
+                and len(prepass_source_rows_cleaned) >= max(3, source_budget - 3)
+            ):
+                continue
+            prepass_source_rows_cleaned.append(
+                {
+                    "source_id": str(row.get("source_id", "")).strip(),
+                    "title": str(row.get("title", "")).strip() or "Untitled",
+                    "url": str(row.get("url", "")).strip(),
+                    "published_at": str(row.get("published_at", "")).strip(),
+                    "decode_status": str(row.get("decode_status", "")).strip()
+                    or "prepass_bundle",
+                    "decoded": bool(row.get("decoded", True)),
+                    "excerpt": excerpt[
+                        : max(300, int(PERPLEXITY_STAGE1_SECOND_PASS_MAX_CHARS_PER_SOURCE))
+                    ],
+                    "material_signal_score": int(row.get("material_signal_score", 0) or 0),
+                }
+            )
+            if len(prepass_source_rows_cleaned) >= source_budget:
+                break
+        asx_deterministic_ingestion_summary = {
+            "enabled": bool(ASX_DETERMINISTIC_ANNOUNCEMENTS_ENABLED),
+            "used": False,
+            "symbol": "",
+            "reason": "prepass_source_rows_applied",
+            "cache_hit": False,
+            "fetched_rows": 0,
+            "selected_rows": 0,
+            "decoded_rows": 0,
+            "target_rows": 0,
+            "price_sensitive_only": bool(ASX_DETERMINISTIC_PRICE_SENSITIVE_ONLY),
+            "include_non_sensitive_fill": bool(
+                ASX_DETERMINISTIC_INCLUDE_NON_SENSITIVE_FILL
+            ),
+            "years_queried": [],
+            "errors": [],
+        }
+    else:
+        run, asx_deterministic_ingestion_summary = await _augment_run_with_deterministic_asx_sources(
+            user_query=user_query,
+            research_brief=research_brief,
+            run=run,
+        )
 
-    run, asx_deterministic_ingestion_summary = await _augment_run_with_deterministic_asx_sources(
-        user_query=user_query,
-        research_brief=research_brief,
-        run=run,
+    source_rows = (
+        prepass_source_rows_cleaned
+        if using_prepass_source_rows
+        else _prepare_stage1_source_rows(
+            run=run,
+            max_sources=source_budget,
+            max_chars_per_source=PERPLEXITY_STAGE1_SECOND_PASS_MAX_CHARS_PER_SOURCE,
+        )
     )
-
-    source_rows = _prepare_stage1_source_rows(
-        run=run,
-        max_sources=source_budget,
-        max_chars_per_source=PERPLEXITY_STAGE1_SECOND_PASS_MAX_CHARS_PER_SOURCE,
+    if using_prepass_source_rows:
+        cashflow_detection_limit = max(
+            len(source_rows),
+            int(
+                profile.get(
+                    "cashflow_schema_detection_max_sources",
+                    STAGE1_CASHFLOW_DETECTION_MAX_SOURCES,
+                )
+            ),
+        )
+        cashflow_detection_rows = prepass_source_rows_cleaned[: max(1, cashflow_detection_limit)]
+    else:
+        cashflow_detection_rows = _prepare_stage1_source_rows(
+            run=run,
+            max_sources=max(
+                len(source_rows),
+                int(
+                    profile.get(
+                        "cashflow_schema_detection_max_sources",
+                        STAGE1_CASHFLOW_DETECTION_MAX_SOURCES,
+                    )
+                ),
+            ),
+            max_chars_per_source=min(
+                max(600, PERPLEXITY_STAGE1_SECOND_PASS_MAX_CHARS_PER_SOURCE),
+                1600,
+            ),
+        )
+    cashflow_schema_status = _detect_cashflow_schema_activation(
+        source_rows=cashflow_detection_rows,
+        mode=str(profile.get("cashflow_schema_mode", "disabled")),
+        min_reporting_periods=int(profile.get("cashflow_schema_min_reporting_periods", 3)),
+        require_operating_cashflow=bool(
+            profile.get("cashflow_schema_require_operating_cashflow", True)
+        ),
+    )
+    cashflow_schema_status["decision_source"] = "rules"
+    cashflow_schema_status["detection_source_rows_count"] = int(len(cashflow_detection_rows))
+    classifier_result = await _classify_cashflow_schema_with_agent(
+        source_rows=cashflow_detection_rows,
+        template_id=str(profile.get("template_id", "")),
+        mode=str(profile.get("cashflow_schema_mode", "auto")),
+        min_reporting_periods=int(profile.get("cashflow_schema_min_reporting_periods", 3)),
+        require_operating_cashflow=bool(
+            profile.get("cashflow_schema_require_operating_cashflow", True)
+        ),
+    )
+    cashflow_schema_status["agent_classifier"] = classifier_result
+    classifier_used = bool(isinstance(classifier_result, dict) and classifier_result.get("used", False))
+    classifier_active = (
+        bool(classifier_result.get("active"))
+        if classifier_used and isinstance(classifier_result, dict)
+        else None
+    )
+    classifier_confidence = 0.0
+    if classifier_used and isinstance(classifier_result, dict):
+        try:
+            classifier_confidence = float(classifier_result.get("confidence_pct", 0.0))
+        except Exception:
+            classifier_confidence = 0.0
+    confidence_gate = max(0.0, min(100.0, float(STAGE1_CASHFLOW_CLASSIFIER_MIN_CONFIDENCE_PCT)))
+    if (
+        classifier_used
+        and classifier_active is not None
+        and classifier_confidence >= confidence_gate
+    ):
+        cashflow_schema_status["rules_active"] = bool(cashflow_schema_status.get("active", False))
+        cashflow_schema_status["active"] = bool(classifier_active)
+        cashflow_schema_status["decision_source"] = "agent_high_confidence"
+        cashflow_schema_status["reason"] = (
+            f"{str(cashflow_schema_status.get('reason', '')).strip()}|"
+            f"agent:{str(classifier_result.get('reason', '')).strip()}|"
+            f"confidence:{classifier_confidence:.1f}"
+        ).strip("|")
+    elif (
+        classifier_used
+        and classifier_active is not None
+        and classifier_active == bool(cashflow_schema_status.get("active", False))
+    ):
+        cashflow_schema_status["decision_source"] = "rules_confirmed_by_agent"
+    cashflow_schema_contract = (
+        _build_cashflow_schema_contract_text()
+        if bool(cashflow_schema_status.get("active", False))
+        else ""
+    )
+    if bool(cashflow_schema_status.get("active", False)):
+        cashflow_section_id = "cashflow_analysis"
+        existing_section_ids = {
+            str(item[0]).strip().lower()
+            for item in profile_section_markers
+            if isinstance(item, (list, tuple)) and len(item) == 2
+        }
+        if cashflow_section_id not in existing_section_ids:
+            profile_section_markers.append(
+                (
+                    cashflow_section_id,
+                    [
+                        "cashflow analysis",
+                        "cash flow analysis",
+                        "historical / current / forward",
+                        "operating cash flow",
+                        "free cash flow",
+                    ],
+                )
+            )
+        profile_critical_sections.add(cashflow_section_id)
+    if isinstance(supplementary_macro_news_override, dict):
+        # Reuse one shared supplementary macro brief across all Stage-1 model
+        # second-pass calls in the same run to keep evidence injection consistent.
+        supplementary_macro_news = copy.deepcopy(supplementary_macro_news_override)
+    else:
+        supplementary_macro_news = await _collect_stage1_supplementary_macro_news(
+            model=model,
+            user_query=user_query,
+            run=run,
+            template_id=str(profile.get("template_id", "")),
+            existing_source_rows=source_rows,
+        )
+    supplementary_macro_news_sources = list(supplementary_macro_news.get("sources", []) or [])
+    supplementary_macro_news_summary = str(
+        supplementary_macro_news.get("summary_paragraph", "")
+    ).strip()
+    supplementary_macro_news_prompt_payload = {
+        "segment": "supplementary_macro_news",
+        "news_text": _truncate_text_for_prompt(
+            supplementary_macro_news_summary,
+            2400,
+        ),
+    }
+    supplementary_macro_news_json = json.dumps(
+        supplementary_macro_news_prompt_payload,
+        ensure_ascii=True,
+        separators=(",", ":"),
     )
     timeline_rows = _extract_stage1_timeline_evidence(
         source_rows,
@@ -5178,11 +6480,22 @@ async def _run_stage1_second_pass_analysis(
             max(1, len(source_rows)),
         ),
     )
-    appendix_rows = _prepare_stage1_source_rows(
-        run=run,
-        max_sources=appendix_source_count,
-        max_chars_per_source=min(450, PERPLEXITY_STAGE1_SECOND_PASS_MAX_CHARS_PER_SOURCE),
-    )
+    if using_prepass_source_rows:
+        appendix_rows = [
+            {
+                **row,
+                "excerpt": str(row.get("excerpt", ""))[
+                    : min(450, int(PERPLEXITY_STAGE1_SECOND_PASS_MAX_CHARS_PER_SOURCE))
+                ],
+            }
+            for row in source_rows[:appendix_source_count]
+        ]
+    else:
+        appendix_rows = _prepare_stage1_source_rows(
+            run=run,
+            max_sources=appendix_source_count,
+            max_chars_per_source=min(450, PERPLEXITY_STAGE1_SECOND_PASS_MAX_CHARS_PER_SOURCE),
+        )
     evidence = _build_stage1_decoded_evidence_block(appendix_rows)
     source_key_points_bundle = _build_stage1_doc_key_points_bundle(
         source_rows,
@@ -5234,11 +6547,13 @@ async def _run_stage1_second_pass_analysis(
         research_brief=research_brief,
         run=run,
         source_key_points_json=source_key_points_json,
+        supplementary_macro_news_json=supplementary_macro_news_json,
         compact_fact_bundle_json=compact_fact_bundle_json,
         fact_digest_json=fact_digest_json,
         fact_pack_json=fact_pack_json,
         evidence_appendix=evidence.get("block", ""),
         timeline_digest=timeline_digest_block,
+        cashflow_schema_contract=cashflow_schema_contract,
     )
     prompt_chars_before_compression = len(prompt)
 
@@ -5273,6 +6588,7 @@ async def _run_stage1_second_pass_analysis(
             research_brief=research_brief,
             run=run,
             source_key_points_json=source_key_points_json,
+            supplementary_macro_news_json=supplementary_macro_news_json,
             compact_fact_bundle_json=json.dumps(
                 compact_fact_bundle_slim,
                 ensure_ascii=True,
@@ -5290,6 +6606,7 @@ async def _run_stage1_second_pass_analysis(
             ),
             evidence_appendix="(omitted due to prompt budget; represented in Source Key Points)",
             timeline_digest=timeline_digest_block,
+            cashflow_schema_contract=cashflow_schema_contract,
         )
         if len(prompt) > prompt_target_chars:
             source_key_points_tiny = {
@@ -5331,6 +6648,7 @@ async def _run_stage1_second_pass_analysis(
                     ensure_ascii=True,
                     separators=(",", ":"),
                 ),
+                supplementary_macro_news_json=supplementary_macro_news_json,
                 compact_fact_bundle_json=json.dumps(
                     compact_fact_bundle_slim,
                     ensure_ascii=True,
@@ -5348,6 +6666,7 @@ async def _run_stage1_second_pass_analysis(
                 ),
                 evidence_appendix="(omitted due to prompt budget; represented in Source Key Points)",
                 timeline_digest=timeline_digest_block,
+                cashflow_schema_contract=cashflow_schema_contract,
             )
         prompt_compression_applied = True
         prompt_compression_appendix_omitted = True
@@ -5376,9 +6695,30 @@ async def _run_stage1_second_pass_analysis(
         ]
         for key, rows in compact_categories.items()
     }
+    supplementary_summary = str(supplementary_macro_news.get("summary_paragraph", "")).strip()
+    supplementary_preview = (
+        [
+            {
+                "type": "xai_sector_macro_brief",
+                "sector_label": str(supplementary_macro_news.get("sector_label", "")),
+                "summary_provider": str(supplementary_macro_news.get("summary_provider", "")),
+                "summary_model": str(supplementary_macro_news.get("summary_model", "")),
+                "summary_preview": _truncate_text_for_prompt(supplementary_summary, 320),
+            }
+        ]
+        if supplementary_summary
+        else []
+    )
     injection_audit = {
         "template_id": str(profile.get("template_id", "")),
+        "prepass_source_rows_used": bool(using_prepass_source_rows),
+        "prepass_source_rows_count": int(len(prepass_source_rows_cleaned)),
+        "cashflow_schema": cashflow_schema_status,
         "source_rows_preview": source_rows_preview,
+        "supplementary_macro_news_preview": supplementary_preview,
+        "supplementary_macro_news_used": bool(supplementary_macro_news.get("used", False)),
+        "supplementary_macro_news_reason": str(supplementary_macro_news.get("reason", "")),
+        "supplementary_macro_news_profile": str(supplementary_macro_news.get("commodity_profile", "")),
         "compact_fact_bundle_preview": compact_category_preview,
         "fact_digest_counts": (fact_digest.get("counts", {}) or {}),
         "fact_pack_counts": (fact_pack.get("counts", {}) or {}),
@@ -5400,6 +6740,7 @@ async def _run_stage1_second_pass_analysis(
     _progress_log(
         f"Stage1 injection audit model={model} "
         f"sources={len(source_rows_preview)} "
+        f"supplementary_sources={len(supplementary_preview)} "
         f"compact_categories={len(compact_category_preview)} "
         f"prompt_chars={len(prompt)} "
         f"compressed={prompt_compression_applied}"
@@ -5408,9 +6749,11 @@ async def _run_stage1_second_pass_analysis(
     max_attempts = max(1, int(PERPLEXITY_STAGE1_SECOND_PASS_MAX_ATTEMPTS))
     backoff = max(0.0, float(PERPLEXITY_STAGE1_SECOND_PASS_RETRY_BACKOFF_SECONDS))
     timeout = max(30.0, float(PERPLEXITY_STAGE1_SECOND_PASS_TIMEOUT_SECONDS))
-    configured_reasoning_effort = str(
+    configured_reasoning_effort = normalize_reasoning_effort(
         PERPLEXITY_STAGE1_SECOND_PASS_REASONING_EFFORT or ""
-    ).strip().lower()
+    )
+    if _is_gpt_5_4_model(model):
+        configured_reasoning_effort = "low"
     attempts_used = 0
     last_error = ""
     last_warning = ""
@@ -5421,6 +6764,12 @@ async def _run_stage1_second_pass_analysis(
     last_response_had_content = False
     last_output_tokens_used = 0
     last_reasoning_effort_applied = configured_reasoning_effort
+    last_truncation_assessment: Dict[str, Any] = {
+        "used": False,
+        "truncated": False,
+        "confidence_pct": 0.0,
+        "reason": "not_evaluated",
+    }
     last_timeline_guard: Dict[str, Any] = {
         "enabled": bool(PERPLEXITY_STAGE1_TIMELINE_GUARD_ENABLED),
         "passed": True,
@@ -5450,9 +6799,17 @@ async def _run_stage1_second_pass_analysis(
         "compliance_rating": "unknown",
         "retry_recommended": False,
         "catastrophic_failure": False,
+        "compliance_fail_reasons": [],
+        "compliance_warning_reasons": [],
+        "compliance_hard_fail_reasons": [],
+        "compliance_soft_fail_reasons": [],
     }
     prompt_used = prompt
-    valid_source_ids = [str(row.get("source_id", "")).strip() for row in source_rows]
+    valid_source_ids = [
+        str(row.get("source_id", "")).strip()
+        for row in (source_rows + supplementary_macro_news_sources)
+        if isinstance(row, dict)
+    ]
 
     for attempt in range(1, max_attempts + 1):
         attempts_used = attempt
@@ -5473,41 +6830,28 @@ async def _run_stage1_second_pass_analysis(
         ):
             prompt_for_attempt = _build_stage1_citation_repair_prompt(prompt, last_gate)
         prompt_used = prompt_for_attempt
-        attempt_reasoning_effort = configured_reasoning_effort
-        if (
-            str(analysis_provider).strip().lower() == "perplexity"
-            and str(model or "").strip().lower().startswith("openai/")
-        ):
-            # OpenAI-via-Perplexity on long second-pass prompts often consumes
-            # output budget in reasoning and returns empty/partial visible text.
-            attempt_reasoning_effort = "none"
+        attempt_reasoning_effort = normalize_reasoning_effort(configured_reasoning_effort)
         if attempt > 1:
-            if attempt_reasoning_effort == "high":
-                attempt_reasoning_effort = "medium"
-            elif attempt_reasoning_effort == "medium":
-                attempt_reasoning_effort = "low"
-        if (
-            attempt > 1
-            and not last_response_had_content
-            and str(last_response_finish_reason).strip().lower() == "length"
-            and attempt_reasoning_effort in {"high", "medium"}
-        ):
-            attempt_reasoning_effort = "low"
-        if (
-            attempt > 1
-            and str(analysis_provider).strip().lower() == "perplexity"
-            and str(model or "").strip().lower().startswith("openai/")
-            and last_output_tokens_used >= 4096
-        ):
-            # GPT routed via Perplexity can consume output budget on reasoning.
-            # Drop reasoning payload on retries to recover full visible output.
-            attempt_reasoning_effort = "none"
+            # Apply strict staged degradation by retry index:
+            # xhigh -> high -> medium -> low (never jump directly to low).
+            step_down = {
+                "xhigh": "high",
+                "high": "medium",
+                "medium": "low",
+                "low": "low",
+                "minimal": "minimal",
+            }
+            for _ in range(attempt - 1):
+                attempt_reasoning_effort = step_down.get(
+                    attempt_reasoning_effort,
+                    attempt_reasoning_effort,
+                )
         effective_reasoning_for_attempt = attempt_reasoning_effort
         if (
             str(analysis_provider).strip().lower() == "perplexity"
             and not _supports_perplexity_reasoning_payload(model)
         ):
-            effective_reasoning_for_attempt = "none"
+            effective_reasoning_for_attempt = "low"
         last_reasoning_effort_applied = effective_reasoning_for_attempt
 
         _progress_log(
@@ -5545,12 +6889,11 @@ async def _run_stage1_second_pass_analysis(
             response_reasoning_effort = str(
                 response.get("reasoning_effort_effective", "") or ""
             ).strip().lower()
-            if response_reasoning_effort in {"low", "medium", "high"}:
+            if response_reasoning_effort in {"xhigh", "high", "medium", "low", "minimal"}:
                 last_reasoning_effort_applied = response_reasoning_effort
             elif str(analysis_provider).strip().lower() == "perplexity":
-                # Explicitly record when reasoning payload is intentionally omitted.
                 if response.get("reasoning_payload_sent") is False:
-                    last_reasoning_effort_applied = "none"
+                    last_reasoning_effort_applied = "low"
         content = ""
         if response and response.get("content"):
             content = str(response.get("content", "")).strip()
@@ -5571,14 +6914,20 @@ async def _run_stage1_second_pass_analysis(
             output_tokens_used = int(
                 ((response or {}).get("usage", {}) or {}).get("output_tokens", 0) or 0
             )
-            output_cap_suspected = bool(output_tokens_used >= 8192 and len(content) >= 1000)
-            truncated_suspected = _stage1_response_looks_truncated(content)
-            if (output_cap_suspected or truncated_suspected) and attempt < max_attempts:
-                reason = "output_cap_suspected" if output_cap_suspected else "truncated_response"
+            truncation_assessment = await _assess_stage1_truncation(
+                model=model,
+                response_text=content,
+                output_tokens_used=output_tokens_used,
+                finish_reason=last_response_finish_reason,
+            )
+            last_truncation_assessment = truncation_assessment
+            if bool(truncation_assessment.get("truncated")) and attempt < max_attempts:
+                reason = str(truncation_assessment.get("reason", "truncated_response")) or "truncated_response"
                 _progress_log(
                     f"Stage1 second-pass retry trigger model={model} "
                     f"attempt={attempt}/{max_attempts} reason={reason} "
-                    f"output_tokens={output_tokens_used} response_chars={len(content)}"
+                    f"output_tokens={output_tokens_used} response_chars={len(content)} "
+                    f"confidence_pct={float(truncation_assessment.get('confidence_pct', 0.0)):.1f}"
                 )
                 prompt = _build_stage1_truncation_repair_prompt(prompt)
                 continue
@@ -5659,7 +7008,31 @@ async def _run_stage1_second_pass_analysis(
                 "last_model_usage": last_response_usage,
                 "last_model_provider": last_response_provider,
                 "last_model_reasoning_effort": last_reasoning_effort_applied,
+                "truncation_assessment": last_truncation_assessment,
                 "source_rows": source_rows,
+                "supplementary_macro_news": supplementary_macro_news,
+                "supplementary_macro_news_sources": supplementary_macro_news_sources,
+                "supplementary_macro_news_count": int(
+                    supplementary_macro_news.get(
+                        "count",
+                        1 if str(supplementary_macro_news.get("summary_paragraph", "")).strip() else 0,
+                    )
+                ),
+                "supplementary_macro_news_profile": str(
+                    supplementary_macro_news.get("commodity_profile", "")
+                ),
+                "supplementary_macro_news_reason": str(
+                    supplementary_macro_news.get("reason", "")
+                ),
+                "supplementary_macro_news_retrieval_attempted": bool(
+                    supplementary_macro_news.get("retrieval_attempted", False)
+                ),
+                "supplementary_macro_news_retrieval_result_count": int(
+                    supplementary_macro_news.get("retrieval_result_count", 0)
+                ),
+                "supplementary_macro_news_retrieval_error": str(
+                    supplementary_macro_news.get("retrieval_error", "")
+                ),
                 "evidence_source_count": int(fact_pack.get("counts", {}).get("source_count", 0)),
                 "decoded_source_count": int(
                     fact_pack.get("counts", {}).get("decoded_source_count", 0)
@@ -5719,6 +7092,7 @@ async def _run_stage1_second_pass_analysis(
                 "verification_profile_critical_sections": int(
                     len(profile_critical_sections or set())
                 ),
+                "cashflow_schema": cashflow_schema_status,
                 "injection_audit": injection_audit,
                 "asx_deterministic_ingestion": asx_deterministic_ingestion_summary,
                 "fact_pack_total_facts": int(fact_pack.get("counts", {}).get("total_facts", 0)),
@@ -5747,10 +7121,26 @@ async def _run_stage1_second_pass_analysis(
                 "compliance_rating": str(gate.get("compliance_rating", "")),
                 "compliance_retry_recommended": bool(gate.get("retry_recommended", False)),
                 "compliance_catastrophic_failure": bool(gate.get("catastrophic_failure", False)),
+                "compliance_fail_reasons": list(gate.get("compliance_fail_reasons", []) or []),
+                "compliance_warning_reasons": list(
+                    gate.get("compliance_warning_reasons", []) or []
+                ),
+                "compliance_hard_fail_reasons": list(
+                    gate.get("compliance_hard_fail_reasons", []) or []
+                ),
+                "compliance_soft_fail_reasons": list(
+                    gate.get("compliance_soft_fail_reasons", []) or []
+                ),
             }
 
         last_error = "empty_response"
         last_warning = ""
+        last_truncation_assessment = {
+            "used": False,
+            "truncated": True,
+            "confidence_pct": 100.0,
+            "reason": "empty_response",
+        }
         last_gate = {
             "enabled": bool(PERPLEXITY_STAGE1_SECOND_PASS_CITATION_GATE_ENABLED),
             "passed": False,
@@ -5772,6 +7162,10 @@ async def _run_stage1_second_pass_analysis(
             "compliance_rating": "red",
             "retry_recommended": True,
             "catastrophic_failure": True,
+            "compliance_fail_reasons": ["empty_response"],
+            "compliance_warning_reasons": [],
+            "compliance_hard_fail_reasons": ["empty_response"],
+            "compliance_soft_fail_reasons": [],
         }
         _progress_log(
             f"Stage1 second-pass empty response model={model} "
@@ -5802,7 +7196,29 @@ async def _run_stage1_second_pass_analysis(
         "last_model_usage": last_response_usage,
         "last_model_provider": last_response_provider,
         "last_model_reasoning_effort": last_reasoning_effort_applied,
+        "truncation_assessment": last_truncation_assessment,
         "source_rows": source_rows,
+        "supplementary_macro_news": supplementary_macro_news,
+        "supplementary_macro_news_sources": supplementary_macro_news_sources,
+        "supplementary_macro_news_count": int(
+            supplementary_macro_news.get(
+                "count",
+                1 if str(supplementary_macro_news.get("summary_paragraph", "")).strip() else 0,
+            )
+        ),
+        "supplementary_macro_news_profile": str(
+            supplementary_macro_news.get("commodity_profile", "")
+        ),
+        "supplementary_macro_news_reason": str(supplementary_macro_news.get("reason", "")),
+        "supplementary_macro_news_retrieval_attempted": bool(
+            supplementary_macro_news.get("retrieval_attempted", False)
+        ),
+        "supplementary_macro_news_retrieval_result_count": int(
+            supplementary_macro_news.get("retrieval_result_count", 0)
+        ),
+        "supplementary_macro_news_retrieval_error": str(
+            supplementary_macro_news.get("retrieval_error", "")
+        ),
         "evidence_source_count": int(fact_pack.get("counts", {}).get("source_count", 0)),
         "decoded_source_count": int(
             fact_pack.get("counts", {}).get("decoded_source_count", 0)
@@ -5862,6 +7278,7 @@ async def _run_stage1_second_pass_analysis(
         "verification_profile_critical_sections": int(
             len(profile_critical_sections or set())
         ),
+        "cashflow_schema": cashflow_schema_status,
         "injection_audit": injection_audit,
         "asx_deterministic_ingestion": asx_deterministic_ingestion_summary,
         "fact_pack_total_facts": int(fact_pack.get("counts", {}).get("total_facts", 0)),
@@ -5890,6 +7307,16 @@ async def _run_stage1_second_pass_analysis(
         "compliance_rating": str(last_gate.get("compliance_rating", "")),
         "compliance_retry_recommended": bool(last_gate.get("retry_recommended", False)),
         "compliance_catastrophic_failure": bool(last_gate.get("catastrophic_failure", False)),
+        "compliance_fail_reasons": list(last_gate.get("compliance_fail_reasons", []) or []),
+        "compliance_warning_reasons": list(
+            last_gate.get("compliance_warning_reasons", []) or []
+        ),
+        "compliance_hard_fail_reasons": list(
+            last_gate.get("compliance_hard_fail_reasons", []) or []
+        ),
+        "compliance_soft_fail_reasons": list(
+            last_gate.get("compliance_soft_fail_reasons", []) or []
+        ),
     }
 
 
@@ -5900,6 +7327,8 @@ async def _apply_stage1_second_pass(
     research_brief: str,
     run: Dict[str, Any],
     verification_profile: Optional[Dict[str, Any]] = None,
+    supplementary_macro_news_override: Optional[Dict[str, Any]] = None,
+    prepass_source_rows: Optional[List[Dict[str, Any]]] = None,
     analysis_provider: str = "openrouter",
 ) -> Dict[str, Any]:
     """Attach second-pass analysis/metadata to an existing Stage 1 retrieval run."""
@@ -5918,6 +7347,8 @@ async def _apply_stage1_second_pass(
         research_brief=research_brief,
         run=run,
         verification_profile=verification_profile,
+        supplementary_macro_news_override=supplementary_macro_news_override,
+        prepass_source_rows=prepass_source_rows,
         analysis_provider=analysis_provider,
     )
     run["stage1_second_pass"] = second_pass_result
@@ -6027,6 +7458,52 @@ async def _apply_stage1_second_pass(
     provider_meta["stage1_second_pass_compact_fact_bundle_categories_with_facts"] = int(
         second_pass_result.get("compact_fact_bundle_categories_with_facts", 0)
     )
+    cashflow_schema_meta = second_pass_result.get("cashflow_schema", {}) or {}
+    if isinstance(cashflow_schema_meta, dict):
+        provider_meta["stage1_second_pass_cashflow_schema_active"] = bool(
+            cashflow_schema_meta.get("active", False)
+        )
+        provider_meta["stage1_second_pass_cashflow_schema_mode"] = str(
+            cashflow_schema_meta.get("mode", "")
+        )
+        provider_meta["stage1_second_pass_cashflow_schema_reason"] = str(
+            cashflow_schema_meta.get("reason", "")
+        )
+        provider_meta["stage1_second_pass_cashflow_schema_decision_source"] = str(
+            cashflow_schema_meta.get("decision_source", "")
+        )
+        provider_meta["stage1_second_pass_cashflow_schema_detection_source_rows_count"] = int(
+            cashflow_schema_meta.get("detection_source_rows_count", 0)
+        )
+        provider_meta["stage1_second_pass_cashflow_schema_periods_detected"] = int(
+            cashflow_schema_meta.get("periods_detected", 0)
+        )
+        provider_meta["stage1_second_pass_cashflow_schema_rows_with_cashflow_terms"] = int(
+            cashflow_schema_meta.get("rows_with_cashflow_terms", 0)
+        )
+        provider_meta["stage1_second_pass_cashflow_schema_rows_with_reporting_terms"] = int(
+            cashflow_schema_meta.get("rows_with_reporting_terms", 0)
+        )
+        provider_meta[
+            "stage1_second_pass_cashflow_schema_rows_with_operating_cashflow_terms"
+        ] = int(cashflow_schema_meta.get("rows_with_operating_cashflow_terms", 0))
+        provider_meta["stage1_second_pass_cashflow_schema_rows_with_forward_terms"] = int(
+            cashflow_schema_meta.get("rows_with_forward_guidance_terms", 0)
+        )
+        classifier_meta = cashflow_schema_meta.get("agent_classifier", {}) or {}
+        if isinstance(classifier_meta, dict):
+            provider_meta["stage1_second_pass_cashflow_schema_agent_used"] = bool(
+                classifier_meta.get("used", False)
+            )
+            provider_meta["stage1_second_pass_cashflow_schema_agent_model"] = str(
+                classifier_meta.get("model", "")
+            )
+            provider_meta["stage1_second_pass_cashflow_schema_agent_reason"] = str(
+                classifier_meta.get("reason", "")
+            )
+            provider_meta["stage1_second_pass_cashflow_schema_agent_confidence_pct"] = float(
+                classifier_meta.get("confidence_pct", 0.0) or 0.0
+            )
     asx_ingestion = second_pass_result.get("asx_deterministic_ingestion", {}) or {}
     if isinstance(asx_ingestion, dict):
         provider_meta["stage1_second_pass_asx_deterministic_enabled"] = bool(
@@ -6052,6 +7529,34 @@ async def _apply_stage1_second_pass(
         )
     provider_meta["stage1_second_pass_source_rows_count"] = int(
         len(second_pass_result.get("source_rows", []) or [])
+    )
+    provider_meta["stage1_second_pass_prepass_source_rows_used"] = bool(
+        (second_pass_result.get("injection_audit", {}) or {}).get(
+            "prepass_source_rows_used",
+            False,
+        )
+    )
+    # Legacy alias kept for backward-compatible consumers.
+    provider_meta["stage1_second_pass_source_rows_override_used"] = bool(
+        provider_meta.get("stage1_second_pass_prepass_source_rows_used", False)
+    )
+    provider_meta["stage1_second_pass_supplementary_macro_news_count"] = int(
+        second_pass_result.get("supplementary_macro_news_count", 0)
+    )
+    provider_meta["stage1_second_pass_supplementary_macro_news_profile"] = str(
+        second_pass_result.get("supplementary_macro_news_profile", "")
+    )
+    provider_meta["stage1_second_pass_supplementary_macro_news_reason"] = str(
+        second_pass_result.get("supplementary_macro_news_reason", "")
+    )
+    provider_meta["stage1_second_pass_supplementary_macro_news_retrieval_attempted"] = bool(
+        second_pass_result.get("supplementary_macro_news_retrieval_attempted", False)
+    )
+    provider_meta["stage1_second_pass_supplementary_macro_news_retrieval_result_count"] = int(
+        second_pass_result.get("supplementary_macro_news_retrieval_result_count", 0)
+    )
+    provider_meta["stage1_second_pass_supplementary_macro_news_retrieval_error"] = str(
+        second_pass_result.get("supplementary_macro_news_retrieval_error", "")
     )
     provider_meta["stage1_second_pass_timeline_evidence_count"] = int(
         len(second_pass_result.get("timeline_evidence", []) or [])
@@ -6149,6 +7654,18 @@ async def _apply_stage1_second_pass(
     provider_meta["stage1_second_pass_compliance_catastrophic_failure"] = bool(
         second_pass_result.get("compliance_catastrophic_failure", False)
     )
+    provider_meta["stage1_second_pass_compliance_fail_reasons"] = list(
+        second_pass_result.get("compliance_fail_reasons", []) or []
+    )
+    provider_meta["stage1_second_pass_compliance_warning_reasons"] = list(
+        second_pass_result.get("compliance_warning_reasons", []) or []
+    )
+    provider_meta["stage1_second_pass_compliance_hard_fail_reasons"] = list(
+        second_pass_result.get("compliance_hard_fail_reasons", []) or []
+    )
+    provider_meta["stage1_second_pass_compliance_soft_fail_reasons"] = list(
+        second_pass_result.get("compliance_soft_fail_reasons", []) or []
+    )
 
     if second_pass_result.get("prompt"):
         run["stage1_second_pass_prompt"] = second_pass_result["prompt"]
@@ -6156,6 +7673,8 @@ async def _apply_stage1_second_pass(
         run["stage1_second_pass_fact_digest_v2"] = second_pass_result["fact_digest_v2"]
     if second_pass_result.get("fact_pack"):
         run["stage1_second_pass_fact_pack"] = second_pass_result["fact_pack"]
+    if isinstance(cashflow_schema_meta, dict) and cashflow_schema_meta:
+        run["stage1_second_pass_cashflow_schema"] = cashflow_schema_meta
     if "compact_fact_bundle" in second_pass_result:
         run["stage1_second_pass_compact_fact_bundle"] = (
             second_pass_result.get("compact_fact_bundle") or {}
@@ -6183,10 +7702,29 @@ async def _apply_stage1_second_pass(
                 ).keys()
             )
         )
+        provider_meta["stage1_second_pass_injection_supplementary_sources"] = int(
+            len(
+                (
+                    (second_pass_result.get("injection_audit") or {}).get(
+                        "supplementary_macro_news_preview",
+                        [],
+                    )
+                    or []
+                )
+            )
+        )
     if isinstance(asx_ingestion, dict):
         run["stage1_second_pass_asx_deterministic_ingestion"] = asx_ingestion
     if second_pass_result.get("source_rows"):
         run["stage1_second_pass_source_rows"] = second_pass_result.get("source_rows", [])
+    if second_pass_result.get("supplementary_macro_news_sources"):
+        run["stage1_second_pass_supplementary_macro_news_sources"] = (
+            second_pass_result.get("supplementary_macro_news_sources", [])
+        )
+    if second_pass_result.get("supplementary_macro_news"):
+        run["stage1_second_pass_supplementary_macro_news"] = (
+            second_pass_result.get("supplementary_macro_news", {})
+        )
     if second_pass_result.get("timeline_evidence"):
         run["stage1_second_pass_timeline_evidence"] = second_pass_result.get(
             "timeline_evidence",
@@ -6223,7 +7761,10 @@ async def _apply_stage1_second_pass(
     return run
 
 
-async def stage1_collect_responses(enhanced_context: str) -> List[Dict[str, Any]]:
+async def stage1_collect_responses(
+    enhanced_context: str,
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+) -> List[Dict[str, Any]]:
     """
     Stage 1: Collect individual responses from all council models.
 
@@ -6234,13 +7775,80 @@ async def stage1_collect_responses(enhanced_context: str) -> List[Dict[str, Any]
         List of dicts with 'model' and 'response' keys
     """
     messages = [{"role": "user", "content": enhanced_context}]
+    total_models = len(COUNCIL_MODELS)
+
+    if progress_callback is not None:
+        try:
+            progress_callback(
+                {
+                    "type": "stage1_progress",
+                    "data": {
+                        "stage": "stage1",
+                        "phase": "local_start",
+                        "model": "",
+                        "status": "running",
+                        "completed": 0,
+                        "total": total_models,
+                        "progress_pct": 0,
+                        "stage_message": f"Stage 1 started with {total_models} local council model(s)",
+                    },
+                }
+            )
+        except Exception:
+            pass
+    _progress_log(
+        f"Stage1 progress: phase=local_start model= completed=0/{max(1, total_models)} pct=0 status=running"
+    )
+
+    def _on_model_complete(
+        model: str,
+        response: Optional[Dict[str, Any]],
+        completed: int,
+        total: int,
+    ) -> None:
+        if progress_callback is None:
+            return
+        status = "success" if response is not None else "failed"
+        progress_pct = int(round((completed / max(total, 1)) * 100)) if total else 100
+        progress_message = (
+            f"Stage 1 model complete: {model} ({completed}/{total})"
+            if status == "success"
+            else f"Stage 1 model failed: {model} ({completed}/{total})"
+        )
+        try:
+            progress_callback(
+                {
+                    "type": "stage1_progress",
+                    "data": {
+                        "stage": "stage1",
+                        "phase": "local_model_complete",
+                        "model": model,
+                        "status": status,
+                        "completed": completed,
+                        "total": total,
+                        "progress_pct": progress_pct,
+                        "stage_message": progress_message,
+                    },
+                }
+            )
+        except Exception:
+            pass
+        _progress_log(
+            f"Stage1 progress: phase=local_model_complete model={model} "
+            f"completed={completed}/{total} pct={progress_pct} status={status}"
+        )
 
     # Query all models in parallel
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    responses = await query_models_parallel(
+        COUNCIL_MODELS,
+        messages,
+        on_model_complete=_on_model_complete,
+    )
 
     # Format results
     stage1_results = []
-    for model, response in responses.items():
+    for model in COUNCIL_MODELS:
+        response = responses.get(model)
         if response is not None:  # Only include successful responses
             stage1_results.append({
                 "model": model,
@@ -6254,10 +7862,13 @@ async def stage1_collect_perplexity_research_responses(
     user_query: str,
     ticker: Optional[str] = None,
     attachment_context: str = "",
+    prepass_source_rows: Optional[List[Dict[str, Any]]] = None,
+    source_rows_override: Optional[List[Dict[str, Any]]] = None,
     depth: str = "deep",
     research_brief: str = "",
     template_id: Optional[str] = None,
     diagnostic_mode: bool = False,
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
     Stage 1 (emulated): run one Perplexity deep-research call per configured model.
@@ -6266,6 +7877,9 @@ async def stage1_collect_perplexity_research_responses(
         user_query: User question
         ticker: Optional ticker symbol
         attachment_context: Optional attached-document context
+        prepass_source_rows: Optional prepass source rows for authoritative
+            second-pass evidence injection.
+        source_rows_override: Deprecated alias for prepass_source_rows.
         depth: basic|deep research depth
         research_brief: Optional template/company-type framing to steer retrieval
         template_id: Optional selected template id for verification profile
@@ -6279,6 +7893,10 @@ async def stage1_collect_perplexity_research_responses(
     _ensure_system_enabled(diagnostic_mode=diagnostic_mode)
     import asyncio
     from .research.providers.perplexity import PerplexityResearchProvider
+
+    if prepass_source_rows is None and source_rows_override is not None:
+        prepass_source_rows = list(source_rows_override)
+    authoritative_prepass_mode = bool(prepass_source_rows)
 
     total_start = perf_counter()
     perplexity_models_requested = _dedupe_model_ids(
@@ -6381,6 +7999,90 @@ async def stage1_collect_perplexity_research_responses(
         models = _dedupe_model_ids(COUNCIL_MODELS)
     perplexity_model_set = set(perplexity_models)
     openrouter_model_set = set(openrouter_pool_models)
+    shared_retrieval_requested = bool(
+        (not authoritative_prepass_mode)
+        and PERPLEXITY_STAGE1_SHARED_RETRIEVAL_ENABLED
+        and len(models) > 1
+    )
+    if mixed_mode_enabled and len(models) > 1 and not shared_retrieval_requested:
+        # Mixed provider fanout is only coherent when retrieval/decode is shared,
+        # except when authoritative prepass rows are supplied.
+        if authoritative_prepass_mode:
+            _progress_log(
+                "Stage1 authoritative prepass mode: skipping shared retrieval "
+                "and provider retrieval fanout."
+            )
+        else:
+            shared_retrieval_requested = True
+            _progress_log(
+                "Stage1 mixed mode forcing shared retrieval: "
+                "shared_retrieval_enabled=false -> true"
+            )
+
+    stage1_total_units = len(models) + (1 if shared_retrieval_requested else 0)
+    stage1_completed_units = 0
+
+    def _emit_stage1_progress(
+        *,
+        model: str,
+        status: str,
+        phase: str,
+        result_count: Optional[int] = None,
+    ) -> None:
+        nonlocal stage1_completed_units
+        stage1_completed_units += 1
+        total = max(1, stage1_total_units)
+        pct = int(round((stage1_completed_units / total) * 100))
+        payload: Dict[str, Any] = {
+            "type": "stage1_progress",
+            "data": {
+                "stage": "stage1",
+                "phase": phase,
+                "model": model,
+                "status": status,
+                "completed": stage1_completed_units,
+                "total": total,
+                "progress_pct": pct,
+                "stage_message": (
+                    f"Stage 1 progress: phase={phase} model={model} "
+                    f"completed={stage1_completed_units}/{total} pct={pct} status={status}"
+                ),
+            },
+        }
+        if result_count is not None:
+            payload["data"]["result_count"] = int(result_count)
+        if progress_callback is not None:
+            try:
+                progress_callback(payload)
+            except Exception:
+                pass
+        _progress_log(
+            f"Stage1 progress: phase={phase} model={model} "
+            f"completed={stage1_completed_units}/{total} pct={pct} status={status}"
+        )
+
+    if progress_callback is not None:
+        try:
+            progress_callback(
+                {
+                    "type": "stage1_progress",
+                    "data": {
+                        "stage": "stage1",
+                        "phase": "start",
+                        "model": "",
+                        "status": "running",
+                        "completed": 0,
+                        "total": max(1, stage1_total_units),
+                        "progress_pct": 0,
+                        "stage_message": f"Stage 1 started with {stage1_total_units} unit(s)",
+                    },
+                }
+            )
+        except Exception:
+            pass
+    _progress_log(
+        f"Stage1 progress: phase=start model= completed=0/{max(1, stage1_total_units)} pct=0 status=running"
+    )
     provider = PerplexityResearchProvider()
     _progress_log(
         "Stage1 perplexity emulation start: "
@@ -6390,7 +8092,9 @@ async def stage1_collect_perplexity_research_responses(
         f"openrouter_pool={openrouter_pool_models}, "
         f"execution_mode={PERPLEXITY_STAGE1_EXECUTION_MODE}, "
         f"second_pass_enabled={PERPLEXITY_STAGE1_SECOND_PASS_ENABLED}, "
-        f"shared_retrieval_enabled={PERPLEXITY_STAGE1_SHARED_RETRIEVAL_ENABLED}"
+        f"shared_retrieval_config_enabled={PERPLEXITY_STAGE1_SHARED_RETRIEVAL_ENABLED}, "
+        f"shared_retrieval_requested={shared_retrieval_requested}, "
+        f"authoritative_prepass_mode={authoritative_prepass_mode}"
     )
     verification_profile = _build_stage1_verification_profile(template_id)
     if PROGRESS_LOGGING:
@@ -6434,6 +8138,9 @@ async def stage1_collect_perplexity_research_responses(
     else:
         max_attempts = max(1, int(PERPLEXITY_STAGE1_MAX_RETRIES) + 1)
     base_backoff = max(0.0, float(PERPLEXITY_STAGE1_RETRY_BACKOFF_SECONDS))
+    # One supplementary macro brief per Stage-1 run; reused across all model
+    # second-pass prompts to avoid model-by-model drift in injected context.
+    shared_supplementary_macro_news: Optional[Dict[str, Any]] = None
     multi_wave_enabled = bool(PERPLEXITY_STAGE1_MULTI_WAVE_ENABLED and depth == "deep")
     max_waves = max(1, int(PERPLEXITY_STAGE1_MULTI_WAVE_MAX_WAVES))
     gap_query_limit = max(1, int(PERPLEXITY_STAGE1_MULTI_WAVE_GAP_QUERY_LIMIT))
@@ -6466,6 +8173,37 @@ async def stage1_collect_perplexity_research_responses(
             return "openrouter"
         # Default unknowns to Perplexity lane in mixed mode for safer attribution.
         return "perplexity"
+
+    def _build_authoritative_prepass_seed_run(model: str) -> Dict[str, Any]:
+        now_iso = datetime.utcnow().isoformat()
+        return {
+            "id": f"stage1_prepass_seed_{uuid.uuid4().hex}",
+            "query": user_query,
+            "ticker": ticker,
+            "depth": depth,
+            "model": model,
+            "generated_at": now_iso,
+            "result_count": 0,
+            "results": [],
+            "latest_updates": [],
+            "research_summary": "",
+            "provider_metadata": {
+                "model": model,
+                "preset": "prepass_authoritative",
+                "tools": [],
+                "source_decoding": {
+                    "attempted": int(len(prepass_source_rows or [])),
+                    "decoded": int(len(prepass_source_rows or [])),
+                    "failed": 0,
+                },
+                "stage1_prepass_authoritative_mode": True,
+                "stage1_prepass_source_rows_supplied": int(len(prepass_source_rows or [])),
+                "stage1_retrieval_skipped": True,
+                "stage1_retrieval_skipped_reason": "authoritative_prepass_mode",
+                "stage1_shared_retrieval_enabled": False,
+                "stage1_shared_retrieval_used": False,
+            },
+        }
 
     async def _run_retrieval_with_planner(
         *,
@@ -6627,6 +8365,67 @@ async def stage1_collect_perplexity_research_responses(
         return merged
 
     async def _gather_model_with_retries(model: str, run_second_pass: bool = True) -> Dict[str, Any]:
+        nonlocal shared_supplementary_macro_news
+        if authoritative_prepass_mode:
+            run = _build_authoritative_prepass_seed_run(model)
+            provider_meta = run.setdefault("provider_metadata", {})
+            if not isinstance(provider_meta, dict):
+                provider_meta = {}
+                run["provider_metadata"] = provider_meta
+            analysis_provider = _analysis_provider_for_model(model)
+            provider_meta["stage1_analysis_provider"] = analysis_provider
+            provider_meta["stage1_attempts"] = 1
+            provider_meta["stage1_retried"] = False
+            provider_meta["stage1_template_retry_triggered"] = False
+            provider_meta["stage1_template_retry_fallback_used"] = False
+            provider_meta["stage1_attempt_history"] = [
+                {
+                    "attempt": 1,
+                    "status": "prepass_authoritative_analysis_only",
+                    "profile": {
+                        "name": "prepass_authoritative",
+                        "max_sources": int(len(prepass_source_rows or [])),
+                        "reasoning_effort": "",
+                    },
+                }
+            ]
+            if run_second_pass:
+                if analysis_provider == "perplexity":
+                    run = await _apply_stage1_second_pass(
+                        model=model,
+                        user_query=user_query,
+                        research_brief=bounded_research_brief,
+                        run=run,
+                        verification_profile=verification_profile,
+                        supplementary_macro_news_override=shared_supplementary_macro_news,
+                        prepass_source_rows=prepass_source_rows,
+                        analysis_provider="perplexity",
+                    )
+                elif _is_openrouter_compatible_model(model):
+                    run = await _apply_stage1_second_pass(
+                        model=model,
+                        user_query=user_query,
+                        research_brief=bounded_research_brief,
+                        run=run,
+                        verification_profile=verification_profile,
+                        supplementary_macro_news_override=shared_supplementary_macro_news,
+                        prepass_source_rows=prepass_source_rows,
+                        analysis_provider="openrouter",
+                    )
+                else:
+                    provider_meta["stage1_second_pass_enabled"] = False
+                    provider_meta["stage1_second_pass_skipped_reason"] = (
+                        "model_not_openrouter_compatible"
+                    )
+                if shared_supplementary_macro_news is None:
+                    maybe_shared = run.get("stage1_second_pass_supplementary_macro_news", {})
+                    if isinstance(maybe_shared, dict) and maybe_shared:
+                        shared_supplementary_macro_news = copy.deepcopy(maybe_shared)
+            else:
+                provider_meta["stage1_second_pass_enabled"] = False
+                provider_meta["stage1_second_pass_skipped_reason"] = "second_pass_disabled"
+            return run
+
         run: Dict[str, Any] = {}
         last_successful_run: Optional[Dict[str, Any]] = None
         active_research_brief = bounded_research_brief
@@ -6660,7 +8459,7 @@ async def stage1_collect_perplexity_research_responses(
                 f"max_sources={attempt_profile['max_sources']}, "
                 f"max_steps={attempt_profile['max_steps']}, "
                 f"max_output_tokens={attempt_profile['max_output_tokens']}, "
-                f"reasoning_effort={attempt_profile['reasoning_effort'] or 'none'}"
+                f"reasoning_effort={attempt_profile['reasoning_effort'] or 'low'}"
             )
 
             run = await _run_retrieval_with_planner(
@@ -6829,6 +8628,8 @@ async def stage1_collect_perplexity_research_responses(
                         research_brief=bounded_research_brief,
                         run=run,
                         verification_profile=verification_profile,
+                        supplementary_macro_news_override=shared_supplementary_macro_news,
+                        prepass_source_rows=prepass_source_rows,
                         analysis_provider="perplexity",
                     )
                 elif _is_openrouter_compatible_model(model):
@@ -6838,6 +8639,8 @@ async def stage1_collect_perplexity_research_responses(
                         research_brief=bounded_research_brief,
                         run=run,
                         verification_profile=verification_profile,
+                        supplementary_macro_news_override=shared_supplementary_macro_news,
+                        prepass_source_rows=prepass_source_rows,
                         analysis_provider="openrouter",
                     )
                 else:
@@ -6845,6 +8648,10 @@ async def stage1_collect_perplexity_research_responses(
                     provider_meta["stage1_second_pass_skipped_reason"] = (
                         "model_not_openrouter_compatible"
                     )
+                if shared_supplementary_macro_news is None:
+                    maybe_shared = run.get("stage1_second_pass_supplementary_macro_news", {})
+                    if isinstance(maybe_shared, dict) and maybe_shared:
+                        shared_supplementary_macro_news = copy.deepcopy(maybe_shared)
             else:
                 provider_meta["stage1_second_pass_enabled"] = False
                 provider_meta["stage1_second_pass_skipped_reason"] = "shared_retrieval_mode"
@@ -6965,11 +8772,6 @@ async def stage1_collect_perplexity_research_responses(
                 f"error={run.get('error') if run else 'unknown'})"
             )
 
-    shared_retrieval_requested = bool(PERPLEXITY_STAGE1_SHARED_RETRIEVAL_ENABLED and len(models) > 1)
-    if mixed_mode_enabled and len(models) > 1 and not shared_retrieval_requested:
-        # Mixed provider fanout is only coherent when retrieval/decode is shared.
-        shared_retrieval_requested = True
-        _progress_log("Stage1 mixed mode forcing shared retrieval: shared_retrieval_enabled=false -> true")
     shared_retrieval_used = False
     shared_retrieval_model = ""
     shared_retrieval_error = ""
@@ -7008,9 +8810,16 @@ async def stage1_collect_perplexity_research_responses(
                 f"model={shared_retrieval_model}, elapsed={shared_elapsed:.1f}s, "
                 f"error={shared_retrieval_error}"
             )
+        _emit_stage1_progress(
+            model=shared_retrieval_model,
+            status="success" if shared_retrieval_used else "failed",
+            phase="shared_seed",
+            result_count=int(shared_seed_run.get("result_count", 0)) if isinstance(shared_seed_run, dict) else None,
+        )
 
         if shared_retrieval_used:
             async def _run_shared_one(model: str) -> Dict[str, Any]:
+                nonlocal shared_supplementary_macro_news
                 model_start = perf_counter()
                 _progress_log(f"Stage1 model start (shared fanout): {model}")
                 run = copy.deepcopy(shared_seed_run)
@@ -7040,6 +8849,8 @@ async def stage1_collect_perplexity_research_responses(
                             research_brief=bounded_research_brief,
                             run=run,
                             verification_profile=verification_profile,
+                            supplementary_macro_news_override=shared_supplementary_macro_news,
+                            prepass_source_rows=prepass_source_rows,
                             analysis_provider="perplexity",
                         )
                     elif _is_openrouter_compatible_model(model):
@@ -7049,6 +8860,8 @@ async def stage1_collect_perplexity_research_responses(
                             research_brief=bounded_research_brief,
                             run=run,
                             verification_profile=verification_profile,
+                            supplementary_macro_news_override=shared_supplementary_macro_news,
+                            prepass_source_rows=prepass_source_rows,
                             analysis_provider="openrouter",
                         )
                     else:
@@ -7056,12 +8869,22 @@ async def stage1_collect_perplexity_research_responses(
                         provider_meta["stage1_second_pass_skipped_reason"] = (
                             "model_not_openrouter_compatible"
                         )
+                    if shared_supplementary_macro_news is None:
+                        maybe_shared = run.get("stage1_second_pass_supplementary_macro_news", {})
+                        if isinstance(maybe_shared, dict) and maybe_shared:
+                            shared_supplementary_macro_news = copy.deepcopy(maybe_shared)
                 else:
                     provider_meta["stage1_second_pass_enabled"] = False
                     provider_meta["stage1_second_pass_skipped_reason"] = "second_pass_disabled"
 
                 elapsed = perf_counter() - model_start
                 _log_stage1_model_result(model, run, elapsed)
+                _emit_stage1_progress(
+                    model=model,
+                    status="success" if not run.get("error") else "failed",
+                    phase="shared_fanout",
+                    result_count=int(run.get("result_count", 0)) if isinstance(run, dict) else None,
+                )
                 return run
 
             if execution_mode == "staggered":
@@ -7076,7 +8899,12 @@ async def stage1_collect_perplexity_research_responses(
                 shared_tasks = [_run_shared_one(model) for model in models]
                 raw_runs = await asyncio.gather(*shared_tasks)
 
-    if mixed_mode_enabled and not shared_retrieval_used and openrouter_pool_models:
+    if (
+        mixed_mode_enabled
+        and not authoritative_prepass_mode
+        and not shared_retrieval_used
+        and openrouter_pool_models
+    ):
         _progress_log(
             "Stage1 mixed-mode fallback: shared retrieval unavailable; "
             f"running Perplexity pool only ({perplexity_models})"
@@ -7096,6 +8924,12 @@ async def stage1_collect_perplexity_research_responses(
                 run = await _gather_model_with_retries(model, run_second_pass=True)
                 elapsed = perf_counter() - model_start
                 _log_stage1_model_result(model, run, elapsed)
+                _emit_stage1_progress(
+                    model=model,
+                    status="success" if not run.get("error") else "failed",
+                    phase="model_complete",
+                    result_count=int(run.get("result_count", 0)) if isinstance(run, dict) else None,
+                )
                 raw_runs.append(run)
         else:
             async def _run_one(model: str) -> Dict[str, Any]:
@@ -7104,6 +8938,12 @@ async def stage1_collect_perplexity_research_responses(
                 run = await _gather_model_with_retries(model, run_second_pass=True)
                 elapsed = perf_counter() - model_start
                 _log_stage1_model_result(model, run, elapsed)
+                _emit_stage1_progress(
+                    model=model,
+                    status="success" if not run.get("error") else "failed",
+                    phase="model_complete",
+                    result_count=int(run.get("result_count", 0)) if isinstance(run, dict) else None,
+                )
                 return run
 
             tasks = [_run_one(model) for model in models]
@@ -7187,6 +9027,13 @@ async def stage1_collect_perplexity_research_responses(
         "stage1_verification_compliance_markers": int(
             len(verification_profile.get("compliance_section_markers", []) or [])
         ),
+        "stage1_verification_required_sections": list(
+            [
+                str(item[0]).strip().lower()
+                for item in (verification_profile.get("compliance_section_markers", []) or [])
+                if isinstance(item, (tuple, list)) and item
+            ]
+        ),
         "stage1_verification_critical_sections": list(
             sorted(verification_profile.get("compliance_critical_sections", set()) or [])
         ),
@@ -7221,14 +9068,20 @@ async def stage1_collect_perplexity_research_responses(
         "stage1_second_pass_max_chars_per_source": int(
             PERPLEXITY_STAGE1_SECOND_PASS_MAX_CHARS_PER_SOURCE
         ),
+        "stage1_prepass_source_rows_supplied": bool(prepass_source_rows),
+        "stage1_prepass_source_rows_count": int(len(prepass_source_rows or [])),
+        "stage1_prepass_authoritative_mode": bool(authoritative_prepass_mode),
+        # Legacy aliases retained for backward-compatible consumers.
+        "stage1_source_rows_override_supplied": bool(prepass_source_rows),
+        "stage1_source_rows_override_count": int(len(prepass_source_rows or [])),
         "stage1_second_pass_appendix_max_sources": int(
             PERPLEXITY_STAGE1_SECOND_PASS_APPENDIX_MAX_SOURCES
         ),
         "stage1_second_pass_max_output_tokens": int(
             PERPLEXITY_STAGE1_SECOND_PASS_MAX_OUTPUT_TOKENS
         ),
-        "stage1_second_pass_reasoning_effort": str(
-            PERPLEXITY_STAGE1_SECOND_PASS_REASONING_EFFORT
+        "stage1_second_pass_reasoning_effort": normalize_reasoning_effort(
+            str(PERPLEXITY_STAGE1_SECOND_PASS_REASONING_EFFORT or "")
         ),
         "stage1_second_pass_prompt_compression_enabled": bool(
             PERPLEXITY_STAGE1_SECOND_PASS_PROMPT_COMPRESSION_ENABLED
@@ -7244,6 +9097,31 @@ async def stage1_collect_perplexity_research_responses(
         ),
         "stage1_second_pass_doc_keypoints_max_fact_chars": int(
             PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_FACT_CHARS
+        ),
+        "stage1_cashflow_detection_max_sources": int(STAGE1_CASHFLOW_DETECTION_MAX_SOURCES),
+        "stage1_cashflow_classifier_enabled": bool(STAGE1_CASHFLOW_CLASSIFIER_ENABLED),
+        "stage1_cashflow_classifier_model": str(STAGE1_CASHFLOW_CLASSIFIER_MODEL or ""),
+        "stage1_cashflow_classifier_timeout_seconds": float(
+            STAGE1_CASHFLOW_CLASSIFIER_TIMEOUT_SECONDS
+        ),
+        "stage1_cashflow_classifier_max_output_tokens": int(
+            STAGE1_CASHFLOW_CLASSIFIER_MAX_OUTPUT_TOKENS
+        ),
+        "stage1_cashflow_classifier_reasoning_effort": normalize_reasoning_effort(
+            str(STAGE1_CASHFLOW_CLASSIFIER_REASONING_EFFORT or "")
+        ),
+        "stage1_cashflow_classifier_min_confidence_pct": float(
+            STAGE1_CASHFLOW_CLASSIFIER_MIN_CONFIDENCE_PCT
+        ),
+        "stage1_supplementary_news_enabled": bool(PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_ENABLED),
+        "stage1_supplementary_news_max_sources": int(
+            PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_MAX_SOURCES
+        ),
+        "stage1_supplementary_news_retrieval_max_sources": int(
+            PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_RETRIEVAL_MAX_SOURCES
+        ),
+        "stage1_supplementary_news_max_recency_days": int(
+            PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_MAX_RECENCY_DAYS
         ),
         "stage1_asx_deterministic_announcements_enabled": bool(
             ASX_DETERMINISTIC_ANNOUNCEMENTS_ENABLED
@@ -7298,6 +9176,7 @@ async def stage1_collect_perplexity_research_responses(
         "stage1_second_pass_compliance_catastrophic_score": float(
             PERPLEXITY_STAGE1_SECOND_PASS_COMPLIANCE_CATASTROPHIC_SCORE
         ),
+        "stage1_shared_retrieval_config_enabled": bool(PERPLEXITY_STAGE1_SHARED_RETRIEVAL_ENABLED),
         "stage1_shared_retrieval_enabled": bool(PERPLEXITY_STAGE1_SHARED_RETRIEVAL_ENABLED),
         "stage1_shared_retrieval_requested": bool(shared_retrieval_requested),
         "stage1_shared_retrieval_used": bool(shared_retrieval_used),
@@ -7308,8 +9187,8 @@ async def stage1_collect_perplexity_research_responses(
         ),
         "stage1_openai_base_max_sources": int(PERPLEXITY_STAGE1_OPENAI_BASE_MAX_SOURCES),
         "stage1_openai_base_max_steps": int(PERPLEXITY_STAGE1_OPENAI_BASE_MAX_STEPS),
-        "stage1_openai_base_reasoning_effort": str(
-            PERPLEXITY_STAGE1_OPENAI_BASE_REASONING_EFFORT
+        "stage1_openai_base_reasoning_effort": normalize_reasoning_effort(
+            str(PERPLEXITY_STAGE1_OPENAI_BASE_REASONING_EFFORT or "")
         ),
         "stage1_preset_strategy": str(PERPLEXITY_PRESET_STRATEGY),
         "stage1_preset_deep": str(PERPLEXITY_PRESET_DEEP),
@@ -7624,10 +9503,18 @@ Now provide your evaluation and ranking:"""
         if response is not None:
             full_text = response.get('content', '')
             parsed = parse_ranking_from_text(full_text)
+            ranking_entries = _ranking_entries_from_labels(parsed, label_to_model)
             stage2_results.append({
                 "model": model,
                 "ranking": full_text,
-                "parsed_ranking": parsed
+                "parsed_ranking": parsed,
+                "parsed_ranking_models": [
+                    str(item.get("model") or item.get("label") or "")
+                    for item in ranking_entries
+                ],
+                "ranking_entries": ranking_entries,
+                "top_choice_label": ranking_entries[0].get("label") if ranking_entries else None,
+                "top_choice_model": ranking_entries[0].get("model") if ranking_entries else None,
             })
 
     return stage2_results, label_to_model
@@ -7798,6 +9685,55 @@ def _extract_revision_notes_from_text(text: str) -> str:
     return payload
 
 
+def _ranking_labels_from_result(ranking: Dict[str, Any]) -> List[str]:
+    parsed = ranking.get("parsed_ranking")
+    if isinstance(parsed, list):
+        labels = []
+        for item in parsed:
+            if isinstance(item, str):
+                label = item.strip()
+            elif isinstance(item, dict):
+                label = str(item.get("label") or "").strip()
+            else:
+                label = ""
+            if label:
+                labels.append(label)
+        if labels:
+            return labels
+
+    entries = ranking.get("ranking_entries")
+    if isinstance(entries, list):
+        labels = [
+            str(item.get("label") or "").strip()
+            for item in entries
+            if isinstance(item, dict) and str(item.get("label") or "").strip()
+        ]
+        if labels:
+            return labels
+
+    ranking_text = str(ranking.get("ranking") or "")
+    return parse_ranking_from_text(ranking_text)
+
+
+def _ranking_entries_from_labels(
+    labels: List[str],
+    label_to_model: Dict[str, str],
+) -> List[Dict[str, Any]]:
+    entries: List[Dict[str, Any]] = []
+    for position, label in enumerate(labels or [], start=1):
+        clean_label = str(label or "").strip()
+        if not clean_label:
+            continue
+        entries.append(
+            {
+                "rank": position,
+                "label": clean_label,
+                "model": label_to_model.get(clean_label),
+            }
+        )
+    return entries
+
+
 def _build_stage2_revision_prompt(
     *,
     enhanced_context: str,
@@ -7874,10 +9810,17 @@ async def stage2_collect_revision_deltas(
             return payload
         return payload[:limit].rstrip() + "\n...[TRUNCATED FOR REVISION PASS]"
 
-    responses_text = "\n\n".join(
-        f"Response {label}:\n{_clip(result.get('response', ''))}"
-        for label, result in zip(labels, stage1_results)
-    )
+    def _build_responses_text(*, clip_limit: int, max_responses: Optional[int] = None) -> str:
+        pairs = list(zip(labels, stage1_results))
+        if isinstance(max_responses, int) and max_responses > 0:
+            pairs = pairs[:max_responses]
+        return "\n\n".join(
+            f"Response {label}:\n{_clip(result.get('response', ''), limit=clip_limit)}"
+            for label, result in pairs
+        )
+
+    responses_text = _build_responses_text(clip_limit=1800)
+    compact_responses_text = _build_responses_text(clip_limit=900, max_responses=5)
     aggregate = calculate_aggregate_rankings(stage2_results, label_to_model)
     targets = [m for m in (revision_models or [r.get("model") for r in stage1_results]) if m]
     timeout = float(STAGE2_REVISION_PASS_TIMEOUT_SECONDS)
@@ -7891,13 +9834,29 @@ async def stage2_collect_revision_deltas(
             responses_text=responses_text,
             aggregate_rankings=aggregate,
         )
-        response = await query_model(
-            model,
-            [{"role": "user", "content": prompt}],
-            timeout=timeout,
-            max_tokens=max_tokens,
-        )
-        raw_text = (response or {}).get("content", "") if response else ""
+        attempts = 0
+        raw_text = ""
+        used_compact_retry = False
+        for prompt_text in (
+            prompt,
+            _build_stage2_revision_prompt(
+                enhanced_context=enhanced_context,
+                own_label=own_label,
+                responses_text=compact_responses_text,
+                aggregate_rankings=aggregate,
+            ),
+        ):
+            attempts += 1
+            response = await query_model(
+                model,
+                [{"role": "user", "content": prompt_text}],
+                timeout=timeout,
+                max_tokens=max_tokens,
+            )
+            raw_text = (response or {}).get("content", "") if response else ""
+            if str(raw_text or "").strip():
+                break
+        used_compact_retry = attempts > 1
         parsed, parse_error = _parse_json_object_from_text(raw_text)
         normalized = None
         normalize_error = None
@@ -7932,6 +9891,8 @@ async def stage2_collect_revision_deltas(
             "parse_error": None if accepted else (parse_error or normalize_error),
             "decode_warning": normalize_error if accepted else None,
             "raw_response": raw_text,
+            "attempts": attempts,
+            "compact_retry_used": used_compact_retry,
         }
 
     _progress_log(
@@ -7942,13 +9903,36 @@ async def stage2_collect_revision_deltas(
     results = await asyncio.gather(*tasks)
     accepted = sum(1 for row in results if row.get("accepted"))
     changed = sum(1 for row in results if row.get("accepted") and row.get("changed"))
+    unchanged_count = int(
+        sum(
+            1
+            for row in results
+            if row.get("accepted") and (not row.get("changed"))
+        )
+    )
+    empty_response_count = int(
+        sum(
+            1
+            for row in results
+            if (not row.get("accepted")) and (row.get("parse_error") == "empty_response")
+        )
+    )
+    parse_failed_count = int(
+        sum(
+            1
+            for row in results
+            if (not row.get("accepted")) and (row.get("parse_error") not in {None, "empty_response"})
+        )
+    )
     summary = {
         "enabled": True,
         "models_attempted": list(targets),
         "models_succeeded": [row.get("model") for row in results if row.get("raw_response")],
         "accepted_count": int(accepted),
         "changed_count": int(changed),
-        "parse_failed_count": int(sum(1 for row in results if not row.get("accepted"))),
+        "no_amendment_count": unchanged_count,
+        "empty_response_count": empty_response_count,
+        "parse_failed_count": parse_failed_count,
     }
     _progress_log(
         "Stage2.5 revision pass done: "
@@ -8006,10 +9990,15 @@ def apply_stage2_revision_deltas(
         "revisions_applied": len(notes_applied_models),
         "revision_notes_applied_models": notes_applied_models,
         "models_changed": changed_models,
+        "models_unchanged_due_to_empty_response": [
+            str(row.get("model") or "")
+            for row in (revision_results or [])
+            if (not row.get("accepted")) and (row.get("parse_error") == "empty_response")
+        ],
         "models_unchanged_due_to_parse_or_validation": [
             str(row.get("model") or "")
             for row in (revision_results or [])
-            if not row.get("accepted")
+            if (not row.get("accepted")) and (row.get("parse_error") != "empty_response")
         ],
     }
     return updated, summary
@@ -8167,17 +10156,20 @@ def calculate_aggregate_rankings(
 
     # Track positions for each model
     model_positions = defaultdict(list)
+    first_place_votes = defaultdict(int)
+    borda_scores = defaultdict(int)
 
     for ranking in stage2_results:
-        ranking_text = ranking['ranking']
-
-        # Parse the ranking from the structured format
-        parsed_ranking = parse_ranking_from_text(ranking_text)
+        parsed_ranking = _ranking_labels_from_result(ranking)
+        total = len(parsed_ranking)
 
         for position, label in enumerate(parsed_ranking, start=1):
             if label in label_to_model:
                 model_name = label_to_model[label]
                 model_positions[model_name].append(position)
+                borda_scores[model_name] += (total - position + 1)
+                if position == 1:
+                    first_place_votes[model_name] += 1
 
     # Calculate average position for each model
     aggregate = []
@@ -8187,11 +10179,13 @@ def calculate_aggregate_rankings(
             aggregate.append({
                 "model": model,
                 "average_rank": round(avg_rank, 2),
-                "rankings_count": len(positions)
+                "rankings_count": len(positions),
+                "first_place_votes": int(first_place_votes.get(model, 0)),
+                "borda_score": int(borda_scores.get(model, 0)),
             })
 
     # Sort by average rank (lower is better)
-    aggregate.sort(key=lambda x: x['average_rank'])
+    aggregate.sort(key=lambda x: (x['average_rank'], -x.get('first_place_votes', 0), -x.get('borda_score', 0)))
 
     return aggregate
 

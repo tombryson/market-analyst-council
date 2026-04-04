@@ -425,12 +425,22 @@ wheels = [
 ]
 
 [[package]]
+name = "liteparse"
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e9/26/b6c9d0e5da1f913327b7eecfea33063eecd1fbcefc49cb8c0d53c263a03b/liteparse-1.2.0.tar.gz", hash = "sha256:c6709e657905b39e72e1be03d75c650e157d41ee2ea4749389141712e1f5eaaf", size = 29460, upload-time = "2026-03-26T15:40:57.885Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5c/fc/6678c63b9e4d859b3e0058acb8c5d332a172073fd425b64cfe7a7375ae9c/liteparse-1.2.0-py3-none-any.whl", hash = "sha256:8ed166e94e909beef2b65860efa1b17792207c3e8e1a8e158d86c0e9fc155199", size = 8687, upload-time = "2026-03-26T15:40:57.01Z" },
+]
+
+[[package]]
 name = "llm-council"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "liteparse" },
     { name = "pydantic" },
     { name = "pymupdf" },
     { name = "python-dotenv" },
@@ -445,6 +455,7 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "httpx", specifier = ">=0.27.0" },
+    { name = "liteparse", specifier = ">=1.2.0" },
     { name = "pydantic", specifier = ">=2.9.0" },
     { name = "pymupdf", specifier = ">=1.23.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },

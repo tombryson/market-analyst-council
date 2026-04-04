@@ -24,6 +24,89 @@ EXCHANGE_TO_YAHOO_SUFFIX = {
     "AIM": ".L",
 }
 
+TEMPLATE_COMMODITY_PROFILE = {
+    "gold_miner": "gold",
+    "copper_miner": "copper",
+    "lithium_miner": "lithium",
+    "silver_miner": "silver",
+    "uranium_miner": "uranium",
+    "energy_oil_gas": "oil_gas",
+}
+
+COMPANY_TYPE_COMMODITY_PROFILE = {
+    "gold_miner": "gold",
+    "copper_miner": "copper",
+    "lithium_miner": "lithium",
+    "silver_miner": "silver",
+    "uranium_miner": "uranium",
+    "energy_oil_gas": "oil_gas",
+}
+
+COMMODITY_FIELD_RANGES: Dict[str, Tuple[float, float]] = {
+    "gold_price_usd_oz": (100.0, 50_000.0),
+    "gold_price_aud_oz": (100.0, 100_000.0),
+    "copper_price_usd_lb": (0.1, 100.0),
+    "copper_price_aud_lb": (0.1, 300.0),
+    "lithium_price_usd_kg": (0.1, 10_000.0),
+    "lithium_price_aud_kg": (0.1, 30_000.0),
+    "silver_price_usd_oz": (1.0, 1_000.0),
+    "silver_price_aud_oz": (1.0, 3_000.0),
+    "uranium_price_usd_lb": (1.0, 1_000.0),
+    "uranium_price_aud_lb": (1.0, 3_000.0),
+    "brent_price_usd_bbl": (1.0, 1_000.0),
+    "brent_price_aud_bbl": (1.0, 2_000.0),
+    "wti_price_usd_bbl": (1.0, 1_000.0),
+    "wti_price_aud_bbl": (1.0, 2_000.0),
+    "henry_hub_price_usd_mmbtu": (0.1, 200.0),
+    "henry_hub_price_aud_mmbtu": (0.1, 400.0),
+}
+COMMODITY_FIELDS = tuple(COMMODITY_FIELD_RANGES.keys())
+
+COMMODITY_FALLBACK_CONFIG: Dict[str, Dict[str, Any]] = {
+    "uranium": {
+        "usd_key": "uranium_price_usd_lb",
+        "aud_key": "uranium_price_aud_lb",
+        "price_queries": (
+            "current uranium spot price usd per lb",
+            "current U3O8 spot price usd/lb",
+        ),
+        "price_patterns": (
+            r"(?:uranium|u3o8)[^\n]{0,80}?(?:US\$|USD\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:/|per)?\s*(?:lb|lbs|pound)",
+            r"(?:US\$|USD\s*)([0-9]+(?:\.[0-9]+)?)\s*(?:/|per)?\s*(?:lb|lbs|pound)",
+        ),
+    },
+}
+
+AUDUSD_PATTERNS: Tuple[str, ...] = (
+    r"(?:AUD\s*/\s*USD|AUDUSD|Australian Dollar[^\\n]{0,40}US Dollar)[^0-9]{0,20}([0-9]+(?:\.[0-9]+)?)",
+    r"\b1\s*AUD[^0-9]{0,20}(?:=|≈|about)?[^0-9]{0,20}(?:US\$|USD\s*)?([0-9]+(?:\.[0-9]+)?)",
+)
+
+
+def _resolve_commodity_profile(
+    template_id: Optional[str],
+    company_type: Optional[str],
+) -> Optional[str]:
+    template_key = str(template_id or "").strip().lower()
+    company_key = str(company_type or "").strip().lower()
+    allowed_profiles = {"gold", "copper", "lithium", "silver", "uranium", "oil_gas", "none", ""}
+    if template_key:
+        try:
+            from .template_loader import get_template_loader
+
+            loader = get_template_loader()
+            behavior = loader.get_template_behavior(template_key) or {}
+            profile = str(behavior.get("commodity_profile") or "").strip().lower()
+            if profile in allowed_profiles:
+                return None if profile in {"none", ""} else profile
+        except Exception:
+            pass
+    if template_key and template_key in TEMPLATE_COMMODITY_PROFILE:
+        return TEMPLATE_COMMODITY_PROFILE[template_key]
+    if company_key and company_key in COMPANY_TYPE_COMMODITY_PROFILE:
+        return COMPANY_TYPE_COMMODITY_PROFILE[company_key]
+    return None
+
 
 def _parse_ticker(ticker: str) -> Dict[str, str]:
     raw = str(ticker or "").strip().upper()
@@ -128,8 +211,10 @@ def _normalize_facts(
     shares_outstanding: Optional[float],
     enterprise_value: Optional[float],
     currency: Optional[str],
+    commodity_profile: Optional[str] = None,
+    commodity_values: Optional[Dict[str, Optional[float]]] = None,
 ) -> Dict[str, Any]:
-    return {
+    normalized = {
         "current_price": current_price,
         "market_cap": market_cap,
         "market_cap_m": (market_cap / 1_000_000.0) if market_cap is not None else None,
@@ -146,7 +231,15 @@ def _normalize_facts(
             else None
         ),
         "currency": (currency or "").strip().upper() or None,
+        "commodity_profile": commodity_profile,
     }
+    for key in COMMODITY_FIELDS:
+        normalized[key] = None
+    if commodity_values:
+        for key, value in commodity_values.items():
+            if key in COMMODITY_FIELDS:
+                normalized[key] = value
+    return normalized
 
 
 def _available_field_count(normalized_facts: Dict[str, Any]) -> int:
@@ -158,6 +251,110 @@ def _available_field_count(normalized_facts: Dict[str, Any]) -> int:
         "currency",
     )
     return sum(1 for key in keys if normalized_facts.get(key) is not None)
+
+
+def _extract_bounded_number(text: str, patterns: Tuple[str, ...], bounds: Tuple[float, float]) -> Optional[float]:
+    payload = str(text or "")
+    if not payload:
+        return None
+    lower, upper = bounds
+    for pattern in patterns:
+        for match in re.finditer(pattern, payload, flags=re.IGNORECASE):
+            value = _to_float(match.group(1))
+            if value is None:
+                continue
+            if lower <= value <= upper:
+                return value
+    return None
+
+
+def _commodity_keys_for_profile(profile: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    config = COMMODITY_FALLBACK_CONFIG.get(str(profile or "").strip().lower()) or {}
+    usd_key = str(config.get("usd_key") or "").strip() or None
+    aud_key = str(config.get("aud_key") or "").strip() or None
+    return usd_key, aud_key
+
+
+def _collect_tavily_payload_text(payload: Dict[str, Any]) -> str:
+    pieces: List[str] = []
+    answer = str(payload.get("answer") or "").strip()
+    if answer:
+        pieces.append(answer)
+    for row in payload.get("results", []) or []:
+        if not isinstance(row, dict):
+            continue
+        title = str(row.get("title") or "").strip()
+        content = str(row.get("content") or "").strip()
+        if title:
+            pieces.append(title)
+        if content:
+            pieces.append(content)
+    return "\n".join(piece for piece in pieces if piece)
+
+
+async def _gather_commodity_price_fallback(
+    commodity_profile: Optional[str],
+    timeout: float,
+) -> Dict[str, Any]:
+    profile = str(commodity_profile or "").strip().lower()
+    config = COMMODITY_FALLBACK_CONFIG.get(profile)
+    if not config:
+        return {"commodity_values": {}, "source_urls": [], "notes": []}
+
+    usd_key = str(config.get("usd_key") or "").strip()
+    aud_key = str(config.get("aud_key") or "").strip()
+    price_patterns = tuple(config.get("price_patterns") or ())
+    if not usd_key or not price_patterns:
+        return {"commodity_values": {}, "source_urls": [], "notes": []}
+
+    source_urls: List[str] = []
+    notes: List[str] = []
+    usd_value: Optional[float] = None
+
+    for query in config.get("price_queries", ()) or ():
+        payload = await _tavily_search(query=str(query), timeout=timeout, max_results=4)
+        if payload.get("error"):
+            notes.append(f"Commodity fallback query failed: {query} ({payload['error']})")
+            continue
+        for result in payload.get("results", []) or []:
+            url = str((result or {}).get("url") or "").strip()
+            if url and url not in source_urls:
+                source_urls.append(url)
+        usd_value = _extract_bounded_number(
+            _collect_tavily_payload_text(payload),
+            price_patterns,
+            COMMODITY_FIELD_RANGES[usd_key],
+        )
+        if usd_value is not None:
+            break
+
+    if usd_value is None:
+        return {"commodity_values": {}, "source_urls": source_urls, "notes": notes}
+
+    audusd_rate: Optional[float] = None
+    fx_payload = await _tavily_search("current AUD/USD exchange rate", timeout=timeout, max_results=4)
+    if fx_payload.get("error"):
+        notes.append(f"FX fallback query failed: {fx_payload['error']}")
+    else:
+        for result in fx_payload.get("results", []) or []:
+            url = str((result or {}).get("url") or "").strip()
+            if url and url not in source_urls:
+                source_urls.append(url)
+        audusd_rate = _extract_bounded_number(
+            _collect_tavily_payload_text(fx_payload),
+            AUDUSD_PATTERNS,
+            (0.2, 2.0),
+        )
+
+    commodity_values: Dict[str, Optional[float]] = {usd_key: usd_value}
+    if aud_key:
+        commodity_values[aud_key] = (usd_value / audusd_rate) if (audusd_rate and audusd_rate > 0) else None
+    notes.append(f"Applied {profile} commodity fallback.")
+    return {
+        "commodity_values": commodity_values,
+        "source_urls": source_urls,
+        "notes": notes,
+    }
 
 
 def _sanitize_normalized_facts(normalized_facts: Dict[str, Any]) -> Dict[str, Any]:
@@ -183,6 +380,14 @@ def _sanitize_normalized_facts(normalized_facts: Dict[str, Any]) -> Dict[str, An
     if enterprise_value is not None and enterprise_value < 1_000_000:
         out["enterprise_value"] = None
         out["enterprise_value_m"] = None
+
+    for key, bounds in COMMODITY_FIELD_RANGES.items():
+        value = _to_float(out.get(key))
+        if value is None:
+            continue
+        lower, upper = bounds
+        if not (lower <= value <= upper):
+            out[key] = None
 
     if out.get("market_cap") is not None and out.get("market_cap_m") is None:
         out["market_cap_m"] = out["market_cap"] / 1_000_000.0
@@ -331,6 +536,7 @@ def _extract_metrics_from_text(text: str) -> Dict[str, Optional[float]]:
 async def _gather_yfinance_facts(
     parsed: Dict[str, str],
     timeout: float,
+    commodity_profile: Optional[str] = None,
 ) -> Dict[str, Any]:
     yahoo_symbol = parsed.get("yahoo_symbol") or parsed.get("symbol")
     if not yahoo_symbol:
@@ -407,10 +613,85 @@ async def _gather_yfinance_facts(
             if isinstance(info_raw, dict):
                 info = info_raw
 
+        async def _fetch_last_close(symbol: str, label: str) -> Optional[float]:
+            history = await _run_thread_call(
+                label,
+                lambda: yf.Ticker(symbol).history(period="5d", interval="1d", auto_adjust=False),
+                min(call_timeout, 8.0),
+                notes,
+            )
+            try:
+                if history is None:
+                    return None
+                closes = history.get("Close")
+                if closes is None:
+                    return None
+                closes = closes.dropna()
+                if len(closes) <= 0:
+                    return None
+                return _to_float(closes.iloc[-1])
+            except Exception as exc:
+                notes.append(f"yfinance {label} parse failed: {type(exc).__name__}: {exc}")
+                return None
+
+        commodity_values: Dict[str, Optional[float]] = {}
+        audusd_rate: Optional[float] = None
+
+        if commodity_profile:
+            audusd_rate = await _fetch_last_close("AUDUSD=X", "audusd_history")
+
+        def _set_usd_and_aud(usd_key: str, aud_key: str, usd_value: Optional[float]) -> None:
+            commodity_values[usd_key] = usd_value
+            if usd_value is not None and audusd_rate is not None and audusd_rate > 0:
+                commodity_values[aud_key] = usd_value / audusd_rate
+            else:
+                commodity_values[aud_key] = None
+
+        if commodity_profile == "gold":
+            gold_usd_oz = await _fetch_last_close("GC=F", "gold_history")
+            _set_usd_and_aud("gold_price_usd_oz", "gold_price_aud_oz", gold_usd_oz)
+        elif commodity_profile == "copper":
+            copper_usd_lb = await _fetch_last_close("HG=F", "copper_history")
+            _set_usd_and_aud("copper_price_usd_lb", "copper_price_aud_lb", copper_usd_lb)
+        elif commodity_profile == "lithium":
+            lithium_usd_kg: Optional[float] = None
+            for symbol in ("LIT=F", "LTH=F"):
+                lithium_usd_kg = await _fetch_last_close(symbol, f"lithium_history_{symbol}")
+                if lithium_usd_kg is not None:
+                    break
+            if lithium_usd_kg is None:
+                notes.append("yfinance lithium commodity proxy unavailable for configured symbols.")
+            _set_usd_and_aud("lithium_price_usd_kg", "lithium_price_aud_kg", lithium_usd_kg)
+        elif commodity_profile == "silver":
+            silver_usd_oz = await _fetch_last_close("SI=F", "silver_history")
+            _set_usd_and_aud("silver_price_usd_oz", "silver_price_aud_oz", silver_usd_oz)
+        elif commodity_profile == "uranium":
+            uranium_usd_lb: Optional[float] = None
+            for symbol in ("UX1=F", "UX2=F", "U=F"):
+                uranium_usd_lb = await _fetch_last_close(symbol, f"uranium_history_{symbol}")
+                if uranium_usd_lb is not None:
+                    break
+            if uranium_usd_lb is None:
+                notes.append("yfinance uranium commodity feed unavailable for configured symbols.")
+            _set_usd_and_aud("uranium_price_usd_lb", "uranium_price_aud_lb", uranium_usd_lb)
+        elif commodity_profile == "oil_gas":
+            brent_usd = await _fetch_last_close("BZ=F", "brent_history")
+            wti_usd = await _fetch_last_close("CL=F", "wti_history")
+            henry_hub_usd = await _fetch_last_close("NG=F", "henry_hub_history")
+            _set_usd_and_aud("brent_price_usd_bbl", "brent_price_aud_bbl", brent_usd)
+            _set_usd_and_aud("wti_price_usd_bbl", "wti_price_aud_bbl", wti_usd)
+            _set_usd_and_aud(
+                "henry_hub_price_usd_mmbtu",
+                "henry_hub_price_aud_mmbtu",
+                henry_hub_usd,
+            )
+
         return {
             "fast_info": fast_info,
             "info": info,
             "history_close": history_close,
+            "commodity_profile": commodity_profile,
+            "commodity_values": commodity_values,
             "notes": notes,
         }
 
@@ -475,6 +756,12 @@ async def _gather_yfinance_facts(
     fast_info = payload.get("fast_info") or {}
     info = payload.get("info") or {}
     history_close = _to_float(payload.get("history_close"))
+    commodity_values_raw = payload.get("commodity_values") or {}
+    commodity_values = {
+        key: _to_float(value)
+        for key, value in commodity_values_raw.items()
+        if key in COMMODITY_FIELDS
+    }
     last_notes = payload.get("notes") or []
 
     current_price = (
@@ -496,6 +783,8 @@ async def _gather_yfinance_facts(
         shares_outstanding=shares_outstanding,
         enterprise_value=enterprise_value,
         currency=currency or ("AUD" if parsed.get("exchange") == "ASX" else ""),
+        commodity_profile=commodity_profile,
+        commodity_values=commodity_values,
     )
     normalized_facts = _sanitize_normalized_facts(normalized_facts)
 
@@ -612,6 +901,8 @@ async def gather_market_facts_prepass(
     ticker: Optional[str],
     company_name: Optional[str] = None,
     exchange: Optional[str] = None,
+    template_id: Optional[str] = None,
+    company_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Fetch deterministic market baseline fields using a provider chain.
@@ -652,6 +943,7 @@ async def gather_market_facts_prepass(
     as_of = datetime.now(timezone.utc).isoformat()
 
     timeout = max(5.0, float(MARKET_FACTS_TIMEOUT_SECONDS))
+    commodity_profile = _resolve_commodity_profile(template_id, company_type)
     yfinance_error = ""
     yfinance_notes: List[str] = []
     normalized_facts = _normalize_facts(
@@ -660,10 +952,16 @@ async def gather_market_facts_prepass(
         shares_outstanding=None,
         enterprise_value=None,
         currency="AUD" if parsed.get("exchange") == "ASX" else "",
+        commodity_profile=commodity_profile,
+        commodity_values={},
     )
     source_urls: List[str] = [quote_page_url]
 
-    yfinance_result = await _gather_yfinance_facts(parsed, timeout=timeout)
+    yfinance_result = await _gather_yfinance_facts(
+        parsed,
+        timeout=timeout,
+        commodity_profile=commodity_profile,
+    )
     yfinance_facts = yfinance_result.get("normalized_facts", {}) or {}
     yfinance_sources = yfinance_result.get("source_urls", []) or []
     yfinance_notes = yfinance_result.get("notes", []) or []
@@ -712,6 +1010,21 @@ async def gather_market_facts_prepass(
 
         available_fields = _available_field_count(normalized_facts)
 
+    commodity_notes: List[str] = []
+    usd_key, aud_key = _commodity_keys_for_profile(commodity_profile)
+    commodity_keys = [key for key in (usd_key, aud_key) if key]
+    if commodity_keys and all(normalized_facts.get(key) is None for key in commodity_keys):
+        commodity_fallback = await _gather_commodity_price_fallback(commodity_profile, timeout=timeout)
+        commodity_values = commodity_fallback.get("commodity_values", {}) or {}
+        for key, value in commodity_values.items():
+            if key in COMMODITY_FIELDS and normalized_facts.get(key) is None and value is not None:
+                normalized_facts[key] = value
+        normalized_facts = _sanitize_normalized_facts(normalized_facts)
+        commodity_notes = commodity_fallback.get("notes", []) or []
+        for url in commodity_fallback.get("source_urls", []) or []:
+            if url and url not in source_urls:
+                source_urls.append(url)
+
     if available_fields >= 3:
         status = "ok" if not fallback_used else "fallback_ok"
     elif available_fields > 0:
@@ -737,6 +1050,8 @@ async def gather_market_facts_prepass(
         _append_unique(["Applied ASX/MarketIndex Tavily fallback."])
     if fallback_notes:
         _append_unique(fallback_notes[:2])
+    if commodity_notes:
+        _append_unique(commodity_notes[:2])
     reason = " | ".join(reason_parts).strip()
 
     return {
@@ -752,47 +1067,6 @@ async def gather_market_facts_prepass(
         "normalized_facts": normalized_facts,
         "providers_attempted": ["yfinance", "tavily_fallback"],
     }
-
-
-def format_market_facts_for_prompt(market_facts: Optional[Dict[str, Any]]) -> str:
-    """Format market facts for prompt/context injection."""
-    if not market_facts:
-        return ""
-
-    normalized = market_facts.get("normalized_facts", {}) or {}
-    if not normalized:
-        return ""
-
-    lines = [
-        "Authoritative Market Facts Prepass (deterministic baseline)",
-        f"- as_of_utc: {market_facts.get('as_of_utc', 'unknown')}",
-        f"- ticker: {market_facts.get('ticker', '')}",
-        f"- yahoo_symbol: {market_facts.get('yahoo_symbol', '')}",
-    ]
-
-    def _line(name: str, key: str) -> None:
-        value = normalized.get(key)
-        if value is not None:
-            lines.append(f"- {name}: {value}")
-
-    _line("current_price", "current_price")
-    _line("market_cap", "market_cap")
-    _line("market_cap_m", "market_cap_m")
-    _line("shares_outstanding", "shares_outstanding")
-    _line("shares_outstanding_m", "shares_outstanding_m")
-    _line("enterprise_value", "enterprise_value")
-    _line("enterprise_value_m", "enterprise_value_m")
-    _line("currency", "currency")
-
-    source_urls = market_facts.get("source_urls", []) or []
-    if source_urls:
-        for idx, url in enumerate(source_urls[:3], start=1):
-            lines.append(f"- source_url_{idx}: {url}")
-
-    lines.append(
-        "- rule: Use these baseline market facts unless a newer dated primary source is explicitly cited."
-    )
-    return "\n".join(lines).strip()
 
 
 def minimal_market_facts_payload(
@@ -811,22 +1085,30 @@ def minimal_market_facts_payload(
         shares_outstanding_m,
         enterprise_value,
         enterprise_value_m,
-        currency
+        currency,
+        commodity_profile,
+        commodity price fields (template-conditional)
       }
     }
     """
     normalized = (market_facts or {}).get("normalized_facts", {}) or {}
+    minimal: Dict[str, Any] = {
+        "current_price": normalized.get("current_price"),
+        "market_cap": normalized.get("market_cap"),
+        "market_cap_m": normalized.get("market_cap_m"),
+        "shares_outstanding": normalized.get("shares_outstanding"),
+        "shares_outstanding_m": normalized.get("shares_outstanding_m"),
+        "enterprise_value": normalized.get("enterprise_value"),
+        "enterprise_value_m": normalized.get("enterprise_value_m"),
+        "currency": normalized.get("currency"),
+        "commodity_profile": normalized.get("commodity_profile"),
+    }
+    for key in COMMODITY_FIELDS:
+        value = normalized.get(key)
+        if value is not None:
+            minimal[key] = value
     return {
-        "normalized_facts": {
-            "current_price": normalized.get("current_price"),
-            "market_cap": normalized.get("market_cap"),
-            "market_cap_m": normalized.get("market_cap_m"),
-            "shares_outstanding": normalized.get("shares_outstanding"),
-            "shares_outstanding_m": normalized.get("shares_outstanding_m"),
-            "enterprise_value": normalized.get("enterprise_value"),
-            "enterprise_value_m": normalized.get("enterprise_value_m"),
-            "currency": normalized.get("currency"),
-        }
+        "normalized_facts": minimal
     }
 
 
@@ -840,7 +1122,8 @@ def format_market_facts_query_prefix(
         normalized.get("market_cap") is not None
         and normalized.get("shares_outstanding") is not None
     )
-    if not has_core_market_facts:
+    has_commodity_prices = any(normalized.get(key) is not None for key in COMMODITY_FIELDS)
+    if not has_core_market_facts and not has_commodity_prices:
         return ""
     return json.dumps(payload, indent=2)
 
