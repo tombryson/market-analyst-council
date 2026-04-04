@@ -1,7 +1,15 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ausgoldStage3Sample } from '../data/ausgoldStage3Sample';
 import { mapStage3ToGanttModel } from '../utils/stage3GanttMapper';
 import './GanttMappingDemo.css';
+
+function backToCouncilChat() {
+  if (typeof window === 'undefined') return;
+  const current = window.location.pathname;
+  if (current === '/') return;
+  window.history.pushState({}, '', '/');
+  window.dispatchEvent(new Event('app:navigate'));
+}
 
 function impactClass(impact) {
   const value = String(impact || 'MED').toUpperCase();
@@ -40,8 +48,29 @@ function shortDriver(text) {
   return `${clean.slice(0, 67)}...`;
 }
 
+function wrapDriverLines(text, maxCharsPerLine = 34) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return [];
+  const words = clean.split(' ');
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= maxCharsPerLine) {
+      current = candidate;
+    } else {
+      if (current) lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
 export default function GanttMappingDemo() {
   const mapped = useMemo(() => mapStage3ToGanttModel(ausgoldStage3Sample), []);
+  const [manualCatalysts, setManualCatalysts] = useState([]);
+  const [hoveredDriverTag, setHoveredDriverTag] = useState(null);
   // Demo override: simulate "today" for gantt-style progress tracking.
   // In the larger app, replace with a global date source.
   const simulatedToday = useMemo(() => new Date(2026, 2, 15), []);
@@ -56,11 +85,39 @@ export default function GanttMappingDemo() {
     return date;
   }, [axisStart]);
 
-  const futureCatalysts = mapped.catalysts.filter((c) => {
+  const autoFutureCatalysts = mapped.catalysts.filter((c) => {
     if (!c.date) return true;
     const d = new Date(c.date);
     return d > now && d <= endDate;
   });
+  const allFutureCatalysts = useMemo(
+    () => [...autoFutureCatalysts, ...manualCatalysts],
+    [autoFutureCatalysts, manualCatalysts]
+  );
+
+  const addManualCatalyst = useCallback(() => {
+    const targetDate = new Date(now);
+    targetDate.setMonth(targetDate.getMonth() + 3);
+    const dateIso = targetDate.toISOString().slice(0, 10);
+    setManualCatalysts((prev) => [
+      ...prev,
+      {
+        id: `manual-${Date.now()}-${prev.length}`,
+        name: 'New catalyst',
+        date: dateIso,
+        impact: 'MED',
+        source: 'manual',
+      },
+    ]);
+  }, [now]);
+
+  const updateManualCatalyst = useCallback((id, field, value) => {
+    setManualCatalysts((prev) => prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
+  }, []);
+
+  const removeManualCatalyst = useCallback((id) => {
+    setManualCatalysts((prev) => prev.filter((item) => item.id !== id));
+  }, []);
 
   const chartData = useMemo(() => {
     const priceTargets = mapped.raw?.price_targets || {};
@@ -112,7 +169,7 @@ export default function GanttMappingDemo() {
       }
     }
 
-    const nonDriverCatalysts = futureCatalysts
+    const nonDriverCatalysts = allFutureCatalysts
       .filter((c) => c.source !== 'price_targets.scenario_drivers')
       .map((c) => ({
         ...c,
@@ -129,7 +186,7 @@ export default function GanttMappingDemo() {
       driverTags,
       nonDriverCatalysts,
     };
-  }, [mapped, futureCatalysts, axisStart]);
+  }, [mapped, allFutureCatalysts, axisStart]);
 
   const chartLayout = {
     width: 920,
@@ -192,14 +249,16 @@ export default function GanttMappingDemo() {
       <div className="gantt-demo-header">
         <div>
           <div className="gantt-demo-title">
-            Gantt Mapping Demo: {mapped.companyName} ({mapped.ticker})
+            Timeline Mapping Demo: {mapped.companyName} ({mapped.ticker})
           </div>
           <div className="gantt-demo-subtitle">
             Route: <code>/gantt-demo</code> | Source: Stage 3 structured JSON (Ausgold sample)
           </div>
         </div>
         <div className="gantt-demo-nav">
-          <a href="/">Back To Council Chat</a>
+          <button type="button" className="gantt-nav-btn" onClick={backToCouncilChat}>
+            Back To Council Chat
+          </button>
         </div>
       </div>
 
@@ -242,11 +301,14 @@ export default function GanttMappingDemo() {
         </div>
 
         <div className="gantt-card">
-          <div className="catalyst-header-row">
+          <div className="catalyst-header-row catalyst-header-row-tight">
             <label className="gantt-label">IMPORTANCE | KEY CATALYSTS</label>
+            <button className="catalyst-add-btn" onClick={addManualCatalyst} type="button">
+              + ADD
+            </button>
           </div>
           <div className="catalyst-list">
-            {futureCatalysts.map((c, idx) => (
+            {autoFutureCatalysts.map((c, idx) => (
               <div className="catalyst-item" key={`${c.name}-${c.date}-${idx}`}>
                 <div className="catalyst-top">
                   <span className={`impact-badge impact-${impactClass(c.impact)}`}>
@@ -258,14 +320,49 @@ export default function GanttMappingDemo() {
                 <div className="catalyst-source">{c.source}</div>
               </div>
             ))}
-            {!futureCatalysts.length && (
-              <div className="catalyst-item">No catalysts in 24m window.</div>
+            {manualCatalysts.map((c) => (
+              <div className="catalyst-item catalyst-item-manual" key={c.id}>
+                <div className="catalyst-manual-row">
+                  <select
+                    value={c.impact}
+                    onChange={(e) => updateManualCatalyst(c.id, 'impact', e.target.value)}
+                    className="catalyst-manual-impact"
+                  >
+                    <option value="HIGH">HIGH</option>
+                    <option value="MED">MED</option>
+                    <option value="LOW">LOW</option>
+                  </select>
+                  <input
+                    type="text"
+                    value={c.name}
+                    onChange={(e) => updateManualCatalyst(c.id, 'name', e.target.value)}
+                    className="catalyst-manual-name"
+                    placeholder="Catalyst name"
+                  />
+                  <input
+                    type="date"
+                    value={c.date || ''}
+                    onChange={(e) => updateManualCatalyst(c.id, 'date', e.target.value)}
+                    className="catalyst-manual-date"
+                  />
+                  <button
+                    type="button"
+                    className="catalyst-manual-remove"
+                    onClick={() => removeManualCatalyst(c.id)}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            ))}
+            {!autoFutureCatalysts.length && !manualCatalysts.length && (
+              <div className="catalyst-item catalyst-item-empty">No catalysts in 24m window.</div>
             )}
           </div>
         </div>
 
         <div className="gantt-card">
-          <label className="gantt-label">PRICE PATH (24M)</label>
+          <label className="gantt-label">TIMELINE (24M)</label>
           <div className="price-chart-box">
             <svg
               className="price-chart"
@@ -430,7 +527,23 @@ export default function GanttMappingDemo() {
                     <polyline points={points} fill="none" stroke={style.color} strokeWidth="2.6" />
                     {chartData.series[scenario].map((p, idx) => (
                       <g key={`${scenario}-${idx}`}>
-                        <circle cx={xScale(p.month)} cy={yScale(p.price)} r="4.2" fill={style.color} />
+                        <circle
+                          cx={xScale(p.month)}
+                          cy={yScale(p.price)}
+                          r="5.2"
+                          fill={style.color}
+                          className={p.month === 12 || p.month === 24 ? 'price-point-dot hoverable' : 'price-point-dot'}
+                          onMouseEnter={() => {
+                            if (p.month === 12 || p.month === 24) {
+                              setHoveredDriverTag(`${p.month}m-${scenario}`);
+                            }
+                          }}
+                          onMouseLeave={() => {
+                            if (p.month === 12 || p.month === 24) {
+                              setHoveredDriverTag(null);
+                            }
+                          }}
+                        />
                         <text
                           x={xScale(p.month)}
                           y={yScale(p.price) - 8}
@@ -448,14 +561,47 @@ export default function GanttMappingDemo() {
               {chartData.driverTags.map((tag) => {
                 const x = xScale(tag.month);
                 const y = yScale(Number(tag.target) || chartData.currentPrice);
-                const xLabel = tag.month >= 20 ? x - 210 : x + 10;
+                const tagText = Array.isArray(tag.drivers) ? tag.drivers.join(' • ') : '';
+                const wrappedLines = wrapDriverLines(tagText, 34);
+                if (!wrappedLines.length) return null;
+                const tagWidth = 170;
+                const lineHeight = 11;
+                const tagHeight = 10 + wrappedLines.length * lineHeight + 4;
+                const rawX = tag.month >= 20 ? x - tagWidth - 14 : x + 10;
+                const minX = chartLayout.margin.left + 4;
+                const maxX = chartLayout.margin.left + plotWidth - tagWidth - 4;
+                const xLabel = Math.max(minX, Math.min(rawX, maxX));
                 const baseOffsets = { bear: 18, base: -4, bull: -26 };
-                const yLabel = y + (baseOffsets[tag.scenario] || 0);
+                const rawY = y + (baseOffsets[tag.scenario] || 0) - 10;
+                const minY = chartLayout.margin.top + 4;
+                const maxY = chartLayout.margin.top + plotHeight - tagHeight - 4;
+                const yLabel = Math.max(minY, Math.min(rawY, maxY));
+                const isVisible = hoveredDriverTag === tag.id;
                 return (
-                  <g key={tag.id}>
-                    <text x={xLabel} y={yLabel + 4} className="driver-tag-text">
-                      {shortDriver(tag.drivers[0])}
-                    </text>
+                  <g
+                    key={tag.id}
+                    className={`driver-tag ${isVisible ? 'is-visible' : 'is-hidden'}`}
+                    pointerEvents="none"
+                  >
+                    <rect
+                      x={xLabel}
+                      y={yLabel}
+                      width={tagWidth}
+                      height={tagHeight}
+                      rx="6"
+                      ry="6"
+                      className="driver-tag-box"
+                    />
+                    {wrappedLines.map((line, idx) => (
+                      <text
+                        key={`${tag.id}-line-${idx}`}
+                        x={xLabel + 8}
+                        y={yLabel + 16 + idx * lineHeight}
+                        className="driver-tag-text-line"
+                      >
+                        {line}
+                      </text>
+                    ))}
                   </g>
                 );
               })}

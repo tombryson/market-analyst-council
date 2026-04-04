@@ -6,6 +6,31 @@ import Stage2 from './Stage2';
 import Stage3 from './Stage3';
 import './ChatInterface.css';
 
+function LoadingMeter({ label, progress = null, detail = '', className = '' }) {
+  const numericProgress = Number(progress);
+  const hasProgress = Number.isFinite(numericProgress);
+  const pct = hasProgress ? Math.max(0, Math.min(100, numericProgress)) : null;
+  const displayPct = hasProgress ? `${Math.round(pct)}%` : 'Working';
+
+  return (
+    <div className={`loading-meter ${className}`.trim()}>
+      <div className="loading-meter-topline">
+        <span className="loading-meter-label">{label}</span>
+        <span className={`loading-meter-pct ${hasProgress ? '' : 'is-muted'}`.trim()}>
+          {displayPct}
+        </span>
+      </div>
+      <div className={`loading-meter-track ${hasProgress ? '' : 'is-indeterminate'}`.trim()}>
+        <div
+          className="loading-meter-fill"
+          style={hasProgress ? { width: `${pct}%` } : undefined}
+        />
+      </div>
+      {detail ? <div className="loading-meter-detail">{detail}</div> : null}
+    </div>
+  );
+}
+
 export default function ChatInterface({
   conversation,
   onSendMessage,
@@ -15,11 +40,11 @@ export default function ChatInterface({
   const [ticker, setTicker] = useState('');
   const [enableSearch, setEnableSearch] = useState(true);
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [supplementaryFile, setSupplementaryFile] = useState(null);
   const [fileInputKey, setFileInputKey] = useState(Date.now());
+  const [supplementaryInputKey, setSupplementaryInputKey] = useState(Date.now() + 1);
   const [availableTemplates, setAvailableTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
-  const [availableCompanyTypes, setAvailableCompanyTypes] = useState([]);
-  const [selectedCompanyType, setSelectedCompanyType] = useState('');
   const [availableExchanges, setAvailableExchanges] = useState([]);
   const [selectedExchange, setSelectedExchange] = useState('');
   const [councilMode, setCouncilMode] = useState('local');
@@ -37,13 +62,11 @@ export default function ChatInterface({
   useEffect(() => {
     const loadSelectors = async () => {
       try {
-        const [templates, companyTypes, exchanges] = await Promise.all([
+        const [templates, exchanges] = await Promise.all([
           api.listTemplates(),
-          api.listCompanyTypes(),
           api.listExchanges(),
         ]);
         setAvailableTemplates(templates || []);
-        setAvailableCompanyTypes(companyTypes || []);
         setAvailableExchanges(exchanges || []);
       } catch (error) {
         console.error('Failed to load selector data:', error);
@@ -72,6 +95,27 @@ export default function ChatInterface({
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handleSupplementarySelect = (e) => {
+    const file = e.target.files?.[0] || null;
+    if (!file) return;
+    const lowerName = file.name.toLowerCase();
+    const allowed = ['.pdf', '.md', '.txt', '.json'];
+    if (!allowed.some(ext => lowerName.endsWith(ext))) {
+      alert(`${file.name} must be a PDF, Markdown, text, or JSON file`);
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      alert(`${file.name} exceeds 20MB limit`);
+      return;
+    }
+    setSupplementaryFile(file);
+  };
+
+  const removeSupplementaryFile = () => {
+    setSupplementaryFile(null);
+    setSupplementaryInputKey(Date.now());
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (input.trim() && !isLoading) {
@@ -79,20 +123,22 @@ export default function ChatInterface({
         input,
         enableSearch,
         selectedFiles,
+        supplementaryFile,
         ticker.trim() || null,
         councilMode || 'local',
         null,
         selectedTemplate || null,
-        selectedCompanyType || null,
+        null,
         selectedExchange || null
       );
       setInput('');
       setTicker('');
       setSelectedFiles([]);
+      setSupplementaryFile(null);
       setSelectedTemplate('');
-      setSelectedCompanyType('');
       setSelectedExchange('');
       setFileInputKey(Date.now());
+      setSupplementaryInputKey(Date.now() + 1);
     }
   };
 
@@ -144,12 +190,10 @@ export default function ChatInterface({
                       {msg.metadata?.research_depth ? ` | Depth: ${msg.metadata.research_depth}` : ''}
                     </div>
                   )}
-                  {(msg.metadata?.template_id || msg.metadata?.company_type || msg.metadata?.exchange) && (
+                  {(msg.metadata?.company_name || msg.metadata?.exchange) && (
                     <div className="search-query">
                       {[
-                        msg.metadata?.template_id ? `Template: ${msg.metadata.template_id}` : null,
                         msg.metadata?.company_name ? `Company: ${msg.metadata.company_name}` : null,
-                        msg.metadata?.company_type ? `Company type: ${msg.metadata.company_type}` : null,
                         msg.metadata?.exchange ? `Exchange: ${msg.metadata.exchange}` : null,
                       ].filter(Boolean).join(' | ')}
                     </div>
@@ -157,14 +201,18 @@ export default function ChatInterface({
 
                   {/* Search Results Display */}
                   {msg.loading?.search && (
-                    <div className="stage-loading">
-                      <div className="spinner"></div>
-                      <span>
-                        {msg.search_results?.search_type === 'market_data_only'
-                          ? 'Searching for market data (share price, market cap, etc.)...'
-                          : 'Searching the internet...'}
-                      </span>
-                    </div>
+                    <LoadingMeter
+                      label={
+                        msg.search_results?.search_type === 'market_data_only'
+                          ? 'Searching market data'
+                          : 'Searching the internet'
+                      }
+                      detail={
+                        msg.search_results?.search_type === 'market_data_only'
+                          ? 'Share price, market cap, and structure facts'
+                          : 'Gathering supporting sources'
+                      }
+                    />
                   )}
                   {msg.search_results && msg.search_results.results && msg.search_results.results.length > 0 && (
                     <div className="search-results-section">
@@ -191,10 +239,10 @@ export default function ChatInterface({
 
                   {/* Evidence Pack Display */}
                   {msg.loading?.evidence && (
-                    <div className="stage-loading">
-                      <div className="spinner"></div>
-                      <span>Building normalized evidence pack...</span>
-                    </div>
+                    <LoadingMeter
+                      label="Building evidence pack"
+                      detail="Normalizing claims and source rows"
+                    />
                   )}
                   {msg.evidence_pack && (
                     <div className="search-results-section">
@@ -241,10 +289,10 @@ export default function ChatInterface({
 
                   {/* Attachments Display */}
                   {msg.loading?.attachments && (
-                    <div className="stage-loading">
-                      <div className="spinner"></div>
-                      <span>Processing PDF attachments...</span>
-                    </div>
+                    <LoadingMeter
+                      label="Processing PDF attachments"
+                      detail="Extracting and normalizing documents"
+                    />
                   )}
                   {msg.attachments_processed && msg.attachments_processed.length > 0 && (
                     <div className="attachments-section">
@@ -265,19 +313,25 @@ export default function ChatInterface({
 
                   {/* Stage 1 */}
                   {msg.loading?.stage1 && (
-                    <div className="stage-loading">
-                      <div className="spinner"></div>
-                      <span>Running Stage 1: Collecting individual responses...</span>
-                    </div>
+                    <LoadingMeter
+                      label="Running Stage 1"
+                      progress={msg.loading?.stage1Progress}
+                      detail={
+                        msg.loading?.stage1Message ||
+                        (msg.loading?.stage1Total
+                          ? `${msg.loading.stage1Completed}/${msg.loading.stage1Total} models complete`
+                          : 'Collecting individual responses')
+                      }
+                    />
                   )}
                   {msg.stage1 && <Stage1 responses={msg.stage1} />}
 
                   {/* Stage 2 */}
                   {msg.loading?.stage2 && (
-                    <div className="stage-loading">
-                      <div className="spinner"></div>
-                      <span>Running Stage 2: Peer rankings...</span>
-                    </div>
+                    <LoadingMeter
+                      label="Running Stage 2"
+                      detail="Collecting peer rankings"
+                    />
                   )}
                   {msg.stage2 && (
                     <Stage2
@@ -289,10 +343,10 @@ export default function ChatInterface({
 
                   {/* Stage 3 */}
                   {msg.loading?.stage3 && (
-                    <div className="stage-loading">
-                      <div className="spinner"></div>
-                      <span>Running Stage 3: Final synthesis...</span>
-                    </div>
+                    <LoadingMeter
+                      label="Running Stage 3"
+                      detail="Final council synthesis"
+                    />
                   )}
                   {msg.stage3 && <Stage3 finalResponse={msg.stage3} />}
                 </div>
@@ -303,8 +357,10 @@ export default function ChatInterface({
 
         {isLoading && (
           <div className="loading-indicator">
-            <div className="spinner"></div>
-            <span>Consulting the council...</span>
+            <LoadingMeter
+              label="Consulting the council"
+              detail="Coordinating stage-by-stage analysis"
+            />
           </div>
         )}
 
@@ -376,30 +432,6 @@ export default function ChatInterface({
             </select>
             <span className="template-hint">
               Leave on "Auto-detect" to infer a topic from your question (e.g., financial quality score)
-            </span>
-          </div>
-
-          {/* Company Type Selector */}
-          <div className="template-selector-container">
-            <label htmlFor="company-type-select" className="template-label">
-              Company Type:
-            </label>
-            <select
-              id="company-type-select"
-              className="template-select"
-              value={selectedCompanyType}
-              onChange={(e) => setSelectedCompanyType(e.target.value)}
-              disabled={isLoading}
-            >
-              <option value="">Auto-detect (recommended)</option>
-              {availableCompanyTypes.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-            <span className="template-hint">
-              Optional manual override for sector rubric routing (e.g., Gold Miner, Pharma/Biotech).
             </span>
           </div>
 
@@ -481,6 +513,41 @@ export default function ChatInterface({
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          <div className="file-upload-section">
+            <input
+              key={supplementaryInputKey}
+              type="file"
+              id="supplementary-upload"
+              accept=".pdf,.md,.txt,.json"
+              onChange={handleSupplementarySelect}
+              className="file-input"
+            />
+            <label htmlFor="supplementary-upload" className="file-upload-label">
+              Attach Supplementary Document (optional)
+            </label>
+            <span className="template-hint">
+              Supplementary context only. Analysis runs normally without it.
+            </span>
+
+            {supplementaryFile && (
+              <div className="selected-files">
+                <div className="file-chip">
+                  <span className="file-name">{supplementaryFile.name}</span>
+                  <span className="file-size">
+                    ({(supplementaryFile.size / 1024).toFixed(1)} KB)
+                  </span>
+                  <button
+                    type="button"
+                    className="remove-file"
+                    onClick={removeSupplementaryFile}
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
             )}
           </div>

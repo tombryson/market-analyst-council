@@ -36,6 +36,51 @@
   border-color: #357abd;
 }
 
+.timeline-demo-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 10px;
+  background: transparent;
+  border: 1px solid #4a90e2;
+  border-radius: 6px;
+  color: #4a90e2;
+  text-decoration: none;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.2s, color 0.2s;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.timeline-demo-btn:hover {
+  background: #e8f0fe;
+  color: #357abd;
+}
+
+.timeline-lab-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 10px;
+  background: #111827;
+  border: 1px solid #111827;
+  border-radius: 6px;
+  color: #d1f5ff;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s, border-color 0.2s;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.timeline-lab-btn:hover {
+  background: #1f2937;
+  border-color: #1f2937;
+}
+
 .conversation-list {
   flex: 1;
   overflow-y: auto;

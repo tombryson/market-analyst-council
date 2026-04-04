@@ -25,10 +25,19 @@
   font-size: 12px;
 }
 
-.gantt-demo-nav a {
+.gantt-demo-nav .gantt-nav-btn {
   color: #9dd8ff;
   text-decoration: none;
   font-size: 12px;
+  background: transparent;
+  border: 1px solid rgba(157, 216, 255, 0.35);
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.gantt-demo-nav .gantt-nav-btn:hover {
+  background: rgba(157, 216, 255, 0.08);
 }
 
 .gantt-thesis-row {
@@ -45,10 +54,10 @@
 }
 
 .gantt-thesis-text {
-  border: 1px solid rgba(133, 151, 167, 0.35);
+  border: 1px solid rgba(133, 151, 167, 0.22);
   border-radius: 6px;
-  padding: 10px;
-  background: #0f151a;
+  padding: 8px 10px;
+  background: transparent;
   font-size: 12px;
   color: #d4e0ea;
 }
@@ -60,10 +69,10 @@
 }
 
 .gantt-card {
-  border: 1px solid rgba(133, 151, 167, 0.28);
+  border: 1px solid rgba(133, 151, 167, 0.14);
   border-radius: 8px;
-  background: #0d1318;
-  padding: 10px;
+  background: transparent;
+  padding: 8px;
 }
 
 .scenario-table {
@@ -94,21 +103,21 @@
 }
 
 .pill-bear {
-  background: rgba(239, 68, 68, 0.12);
+  background: rgba(239, 68, 68, 0.08);
   color: #fca5a5;
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  border: 1px solid rgba(239, 68, 68, 0.22);
 }
 
 .pill-base {
-  background: rgba(245, 158, 11, 0.13);
+  background: rgba(245, 158, 11, 0.08);
   color: #fcd34d;
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  border: 1px solid rgba(245, 158, 11, 0.22);
 }
 
 .pill-bull {
-  background: rgba(16, 185, 129, 0.12);
+  background: rgba(16, 185, 129, 0.08);
   color: #6ee7b7;
-  border: 1px solid rgba(16, 185, 129, 0.35);
+  border: 1px solid rgba(16, 185, 129, 0.22);
 }
 
 .weighted-row {
@@ -141,11 +150,30 @@
   margin-bottom: 0;
 }
 
+.catalyst-header-row-tight {
+  margin-bottom: 8px;
+}
+
+.catalyst-add-btn {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  border: 1px solid rgba(157, 216, 255, 0.4);
+  color: #9dd8ff;
+  background: transparent;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.catalyst-add-btn:hover {
+  background: rgba(157, 216, 255, 0.1);
+}
+
 .catalyst-item {
-  border: 1px solid rgba(133, 151, 167, 0.26);
+  border: 1px solid rgba(133, 151, 167, 0.18);
   border-radius: 6px;
   padding: 7px;
-  background: #101820;
+  background: transparent;
 }
 
 .catalyst-top {
@@ -170,20 +198,20 @@
 
 .impact-high {
   color: #fecaca;
-  background: rgba(239, 68, 68, 0.16);
-  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
 }
 
 .impact-med {
   color: #fde68a;
-  background: rgba(245, 158, 11, 0.16);
-  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
 }
 
 .impact-low {
   color: #bfdbfe;
-  background: rgba(59, 130, 246, 0.16);
-  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
 }
 
 .catalyst-name {
@@ -202,6 +230,62 @@
   margin-top: 4px;
   color: #7e94a7;
   font-size: 10px;
+}
+
+.catalyst-item-manual {
+  padding: 5px 6px;
+}
+
+.catalyst-item-empty {
+  text-align: center;
+  color: #7e94a7;
+  font-size: 11px;
+  padding: 12px;
+}
+
+.catalyst-manual-row {
+  display: grid;
+  grid-template-columns: 56px 1fr 124px 24px;
+  gap: 6px;
+  align-items: center;
+}
+
+.catalyst-manual-impact,
+.catalyst-manual-name,
+.catalyst-manual-date {
+  border: 1px solid rgba(133, 151, 167, 0.3);
+  background: transparent;
+  color: #d4e0ea;
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 4px 6px;
+}
+
+.catalyst-manual-impact {
+  width: 100%;
+}
+
+.catalyst-manual-name {
+  min-width: 0;
+}
+
+.catalyst-manual-date {
+  width: 100%;
+}
+
+.catalyst-manual-remove {
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  background: transparent;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  padding: 3px 0;
+  cursor: pointer;
+}
+
+.catalyst-manual-remove:hover {
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .timeline-box {
@@ -263,10 +347,10 @@
 }
 
 .price-chart-box {
-  border: 1px solid rgba(133, 151, 167, 0.28);
+  border: 1px solid rgba(133, 151, 167, 0.2);
   border-radius: 6px;
-  background: #060a0d;
-  padding: 8px;
+  background: transparent;
+  padding: 6px 4px 2px;
 }
 
 .price-chart {
@@ -341,6 +425,20 @@
   font-weight: 600;
 }
 
+.price-point-dot {
+  transition: r 120ms ease, filter 120ms ease;
+}
+
+.price-point-dot.hoverable {
+  cursor: pointer;
+}
+
+.price-point-dot.hoverable:hover {
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-width: 1.2;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.35));
+}
+
 .event-marker-line {
   stroke: rgba(146, 168, 184, 0.55);
   stroke-width: 1;
@@ -352,8 +450,27 @@
   font-size: 8px;
 }
 
-.driver-tag-text {
-  fill: #c4d4e1;
+.driver-tag {
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.driver-tag.is-visible {
+  opacity: 1;
+}
+
+.driver-tag.is-hidden {
+  opacity: 0;
+}
+
+.driver-tag-box {
+  fill: rgba(6, 10, 13, 0.92);
+  stroke: rgba(157, 216, 255, 0.3);
+  stroke-width: 1;
+}
+
+.driver-tag-text-line {
+  fill: #d2e1ee;
   font-size: 8px;
 }
 

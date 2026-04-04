@@ -6,6 +6,8 @@ export default function Sidebar({
   currentConversationId,
   onSelectConversation,
   onNewConversation,
+  onOpenTimelineDemo,
+  onOpenTimelineLab,
 }) {
   return (
     <div className="sidebar">
@@ -13,6 +15,20 @@ export default function Sidebar({
         <h1>LLM Council</h1>
         <button className="new-conversation-btn" onClick={onNewConversation}>
           + New Conversation
+        </button>
+        <button
+          className="timeline-demo-btn"
+          onClick={onOpenTimelineDemo}
+          type="button"
+        >
+          Open Timeline Demo
+        </button>
+        <button
+          className="timeline-lab-btn"
+          onClick={onOpenTimelineLab}
+          type="button"
+        >
+          Open Timeline Lab
         </button>
       </div>
 

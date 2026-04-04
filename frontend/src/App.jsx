@@ -2,12 +2,39 @@ import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import GanttMappingDemo from './components/GanttMappingDemo';
+import GanttIntelligenceLab from './components/GanttIntelligenceLab';
 import { api } from './api';
 import './App.css';
 
+const CURRENT_CONVERSATION_STORAGE_KEY = 'llm_council_current_conversation_id';
+
+function hasPendingAssistantMessage(conversation) {
+  return Boolean(
+    conversation?.messages?.some(
+      (msg) => msg?.role === 'assistant' && msg?.status === 'running'
+    )
+  );
+}
+
+function getCurrentPath() {
+  if (typeof window === 'undefined') return '';
+  return window.location.pathname.replace(/\/+$/, '') || '/';
+}
+
+function navigate(pathname) {
+  if (typeof window === 'undefined') return;
+  const current = window.location.pathname;
+  if (current === pathname) return;
+  window.history.pushState({}, '', pathname);
+  window.dispatchEvent(new Event('app:navigate'));
+}
+
 function CouncilApp() {
   const [conversations, setConversations] = useState([]);
-  const [currentConversationId, setCurrentConversationId] = useState(null);
+  const [currentConversationId, setCurrentConversationId] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem(CURRENT_CONVERSATION_STORAGE_KEY) || null;
+  });
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -22,6 +49,30 @@ function CouncilApp() {
       loadConversation(currentConversationId);
     }
   }, [currentConversationId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (currentConversationId) {
+      window.localStorage.setItem(CURRENT_CONVERSATION_STORAGE_KEY, currentConversationId);
+    } else {
+      window.localStorage.removeItem(CURRENT_CONVERSATION_STORAGE_KEY);
+    }
+  }, [currentConversationId]);
+
+  useEffect(() => {
+    setIsLoading(hasPendingAssistantMessage(currentConversation));
+  }, [currentConversation]);
+
+  useEffect(() => {
+    if (!currentConversationId || !hasPendingAssistantMessage(currentConversation)) {
+      return undefined;
+    }
+    const interval = window.setInterval(() => {
+      loadConversation(currentConversationId);
+      loadConversations();
+    }, 2000);
+    return () => window.clearInterval(interval);
+  }, [currentConversationId, currentConversation]);
 
   const loadConversations = async () => {
     try {
@@ -38,6 +89,10 @@ function CouncilApp() {
       setCurrentConversation(conv);
     } catch (error) {
       console.error('Failed to load conversation:', error);
+      if (String(id || '') === String(currentConversationId || '')) {
+        setCurrentConversationId(null);
+        setCurrentConversation(null);
+      }
     }
   };
 
@@ -58,10 +113,19 @@ function CouncilApp() {
     setCurrentConversationId(id);
   };
 
+  const handleOpenTimelineDemo = () => {
+    navigate('/gantt-demo');
+  };
+
+  const handleOpenTimelineLab = () => {
+    navigate('/gantt-lab');
+  };
+
   const handleSendMessage = async (
     content,
     enableSearch,
     files,
+    supplementaryFile,
     ticker,
     councilMode,
     researchDepth,
@@ -97,6 +161,7 @@ function CouncilApp() {
       // Create a partial assistant message that will be updated progressively
       const assistantMessage = {
         role: 'assistant',
+        status: 'running',
         stage1: null,
         stage2: null,
         stage3: null,
@@ -111,6 +176,11 @@ function CouncilApp() {
           stage1: false,
           stage2: false,
           stage3: false,
+          stage1Progress: 0,
+          stage1Completed: 0,
+          stage1Total: 0,
+          stage1Model: '',
+          stage1Message: '',
         },
       };
 
@@ -126,6 +196,7 @@ function CouncilApp() {
         content,
         enableSearch,
         files,
+        supplementaryFile,
         ticker,
         councilMode,
         researchDepth,
@@ -230,6 +301,32 @@ function CouncilApp() {
               const messages = [...prev.messages];
               const lastMsg = messages[messages.length - 1];
               lastMsg.loading.stage1 = true;
+              lastMsg.loading.stage1Progress = 0;
+              lastMsg.loading.stage1Completed = 0;
+              lastMsg.loading.stage1Total = 0;
+              lastMsg.loading.stage1Model = '';
+              lastMsg.loading.stage1Message = 'Stage 1 starting...';
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'stage1_progress':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              const data = event.data || {};
+              lastMsg.loading.stage1 = true;
+              lastMsg.loading.stage1Progress = Number.isFinite(Number(data.progress_pct))
+                ? Number(data.progress_pct)
+                : lastMsg.loading.stage1Progress || 0;
+              lastMsg.loading.stage1Completed = Number.isFinite(Number(data.completed))
+                ? Number(data.completed)
+                : lastMsg.loading.stage1Completed || 0;
+              lastMsg.loading.stage1Total = Number.isFinite(Number(data.total))
+                ? Number(data.total)
+                : lastMsg.loading.stage1Total || 0;
+              lastMsg.loading.stage1Model = data.model || '';
+              lastMsg.loading.stage1Message = data.stage_message || '';
               return { ...prev, messages };
             });
             break;
@@ -240,6 +337,8 @@ function CouncilApp() {
               const lastMsg = messages[messages.length - 1];
               lastMsg.stage1 = event.data;
               lastMsg.loading.stage1 = false;
+              lastMsg.loading.stage1Progress = 100;
+              lastMsg.loading.stage1Message = 'Stage 1 complete';
               return { ...prev, messages };
             });
             break;
@@ -282,6 +381,7 @@ function CouncilApp() {
               const lastMsg = messages[messages.length - 1];
               lastMsg.stage3 = event.data;
               lastMsg.loading.stage3 = false;
+              lastMsg.status = 'complete';
               return { ...prev, messages };
             });
             break;
@@ -294,11 +394,31 @@ function CouncilApp() {
           case 'complete':
             // Stream complete, reload conversations list
             loadConversations();
+            loadConversation(currentConversationId);
             setIsLoading(false);
             break;
 
           case 'error':
             console.error('Stream error:', event.message);
+            setCurrentConversation((prev) => {
+              const messages = [...(prev?.messages || [])];
+              const lastMsg = messages[messages.length - 1];
+              if (lastMsg && lastMsg.role === 'assistant') {
+                lastMsg.status = 'failed';
+                lastMsg.error = event.message;
+                lastMsg.loading = {
+                  ...(lastMsg.loading || {}),
+                  search: false,
+                  evidence: false,
+                  attachments: false,
+                  stage1: false,
+                  stage2: false,
+                  stage3: false,
+                };
+              }
+              return prev ? { ...prev, messages } : prev;
+            });
+            loadConversation(currentConversationId);
             setIsLoading(false);
             break;
 
@@ -325,6 +445,8 @@ function CouncilApp() {
         currentConversationId={currentConversationId}
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
+        onOpenTimelineDemo={handleOpenTimelineDemo}
+        onOpenTimelineLab={handleOpenTimelineLab}
       />
       <ChatInterface
         conversation={currentConversation}
@@ -336,12 +458,23 @@ function CouncilApp() {
 }
 
 function App() {
-  const path =
-    typeof window !== 'undefined'
-      ? window.location.pathname.replace(/\/+$/, '')
-      : '';
+  const [path, setPath] = useState(getCurrentPath());
+
+  useEffect(() => {
+    const handleRouteChange = () => setPath(getCurrentPath());
+    window.addEventListener('popstate', handleRouteChange);
+    window.addEventListener('app:navigate', handleRouteChange);
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+      window.removeEventListener('app:navigate', handleRouteChange);
+    };
+  }, []);
+
   if (path === '/gantt-demo') {
     return <GanttMappingDemo />;
+  }
+  if (path === '/gantt-lab') {
+    return <GanttIntelligenceLab />;
   }
   return <CouncilApp />;
 }

@@ -141,12 +141,20 @@ function toCurrencyLabel(value, currency = 'AUD') {
   return `${symbol}${num.toFixed(2)}`;
 }
 
-function probabilitiesFromCertainty(certaintyPct) {
-  const base = clampNumber(certaintyPct ?? 55, 5, 90);
-  const remainder = 100 - base;
-  const bull = Math.round(remainder * 0.55);
-  const bear = 100 - base - bull;
-  return { bear, base, bull };
+function normalizeScenarioProbabilities(rawProbabilities) {
+  const raw = rawProbabilities && typeof rawProbabilities === 'object' ? rawProbabilities : {};
+  const bear = Number(raw.bear);
+  const base = Number(raw.base);
+  const bull = Number(raw.bull);
+  if ([bear, base, bull].every((v) => Number.isFinite(v))) {
+    const scale = Math.max(bear, base, bull) <= 1 ? 100 : 1;
+    return {
+      bear: Math.max(0, bear * scale),
+      base: Math.max(0, base * scale),
+      bull: Math.max(0, bull * scale),
+    };
+  }
+  return { bear: 25, base: 50, bull: 25 };
 }
 
 function pushUniqueCatalyst(list, catalyst) {
@@ -165,6 +173,7 @@ export function mapStage3ToGanttModel(structuredData) {
   const priceTargets = data.price_targets || {};
   const scenarios = priceTargets.scenarios || {};
   const scenarioTargets = priceTargets.scenario_targets || {};
+  const scenarioProbabilities = priceTargets.scenario_probabilities || {};
   const scenarioDrivers = priceTargets.scenario_drivers || {};
   const timeline = Array.isArray(data.development_timeline) ? data.development_timeline : [];
   const nextCatalysts = (data.extended_analysis || {}).next_major_catalysts || [];
@@ -174,7 +183,7 @@ export function mapStage3ToGanttModel(structuredData) {
   const twelveMonthTargets = scenarioTargets['12m'] || scenarios || {};
   const twentyFourMonthTargets = scenarioTargets['24m'] || {};
 
-  const probabilities = probabilitiesFromCertainty(data.certainty_pct_24m);
+  const probabilities = normalizeScenarioProbabilities(scenarioProbabilities['12m']);
   const bearPT = Number(twelveMonthTargets.bear) || 0;
   const basePT = Number(twelveMonthTargets.base) || Number(priceTargets.target_12m) || 0;
   const bullPT = Number(twelveMonthTargets.bull) || 0;
@@ -247,6 +256,24 @@ export function mapStage3ToGanttModel(structuredData) {
     const bd = new Date(b.date).getTime();
     return ad - bd;
   });
+
+  // Keep at most one historical catalyst as context; preserve forward focus.
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const indexed = catalysts.map((item, idx) => ({ idx, item }));
+  const pastRows = indexed.filter(({ item }) => item?.date && new Date(item.date) < today);
+  if (pastRows.length > 1) {
+    const keepPastIdx = new Set(
+      [...pastRows]
+        .sort((a, b) => new Date(b.item.date).getTime() - new Date(a.item.date).getTime())
+        .slice(0, 1)
+        .map((row) => row.idx)
+    );
+    const filtered = indexed
+      .filter(({ idx, item }) => !(item?.date && new Date(item.date) < today) || keepPastIdx.has(idx))
+      .map(({ item }) => item);
+    catalysts.length = 0;
+    catalysts.push(...filtered);
+  }
 
   const topReasons = (data.investment_verdict || {}).top_reasons || [];
   const headlineThesis = (data.investment_recommendation || {}).summary || topReasons[0] || '';
