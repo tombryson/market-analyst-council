@@ -1,6 +1,7 @@
 """Freshness runner agent models and orchestration helpers."""
 
 from .action_judge import ActionJudge
+from .lab_scribe import LabScribe
 from .models import (
     ActionDecision,
     AnnouncementAttachment,
@@ -13,6 +14,7 @@ from .models import (
     EvidenceRef,
     FreshnessDecision,
 )
+from .run_selector import LatestRunSelector
 from .service import FreshnessAgentDependencies, FreshnessAgentService
 
 __all__ = [
@@ -27,6 +29,8 @@ __all__ = [
     "ComparisonReport",
     "EvidenceRef",
     "FreshnessDecision",
+    "LabScribe",
+    "LatestRunSelector",
     "FreshnessAgentDependencies",
     "FreshnessAgentService",
 ]

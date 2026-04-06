@@ -32,6 +32,18 @@ ActionType = Literal[
     "full_rerun",
     "urgent_human_review",
 ]
+MaterialChangeType = Literal[
+    "financing",
+    "permitting",
+    "timeline",
+    "resource",
+    "production",
+    "guidance",
+    "capital_structure",
+    "m_and_a",
+    "management",
+    "operations",
+]
 
 
 
@@ -155,6 +167,8 @@ class ComparisonReport:
     thesis_effect: ThesisEffect = "unknown"
     timeline_effect: TimelineEffect = "unknown"
     capital_effect: CapitalEffect = "unknown"
+    affected_domains: List[str] = field(default_factory=list)
+    material_change_types: List[MaterialChangeType] = field(default_factory=list)
     key_findings: List[ComparisonFinding] = field(default_factory=list)
     conflicts_with_run: List[ComparisonFinding] = field(default_factory=list)
     notes: List[str] = field(default_factory=list)
@@ -172,6 +186,10 @@ class ActionDecision:
     confidence: float
     reason: str
     should_trigger_workflow: bool = False
+    run_reuse_ok: bool = True
+    requires_human_ack: bool = False
+    invalidated_sections: List[str] = field(default_factory=list)
+    follow_up_steps: List[str] = field(default_factory=list)
     tags: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:

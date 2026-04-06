@@ -1,4 +1,6 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from backend.freshness_agents import (
     ActionJudge,
@@ -11,7 +13,10 @@ from backend.freshness_agents import (
     ComparisonReport,
     EvidenceRef,
     FreshnessAgentDependencies,
+    FreshnessDecision,
     FreshnessAgentService,
+    LabScribe,
+    LatestRunSelector,
 )
 
 
@@ -36,12 +41,16 @@ class ActionJudgeTests(unittest.TestCase):
             baseline_run_id="run-1",
             impact_level="medium",
             thesis_effect="undermines",
+            affected_domains=["financing"],
+            material_change_types=["financing"],
             conflicts_with_run=[
                 ComparisonFinding(type="conflict", summary="Funding assumptions no longer hold.")
             ],
         )
         decision = self.judge.judge(report)
         self.assertEqual(decision.action, "full_rerun")
+        self.assertFalse(decision.run_reuse_ok)
+        self.assertIn("financing", decision.invalidated_sections)
 
     def test_timeline_delay_triggers_stage1_rerun(self):
         report = ComparisonReport(
@@ -49,9 +58,11 @@ class ActionJudgeTests(unittest.TestCase):
             baseline_run_id="run-1",
             impact_level="low",
             timeline_effect="delayed",
+            affected_domains=["timeline"],
         )
         decision = self.judge.judge(report)
         self.assertEqual(decision.action, "rerun_stage1")
+        self.assertIn("Refresh Stage 1 evidence", " ".join(decision.follow_up_steps))
 
     def test_low_impact_findings_annotate_run(self):
         report = ComparisonReport(
@@ -71,6 +82,21 @@ class ActionJudgeTests(unittest.TestCase):
         )
         decision = self.judge.judge(report)
         self.assertEqual(decision.action, "ignore")
+        self.assertTrue(decision.run_reuse_ok)
+
+    def test_material_permitting_change_forces_full_rerun_even_without_conflict(self):
+        report = ComparisonReport(
+            ticker="ASX:WWI",
+            baseline_run_id="run-2",
+            impact_level="medium",
+            thesis_effect="partially_confirms",
+            affected_domains=["permitting"],
+            material_change_types=["permitting"],
+            key_findings=[ComparisonFinding(type="permit_change", summary="Permit milestone moved materially.")],
+        )
+        decision = self.judge.judge(report)
+        self.assertEqual(decision.action, "full_rerun")
+        self.assertFalse(decision.run_reuse_ok)
 
 
 class FreshnessAgentServiceTests(unittest.IsolatedAsyncioTestCase):
@@ -174,6 +200,79 @@ class FreshnessAgentServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.baseline_run.run_id, "run-123")
         self.assertEqual(result.persisted_artifacts["baseline_run_id"], "run-123")
         self.assertEqual(result.announcement_packet.title, "Quarterly Activities Report")
+
+
+class LatestRunSelectorTests(unittest.IsolatedAsyncioTestCase):
+    async def test_selector_coerces_report_packet(self):
+        selector = LatestRunSelector(limit=5)
+
+        async def fake_list_gantt_runs(limit: int = 20, ticker: str = None):
+            self.assertEqual(limit, 5)
+            self.assertEqual(ticker, "ASX:BTR")
+            return {
+                "runs": [
+                    {
+                        "id": "run-123.json",
+                        "ticker": "ASX:BTR",
+                    }
+                ]
+            }
+
+        async def fake_get_gantt_run_report_packet(run_id: str):
+            self.assertEqual(run_id, "run-123.json")
+            return {
+                "run_id": "run-123.json",
+                "summary_fields": {
+                    "ticker": "ASX:BTR",
+                    "company_name": "Brightstar Resources Limited",
+                    "template_id": "resources_gold_monometallic",
+                    "freshness_status": "watch",
+                    "freshness_age_days": 12,
+                },
+                "lab_payload": {"freshness": {"status": "watch"}},
+                "timeline_rows": [{"stage": "Construction"}],
+                "memos": {"analyst_memo_markdown": "memo"},
+            }
+
+        from backend.freshness_agents import run_selector as run_selector_module
+
+        original_list = run_selector_module.main_api.list_gantt_runs
+        original_packet = run_selector_module.main_api.get_gantt_run_report_packet
+        run_selector_module.main_api.list_gantt_runs = fake_list_gantt_runs
+        run_selector_module.main_api.get_gantt_run_report_packet = fake_get_gantt_run_report_packet
+        try:
+            packet = await selector.select_latest("ASX:BTR", "ASX")
+        finally:
+            run_selector_module.main_api.list_gantt_runs = original_list
+            run_selector_module.main_api.get_gantt_run_report_packet = original_packet
+
+        self.assertEqual(packet.run_id, "run-123.json")
+        self.assertEqual(packet.template_id, "resources_gold_monometallic")
+        self.assertEqual(packet.freshness_status, "watch")
+
+
+class LabScribeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_lab_scribe_persists_primary_and_by_run_artifacts(self):
+        with TemporaryDirectory() as tmpdir:
+            scribe = LabScribe(base_dir=Path(tmpdir))
+            decision = FreshnessDecision(
+                event=AnnouncementEvent(event_id="evt-99", ticker="ASX:BTR", exchange="ASX"),
+                announcement_packet=AnnouncementPacket(event_id="evt-99", ticker="ASX:BTR", title="Update"),
+                announcement_facts=AnnouncementFacts(event_id="evt-99", ticker="ASX:BTR"),
+                baseline_run=BaselineRunPacket(run_id="run-123", ticker="ASX:BTR"),
+                comparison_report=ComparisonReport(ticker="ASX:BTR", baseline_run_id="run-123"),
+                action_decision=self._decision(),
+            )
+
+            persisted = await scribe.persist(decision)
+            self.assertTrue(Path(persisted["event_artifact"]).exists())
+            self.assertTrue(Path(persisted["by_run_artifact"]).exists())
+            self.assertEqual(persisted["run_id"], "run-123")
+
+    def _decision(self):
+        from backend.freshness_agents import ActionDecision
+
+        return ActionDecision(action="annotate_run", confidence=0.8, reason="ok")
 
 
 if __name__ == "__main__":
