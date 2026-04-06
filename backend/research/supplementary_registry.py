@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
+from .energy_oil_gas_supplementary import get_pipeline_spec as get_energy_pipeline_spec
 from .mining_supplementary import get_pipeline_spec as get_resources_pipeline_spec
 from .pharma_biotech_supplementary import get_pipeline_spec as get_pharma_pipeline_spec
+from .software_saas_supplementary import get_pipeline_spec as get_software_pipeline_spec
 from .supplementary_base import SupplementaryPipelineSpec
 
 
@@ -14,6 +16,8 @@ _PIPELINE_SPECS: Dict[str, SupplementaryPipelineSpec] = {
     for spec in [
         get_resources_pipeline_spec(),
         get_pharma_pipeline_spec(),
+        get_software_pipeline_spec(),
+        get_energy_pipeline_spec(),
     ]
 }
 
@@ -38,6 +42,8 @@ def resolve_pipeline_id_for_template(template_id: str) -> Optional[str]:
     fallback_by_family = {
         "resources": "resources_supplementary",
         "pharma": "pharma_biotech_supplementary",
+        "software": "software_saas_supplementary",
+        "energy": "energy_oil_gas_supplementary",
     }
     return fallback_by_family.get(family)
 

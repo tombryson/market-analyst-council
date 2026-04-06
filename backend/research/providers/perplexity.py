@@ -18,6 +18,8 @@ import httpx
 from .base import ResearchProvider
 from .perplexity_mining import PerplexityMiningSupplementaryEnricher
 from .perplexity_pharma_biotech import PerplexityPharmaBiotechSupplementaryEnricher
+from .perplexity_software_saas import PerplexitySoftwareSaaSSupplementaryEnricher
+from .perplexity_energy_oil_gas import PerplexityEnergyOilGasSupplementaryEnricher
 from ..supplementary_registry import get_pipeline_spec
 from ...reasoning import build_reasoning_payload, normalize_reasoning_effort
 from ...config import (
@@ -888,6 +890,36 @@ class PerplexityResearchProvider(ResearchProvider):
             )
         if resolved_pipeline_id == "pharma_biotech_supplementary":
             enricher = PerplexityPharmaBiotechSupplementaryEnricher(self)
+            return await enricher.gather(
+                user_query=user_query,
+                company=company,
+                ticker=ticker,
+                exchange=exchange,
+                template_id=template_id,
+                company_type=company_type,
+                preset=preset,
+                repair_preset=repair_preset,
+                model_override=model_override,
+                max_priority_sources=max_priority_sources,
+                enable_targeted_repairs=enable_targeted_repairs,
+            )
+        if resolved_pipeline_id == "software_saas_supplementary":
+            enricher = PerplexitySoftwareSaaSSupplementaryEnricher(self)
+            return await enricher.gather(
+                user_query=user_query,
+                company=company,
+                ticker=ticker,
+                exchange=exchange,
+                template_id=template_id,
+                company_type=company_type,
+                preset=preset,
+                repair_preset=repair_preset,
+                model_override=model_override,
+                max_priority_sources=max_priority_sources,
+                enable_targeted_repairs=enable_targeted_repairs,
+            )
+        if resolved_pipeline_id == "energy_oil_gas_supplementary":
+            enricher = PerplexityEnergyOilGasSupplementaryEnricher(self)
             return await enricher.gather(
                 user_query=user_query,
                 company=company,
