@@ -137,6 +137,28 @@ _ANALYSIS_STAGE_RANGES: Dict[str, Tuple[int, int]] = {
 }
 
 
+def _build_freshness_agent_service():
+    from .freshness_agents.document_reader import DocumentReader
+    from .freshness_agents.lab_scribe import LabScribe
+    from .freshness_agents.run_selector import LatestRunSelector
+    from .freshness_agents.service import (
+        FreshnessAgentDependencies,
+        FreshnessAgentService,
+    )
+    from .freshness_agents.source_resolver import SourceResolver
+    from .freshness_agents.thesis_comparator import ThesisComparator
+
+    return FreshnessAgentService(
+        FreshnessAgentDependencies(
+            source_resolver=SourceResolver().resolve,
+            document_reader=DocumentReader().read,
+            run_selector=LatestRunSelector(limit=25).select_latest,
+            thesis_comparator=ThesisComparator().compare,
+            lab_scribe=LabScribe().persist,
+        )
+    )
+
+
 def _analysis_stage_rank(stage: Any) -> int:
     return int(_ANALYSIS_STAGE_ORDER.get(str(stage or "").strip().lower(), -1))
 
@@ -421,6 +443,29 @@ class CreateAnalysisJobRequest(BaseModel):
     reuse_recent_bundle: bool = False
     reuse_supplementary_from_job_id: Optional[str] = None
     supplementary_mode: Optional[str] = None
+
+
+class FreshnessAttachmentPayload(BaseModel):
+    filename: str
+    content_type: Optional[str] = None
+    local_path: Optional[str] = None
+
+
+class ProcessAnnouncementRequest(BaseModel):
+    event_id: Optional[str] = None
+    gmail_message_id: Optional[str] = None
+    message_id: Optional[str] = None
+    ticker: Optional[str] = None
+    exchange: Optional[str] = None
+    company_hint: Optional[str] = None
+    company_name: Optional[str] = None
+    subject: Optional[str] = None
+    sender: Optional[str] = None
+    body_text: Optional[str] = None
+    source_channel: Optional[str] = None
+    received_at_utc: Optional[str] = None
+    urls: List[str] = []
+    attachments: List[FreshnessAttachmentPayload] = []
 
 
 class ConversationMetadata(BaseModel):
@@ -2465,6 +2510,57 @@ def _build_summary_fields(structured: Dict[str, Any], freshness: Dict[str, Any])
     }
 
 
+def _load_latest_announcement_router_state(run_id: str) -> Dict[str, Any]:
+    try:
+        from .freshness_agents.lab_scribe import LabScribe
+
+        return LabScribe.load_latest_for_run(run_id)
+    except Exception:
+        return {}
+
+
+def _build_announcement_router_summary(router_state: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(router_state, dict) or not router_state:
+        return {}
+
+    comparison = (
+        router_state.get("comparison_report")
+        if isinstance(router_state.get("comparison_report"), dict)
+        else {}
+    )
+    action = (
+        router_state.get("action_decision")
+        if isinstance(router_state.get("action_decision"), dict)
+        else {}
+    )
+    facts = (
+        router_state.get("announcement_facts")
+        if isinstance(router_state.get("announcement_facts"), dict)
+        else {}
+    )
+    event = (
+        router_state.get("event")
+        if isinstance(router_state.get("event"), dict)
+        else {}
+    )
+    return {
+        "current_path": str(comparison.get("current_path") or "").strip(),
+        "baseline_path": str(comparison.get("baseline_path") or "").strip(),
+        "path_transition": str(comparison.get("path_transition") or "").strip(),
+        "path_confidence": comparison.get("path_confidence"),
+        "run_validity": str(comparison.get("run_validity") or "").strip(),
+        "impact_level": str(comparison.get("impact_level") or "").strip(),
+        "action": str(action.get("action") or "").strip(),
+        "action_confidence": action.get("confidence"),
+        "reason": str(action.get("reason") or "").strip(),
+        "announcement_title": str(
+            comparison.get("announcement_title") or facts.get("title") or event.get("subject") or ""
+        ).strip(),
+        "received_at_utc": str(event.get("received_at_utc") or "").strip(),
+        "saved_at_utc": str(router_state.get("saved_at_utc") or "").strip(),
+    }
+
+
 def _build_integration_packet(
     *,
     run_id: str,
@@ -2472,12 +2568,26 @@ def _build_integration_packet(
 ) -> Dict[str, Any]:
     structured = run_payload.get("structured_data") if isinstance(run_payload.get("structured_data"), dict) else {}
     freshness = run_payload.get("freshness") if isinstance(run_payload.get("freshness"), dict) else {}
+    announcement_router = (
+        run_payload.get("announcement_router")
+        if isinstance(run_payload.get("announcement_router"), dict)
+        else {}
+    )
     timeline_rows = _normalize_timeline_rows_for_api(structured.get("development_timeline"))
+    summary_fields = _build_summary_fields(structured, freshness)
+    summary_fields.update(
+        {
+            "current_path": str(announcement_router.get("current_path") or "").strip(),
+            "path_transition": str(announcement_router.get("path_transition") or "").strip(),
+            "announcement_router_action": str(announcement_router.get("action") or "").strip(),
+            "announcement_router_impact": str(announcement_router.get("impact_level") or "").strip(),
+        }
+    )
 
     return {
         "contract": "analysis_report_packet_v1",
         "run_id": str(run_id),
-        "summary_fields": _build_summary_fields(structured, freshness),
+        "summary_fields": summary_fields,
         "lab_payload": {
             "id": run_payload.get("id"),
             "file": run_payload.get("file"),
@@ -2485,11 +2595,13 @@ def _build_integration_packet(
             "updated_at": run_payload.get("updated_at"),
             "structured_data": structured,
             "freshness": freshness,
+            "announcement_router": announcement_router,
             "delta_check": run_payload.get("delta_check") or {},
             "analyst_memo_markdown": run_payload.get("analyst_memo_markdown") or "",
             "chairman_memo_markdown": run_payload.get("chairman_memo_markdown") or "",
         },
         "timeline_rows": timeline_rows,
+        "announcement_router": announcement_router,
         "memos": {
             "analyst_memo_markdown": run_payload.get("analyst_memo_markdown") or "",
             "chairman_memo_markdown": run_payload.get("chairman_memo_markdown") or "",
@@ -2588,6 +2700,9 @@ async def list_gantt_runs(limit: int = 20, ticker: Optional[str] = None):
 
         run_id = path.name
         updated_at = datetime.utcfromtimestamp(path.stat().st_mtime).replace(microsecond=0).isoformat() + "Z"
+        announcement_router = _build_announcement_router_summary(
+            _load_latest_announcement_router_state(run_id)
+        )
         runs.append(
             {
                 "id": run_id,
@@ -2598,6 +2713,7 @@ async def list_gantt_runs(limit: int = 20, ticker: Optional[str] = None):
                 "analysis_date": structured.get("analysis_date"),
                 "updated_at": updated_at,
                 "freshness": _compute_run_freshness(structured, updated_at),
+                "announcement_router": announcement_router,
             }
         )
         if len(runs) >= safe_limit:
@@ -2667,6 +2783,18 @@ async def get_gantt_run(run_id: str):
     artifact_updated_at = datetime.utcfromtimestamp(path.stat().st_mtime).replace(microsecond=0).isoformat() + "Z"
     delta_latest = get_latest_delta(safe_name)
     freshness = _compute_run_freshness(structured, artifact_updated_at)
+    router_state = _build_announcement_router_summary(
+        _load_latest_announcement_router_state(safe_name)
+    )
+    summary_fields = _build_summary_fields(structured, freshness)
+    summary_fields.update(
+        {
+            "current_path": str(router_state.get("current_path") or "").strip(),
+            "path_transition": str(router_state.get("path_transition") or "").strip(),
+            "announcement_router_action": str(router_state.get("action") or "").strip(),
+            "announcement_router_impact": str(router_state.get("impact_level") or "").strip(),
+        }
+    )
     return {
         "id": safe_name,
         "file": safe_name,
@@ -2674,7 +2802,8 @@ async def get_gantt_run(run_id: str):
         "structured_data": structured,
         "updated_at": artifact_updated_at,
         "freshness": freshness,
-        "summary_fields": _build_summary_fields(structured, freshness),
+        "summary_fields": summary_fields,
+        "announcement_router": router_state,
         "delta_check": delta_latest or {},
         "analyst_memo_markdown": memo_payload.get("analyst_memo_markdown", ""),
         "chairman_memo_markdown": memo_payload.get("chairman_memo_markdown", ""),
@@ -2748,6 +2877,42 @@ async def get_latest_delta_check(run_id: str):
     if not latest:
         raise HTTPException(status_code=404, detail="No delta-check artifact found for run")
     return latest
+
+
+@app.post("/api/freshness/process-announcement")
+async def process_freshness_announcement(request: ProcessAnnouncementRequest):
+    """Process one inbound announcement event against the latest saved lab run."""
+    payload = request.model_dump()
+    try:
+        from .freshness_agents.inbox_sentinel import InboxSentinel
+
+        sentinel = InboxSentinel()
+        event = sentinel.ingest_email_payload(payload)
+        if not str(event.ticker or "").strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Could not determine ticker from announcement payload.",
+            )
+
+        service = _build_freshness_agent_service()
+        decision = await service.process_announcement_event(event)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Freshness announcement processing failed: {exc}",
+        ) from exc
+
+    return {
+        "status": "ok",
+        "ticker": decision.event.ticker,
+        "baseline_run_id": decision.baseline_run.run_id,
+        "current_path": decision.comparison_report.current_path,
+        "path_transition": decision.comparison_report.path_transition,
+        "action": decision.action_decision.action,
+        "decision": decision.to_dict(),
+    }
 
 
 @app.post("/api/gantt-runs/{run_id}/delta-check")

@@ -16,6 +16,7 @@ from backend.freshness_agents import (
     FreshnessAgentDependencies,
     FreshnessDecision,
     FreshnessAgentService,
+    InboxSentinel,
     LabScribe,
     LatestRunSelector,
     SourceResolver,
@@ -175,6 +176,25 @@ class SourceResolverTests(unittest.TestCase):
         self.assertEqual(packet.document_path, str(attachment_path))
         self.assertTrue(packet.document_sha256)
         self.assertEqual(packet.body_text, "Quarterly Activities Report body.")
+
+
+class InboxSentinelTests(unittest.TestCase):
+    def test_inbox_sentinel_extracts_asx_ticker_from_subject(self):
+        sentinel = InboxSentinel()
+        event = sentinel.ingest_email_payload(
+            {
+                "gmail_message_id": "gmail-1",
+                "subject": "ASX:WWI - Capital Raise Update",
+                "sender": "asxonline@asx.com.au",
+                "body_text": "Please see attached announcement.",
+                "urls": ["https://announcements.asx.com.au/asxpdf/20260406/pdf/wwi.pdf"],
+            }
+        )
+
+        self.assertEqual(event.event_id, "gmail-1")
+        self.assertEqual(event.ticker, "ASX:WWI")
+        self.assertEqual(event.exchange, "ASX")
+        self.assertEqual(event.subject, "ASX:WWI - Capital Raise Update")
 
 
 class DocumentReaderTests(unittest.IsolatedAsyncioTestCase):
@@ -497,7 +517,10 @@ class LabScribeTests(unittest.IsolatedAsyncioTestCase):
             persisted = await scribe.persist(decision)
             self.assertTrue(Path(persisted["event_artifact"]).exists())
             self.assertTrue(Path(persisted["by_run_artifact"]).exists())
+            self.assertTrue(Path(persisted["latest_by_run_artifact"]).exists())
             self.assertEqual(persisted["run_id"], "run-123")
+            latest = LabScribe.load_latest_for_run("run-123", base_dir=Path(tmpdir))
+            self.assertEqual(latest.get("comparison_report", {}).get("ticker"), "ASX:BTR")
 
     def _decision(self):
         from backend.freshness_agents import ActionDecision

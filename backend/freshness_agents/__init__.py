@@ -2,6 +2,7 @@
 
 from .action_judge import ActionJudge
 from .document_reader import DocumentReader
+from .inbox_sentinel import InboxSentinel
 from .lab_scribe import LabScribe
 from .models import (
     ActionDecision,
@@ -33,6 +34,7 @@ __all__ = [
     "DocumentReader",
     "EvidenceRef",
     "FreshnessDecision",
+    "InboxSentinel",
     "LabScribe",
     "LatestRunSelector",
     "FreshnessAgentDependencies",
