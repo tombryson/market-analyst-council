@@ -273,6 +273,100 @@ async def _store_supplementary_upload_for_job(
     target.write_bytes(file_content)
     return target, filename
 
+
+def _is_mining_context(*, template_id: str, company_type: str) -> bool:
+    template_key = str(template_id or "").strip().lower()
+    company_type_key = str(company_type or "").strip().lower()
+    mining_templates = {
+        "gold_miner",
+        "silver_miner",
+        "copper_miner",
+        "lithium_miner",
+        "uranium_miner",
+        "bauxite_miner",
+        "diversified_miner",
+    }
+    if template_key in mining_templates:
+        return True
+    if company_type_key in mining_templates:
+        return True
+    return company_type_key.endswith("_miner")
+
+
+async def _prepare_generated_supplementary_for_job(
+    *,
+    job_id: str,
+    request_payload: Dict[str, Any],
+) -> Tuple[Optional[Path], List[Path], Dict[str, Any]]:
+    mode = _validate_supplementary_mode(request_payload.get("supplementary_mode"))
+    if mode != "mining_pipeline":
+        return None, [], {"mode": mode or "", "generated": False}
+    if str(request_payload.get("supplementary_file") or "").strip():
+        return None, [], {"mode": mode, "generated": False, "reason": "uploaded_file_precedence"}
+    if str(request_payload.get("reuse_supplementary_from_job_id") or "").strip():
+        return None, [], {"mode": mode, "generated": False, "reason": "reused_supplementary_precedence"}
+
+    from .template_loader import get_template_loader
+
+    loader = get_template_loader()
+    ticker = str(request_payload.get("ticker") or "").strip().upper()
+    user_query = str(request_payload.get("query") or "").strip()
+    explicit_company_name = str(request_payload.get("company_name") or "").strip()
+    explicit_exchange = str(request_payload.get("exchange") or "").strip()
+    explicit_template_id = str(request_payload.get("template_id") or "").strip()
+    explicit_company_type = str(request_payload.get("company_type") or "").strip()
+
+    selection = loader.resolve_template_selection(
+        user_query or explicit_company_name or ticker,
+        ticker=ticker or None,
+        explicit_template_id=explicit_template_id or None,
+        company_type=explicit_company_type or None,
+        exchange=explicit_exchange or None,
+    )
+    selected_template_id = str(selection.get("template_id") or explicit_template_id or "").strip()
+    selected_company_type = str(selection.get("company_type") or explicit_company_type or "").strip()
+    if not _is_mining_context(template_id=selected_template_id, company_type=selected_company_type):
+        raise RuntimeError(
+            f"Supplementary mode 'mining_pipeline' requested for non-mining context "
+            f"(template_id={selected_template_id or 'unknown'}, company_type={selected_company_type or 'unknown'})."
+        )
+
+    selected_company_name = str(selection.get("company_name") or explicit_company_name or "").strip()
+    selected_exchange = str(selection.get("exchange") or explicit_exchange or "").strip()
+    if not ticker:
+        raise RuntimeError("Mining supplementary generation requires a canonical ticker.")
+
+    generated = await research_service.gather_mining_supplementary_facts(
+        user_query=user_query,
+        company=selected_company_name,
+        ticker=ticker,
+        exchange=selected_exchange,
+        commodity="",
+        template_id=selected_template_id,
+        company_type=selected_company_type,
+    )
+    final_json = generated.get("final_json") if isinstance(generated, dict) else None
+    if not isinstance(final_json, dict) or not final_json:
+        raise RuntimeError("Mining supplementary generation returned no final_json payload.")
+
+    uploads_dir = JOBS_OUTPUTS_DIR / "supplementary"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    base_stem = f"{job_id}_mining_pipeline"
+    context_path = uploads_dir / f"{base_stem}.json"
+    debug_path = uploads_dir / f"{base_stem}.debug.json"
+    context_path.write_text(json.dumps(final_json, indent=2, ensure_ascii=False), encoding="utf-8")
+    debug_path.write_text(json.dumps(generated, indent=2, ensure_ascii=False), encoding="utf-8")
+    return context_path, [context_path, debug_path], {
+        "mode": mode,
+        "generated": True,
+        "context_path": str(context_path),
+        "debug_path": str(debug_path),
+        "template_id": selected_template_id,
+        "company_type": selected_company_type,
+        "company_name": selected_company_name,
+        "exchange": selected_exchange,
+    }
+
 # Enable CORS for local development
 app.add_middleware(
     CORSMiddleware,
@@ -325,6 +419,7 @@ class CreateAnalysisJobRequest(BaseModel):
     diagnostic_mode: bool = False
     reuse_recent_bundle: bool = False
     reuse_supplementary_from_job_id: Optional[str] = None
+    supplementary_mode: Optional[str] = None
 
 
 class ConversationMetadata(BaseModel):
@@ -1105,6 +1200,19 @@ def _coerce_form_bool(value: Any, default: bool = False) -> bool:
     return default
 
 
+def _validate_supplementary_mode(value: Any) -> Optional[str]:
+    text = str(value or "").strip().lower()
+    if not text:
+        return None
+    allowed = {"upload", "mining_pipeline"}
+    if text not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid supplementary_mode: {text}",
+        )
+    return text
+
+
 def _tail_text(value: str, max_chars: int = ANALYSIS_JOB_LOG_TAIL_CHARS) -> str:
     text = str(value or "")
     if len(text) <= max_chars:
@@ -1467,6 +1575,7 @@ async def _run_analysis_job(
     job_id: str,
     command: List[str],
     output_path: Path,
+    request_payload: Optional[Dict[str, Any]] = None,
     cleanup_paths: Optional[List[Path]] = None,
 ) -> None:
     if await _set_job_fields(
@@ -1480,9 +1589,31 @@ async def _run_analysis_job(
         return
 
     process = None
+    command_to_run = list(command)
+    cleanup_list = list(cleanup_paths or [])
     try:
+        if _validate_supplementary_mode((request_payload or {}).get("supplementary_mode")) == "mining_pipeline":
+            await _set_job_fields(
+                job_id,
+                stage="initializing",
+                stage_message="Generating mining supplementary packet",
+                progress_pct=4,
+            )
+        generated_context_path, generated_cleanup_paths, generation_meta = await _prepare_generated_supplementary_for_job(
+            job_id=job_id,
+            request_payload=request_payload or {},
+        )
+        if generated_context_path:
+            command_to_run.extend(["--supplementary-context-file", str(generated_context_path)])
+            cleanup_list.extend(generated_cleanup_paths)
+            await _set_job_fields(
+                job_id,
+                stage="initializing",
+                stage_message="Generated mining supplementary packet",
+                progress_pct=6,
+            )
         process = await asyncio.create_subprocess_exec(
-            *command,
+            *command_to_run,
             cwd=str(PROJECT_ROOT),
             env=_build_analysis_job_env(),
             stdout=asyncio.subprocess.PIPE,
@@ -1550,7 +1681,7 @@ async def _run_analysis_job(
             fields["returncode"] = int(process.returncode)
         await _set_job_fields(job_id, **fields)
     finally:
-        for path in cleanup_paths or []:
+        for path in cleanup_list:
             try:
                 if isinstance(path, Path) and path.exists():
                     path.unlink()
@@ -2697,6 +2828,7 @@ async def create_analysis_job(
     diagnostic_mode: Optional[str] = Form(None),
     reuse_recent_bundle: Optional[str] = Form(None),
     reuse_supplementary_from_job_id: Optional[str] = Form(None),
+    supplementary_mode: Optional[str] = Form(None),
     supplementary_file: UploadFile = File(None),
 ):
     """
@@ -2720,6 +2852,7 @@ async def create_analysis_job(
             diagnostic_mode=_coerce_form_bool(diagnostic_mode, default=False),
             reuse_recent_bundle=_coerce_form_bool(reuse_recent_bundle, default=False),
             reuse_supplementary_from_job_id=str(reuse_supplementary_from_job_id or "").strip() or None,
+            supplementary_mode=_validate_supplementary_mode(supplementary_mode),
         )
     else:
         try:
@@ -2817,6 +2950,7 @@ async def create_analysis_job(
             job_id=job_id,
             command=command,
             output_path=output_path,
+            request_payload=request_payload,
             cleanup_paths=[supplementary_upload_path] if supplementary_upload_path else [],
         )
     )

@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 import httpx
 
 from .base import ResearchProvider
+from .perplexity_mining import PerplexityMiningSupplementaryEnricher
 from ...reasoning import build_reasoning_payload, normalize_reasoning_effort
 from ...config import (
     PERPLEXITY_API_KEY,
@@ -809,6 +810,39 @@ class PerplexityResearchProvider(ResearchProvider):
                 ),
             },
         }
+
+    async def gather_mining_supplementary_facts(
+        self,
+        *,
+        user_query: str = "",
+        company: str,
+        ticker: str,
+        exchange: str,
+        commodity: str,
+        template_id: str = "",
+        company_type: str = "",
+        preset: Optional[str] = None,
+        repair_preset: Optional[str] = None,
+        model_override: Optional[str] = None,
+        max_priority_sources: Optional[int] = None,
+        enable_targeted_repairs: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Run segmented mining supplementary-facts enrichment via Perplexity."""
+        enricher = PerplexityMiningSupplementaryEnricher(self)
+        return await enricher.gather(
+            user_query=user_query,
+            company=company,
+            ticker=ticker,
+            exchange=exchange,
+            commodity=commodity,
+            template_id=template_id,
+            company_type=company_type,
+            preset=preset,
+            repair_preset=repair_preset,
+            model_override=model_override,
+            max_priority_sources=max_priority_sources,
+            enable_targeted_repairs=enable_targeted_repairs,
+        )
 
     def _build_payload(
         self,

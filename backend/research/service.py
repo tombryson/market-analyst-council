@@ -97,6 +97,39 @@ class ResearchService:
 
         return result
 
+    async def gather_mining_supplementary_facts(
+        self,
+        *,
+        user_query: str = "",
+        company: str,
+        ticker: str,
+        exchange: str,
+        commodity: str,
+        template_id: str = "",
+        company_type: str = "",
+        preset: Optional[str] = None,
+        repair_preset: Optional[str] = None,
+        model_override: Optional[str] = None,
+        max_priority_sources: Optional[int] = None,
+        enable_targeted_repairs: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Run the segmented Perplexity mining supplementary-facts workflow."""
+        provider = PerplexityResearchProvider()
+        return await provider.gather_mining_supplementary_facts(
+            user_query=user_query,
+            company=company,
+            ticker=ticker,
+            exchange=exchange,
+            commodity=commodity,
+            template_id=template_id,
+            company_type=company_type,
+            preset=preset,
+            repair_preset=repair_preset,
+            model_override=model_override,
+            max_priority_sources=max_priority_sources,
+            enable_targeted_repairs=enable_targeted_repairs,
+        )
+
     def _create_provider(self, provider_name: str) -> ResearchProvider:
         """Construct provider implementation from config name."""
         if provider_name == "perplexity":
