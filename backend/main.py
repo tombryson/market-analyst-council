@@ -48,6 +48,7 @@ from .config import (
     PROGRESS_LOGGING,
     SYSTEM_ENABLED,
     SYSTEM_SHUTDOWN_REASON,
+    SUPPLEMENTARY_API_PIPELINES_ENABLED,
 )
 from .research import ResearchService, format_evidence_pack_for_prompt
 from .research.supplementary_registry import (
@@ -286,6 +287,10 @@ async def _prepare_generated_supplementary_for_job(
     mode = _validate_supplementary_mode(request_payload.get("supplementary_mode"))
     if mode not in {"mining_pipeline", "api_pipeline"}:
         return None, [], {"mode": mode or "", "generated": False}
+    if not SUPPLEMENTARY_API_PIPELINES_ENABLED:
+        raise RuntimeError(
+            "Supplementary API pipelines are disabled. Use an uploaded supplementary document instead."
+        )
     if str(request_payload.get("supplementary_file") or "").strip():
         return None, [], {"mode": mode, "generated": False, "reason": "uploaded_file_precedence"}
     if str(request_payload.get("reuse_supplementary_from_job_id") or "").strip():

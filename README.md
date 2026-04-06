@@ -75,6 +75,7 @@ PERPLEXITY_PRESET_STRATEGY=adaptive
 PERPLEXITY_PRESET=deep-research
 PERPLEXITY_PRESET_DEEP=deep-research
 PERPLEXITY_PRESET_ADVANCED=advanced-deep-research
+SUPPLEMENTARY_API_PIPELINES_ENABLED=false
 PERPLEXITY_STREAM_ENABLED=true
 # standard | pro (pro is Sonar-oriented and requires streaming)
 PERPLEXITY_SEARCH_MODE=standard
@@ -186,6 +187,12 @@ ENABLE_RESEARCH_SERVICE=true
 RESEARCH_PROVIDER=perplexity
 RESEARCH_DEPTH=deep
 ```
+
+Supplementary API pipelines are currently parked behind:
+```bash
+SUPPLEMENTARY_API_PIPELINES_ENABLED=false
+```
+Leave this off unless we deliberately revisit the cost/quality tradeoff. The current recommendation is to keep using uploaded supplementary documents or manual Perplexity web exports.
 
 To use both deep presets in Stage 1 retrieval:
 ```bash
