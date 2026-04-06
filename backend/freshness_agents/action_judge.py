@@ -14,6 +14,10 @@ class ActionJudge:
         thesis = str(report.thesis_effect or "unknown").lower()
         timeline = str(report.timeline_effect or "unknown").lower()
         capital = str(report.capital_effect or "unknown").lower()
+        baseline_path = str(report.baseline_path or "unknown").lower()
+        current_path = str(report.current_path or "unknown").lower()
+        path_transition = str(report.path_transition or "").strip().lower()
+        run_validity = str(report.run_validity or "watch").lower()
         conflict_count = len(report.conflicts_with_run or [])
         finding_count = len(report.key_findings or [])
         affected_domains = [str(item or "").strip().lower() for item in (report.affected_domains or []) if str(item or "").strip()]
@@ -23,12 +27,22 @@ class ActionJudge:
 
         full_rerun_domains = {"financing", "permitting", "resource", "production", "guidance", "capital_structure", "m_and_a"}
         stage1_rerun_domains = {"timeline", "operations", "management"}
+        scenario_break = (
+            baseline_path in {"bull", "base"}
+            and current_path == "bear"
+            and current_path != baseline_path
+        )
+        scenario_drift = (
+            baseline_path in {"bull", "base", "bear"}
+            and current_path in {"bull", "base", "bear"}
+            and current_path != baseline_path
+        )
 
-        if impact == "critical" or thesis == "invalidates":
+        if impact == "critical" or thesis == "invalidates" or run_validity == "invalidated":
             return ActionDecision(
                 action="urgent_human_review",
                 confidence=0.98,
-                reason="Critical or thesis-invalidating announcement detected.",
+                reason="Critical, thesis-invalidating, or run-invalidating announcement detected.",
                 should_trigger_workflow=True,
                 run_reuse_ok=False,
                 requires_human_ack=True,
@@ -44,19 +58,24 @@ class ActionJudge:
             impact == "high"
             or thesis == "undermines"
             or conflict_count > 0
+            or scenario_break
             or bool(material_change_types & full_rerun_domains)
             or bool(set(affected_domains) & full_rerun_domains)
+            or run_validity == "partial_invalidation"
         ):
             return ActionDecision(
                 action="full_rerun",
                 confidence=0.93,
-                reason="High-impact or conflicting announcement likely invalidates parts of the current run.",
+                reason=(
+                    "High-impact, conflicting, or scenario-breaking announcement likely invalidates parts of the current run."
+                ),
                 should_trigger_workflow=True,
                 run_reuse_ok=False,
                 invalidated_sections=list(sorted(set(affected_domains) | material_change_types)),
                 follow_up_steps=[
                     "Mark the latest run as superseded by a material announcement.",
                     "Queue a full rerun using the announcement as fresh evidence context.",
+                    f"Record scenario transition: {path_transition or f'{baseline_path}->{current_path}'}",
                 ],
                 tags=["rerun", "conflict"],
             )
@@ -64,19 +83,21 @@ class ActionJudge:
         if (
             capital in {"material_change", "worsens"}
             or timeline == "delayed"
+            or scenario_drift
             or bool(material_change_types & stage1_rerun_domains)
             or bool(set(affected_domains) & stage1_rerun_domains)
         ):
             return ActionDecision(
                 action="rerun_stage1",
                 confidence=0.87,
-                reason="Material capital or timeline change should refresh core evidence before trusting the current view.",
+                reason="Scenario drift or material capital/timeline change should refresh core evidence before trusting the current view.",
                 should_trigger_workflow=True,
                 run_reuse_ok=False,
                 invalidated_sections=list(sorted(set(affected_domains) | material_change_types)),
                 follow_up_steps=[
                     "Refresh Stage 1 evidence and scenario framing.",
                     "Reuse later-stage structure only after the new evidence has been checked.",
+                    f"Update visible current path to {current_path or 'unknown'}.",
                 ],
                 tags=["stage1", "update"],
             )

@@ -98,6 +98,42 @@ class ActionJudgeTests(unittest.TestCase):
         self.assertEqual(decision.action, "full_rerun")
         self.assertFalse(decision.run_reuse_ok)
 
+    def test_scenario_break_from_base_to_bear_forces_full_rerun(self):
+        report = ComparisonReport(
+            ticker="ASX:BTR",
+            baseline_run_id="run-3",
+            baseline_path="base",
+            current_path="bear",
+            path_transition="base->bear",
+            path_confidence=0.86,
+            run_validity="partial_invalidation",
+            impact_level="medium",
+            thesis_effect="delays",
+            key_findings=[ComparisonFinding(type="funding_break", summary="Funding pathway is now at risk.")],
+        )
+        decision = self.judge.judge(report)
+        self.assertEqual(decision.action, "full_rerun")
+        self.assertFalse(decision.run_reuse_ok)
+        self.assertIn("base->bear", " ".join(decision.follow_up_steps))
+
+    def test_scenario_drift_from_base_to_bull_triggers_stage1_refresh(self):
+        report = ComparisonReport(
+            ticker="ASX:BTR",
+            baseline_run_id="run-4",
+            baseline_path="base",
+            current_path="bull",
+            path_transition="base->bull",
+            path_confidence=0.74,
+            run_validity="watch",
+            impact_level="low",
+            thesis_effect="accelerates",
+            key_findings=[ComparisonFinding(type="permit_acceleration", summary="Permitting moved ahead of plan.")],
+        )
+        decision = self.judge.judge(report)
+        self.assertEqual(decision.action, "rerun_stage1")
+        self.assertFalse(decision.run_reuse_ok)
+        self.assertIn("current path to bull", " ".join(decision.follow_up_steps).lower())
+
 
 class FreshnessAgentServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_process_announcement_event_runs_pipeline_and_persists(self):

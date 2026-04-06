@@ -32,6 +32,8 @@ ActionType = Literal[
     "full_rerun",
     "urgent_human_review",
 ]
+ScenarioPath = Literal["unknown", "bull", "base", "bear", "mixed"]
+RunValidity = Literal["intact", "watch", "partial_invalidation", "invalidated"]
 MaterialChangeType = Literal[
     "financing",
     "permitting",
@@ -163,6 +165,11 @@ class ComparisonReport:
     ticker: str
     baseline_run_id: str
     announcement_title: str = ""
+    baseline_path: ScenarioPath = "unknown"
+    current_path: ScenarioPath = "unknown"
+    path_transition: str = ""
+    path_confidence: float = 0.0
+    run_validity: RunValidity = "watch"
     impact_level: ImpactLevel = "none"
     thesis_effect: ThesisEffect = "unknown"
     timeline_effect: TimelineEffect = "unknown"
