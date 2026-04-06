@@ -17,6 +17,8 @@ import httpx
 
 from .base import ResearchProvider
 from .perplexity_mining import PerplexityMiningSupplementaryEnricher
+from .perplexity_pharma_biotech import PerplexityPharmaBiotechSupplementaryEnricher
+from ..supplementary_registry import get_pipeline_spec
 from ...reasoning import build_reasoning_payload, normalize_reasoning_effort
 from ...config import (
     PERPLEXITY_API_KEY,
@@ -828,8 +830,8 @@ class PerplexityResearchProvider(ResearchProvider):
         enable_targeted_repairs: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """Run segmented mining supplementary-facts enrichment via Perplexity."""
-        enricher = PerplexityMiningSupplementaryEnricher(self)
-        return await enricher.gather(
+        return await self.gather_supplementary_facts(
+            pipeline_id="resources_supplementary",
             user_query=user_query,
             company=company,
             ticker=ticker,
@@ -843,6 +845,63 @@ class PerplexityResearchProvider(ResearchProvider):
             max_priority_sources=max_priority_sources,
             enable_targeted_repairs=enable_targeted_repairs,
         )
+
+    async def gather_supplementary_facts(
+        self,
+        *,
+        pipeline_id: str,
+        user_query: str = "",
+        company: str,
+        ticker: str,
+        exchange: str,
+        commodity: str = "",
+        template_id: str = "",
+        company_type: str = "",
+        preset: Optional[str] = None,
+        repair_preset: Optional[str] = None,
+        model_override: Optional[str] = None,
+        max_priority_sources: Optional[int] = None,
+        enable_targeted_repairs: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Run sector supplementary-facts enrichment via Perplexity."""
+        resolved_pipeline_id = str(pipeline_id or "").strip()
+        if not resolved_pipeline_id:
+            raise ValueError("pipeline_id is required for supplementary enrichment")
+        if not get_pipeline_spec(resolved_pipeline_id):
+            raise ValueError(f"Unsupported supplementary pipeline: {resolved_pipeline_id}")
+
+        if resolved_pipeline_id == "resources_supplementary":
+            enricher = PerplexityMiningSupplementaryEnricher(self)
+            return await enricher.gather(
+                user_query=user_query,
+                company=company,
+                ticker=ticker,
+                exchange=exchange,
+                commodity=commodity,
+                template_id=template_id,
+                company_type=company_type,
+                preset=preset,
+                repair_preset=repair_preset,
+                model_override=model_override,
+                max_priority_sources=max_priority_sources,
+                enable_targeted_repairs=enable_targeted_repairs,
+            )
+        if resolved_pipeline_id == "pharma_biotech_supplementary":
+            enricher = PerplexityPharmaBiotechSupplementaryEnricher(self)
+            return await enricher.gather(
+                user_query=user_query,
+                company=company,
+                ticker=ticker,
+                exchange=exchange,
+                template_id=template_id,
+                company_type=company_type,
+                preset=preset,
+                repair_preset=repair_preset,
+                model_override=model_override,
+                max_priority_sources=max_priority_sources,
+                enable_targeted_repairs=enable_targeted_repairs,
+            )
+        raise ValueError(f"No enricher implementation registered for pipeline: {resolved_pipeline_id}")
 
     def _build_payload(
         self,

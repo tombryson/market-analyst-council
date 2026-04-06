@@ -2,10 +2,24 @@
 
 from __future__ import annotations
 
+PIPELINE_ID = "resources_supplementary"
+SUPPORTED_TEMPLATE_IDS = [
+    "gold_miner",
+    "silver_miner",
+    "copper_miner",
+    "lithium_miner",
+    "uranium_miner",
+    "bauxite_miner",
+    "diversified_miner",
+]
+SUPPORTED_FAMILY_IDS = ["resources"]
+
 import json
 import re
 from datetime import date
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+from .supplementary_base import SupplementaryPipelineSpec, resolve_company_context
 
 CHECKLIST_ITEMS: List[str] = [
     "Carried tax losses or deferred tax assets (quantum and origin)",
@@ -426,62 +440,25 @@ def resolve_mining_enricher_context(
     company_type: str = "",
 ) -> Dict[str, str]:
     """Resolve canonical enricher header fields from pipeline context."""
-    from ..template_loader import get_template_loader
     from ..market_facts import _resolve_commodity_profile
 
-    loader = get_template_loader()
-    ticker_raw = str(ticker or "").strip().upper()
-    query_seed = str(user_query or "").strip() or str(company or "").strip() or ticker_raw
-    selection = loader.resolve_template_selection(
-        query_seed,
-        ticker=ticker_raw,
-        explicit_template_id=str(template_id or "").strip() or None,
-        company_type=str(company_type or "").strip() or None,
-        exchange=str(exchange or "").strip() or None,
+    context = resolve_company_context(
+        user_query=user_query,
+        ticker=ticker,
+        company=company,
+        exchange=exchange,
+        template_id=template_id,
+        company_type=company_type,
     )
-
-    selected_template_id = str(
-        template_id
-        or selection.get("template_id")
-        or ""
-    ).strip()
-    selected_company_type = str(
-        company_type
-        or selection.get("company_type")
-        or ""
-    ).strip()
-    exchange_code = _normalize_exchange_code(
-        exchange
-        or selection.get("exchange")
-        or (ticker_raw.split(":", 1)[0] if ":" in ticker_raw else "")
-    )
-    ticker_symbol = _normalize_ticker_symbol(ticker_raw)
-
-    selected_company_name = str(company or "").strip()
-    if not selected_company_name:
-        selected_company_name = str(selection.get("company_name") or "").strip()
-    if not selected_company_name:
-        selected_company_name = loader.infer_company_name(query_seed, ticker=ticker_raw).strip()
-    if not selected_company_name:
-        selected_company_name = ticker_symbol or "the company"
-
+    selected_template_id = str(context.get("template_id") or "").strip()
+    selected_company_type = str(context.get("company_type") or "").strip()
     selected_commodity = _normalize_primary_commodity(commodity)
     if not selected_commodity:
         selected_commodity = _normalize_primary_commodity(
             _resolve_commodity_profile(selected_template_id, selected_company_type)
         )
-
-    return {
-        "exchange": exchange_code,
-        "ticker_symbol": ticker_symbol,
-        "display_ticker": (
-            f"{exchange_code}:{ticker_symbol}" if exchange_code and ticker_symbol else ticker_symbol
-        ),
-        "company": selected_company_name,
-        "commodity": selected_commodity,
-        "template_id": selected_template_id,
-        "company_type": selected_company_type,
-    }
+    context["commodity"] = selected_commodity
+    return context
 
 
 def build_segment_schema(*, company: str, ticker: str, exchange: str, commodity: str, categories: List[str]) -> str:
@@ -1128,3 +1105,21 @@ __all__ = [
     "resolve_mining_enricher_context",
     "segment_repairs_for_missing_items",
 ]
+
+
+def get_pipeline_spec() -> SupplementaryPipelineSpec:
+    return SupplementaryPipelineSpec(
+        pipeline_id=PIPELINE_ID,
+        asset_class="mining",
+        industry_label="resources and mining",
+        template_ids=list(SUPPORTED_TEMPLATE_IDS),
+        family_ids=list(SUPPORTED_FAMILY_IDS),
+        checklist_items=list(CHECKLIST_ITEMS),
+        segment_definitions=[dict(segment) for segment in SEGMENT_DEFINITIONS],
+        category_order=list(CATEGORY_ORDER),
+        category_schema_blocks=dict(CATEGORY_SCHEMA_BLOCKS),
+        discovery_prompt_template=DISCOVERY_PROMPT_TEMPLATE,
+        segment_extraction_prompt_template=SEGMENT_EXTRACTION_PROMPT_TEMPLATE,
+        targeted_repair_prompt_template=TARGETED_REPAIR_PROMPT_TEMPLATE,
+        contamination_review_prompt_template=CONTAMINATION_REVIEW_PROMPT_TEMPLATE,
+    )

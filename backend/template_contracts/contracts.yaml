@@ -248,6 +248,7 @@ templates:
   gold_miner:
     family: resources
     industry_label: gold mining
+    supplementary_pipeline_id: resources_supplementary
     analysis_contract:
       commodity_case_default_weights:
         reference_case: 0.50
@@ -266,6 +267,7 @@ templates:
   silver_miner:
     family: resources
     industry_label: silver mining
+    supplementary_pipeline_id: resources_supplementary
     analysis_contract:
       commodity_case_default_weights:
         reference_case: 0.50
@@ -284,6 +286,7 @@ templates:
   copper_miner:
     family: resources
     industry_label: copper mining
+    supplementary_pipeline_id: resources_supplementary
     analysis_contract:
       commodity_case_labels:
         reference_case: study_copper_price
@@ -299,6 +302,7 @@ templates:
   lithium_miner:
     family: resources
     industry_label: lithium mining
+    supplementary_pipeline_id: resources_supplementary
     analysis_contract:
       commodity_case_labels:
         reference_case: study_lithium_price
@@ -314,6 +318,7 @@ templates:
   uranium_miner:
     family: resources
     industry_label: uranium mining
+    supplementary_pipeline_id: resources_supplementary
     analysis_contract:
       commodity_case_labels:
         reference_case: study_uranium_price
@@ -329,6 +334,7 @@ templates:
   bauxite_miner:
     family: resources
     industry_label: bauxite and alumina
+    supplementary_pipeline_id: resources_supplementary
     analysis_contract:
       commodity_case_labels:
         reference_case: study_bauxite_or_alumina_price
@@ -344,6 +350,7 @@ templates:
   diversified_miner:
     family: resources
     industry_label: diversified mining
+    supplementary_pipeline_id: resources_supplementary
     analysis_contract:
       valuation_normalization:
         surplus_cash_debt_basis: subtract_only_obligations_not_already_reflected_in_project_cashflow_or_capex_and_never_double_count_funding_burden
@@ -358,78 +365,91 @@ templates:
   pharma_biotech:
     family: pharma
     industry_label: pharma and biotech
+    supplementary_pipeline_id: pharma_biotech_supplementary
     chairman_contract:
       valuation_methods:
         primary: [rnpv, ev_risk_adjusted_peak_sales, cash_runway, partnering_value]
   medtech:
     family: medtech
     industry_label: medtech
+    supplementary_pipeline_id: medtech_supplementary
     chairman_contract:
       valuation_methods:
         primary: [ev_sales, gross_margin_path, adoption_curve, reimbursement_value]
   bank_financials:
     family: banks
     industry_label: banking and lending
+    supplementary_pipeline_id: banks_supplementary
     chairman_contract:
       valuation_methods:
         primary: [price_to_book, rote, dividend_yield, nim_sensitivity]
   insurance:
     family: insurance
     industry_label: insurance
+    supplementary_pipeline_id: insurance_supplementary
     chairman_contract:
       valuation_methods:
         primary: [price_to_book, roe, combined_ratio, reserve_adequacy]
   financials_bank_insurance:
     family: insurance
     industry_label: diversified financials and insurance
+    supplementary_pipeline_id: insurance_supplementary
     chairman_contract:
       valuation_methods:
         primary: [price_to_book, roe, capital_strength, earnings_quality]
   software_saas:
     family: software
     industry_label: software and saas
+    supplementary_pipeline_id: software_saas_supplementary
     chairman_contract:
       valuation_methods:
         primary: [ev_sales, rule_of_40, free_cash_flow_yield, margin_path, retention_quality]
   datacentres:
     family: datacentres
     industry_label: datacentres and digital infrastructure
+    supplementary_pipeline_id: datacentre_supplementary
     chairman_contract:
       valuation_methods:
         primary: [ev_ebitda, nav, mw_capacity_value, yield_on_cost, funding_capacity]
   industrials:
     family: industrials
     industry_label: industrials
+    supplementary_pipeline_id: industrials_supplementary
     chairman_contract:
       valuation_methods:
         primary: [ev_ebitda, free_cash_flow_yield, orderbook_quality, margin_recovery]
   consumer_retail:
     family: consumer
     industry_label: consumer and retail
+    supplementary_pipeline_id: consumer_retail_supplementary
     chairman_contract:
       valuation_methods:
         primary: [ev_ebitda, same_store_sales, gross_margin, free_cash_flow_yield]
   real_estate_reit:
     family: reit
     industry_label: real estate and reit
+    supplementary_pipeline_id: reit_property_supplementary
     chairman_contract:
       valuation_methods:
         primary: [nav_discount, cap_rate, affo_multiple, ltv]
   industrials_consumer_reit:
     family: reit
     industry_label: industrials, consumer, and reit umbrella
+    supplementary_pipeline_id: reit_property_supplementary
     chairman_contract:
       valuation_methods:
         primary: [intrinsic_value, ev_ebitda, nav_discount, free_cash_flow_yield]
   energy_oil_gas:
     family: energy
     industry_label: energy and oil gas
+    supplementary_pipeline_id: energy_oil_gas_supplementary
     chairman_contract:
       valuation_methods:
         primary: [risked_nav, reserve_value, free_cash_flow_break_even, leverage, hedge_book]
   general_equity:
     family: general
     industry_label: general equity
+    supplementary_pipeline_id: general_equity_supplementary
     chairman_contract:
       valuation_methods:
         primary: [intrinsic_value, relative_multiple, free_cash_flow_yield, balance_sheet_risk]
