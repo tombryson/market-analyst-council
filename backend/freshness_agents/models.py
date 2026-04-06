@@ -95,6 +95,7 @@ class AnnouncementPacket:
     document_path: str = ""
     document_sha256: str = ""
     company_name: str = ""
+    body_text: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

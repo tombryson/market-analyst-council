@@ -11,12 +11,15 @@ from backend.freshness_agents import (
     BaselineRunPacket,
     ComparisonFinding,
     ComparisonReport,
+    DocumentReader,
     EvidenceRef,
     FreshnessAgentDependencies,
     FreshnessDecision,
     FreshnessAgentService,
     LabScribe,
     LatestRunSelector,
+    SourceResolver,
+    ThesisComparator,
 )
 
 
@@ -133,6 +136,197 @@ class ActionJudgeTests(unittest.TestCase):
         self.assertEqual(decision.action, "rerun_stage1")
         self.assertFalse(decision.run_reuse_ok)
         self.assertIn("current path to bull", " ".join(decision.follow_up_steps).lower())
+
+
+class SourceResolverTests(unittest.TestCase):
+    def test_resolver_prefers_asx_url_and_normalizes_subject(self):
+        with TemporaryDirectory() as tmpdir:
+            attachment_path = Path(tmpdir) / "btr-quarterly.txt"
+            attachment_path.write_text("Quarterly update", encoding="utf-8")
+
+            resolver = SourceResolver()
+            packet = resolver.resolve(
+                AnnouncementEvent(
+                    event_id="evt-asx-1",
+                    ticker="ASX:BTR",
+                    subject="ASX:BTR - Quarterly Activities Report",
+                    sender="asxonline@asx.com.au",
+                    urls=[
+                        "https://example.com/generic-release",
+                        "https://announcements.asx.com.au/asxpdf/20260406/pdf/example.pdf",
+                    ],
+                    attachments=[
+                        AnnouncementAttachment(
+                            filename="btr-quarterly.txt",
+                            local_path=str(attachment_path),
+                        )
+                    ],
+                    body_text="Quarterly Activities Report body.",
+                )
+            )
+
+        self.assertEqual(packet.exchange, "ASX")
+        self.assertEqual(packet.title, "Quarterly Activities Report")
+        self.assertEqual(
+            packet.source_url,
+            "https://announcements.asx.com.au/asxpdf/20260406/pdf/example.pdf",
+        )
+        self.assertEqual(packet.source_type, "exchange_filing")
+        self.assertEqual(packet.document_path, str(attachment_path))
+        self.assertTrue(packet.document_sha256)
+        self.assertEqual(packet.body_text, "Quarterly Activities Report body.")
+
+
+class DocumentReaderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_reader_extracts_topics_and_facts_from_local_text_attachment(self):
+        with TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "announcement.txt"
+            path.write_text(
+                "\n".join(
+                    [
+                        "Brightstar secured a new debt facility for project funding.",
+                        "The environmental permit approval remains on track for the June quarter.",
+                        "Management stated the processing plant timeline is ahead of schedule.",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            reader = DocumentReader()
+            facts = await reader.read(
+                AnnouncementPacket(
+                    event_id="evt-doc-1",
+                    ticker="ASX:BTR",
+                    exchange="ASX",
+                    title="Quarterly Activities Report",
+                    source_url="https://announcements.asx.com.au/example.pdf",
+                    document_path=str(path),
+                    company_name="Brightstar Resources Limited",
+                )
+            )
+
+        self.assertEqual(facts.title, "Quarterly Activities Report")
+        self.assertTrue(facts.summary)
+        self.assertGreaterEqual(len(facts.extracted_facts), 2)
+        self.assertIn("financing", facts.material_topics)
+        self.assertIn("permitting", facts.material_topics)
+        self.assertIn("timeline", facts.material_topics)
+        self.assertTrue(facts.evidence)
+        self.assertIn("debt facility", facts.raw_text_excerpt.lower())
+
+
+class ThesisComparatorTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.comparator = ThesisComparator()
+        self.baseline_run = BaselineRunPacket(
+            run_id="run-scenario-1",
+            ticker="ASX:BTR",
+            exchange="ASX",
+            company_name="Brightstar Resources Limited",
+            lab_payload={
+                "structured_data": {
+                    "extended_analysis": {
+                        "current_thesis_state": {
+                            "leaning": "base",
+                            "status": "on-track",
+                            "basis": "Funding and permitting remain on plan.",
+                        }
+                    },
+                    "thesis_map": {
+                        "bull": {
+                            "required_conditions": [
+                                {
+                                    "condition_id": "bull_permit_fast",
+                                    "condition": "Permitting approvals arrive ahead of plan",
+                                    "evidence_hooks": ["permit approval ahead of schedule"],
+                                    "linked_milestones": ["permit approval"],
+                                }
+                            ],
+                            "failure_conditions": [],
+                        },
+                        "base": {
+                            "required_conditions": [
+                                {
+                                    "condition_id": "base_financing_secure",
+                                    "condition": "Funding remains sufficient for planned milestones",
+                                    "evidence_hooks": ["funding remains sufficient"],
+                                    "linked_milestones": ["funding"],
+                                }
+                            ],
+                            "failure_conditions": [
+                                {
+                                    "condition_id": "base_funding_break",
+                                    "condition": "Funding pathway breaks before key milestones",
+                                    "evidence_hooks": ["funding shortfall", "capital raise under pressure"],
+                                    "linked_milestones": ["funding"],
+                                }
+                            ],
+                        },
+                        "bear": {
+                            "required_conditions": [
+                                {
+                                    "condition_id": "bear_delay_and_shortfall",
+                                    "condition": "Project delays and funding shortfall emerge",
+                                    "evidence_hooks": ["delay", "funding shortfall"],
+                                    "linked_milestones": ["project timeline"],
+                                }
+                            ],
+                            "failure_conditions": [],
+                        },
+                    },
+                }
+            },
+        )
+
+    def test_comparator_routes_base_to_bear_on_failure_condition_match(self):
+        facts = AnnouncementFacts(
+            event_id="evt-compare-1",
+            ticker="ASX:BTR",
+            company_name="Brightstar Resources Limited",
+            title="Funding Update",
+            summary="The company disclosed a funding shortfall and project delay.",
+            extracted_facts=[
+                "Funding shortfall emerged before planned milestones.",
+                "Project delay was confirmed for the next quarter.",
+            ],
+            material_topics=["financing", "timeline"],
+            evidence=[EvidenceRef(source_url="https://announcements.asx.com.au/example.pdf")],
+            raw_text_excerpt="Funding shortfall and delay were disclosed.",
+        )
+
+        report = self.comparator.compare(facts, self.baseline_run)
+
+        self.assertEqual(report.baseline_path, "base")
+        self.assertEqual(report.current_path, "bear")
+        self.assertEqual(report.path_transition, "base->bear")
+        self.assertEqual(report.run_validity, "partial_invalidation")
+        self.assertEqual(report.impact_level, "high")
+        self.assertTrue(report.conflicts_with_run)
+
+    def test_comparator_routes_base_to_bull_on_bull_condition_match(self):
+        facts = AnnouncementFacts(
+            event_id="evt-compare-2",
+            ticker="ASX:BTR",
+            company_name="Brightstar Resources Limited",
+            title="Permitting Update",
+            summary="Permit approval arrived ahead of schedule and management said the project remains funded.",
+            extracted_facts=[
+                "Permit approval ahead of schedule was granted.",
+                "Funding remains sufficient for planned milestones.",
+            ],
+            material_topics=["permitting", "timeline", "financing"],
+            evidence=[EvidenceRef(source_url="https://announcements.asx.com.au/example2.pdf")],
+            raw_text_excerpt="Permit approval ahead of schedule was granted and funding remains sufficient.",
+        )
+
+        report = self.comparator.compare(facts, self.baseline_run)
+
+        self.assertEqual(report.baseline_path, "base")
+        self.assertEqual(report.current_path, "bull")
+        self.assertEqual(report.path_transition, "base->bull")
+        self.assertGreater(report.path_confidence, 0.0)
+        self.assertEqual(report.thesis_effect, "accelerates")
+        self.assertTrue(report.key_findings)
 
 
 class FreshnessAgentServiceTests(unittest.IsolatedAsyncioTestCase):
