@@ -254,6 +254,55 @@ export const api = {
     return body;
   },
 
+  async getScenarioRouterOverview(limit = 100, ticker = '') {
+    const qs = new URLSearchParams();
+    qs.set('limit', String(limit));
+    if (String(ticker || '').trim()) {
+      qs.set('ticker', String(ticker || '').trim());
+    }
+    const { response, body } = await fetchJsonWithRetry(
+      `${API_BASE}/api/scenario-router/overview?${qs.toString()}`,
+      { method: 'GET' },
+      { retries: 2, timeoutMs: 30000 }
+    );
+    if (!response.ok) {
+      const detail = errorDetailFromPayload(body);
+      throw new Error(detail ? `Failed to load scenario router overview: ${detail}` : 'Failed to load scenario router overview');
+    }
+    return body;
+  },
+
+  async listScenarioRouterEvents(limit = 50, ticker = '') {
+    const qs = new URLSearchParams();
+    qs.set('limit', String(limit));
+    if (String(ticker || '').trim()) {
+      qs.set('ticker', String(ticker || '').trim());
+    }
+    const { response, body } = await fetchJsonWithRetry(
+      `${API_BASE}/api/scenario-router/events?${qs.toString()}`,
+      { method: 'GET' },
+      { retries: 2, timeoutMs: 30000 }
+    );
+    if (!response.ok) {
+      const detail = errorDetailFromPayload(body);
+      throw new Error(detail ? `Failed to load scenario router events: ${detail}` : 'Failed to load scenario router events');
+    }
+    return body;
+  },
+
+  async getScenarioRouterEvaluations() {
+    const { response, body } = await fetchJsonWithRetry(
+      `${API_BASE}/api/scenario-router/evaluations`,
+      { method: 'GET' },
+      { retries: 2, timeoutMs: 30000 }
+    );
+    if (!response.ok) {
+      const detail = errorDetailFromPayload(body);
+      throw new Error(detail ? `Failed to load scenario router evaluations: ${detail}` : 'Failed to load scenario router evaluations');
+    }
+    return body;
+  },
+
   /**
    * Run (or fetch cached) delta-check for one run.
    */

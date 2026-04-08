@@ -205,6 +205,19 @@ class ActionDecision:
 
 
 @dataclass
+class StageTrace:
+    stage: str
+    started_at_utc: str = ""
+    completed_at_utc: str = ""
+    duration_ms: int = 0
+    outcome: str = "ok"
+    meta: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class ScenarioRouterDecision:
     event: AnnouncementEvent
     announcement_packet: AnnouncementPacket
@@ -212,6 +225,10 @@ class ScenarioRouterDecision:
     baseline_run: BaselineRunPacket
     comparison_report: ComparisonReport
     action_decision: ActionDecision
+    processing_started_at_utc: str = ""
+    processing_completed_at_utc: str = ""
+    processing_duration_ms: int = 0
+    processing_trace: List[StageTrace] = field(default_factory=list)
     persisted_artifacts: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -222,5 +239,9 @@ class ScenarioRouterDecision:
             "baseline_run": self.baseline_run.to_dict(),
             "comparison_report": self.comparison_report.to_dict(),
             "action_decision": self.action_decision.to_dict(),
+            "processing_started_at_utc": self.processing_started_at_utc,
+            "processing_completed_at_utc": self.processing_completed_at_utc,
+            "processing_duration_ms": self.processing_duration_ms,
+            "processing_trace": [item.to_dict() for item in self.processing_trace],
             "persisted_artifacts": dict(self.persisted_artifacts or {}),
         }

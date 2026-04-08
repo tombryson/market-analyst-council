@@ -154,10 +154,6 @@ class ThesisComparator:
             text = str(value or "").strip()
             if ThesisComparator._is_meaningful_support_phrase(text):
                 phrases.append(text)
-        for value in item.get("linked_milestones") or []:
-            text = str(value or "").strip()
-            if ThesisComparator._is_meaningful_support_phrase(text):
-                phrases.append(text)
         return phrases[:6]
 
     @staticmethod
@@ -205,7 +201,9 @@ class ThesisComparator:
     ) -> str:
         if bear_strength > 0 and (negative or bear_strength >= max(bull_strength, base_strength)):
             return "bear"
-        if bull_strength > 0 and (positive or bull_strength > base_strength) and bear_strength == 0:
+        if bear_strength == 0 and bull_strength > base_strength:
+            return "bull"
+        if bear_strength == 0 and bull_strength > 0 and base_strength == 0 and positive:
             return "bull"
         if base_strength > 0:
             return "base"

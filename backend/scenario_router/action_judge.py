@@ -27,6 +27,8 @@ class ActionJudge:
 
         full_rerun_domains = {"financing", "permitting", "resource", "production", "guidance", "capital_structure", "m_and_a"}
         stage1_rerun_domains = {"timeline", "operations", "management"}
+        critical_domain_hit = bool(material_change_types & full_rerun_domains) or bool(set(affected_domains) & full_rerun_domains)
+        stage1_domain_hit = bool(material_change_types & stage1_rerun_domains) or bool(set(affected_domains) & stage1_rerun_domains)
         scenario_break = (
             baseline_path in {"bull", "base"}
             and current_path == "bear"
@@ -36,6 +38,11 @@ class ActionJudge:
             baseline_path in {"bull", "base", "bear"}
             and current_path in {"bull", "base", "bear"}
             and current_path != baseline_path
+        )
+        positive_scenario_shift = (
+            scenario_drift
+            and current_path in {"bull", "base"}
+            and thesis in {"accelerates", "confirms", "partially_confirms"}
         )
 
         if impact == "critical" or thesis == "invalidates" or run_validity == "invalidated":
@@ -59,9 +66,14 @@ class ActionJudge:
             or thesis == "undermines"
             or conflict_count > 0
             or scenario_break
-            or bool(material_change_types & full_rerun_domains)
-            or bool(set(affected_domains) & full_rerun_domains)
             or run_validity == "partial_invalidation"
+            or (critical_domain_hit and current_path == "bear")
+            or (
+                critical_domain_hit
+                and not positive_scenario_shift
+                and impact in {"medium", "high"}
+                and thesis not in {"confirms", "accelerates"}
+            )
         ):
             return ActionDecision(
                 action="full_rerun",
@@ -84,8 +96,7 @@ class ActionJudge:
             capital in {"material_change", "worsens"}
             or timeline == "delayed"
             or scenario_drift
-            or bool(material_change_types & stage1_rerun_domains)
-            or bool(set(affected_domains) & stage1_rerun_domains)
+            or (stage1_domain_hit and impact in {"medium", "high"})
         ):
             return ActionDecision(
                 action="rerun_stage1",

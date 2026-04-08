@@ -243,6 +243,165 @@
   gap: 16px;
 }
 
+.scenario-router-monitor-panel {
+  margin-bottom: 12px;
+}
+
+.scenario-router-monitor-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.scenario-router-monitor-head h3 {
+  margin: 0;
+}
+
+.scenario-router-monitor-copy {
+  margin: 4px 0 0;
+  color: #b7d4e8;
+  font-size: 12px;
+}
+
+.scenario-router-monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.scenario-router-card {
+  border: 1px solid rgba(171, 208, 231, 0.18);
+  background: rgba(9, 24, 36, 0.72);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scenario-router-card label {
+  font-size: 11px;
+  color: #9fc4df;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.scenario-router-card strong {
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.scenario-router-card span {
+  font-size: 12px;
+  color: #b7d4e8;
+}
+
+.scenario-router-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.scenario-router-column {
+  border: 1px solid rgba(171, 208, 231, 0.16);
+  border-radius: 10px;
+  background: rgba(7, 20, 30, 0.56);
+  padding: 12px;
+}
+
+.scenario-router-column-wide {
+  grid-column: span 2;
+}
+
+.scenario-router-column h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.scenario-router-detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(171, 208, 231, 0.12);
+  font-size: 12px;
+}
+
+.scenario-router-detail-row:last-of-type {
+  border-bottom: none;
+}
+
+.scenario-router-detail-row span {
+  color: #9fc4df;
+}
+
+.scenario-router-detail-note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #b7d4e8;
+  line-height: 1.4;
+}
+
+.scenario-router-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.scenario-router-chip {
+  border: 1px solid rgba(171, 208, 231, 0.2);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #d7eafa;
+  background: rgba(12, 34, 47, 0.66);
+}
+
+.scenario-router-event-list {
+  display: grid;
+  gap: 8px;
+}
+
+.scenario-router-event {
+  border: 1px solid rgba(171, 208, 231, 0.14);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(6, 17, 27, 0.64);
+}
+
+.scenario-router-event.is-pass {
+  border-color: rgba(58, 192, 143, 0.26);
+}
+
+.scenario-router-event.is-fail {
+  border-color: rgba(224, 89, 82, 0.34);
+}
+
+.scenario-router-event-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.scenario-router-event-title {
+  font-size: 13px;
+  color: #e8f4ff;
+  margin-bottom: 4px;
+}
+
+.scenario-router-event-meta {
+  color: #9fc4df;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .banner-name {
   font-size: 20px;
   font-weight: 700;

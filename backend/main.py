@@ -2949,6 +2949,32 @@ async def get_gantt_run_report_packet(run_id: str):
     return _build_integration_packet(run_id=str(run_payload.get("id") or run_id), run_payload=run_payload)
 
 
+@app.get("/api/scenario-router/overview")
+async def get_scenario_router_overview(limit: int = 100, ticker: str = ""):
+    from .scenario_router.observability import ScenarioRouterObservability
+
+    observer = ScenarioRouterObservability()
+    return observer.build_overview(recent_limit=max(1, min(int(limit or 100), 500)), ticker=str(ticker or "").strip())
+
+
+@app.get("/api/scenario-router/events")
+async def list_scenario_router_events(limit: int = 50, ticker: str = ""):
+    from .scenario_router.observability import ScenarioRouterObservability
+
+    observer = ScenarioRouterObservability()
+    return {
+        "events": observer.list_recent_events(limit=max(1, min(int(limit or 50), 500)), ticker=str(ticker or "").strip()),
+    }
+
+
+@app.get("/api/scenario-router/evaluations")
+async def get_scenario_router_evaluations():
+    from .scenario_router.observability import ScenarioRouterObservability
+
+    observer = ScenarioRouterObservability()
+    return observer.run_evaluation_suite()
+
+
 @app.get("/api/gantt-runs/{run_id}/delta-check/latest")
 async def get_latest_delta_check(run_id: str):
     """Return latest delta-check result for a run, if available."""

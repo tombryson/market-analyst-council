@@ -1,0 +1,122 @@
+[
+  {
+    "case_id": "resources_bear_funding_shortfall",
+    "category": "bearish",
+    "template_family": "resources",
+    "label": "Funding shortfall and project delay should flip base to bear",
+    "ticker": "ASX:BTR",
+    "baseline_path": "base",
+    "title": "Funding Update",
+    "summary": "The company disclosed a funding shortfall and project delay.",
+    "extracted_facts": [
+      "Funding shortfall emerged before planned milestones.",
+      "Project delay was confirmed for the next quarter."
+    ],
+    "material_topics": ["financing", "timeline"],
+    "expected": {
+      "current_path": "bear",
+      "action": "full_rerun",
+      "impact_level": "high"
+    }
+  },
+  {
+    "case_id": "resources_bull_permit_acceleration",
+    "category": "bullish",
+    "template_family": "resources",
+    "label": "Ahead-of-plan permitting should move base to bull",
+    "ticker": "ASX:BTR",
+    "baseline_path": "base",
+    "title": "Permitting Update",
+    "summary": "Permit approval arrived ahead of schedule and management said the project remains funded.",
+    "extracted_facts": [
+      "Permit approval ahead of schedule was granted.",
+      "Funding remains sufficient for planned milestones."
+    ],
+    "material_topics": ["permitting", "timeline", "financing"],
+    "expected": {
+      "current_path": "bull",
+      "action": "rerun_stage1",
+      "impact_level": "medium"
+    }
+  },
+  {
+    "case_id": "resources_noise_appendix_3b",
+    "category": "noise",
+    "template_family": "resources",
+    "label": "Routine Appendix 3B should not move the scenario",
+    "ticker": "ASX:BTR",
+    "baseline_path": "base",
+    "title": "Appendix 3B Application for Quotation of Securities",
+    "summary": "Routine application for quotation of securities.",
+    "extracted_facts": [
+      "Application for quotation of existing securities."
+    ],
+    "material_topics": [],
+    "expected": {
+      "current_path": "base",
+      "action": "ignore",
+      "impact_level": "none"
+    }
+  },
+  {
+    "case_id": "resources_confirms_base_ops",
+    "category": "confirmatory",
+    "template_family": "resources",
+    "label": "Operational confirmation should keep the base path while surfacing a review signal",
+    "ticker": "ASX:BTR",
+    "baseline_path": "base",
+    "title": "Operational Update",
+    "summary": "Processing arrangements remain active and the project remains on track.",
+    "extracted_facts": [
+      "Funding remains sufficient for planned milestones.",
+      "Processing plant operations remain on track."
+    ],
+    "material_topics": ["operations", "timeline"],
+    "expected": {
+      "current_path": "base",
+      "action": "rerun_stage1",
+      "impact_level": "medium"
+    }
+  },
+  {
+    "case_id": "resources_bear_permit_withdrawn",
+    "category": "bearish",
+    "template_family": "resources",
+    "label": "Permit withdrawal should force a bear-path rerun",
+    "ticker": "ASX:BTR",
+    "baseline_path": "base",
+    "title": "Permitting Setback",
+    "summary": "Key permit was withdrawn and the development timeline is now at risk.",
+    "extracted_facts": [
+      "Permit approval was withdrawn by the regulator.",
+      "The project timeline is at risk following the permit setback."
+    ],
+    "material_topics": ["permitting", "timeline"],
+    "expected": {
+      "current_path": "bear",
+      "action": "full_rerun",
+      "impact_level": "high"
+    }
+  },
+  {
+    "case_id": "resources_bull_funding_secured",
+    "category": "bullish",
+    "template_family": "resources",
+    "label": "New facility and milestone achievement should improve the path",
+    "ticker": "ASX:BTR",
+    "baseline_path": "base",
+    "title": "Funding Secured",
+    "summary": "A new facility was secured and a major project milestone was achieved.",
+    "extracted_facts": [
+      "Funding remains sufficient for planned milestones.",
+      "A new debt facility was secured for project funding.",
+      "The milestone was achieved ahead of schedule."
+    ],
+    "material_topics": ["financing", "timeline"],
+    "expected": {
+      "current_path": "bull",
+      "action": "rerun_stage1",
+      "impact_level": "medium"
+    }
+  }
+]

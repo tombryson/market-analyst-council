@@ -17,6 +17,7 @@ from backend.scenario_router import (
     ScenarioRouterDependencies,
     ScenarioRouterDecision,
     ScenarioRouterService,
+    StageTrace,
     InboxSentinel,
     LabScribe,
     LatestRunSelector,
@@ -487,14 +488,13 @@ class ThesisComparatorTests(unittest.TestCase):
             ticker="ASX:BTR",
             company_name="Brightstar Resources Limited",
             title="Permitting Update",
-            summary="Permit approval arrived ahead of schedule and management said the project remains funded.",
+            summary="Permit approval arrived ahead of schedule.",
             extracted_facts=[
                 "Permit approval ahead of schedule was granted.",
-                "Funding remains sufficient for planned milestones.",
             ],
-            material_topics=["permitting", "timeline", "financing"],
+            material_topics=["permitting", "timeline"],
             evidence=[EvidenceRef(source_url="https://announcements.asx.com.au/example2.pdf")],
-            raw_text_excerpt="Permit approval ahead of schedule was granted and funding remains sufficient.",
+            raw_text_excerpt="Permit approval ahead of schedule was granted.",
         )
 
         report = self.comparator.compare(facts, self.baseline_run)
@@ -608,6 +608,11 @@ class ScenarioRouterServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.baseline_run.run_id, "run-123")
         self.assertEqual(result.persisted_artifacts["baseline_run_id"], "run-123")
         self.assertEqual(result.announcement_packet.title, "Quarterly Activities Report")
+        self.assertGreaterEqual(result.processing_duration_ms, 0)
+        self.assertEqual(
+            [stage.stage for stage in result.processing_trace],
+            ["source_resolver", "document_reader", "run_selector", "thesis_comparator", "action_judge", "lab_scribe"],
+        )
 
 
 class LatestRunSelectorTests(unittest.IsolatedAsyncioTestCase):
@@ -719,6 +724,68 @@ class ScenarioRouterWebhookHelperTests(unittest.TestCase):
 
         self.assertEqual(loaded.get("ticker"), "ASX:TOR")
         self.assertEqual(loaded.get("baseline_run_id"), "run-99")
+
+
+class ScenarioRouterObservabilityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_observability_summarizes_persisted_events(self):
+        from backend.scenario_router.observability import ScenarioRouterObservability
+
+        with TemporaryDirectory() as tmpdir:
+            scribe = LabScribe(base_dir=Path(tmpdir))
+            decision = ScenarioRouterDecision(
+                event=AnnouncementEvent(event_id="evt-obs-1", ticker="ASX:TOR", exchange="ASX"),
+                announcement_packet=AnnouncementPacket(
+                    event_id="evt-obs-1",
+                    ticker="ASX:TOR",
+                    title="Operational Update",
+                    source_type="exchange_filing",
+                    source_url="https://announcements.asx.com.au/asxpdf/example.pdf",
+                ),
+                announcement_facts=AnnouncementFacts(event_id="evt-obs-1", ticker="ASX:TOR"),
+                baseline_run=BaselineRunPacket(run_id="run-obs-1", ticker="ASX:TOR"),
+                comparison_report=ComparisonReport(
+                    ticker="ASX:TOR",
+                    baseline_run_id="run-obs-1",
+                    current_path="bull",
+                    baseline_path="base",
+                    path_transition="base->bull",
+                    impact_level="medium",
+                ),
+                action_decision=ActionJudge().judge(
+                    ComparisonReport(
+                        ticker="ASX:TOR",
+                        baseline_run_id="run-obs-1",
+                        current_path="base",
+                        baseline_path="base",
+                        impact_level="low",
+                        key_findings=[ComparisonFinding(type="note", summary="ok")],
+                    )
+                ),
+                processing_started_at_utc="2026-04-08T00:00:00Z",
+                processing_completed_at_utc="2026-04-08T00:00:01Z",
+                processing_duration_ms=1000,
+                processing_trace=[StageTrace(stage="source_resolver", duration_ms=100)],
+            )
+            await scribe.persist(decision)
+
+            observer = ScenarioRouterObservability(base_dir=Path(tmpdir))
+            overview = observer.build_overview()
+            events = observer.list_recent_events()
+
+        self.assertEqual(overview.get("total_events"), 1)
+        self.assertEqual(overview.get("unique_tickers"), 1)
+        self.assertEqual(events[0].get("path_transition"), "base->bull")
+        self.assertEqual(events[0].get("source_type"), "exchange_filing")
+        self.assertEqual(events[0].get("processing_duration_ms"), 1000)
+
+    async def test_evaluation_suite_cases_pass(self):
+        from backend.scenario_router.observability import ScenarioRouterObservability
+
+        observer = ScenarioRouterObservability()
+        summary = observer.run_evaluation_suite()
+        self.assertGreaterEqual(summary.get("total_cases", 0), 6)
+        self.assertEqual(summary.get("failed_cases"), 0)
+        self.assertEqual(summary.get("pass_rate_pct"), 100.0)
 
 
 if __name__ == "__main__":
