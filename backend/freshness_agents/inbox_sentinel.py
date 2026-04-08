@@ -10,6 +10,7 @@ from .models import AnnouncementAttachment, AnnouncementEvent
 TICKER_PATTERNS = (
     re.compile(r"\b([A-Z]{2,8}:[A-Z0-9]{2,12})\b"),
     re.compile(r"\bASX[: ]([A-Z0-9]{2,8})\b", re.IGNORECASE),
+    re.compile(r"\b([A-Z0-9]{2,8})\s*\((ASX)\)", re.IGNORECASE),
 )
 
 
@@ -46,7 +47,10 @@ class InboxSentinel:
             subject=subject,
             sender=sender,
             body_text=body_text,
-            company_hint=str(data.get("company_hint") or data.get("company_name") or "").strip(),
+            company_hint=self._coerce_company_hint(
+                explicit=data.get("company_hint") or data.get("company_name"),
+                body_text=body_text,
+            ),
             source_channel=str(data.get("source_channel") or "email").strip() or "email",
             received_at_utc=str(data.get("received_at_utc") or "").strip(),
             urls=urls,
@@ -88,10 +92,35 @@ class InboxSentinel:
             match = pattern.search(raw)
             if not match:
                 continue
-            value = match.group(1).strip().upper()
+            groups = [str(group or "").strip().upper() for group in match.groups()]
+            if len(groups) >= 2 and groups[1] in {"ASX"} and ":" not in groups[0]:
+                return f"{groups[1]}:{groups[0]}"
+            value = groups[0]
             if ":" in value:
                 return value
             return f"ASX:{value}"
+        return ""
+
+    @staticmethod
+    def _coerce_company_hint(*, explicit: Any, body_text: str) -> str:
+        text = str(explicit or "").strip()
+        if text:
+            return text
+
+        lines = [str(line or "").strip() for line in str(body_text or "").splitlines()]
+        lines = [line for line in lines if line]
+        for line in lines:
+            if re.match(r"^[A-Z0-9]{2,8}:\s+", line):
+                continue
+            lowered = line.lower()
+            if "released an announcement" in lowered:
+                prefix = re.split(r"released an announcement", line, flags=re.IGNORECASE)[0]
+                candidate = prefix.rstrip(". ").strip()
+                if candidate:
+                    return candidate
+                break
+            if re.search(r"\b(limited|resources|mining|metals|energy|holdings|corp|corporation|pharmaceuticals|biotech)\b", line, flags=re.IGNORECASE):
+                return line.rstrip(".")
         return ""
 
     @staticmethod

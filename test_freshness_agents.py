@@ -196,6 +196,54 @@ class InboxSentinelTests(unittest.TestCase):
         self.assertEqual(event.exchange, "ASX")
         self.assertEqual(event.subject, "ASX:WWI - Capital Raise Update")
 
+    def test_inbox_sentinel_extracts_hotcopper_subject_and_company_hint(self):
+        sentinel = InboxSentinel()
+        event = sentinel.ingest_email_payload(
+            {
+                "gmail_message_id": "gmail-hc-1",
+                "subject": "TOR (ASX) announcement on HotCopper",
+                "sender": "no-reply@hotcopper.com.au",
+                "body_text": "\n".join(
+                    [
+                        "8 April 2026 09:14am (AEST)",
+                        "",
+                        "TOR: Significant New Thick High-Grade Intercepts at Paris Gold",
+                        "Torque Metals Limited.. released an announcement at 09:13am on 8 April 2026.",
+                    ]
+                ),
+            }
+        )
+
+        self.assertEqual(event.event_id, "gmail-hc-1")
+        self.assertEqual(event.ticker, "ASX:TOR")
+        self.assertEqual(event.exchange, "ASX")
+        self.assertEqual(event.company_hint, "Torque Metals Limited")
+
+
+class HotCopperSourceResolverTests(unittest.TestCase):
+    def test_source_resolver_uses_hotcopper_body_headline_as_title(self):
+        resolver = SourceResolver()
+        packet = resolver.resolve(
+            AnnouncementEvent(
+                event_id="evt-hc-1",
+                ticker="ASX:TOR",
+                subject="TOR (ASX) announcement on HotCopper",
+                sender="no-reply@hotcopper.com.au",
+                body_text="\n".join(
+                    [
+                        "8 April 2026 09:14am (AEST)",
+                        "",
+                        "TOR: Significant New Thick High-Grade Intercepts at Paris Gold",
+                        "Torque Metals Limited.. released an announcement at 09:13am on 8 April 2026.",
+                    ]
+                ),
+                company_hint="Torque Metals Limited",
+            )
+        )
+
+        self.assertEqual(packet.title, "Significant New Thick High-Grade Intercepts at Paris Gold")
+        self.assertEqual(packet.company_name, "Torque Metals Limited")
+
 
 class DocumentReaderTests(unittest.IsolatedAsyncioTestCase):
     async def test_reader_extracts_topics_and_facts_from_local_text_attachment(self):

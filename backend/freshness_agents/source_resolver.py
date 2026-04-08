@@ -17,7 +17,7 @@ class SourceResolver:
     def resolve(self, event: AnnouncementEvent) -> AnnouncementPacket:
         ticker = str(event.ticker or "").strip().upper()
         exchange = str(event.exchange or self._infer_exchange_from_ticker(ticker)).strip().upper()
-        title = self._title_from_subject(event.subject, ticker)
+        title = self._resolve_title(event.subject, event.body_text, ticker)
         source_url = self._select_source_url(event)
         attachment_path = self._select_attachment_path(event)
         source_type = self._infer_source_type(event, source_url)
@@ -46,6 +46,13 @@ class SourceResolver:
         return ""
 
     @staticmethod
+    def _resolve_title(subject: str, body_text: str, ticker: str) -> str:
+        body_title = SourceResolver._title_from_body(body_text, ticker)
+        if body_title:
+            return body_title
+        return SourceResolver._title_from_subject(subject, ticker)
+
+    @staticmethod
     def _title_from_subject(subject: str, ticker: str) -> str:
         raw = str(subject or "").strip()
         if not raw:
@@ -54,6 +61,7 @@ class SourceResolver:
         patterns = [
             rf"^{re.escape(ticker)}\s*[-:|]\s*",
             rf"^{re.escape(symbol)}\s*[-:|]\s*",
+            rf"^{re.escape(symbol)}\s*\(ASX\)\s*announcement\s+on\s+HotCopper\s*$",
             r"^[A-Z]{2,8}:[A-Z0-9]{2,8}\s*[-:|]\s*",
             r"^[A-Z0-9]{2,8}\s*[-:|]\s*",
         ]
@@ -61,6 +69,22 @@ class SourceResolver:
         for pattern in patterns:
             title = re.sub(pattern, "", title, flags=re.IGNORECASE).strip()
         return title or raw
+
+    @staticmethod
+    def _title_from_body(body_text: str, ticker: str) -> str:
+        symbol = ticker.split(":", 1)[1].strip() if ":" in ticker else ticker
+        lines = [str(line or "").strip() for line in str(body_text or "").splitlines()]
+        for line in lines:
+            if not line:
+                continue
+            match = re.match(
+                rf"^{re.escape(symbol)}\s*:\s*(.+)$",
+                line,
+                flags=re.IGNORECASE,
+            )
+            if match:
+                return str(match.group(1) or "").strip()
+        return ""
 
     @staticmethod
     def _select_source_url(event: AnnouncementEvent) -> str:
