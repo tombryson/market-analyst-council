@@ -52,8 +52,8 @@ from .config import (
     SYSTEM_ENABLED,
     SYSTEM_SHUTDOWN_REASON,
     SUPPLEMENTARY_API_PIPELINES_ENABLED,
-    FRESHNESS_WEBHOOK_SECRET,
-    FRESHNESS_WEBHOOK_REQUIRE_SECRET,
+    SCENARIO_ROUTER_WEBHOOK_SECRET,
+    SCENARIO_ROUTER_WEBHOOK_REQUIRE_SECRET,
 )
 from .research import ResearchService, format_evidence_pack_for_prompt
 from .research.supplementary_registry import (
@@ -99,8 +99,10 @@ INSTANCE_ID = (
 )
 SUPPLEMENTARY_DOC_MAX_CHARS = 12000
 SUPPLEMENTARY_DOC_ALLOWED_EXTENSIONS = {".pdf", ".md", ".txt", ".json"}
-FRESHNESS_EVENTS_DIR = OUTPUTS_DIR / "freshness_events"
-FRESHNESS_DEDUPE_DIR = FRESHNESS_EVENTS_DIR / "dedupe"
+SCENARIO_ROUTER_EVENTS_DIR = OUTPUTS_DIR / "scenario_router_events"
+SCENARIO_ROUTER_DEDUPE_DIR = SCENARIO_ROUTER_EVENTS_DIR / "dedupe"
+LEGACY_FRESHNESS_EVENTS_DIR = OUTPUTS_DIR / "freshness_events"
+LEGACY_FRESHNESS_DEDUPE_DIR = LEGACY_FRESHNESS_EVENTS_DIR / "dedupe"
 
 _ANALYSIS_PROGRESS_MARKERS: List[Tuple[str, str, int]] = [
     ("market facts prepass start", "prepass", 4),
@@ -144,44 +146,62 @@ _ANALYSIS_STAGE_RANGES: Dict[str, Tuple[int, int]] = {
 }
 
 
-def _build_freshness_agent_service():
-    from .freshness_agents.document_reader import DocumentReader
-    from .freshness_agents.lab_scribe import LabScribe
-    from .freshness_agents.run_selector import LatestRunSelector
-    from .freshness_agents.service import (
-        FreshnessAgentDependencies,
-        FreshnessAgentService,
+def _build_scenario_router_service():
+    from .scenario_router.document_reader import DocumentReader
+    from .scenario_router.lab_scribe import LabScribe
+    from .scenario_router.run_selector import LatestRunSelector
+    from .scenario_router.source_resolver import SourceResolver
+    from .scenario_router.thesis_comparator import ThesisComparator
+    from .scenario_router.service import (
+        ScenarioRouterDependencies,
+        ScenarioRouterService,
+    )
+
+    return ScenarioRouterService(
+        ScenarioRouterDependencies(
+            source_resolver=SourceResolver().resolve,
+            document_reader=DocumentReader().read,
+            run_selector=LatestRunSelector(limit=25).select_latest,
+            thesis_comparator=ThesisComparator().compare,
+            lab_scribe=LabScribe().persist,
+        )
     )
 
 
-def _safe_freshness_key(value: Any) -> str:
+def _safe_scenario_router_key(value: Any) -> str:
     text = str(value or "").strip()
     if not text:
         return ""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _freshness_dedupe_paths(event_key: str) -> Tuple[Path, Path]:
-    safe_key = _safe_freshness_key(event_key)
+def _scenario_router_dedupe_paths(event_key: str) -> Tuple[Path, Path]:
+    safe_key = _safe_scenario_router_key(event_key)
     if not safe_key:
         return Path(""), Path("")
     prefix = safe_key[:2]
-    directory = FRESHNESS_DEDUPE_DIR / prefix
+    directory = SCENARIO_ROUTER_DEDUPE_DIR / prefix
     return directory, directory / f"{safe_key}.json"
 
 
-def _load_freshness_dedupe(event_key: str) -> Dict[str, Any]:
-    directory, marker_path = _freshness_dedupe_paths(event_key)
-    if not directory or not marker_path.exists():
+def _load_scenario_router_dedupe(event_key: str) -> Dict[str, Any]:
+    directory, marker_path = _scenario_router_dedupe_paths(event_key)
+    if not directory:
         return {}
+    if not marker_path.exists():
+        legacy_path = LEGACY_FRESHNESS_DEDUPE_DIR / marker_path.parent.name / marker_path.name
+        if legacy_path.exists():
+            marker_path = legacy_path
+        else:
+            return {}
     try:
         return json.loads(marker_path.read_text(encoding="utf-8"))
     except Exception:
         return {}
 
 
-def _persist_freshness_dedupe(event_key: str, payload: Dict[str, Any]) -> None:
-    directory, marker_path = _freshness_dedupe_paths(event_key)
+def _persist_scenario_router_dedupe(event_key: str, payload: Dict[str, Any]) -> None:
+    directory, marker_path = _scenario_router_dedupe_paths(event_key)
     if not directory:
         return
     directory.mkdir(parents=True, exist_ok=True)
@@ -191,7 +211,7 @@ def _persist_freshness_dedupe(event_key: str, payload: Dict[str, Any]) -> None:
     )
 
 
-def _choose_freshness_event_key(payload: Dict[str, Any]) -> str:
+def _choose_scenario_router_event_key(payload: Dict[str, Any]) -> str:
     for field in ("gmail_message_id", "event_id", "message_id"):
         value = str(payload.get(field) or "").strip()
         if value:
@@ -205,23 +225,27 @@ def _choose_freshness_event_key(payload: Dict[str, Any]) -> str:
     return ""
 
 
-def _check_freshness_webhook_secret(request: Request) -> None:
-    provided = str(request.headers.get("x-freshness-secret") or "").strip()
-    configured = str(FRESHNESS_WEBHOOK_SECRET or "").strip()
-    if not configured and not FRESHNESS_WEBHOOK_REQUIRE_SECRET:
+def _check_scenario_router_webhook_secret(request: Request) -> None:
+    provided = str(
+        request.headers.get("x-scenario-router-secret")
+        or request.headers.get("x-freshness-secret")
+        or ""
+    ).strip()
+    configured = str(SCENARIO_ROUTER_WEBHOOK_SECRET or "").strip()
+    if not configured and not SCENARIO_ROUTER_WEBHOOK_REQUIRE_SECRET:
         return
     if not configured:
         raise HTTPException(
             status_code=503,
-            detail="Freshness webhook secret is required but not configured.",
+            detail="Scenario router webhook secret is required but not configured.",
         )
     if not provided or not hmac.compare_digest(provided, configured):
-        raise HTTPException(status_code=401, detail="Invalid freshness webhook secret.")
-    from .freshness_agents.source_resolver import SourceResolver
-    from .freshness_agents.thesis_comparator import ThesisComparator
+        raise HTTPException(status_code=401, detail="Invalid scenario router webhook secret.")
+    from .scenario_router.source_resolver import SourceResolver
+    from .scenario_router.thesis_comparator import ThesisComparator
 
-    return FreshnessAgentService(
-        FreshnessAgentDependencies(
+    return ScenarioRouterService(
+        ScenarioRouterDependencies(
             source_resolver=SourceResolver().resolve,
             document_reader=DocumentReader().read,
             run_selector=LatestRunSelector(limit=25).select_latest,
@@ -517,13 +541,13 @@ class CreateAnalysisJobRequest(BaseModel):
     supplementary_mode: Optional[str] = None
 
 
-class FreshnessAttachmentPayload(BaseModel):
+class ScenarioRouterAttachmentPayload(BaseModel):
     filename: str
     content_type: Optional[str] = None
     local_path: Optional[str] = None
 
 
-class ProcessAnnouncementRequest(BaseModel):
+class ProcessScenarioRouterAnnouncementRequest(BaseModel):
     event_id: Optional[str] = None
     gmail_message_id: Optional[str] = None
     message_id: Optional[str] = None
@@ -537,7 +561,7 @@ class ProcessAnnouncementRequest(BaseModel):
     source_channel: Optional[str] = None
     received_at_utc: Optional[str] = None
     urls: List[str] = []
-    attachments: List[FreshnessAttachmentPayload] = []
+    attachments: List[ScenarioRouterAttachmentPayload] = []
 
 
 class ConversationMetadata(BaseModel):
@@ -2582,16 +2606,16 @@ def _build_summary_fields(structured: Dict[str, Any], freshness: Dict[str, Any])
     }
 
 
-def _load_latest_announcement_router_state(run_id: str) -> Dict[str, Any]:
+def _load_latest_scenario_router_state(run_id: str) -> Dict[str, Any]:
     try:
-        from .freshness_agents.lab_scribe import LabScribe
+        from .scenario_router.lab_scribe import LabScribe
 
         return LabScribe.load_latest_for_run(run_id)
     except Exception:
         return {}
 
 
-def _build_announcement_router_summary(router_state: Dict[str, Any]) -> Dict[str, Any]:
+def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(router_state, dict) or not router_state:
         return {}
 
@@ -2640,19 +2664,19 @@ def _build_integration_packet(
 ) -> Dict[str, Any]:
     structured = run_payload.get("structured_data") if isinstance(run_payload.get("structured_data"), dict) else {}
     freshness = run_payload.get("freshness") if isinstance(run_payload.get("freshness"), dict) else {}
-    announcement_router = (
-        run_payload.get("announcement_router")
-        if isinstance(run_payload.get("announcement_router"), dict)
+    scenario_router = (
+        run_payload.get("scenario_router")
+        if isinstance(run_payload.get("scenario_router"), dict)
         else {}
     )
     timeline_rows = _normalize_timeline_rows_for_api(structured.get("development_timeline"))
     summary_fields = _build_summary_fields(structured, freshness)
     summary_fields.update(
         {
-            "current_path": str(announcement_router.get("current_path") or "").strip(),
-            "path_transition": str(announcement_router.get("path_transition") or "").strip(),
-            "announcement_router_action": str(announcement_router.get("action") or "").strip(),
-            "announcement_router_impact": str(announcement_router.get("impact_level") or "").strip(),
+            "current_path": str(scenario_router.get("current_path") or "").strip(),
+            "path_transition": str(scenario_router.get("path_transition") or "").strip(),
+            "scenario_router_action": str(scenario_router.get("action") or "").strip(),
+            "scenario_router_impact": str(scenario_router.get("impact_level") or "").strip(),
         }
     )
 
@@ -2667,13 +2691,13 @@ def _build_integration_packet(
             "updated_at": run_payload.get("updated_at"),
             "structured_data": structured,
             "freshness": freshness,
-            "announcement_router": announcement_router,
+            "scenario_router": scenario_router,
             "delta_check": run_payload.get("delta_check") or {},
             "analyst_memo_markdown": run_payload.get("analyst_memo_markdown") or "",
             "chairman_memo_markdown": run_payload.get("chairman_memo_markdown") or "",
         },
         "timeline_rows": timeline_rows,
-        "announcement_router": announcement_router,
+        "scenario_router": scenario_router,
         "memos": {
             "analyst_memo_markdown": run_payload.get("analyst_memo_markdown") or "",
             "chairman_memo_markdown": run_payload.get("chairman_memo_markdown") or "",
@@ -2772,8 +2796,8 @@ async def list_gantt_runs(limit: int = 20, ticker: Optional[str] = None):
 
         run_id = path.name
         updated_at = datetime.utcfromtimestamp(path.stat().st_mtime).replace(microsecond=0).isoformat() + "Z"
-        announcement_router = _build_announcement_router_summary(
-            _load_latest_announcement_router_state(run_id)
+        scenario_router = _build_scenario_router_summary(
+            _load_latest_scenario_router_state(run_id)
         )
         runs.append(
             {
@@ -2785,7 +2809,7 @@ async def list_gantt_runs(limit: int = 20, ticker: Optional[str] = None):
                 "analysis_date": structured.get("analysis_date"),
                 "updated_at": updated_at,
                 "freshness": _compute_run_freshness(structured, updated_at),
-                "announcement_router": announcement_router,
+                "scenario_router": scenario_router,
             }
         )
         if len(runs) >= safe_limit:
@@ -2855,16 +2879,16 @@ async def get_gantt_run(run_id: str):
     artifact_updated_at = datetime.utcfromtimestamp(path.stat().st_mtime).replace(microsecond=0).isoformat() + "Z"
     delta_latest = get_latest_delta(safe_name)
     freshness = _compute_run_freshness(structured, artifact_updated_at)
-    router_state = _build_announcement_router_summary(
-        _load_latest_announcement_router_state(safe_name)
+    router_state = _build_scenario_router_summary(
+        _load_latest_scenario_router_state(safe_name)
     )
     summary_fields = _build_summary_fields(structured, freshness)
     summary_fields.update(
         {
             "current_path": str(router_state.get("current_path") or "").strip(),
             "path_transition": str(router_state.get("path_transition") or "").strip(),
-            "announcement_router_action": str(router_state.get("action") or "").strip(),
-            "announcement_router_impact": str(router_state.get("impact_level") or "").strip(),
+            "scenario_router_action": str(router_state.get("action") or "").strip(),
+            "scenario_router_impact": str(router_state.get("impact_level") or "").strip(),
         }
     )
     return {
@@ -2875,7 +2899,7 @@ async def get_gantt_run(run_id: str):
         "updated_at": artifact_updated_at,
         "freshness": freshness,
         "summary_fields": summary_fields,
-        "announcement_router": router_state,
+        "scenario_router": router_state,
         "delta_check": delta_latest or {},
         "analyst_memo_markdown": memo_payload.get("analyst_memo_markdown", ""),
         "chairman_memo_markdown": memo_payload.get("chairman_memo_markdown", ""),
@@ -2951,17 +2975,18 @@ async def get_latest_delta_check(run_id: str):
     return latest
 
 
+@app.post("/api/scenario-router/process-announcement")
 @app.post("/api/freshness/process-announcement")
-async def process_freshness_announcement(
-    request: ProcessAnnouncementRequest,
+async def process_scenario_router_announcement(
+    request: ProcessScenarioRouterAnnouncementRequest,
     raw_request: Request,
 ):
     """Process one inbound announcement event against the latest saved lab run."""
-    _check_freshness_webhook_secret(raw_request)
+    _check_scenario_router_webhook_secret(raw_request)
     payload = request.model_dump()
-    dedupe_key = _choose_freshness_event_key(payload)
+    dedupe_key = _choose_scenario_router_event_key(payload)
     if dedupe_key:
-        existing = _load_freshness_dedupe(dedupe_key)
+        existing = _load_scenario_router_dedupe(dedupe_key)
         if existing:
             return {
                 "status": "duplicate",
@@ -2976,7 +3001,7 @@ async def process_freshness_announcement(
                 },
             }
     try:
-        from .freshness_agents.inbox_sentinel import InboxSentinel
+        from .scenario_router.inbox_sentinel import InboxSentinel
 
         sentinel = InboxSentinel()
         event = sentinel.ingest_email_payload(payload)
@@ -2986,19 +3011,19 @@ async def process_freshness_announcement(
                 detail="Could not determine ticker from announcement payload.",
             )
 
-        service = _build_freshness_agent_service()
+        service = _build_scenario_router_service()
         decision = await service.process_announcement_event(event)
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Freshness announcement processing failed: {exc}",
+            detail=f"Scenario router announcement processing failed: {exc}",
         ) from exc
 
     processed_at_utc = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     if dedupe_key:
-        _persist_freshness_dedupe(
+        _persist_scenario_router_dedupe(
             dedupe_key,
             {
                 "event_key": dedupe_key,

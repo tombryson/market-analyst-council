@@ -217,11 +217,14 @@ STAGE1_TRUNCATION_CHECKER_MIN_CONFIDENCE_PCT = _get_float(
     90.0,
 )
 
-# Freshness inbox/webhook settings
-FRESHNESS_WEBHOOK_SECRET = os.getenv("FRESHNESS_WEBHOOK_SECRET", "").strip()
-FRESHNESS_WEBHOOK_REQUIRE_SECRET = _get_bool(
-    "FRESHNESS_WEBHOOK_REQUIRE_SECRET",
-    default=True,
+# Scenario router inbox/webhook settings
+SCENARIO_ROUTER_WEBHOOK_SECRET = os.getenv(
+    "SCENARIO_ROUTER_WEBHOOK_SECRET",
+    os.getenv("FRESHNESS_WEBHOOK_SECRET", ""),
+).strip()
+SCENARIO_ROUTER_WEBHOOK_REQUIRE_SECRET = _get_bool(
+    "SCENARIO_ROUTER_WEBHOOK_REQUIRE_SECRET",
+    default=_get_bool("FRESHNESS_WEBHOOK_REQUIRE_SECRET", default=True),
 )
 
 
