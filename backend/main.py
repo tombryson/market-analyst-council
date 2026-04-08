@@ -1,5 +1,8 @@
 """FastAPI backend for LLM Council."""
 
+import hashlib
+import hmac
+
 from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
@@ -49,6 +52,8 @@ from .config import (
     SYSTEM_ENABLED,
     SYSTEM_SHUTDOWN_REASON,
     SUPPLEMENTARY_API_PIPELINES_ENABLED,
+    FRESHNESS_WEBHOOK_SECRET,
+    FRESHNESS_WEBHOOK_REQUIRE_SECRET,
 )
 from .research import ResearchService, format_evidence_pack_for_prompt
 from .research.supplementary_registry import (
@@ -94,6 +99,8 @@ INSTANCE_ID = (
 )
 SUPPLEMENTARY_DOC_MAX_CHARS = 12000
 SUPPLEMENTARY_DOC_ALLOWED_EXTENSIONS = {".pdf", ".md", ".txt", ".json"}
+FRESHNESS_EVENTS_DIR = OUTPUTS_DIR / "freshness_events"
+FRESHNESS_DEDUPE_DIR = FRESHNESS_EVENTS_DIR / "dedupe"
 
 _ANALYSIS_PROGRESS_MARKERS: List[Tuple[str, str, int]] = [
     ("market facts prepass start", "prepass", 4),
@@ -145,6 +152,71 @@ def _build_freshness_agent_service():
         FreshnessAgentDependencies,
         FreshnessAgentService,
     )
+
+
+def _safe_freshness_key(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _freshness_dedupe_paths(event_key: str) -> Tuple[Path, Path]:
+    safe_key = _safe_freshness_key(event_key)
+    if not safe_key:
+        return Path(""), Path("")
+    prefix = safe_key[:2]
+    directory = FRESHNESS_DEDUPE_DIR / prefix
+    return directory, directory / f"{safe_key}.json"
+
+
+def _load_freshness_dedupe(event_key: str) -> Dict[str, Any]:
+    directory, marker_path = _freshness_dedupe_paths(event_key)
+    if not directory or not marker_path.exists():
+        return {}
+    try:
+        return json.loads(marker_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _persist_freshness_dedupe(event_key: str, payload: Dict[str, Any]) -> None:
+    directory, marker_path = _freshness_dedupe_paths(event_key)
+    if not directory:
+        return
+    directory.mkdir(parents=True, exist_ok=True)
+    marker_path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=True),
+        encoding="utf-8",
+    )
+
+
+def _choose_freshness_event_key(payload: Dict[str, Any]) -> str:
+    for field in ("gmail_message_id", "event_id", "message_id"):
+        value = str(payload.get(field) or "").strip()
+        if value:
+            return value
+    subject = str(payload.get("subject") or "").strip()
+    sender = str(payload.get("sender") or "").strip().lower()
+    received_at = str(payload.get("received_at_utc") or "").strip()
+    ticker = str(payload.get("ticker") or "").strip().upper()
+    if subject or sender or received_at:
+        return f"{ticker}|{sender}|{received_at}|{subject}"
+    return ""
+
+
+def _check_freshness_webhook_secret(request: Request) -> None:
+    provided = str(request.headers.get("x-freshness-secret") or "").strip()
+    configured = str(FRESHNESS_WEBHOOK_SECRET or "").strip()
+    if not configured and not FRESHNESS_WEBHOOK_REQUIRE_SECRET:
+        return
+    if not configured:
+        raise HTTPException(
+            status_code=503,
+            detail="Freshness webhook secret is required but not configured.",
+        )
+    if not provided or not hmac.compare_digest(provided, configured):
+        raise HTTPException(status_code=401, detail="Invalid freshness webhook secret.")
     from .freshness_agents.source_resolver import SourceResolver
     from .freshness_agents.thesis_comparator import ThesisComparator
 
@@ -2880,9 +2952,29 @@ async def get_latest_delta_check(run_id: str):
 
 
 @app.post("/api/freshness/process-announcement")
-async def process_freshness_announcement(request: ProcessAnnouncementRequest):
+async def process_freshness_announcement(
+    request: ProcessAnnouncementRequest,
+    raw_request: Request,
+):
     """Process one inbound announcement event against the latest saved lab run."""
+    _check_freshness_webhook_secret(raw_request)
     payload = request.model_dump()
+    dedupe_key = _choose_freshness_event_key(payload)
+    if dedupe_key:
+        existing = _load_freshness_dedupe(dedupe_key)
+        if existing:
+            return {
+                "status": "duplicate",
+                "ticker": str(existing.get("ticker") or payload.get("ticker") or "").strip(),
+                "baseline_run_id": str(existing.get("baseline_run_id") or "").strip(),
+                "current_path": str(existing.get("current_path") or "").strip(),
+                "path_transition": str(existing.get("path_transition") or "").strip(),
+                "action": str(existing.get("action") or "").strip(),
+                "dedupe": {
+                    "event_key": dedupe_key,
+                    "processed_at_utc": str(existing.get("processed_at_utc") or "").strip(),
+                },
+            }
     try:
         from .freshness_agents.inbox_sentinel import InboxSentinel
 
@@ -2904,6 +2996,22 @@ async def process_freshness_announcement(request: ProcessAnnouncementRequest):
             detail=f"Freshness announcement processing failed: {exc}",
         ) from exc
 
+    processed_at_utc = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    if dedupe_key:
+        _persist_freshness_dedupe(
+            dedupe_key,
+            {
+                "event_key": dedupe_key,
+                "processed_at_utc": processed_at_utc,
+                "event_id": decision.event.event_id,
+                "ticker": decision.event.ticker,
+                "baseline_run_id": decision.baseline_run.run_id,
+                "current_path": decision.comparison_report.current_path,
+                "path_transition": decision.comparison_report.path_transition,
+                "action": decision.action_decision.action,
+            },
+        )
+
     return {
         "status": "ok",
         "ticker": decision.event.ticker,
@@ -2911,6 +3019,10 @@ async def process_freshness_announcement(request: ProcessAnnouncementRequest):
         "current_path": decision.comparison_report.current_path,
         "path_transition": decision.comparison_report.path_transition,
         "action": decision.action_decision.action,
+        "dedupe": {
+            "event_key": dedupe_key,
+            "processed_at_utc": processed_at_utc,
+        },
         "decision": decision.to_dict(),
     }
 

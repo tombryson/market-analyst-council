@@ -576,5 +576,40 @@ class LabScribeTests(unittest.IsolatedAsyncioTestCase):
         return ActionDecision(action="annotate_run", confidence=0.8, reason="ok")
 
 
+class FreshnessWebhookHelperTests(unittest.TestCase):
+    def test_choose_freshness_event_key_prefers_gmail_message_id(self):
+        from backend import main as main_module
+
+        key = main_module._choose_freshness_event_key(
+            {
+                "gmail_message_id": "gmail-evt-1",
+                "event_id": "evt-1",
+                "subject": "TOR (ASX) announcement on HotCopper",
+            }
+        )
+        self.assertEqual(key, "gmail-evt-1")
+
+    def test_persist_and_load_freshness_dedupe_marker(self):
+        from backend import main as main_module
+
+        with TemporaryDirectory() as tmpdir:
+            original_dir = main_module.FRESHNESS_DEDUPE_DIR
+            main_module.FRESHNESS_DEDUPE_DIR = Path(tmpdir)
+            try:
+                payload = {
+                    "event_key": "gmail-evt-2",
+                    "ticker": "ASX:TOR",
+                    "baseline_run_id": "run-99",
+                    "action": "annotate_run",
+                }
+                main_module._persist_freshness_dedupe("gmail-evt-2", payload)
+                loaded = main_module._load_freshness_dedupe("gmail-evt-2")
+            finally:
+                main_module.FRESHNESS_DEDUPE_DIR = original_dir
+
+        self.assertEqual(loaded.get("ticker"), "ASX:TOR")
+        self.assertEqual(loaded.get("baseline_run_id"), "run-99")
+
+
 if __name__ == "__main__":
     unittest.main()

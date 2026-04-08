@@ -217,6 +217,13 @@ STAGE1_TRUNCATION_CHECKER_MIN_CONFIDENCE_PCT = _get_float(
     90.0,
 )
 
+# Freshness inbox/webhook settings
+FRESHNESS_WEBHOOK_SECRET = os.getenv("FRESHNESS_WEBHOOK_SECRET", "").strip()
+FRESHNESS_WEBHOOK_REQUIRE_SECRET = _get_bool(
+    "FRESHNESS_WEBHOOK_REQUIRE_SECRET",
+    default=True,
+)
+
 
 # Feature flag to route retrieval through backend/research service
 ENABLE_RESEARCH_SERVICE = _get_bool("ENABLE_RESEARCH_SERVICE", default=False)
