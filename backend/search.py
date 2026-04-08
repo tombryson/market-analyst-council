@@ -1,10 +1,11 @@
-"""Internet search integration using Tavily API."""
+"""Internet search integration using Tavily API and deterministic ASX retrieval."""
 
 import httpx
 import re
-from typing import List, Dict, Any, Optional
-from datetime import datetime
+from typing import List, Dict, Any, Optional, Tuple
+from datetime import datetime, timezone
 from html import unescape
+from urllib.parse import urljoin
 from .config import TAVILY_API_KEY, MAX_SEARCH_RESULTS
 from .openrouter import query_model
 
@@ -32,6 +33,8 @@ EXCHANGE_TO_YAHOO_SUFFIX = {
     "CSE": ".CN",
     "JSE": ".JO",
 }
+
+_ASX_ANNOUNCEMENT_SEARCH_URL = "https://www.asx.com.au/asx/v2/statistics/announcements.do"
 
 
 async def perform_search(
@@ -218,6 +221,107 @@ def classify_asx_announcement(title: str, url: str) -> tuple[str, int]:
     return ('routine', 3)
 
 
+def _clean_html_fragment(value: str) -> str:
+    text = re.sub(r"(?is)<br\s*/?>", " ", str(value or ""))
+    text = re.sub(r"(?is)<[^>]+>", " ", text)
+    text = unescape(text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def _parse_asx_datetime(date_text: str, time_text: str) -> Optional[datetime]:
+    date_value = str(date_text or "").strip()
+    if not date_value:
+        return None
+    text = f"{date_value} {str(time_text or '').strip()}".strip()
+    for fmt in ("%d/%m/%Y %I:%M %p", "%d/%m/%Y %H:%M", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)
+        except Exception:
+            continue
+    try:
+        return datetime.strptime(date_value, "%d/%m/%Y").replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+
+def _parse_asx_announcement_rows(html_text: str) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    if not html_text:
+        return rows
+
+    row_chunks = re.findall(r"(?is)<tr>(.*?)</tr>", html_text)
+    for chunk in row_chunks:
+        if "displayannouncement.do" not in chunk.lower():
+            continue
+        date_match = re.search(
+            r"(?is)(\d{2}/\d{2}/\d{4})\s*<br>\s*(?:<span[^>]*>([^<]+)</span>)?",
+            chunk,
+        )
+        if not date_match:
+            continue
+        date_text = str(date_match.group(1) or "").strip()
+        time_text = str(date_match.group(2) or "").strip()
+
+        link_match = re.search(
+            r'(?is)<a[^>]+href="([^"]*displayAnnouncement\.do[^"]+)"[^>]*>',
+            chunk,
+        )
+        if not link_match:
+            continue
+        display_url = urljoin("https://www.asx.com.au", unescape(link_match.group(1)))
+
+        title_match = re.search(
+            r'(?is)<a[^>]+href="[^"]*displayAnnouncement\.do[^"]+"[^>]*>\s*(.*?)<br',
+            chunk,
+        )
+        title = _clean_html_fragment(title_match.group(1) if title_match else "")
+        if not title:
+            title = "ASX Announcement"
+
+        published_dt = _parse_asx_datetime(date_text, time_text)
+        category, priority = classify_asx_announcement(title, display_url)
+        rows.append(
+            {
+                "display_url": display_url,
+                "title": title,
+                "published_dt": published_dt,
+                "published_at": (
+                    published_dt.astimezone(timezone.utc).date().isoformat() if published_dt else ""
+                ),
+                "category": category,
+                "priority": priority,
+            }
+        )
+    return rows
+
+
+async def _resolve_asx_display_to_pdf_url(
+    client: httpx.AsyncClient,
+    display_url: str,
+) -> str:
+    try:
+        response = await client.get(display_url)
+    except Exception:
+        return ""
+    if response.status_code >= 400:
+        return ""
+
+    html_text = str(response.text or "")
+    hidden = re.search(r'(?is)name="pdfURL"\s+value="([^"]+)"', html_text)
+    if hidden:
+        return unescape(hidden.group(1)).strip()
+
+    direct = re.search(
+        r"(https://announcements\.asx\.com\.au/asxpdf/[^\s\"']+\.pdf)",
+        html_text,
+        flags=re.IGNORECASE,
+    )
+    if direct:
+        return unescape(direct.group(1)).strip()
+    return ""
+
+
 def _clean_html_text(fragment: str) -> str:
     text = unescape(str(fragment or ""))
     text = re.sub(r"(?is)<script[^>]*>.*?</script>", " ", text)
@@ -335,6 +439,79 @@ async def scrape_marketindex_announcements(ticker: str, max_results: int = 80) -
             return announcements[: max(1, int(max_results))]
     except Exception as e:
         print(f"Error scraping Market Index for {symbol}: {e}")
+        return []
+
+
+async def search_asx_announcements(
+    ticker: str,
+    max_results: int = 20,
+    lookback_years: int = 2,
+) -> List[Dict[str, Any]]:
+    """
+    Deterministically fetch ASX announcement PDFs from the official ASX search page.
+
+    This is the same core retrieval lane used in full analysis:
+    ASX search page -> displayAnnouncement -> canonical announcements PDF.
+    """
+    parsed = _parse_ticker(ticker)
+    symbol = str(parsed.get("symbol", "") or "").strip().upper()
+    if not symbol:
+        symbol = str(ticker or "").strip().upper().replace("ASX:", "")
+    if not symbol:
+        return []
+
+    user_agent = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/126.0.0.0 Safari/537.36"
+    )
+    years = [datetime.utcnow().year - idx for idx in range(max(1, int(lookback_years)))]
+    rows: List[Dict[str, Any]] = []
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=30.0,
+            follow_redirects=True,
+            headers={"User-Agent": user_agent},
+        ) as client:
+            for year in years:
+                response = await client.get(
+                    _ASX_ANNOUNCEMENT_SEARCH_URL,
+                    params={
+                        "by": "asxCode",
+                        "asxCode": symbol,
+                        "timeframe": "Y",
+                        "year": str(year),
+                    },
+                )
+                if response.status_code >= 400:
+                    continue
+                rows.extend(_parse_asx_announcement_rows(str(response.text or "")))
+
+            deduped: List[Dict[str, Any]] = []
+            seen_displays = set()
+            for row in rows:
+                display_url = str(row.get("display_url") or "").strip()
+                if not display_url or display_url in seen_displays:
+                    continue
+                seen_displays.add(display_url)
+                pdf_url = await _resolve_asx_display_to_pdf_url(client, display_url)
+                if not pdf_url:
+                    continue
+                item = dict(row)
+                item["url"] = pdf_url
+                deduped.append(item)
+
+        deduped.sort(
+            key=lambda item: (
+                str(item.get("published_at", "")).strip(),
+                -int(item.get("priority", 99) or 99),
+            ),
+            reverse=True,
+        )
+        return deduped[: max(1, int(max_results))]
+    except Exception as e:
+        print(f"Error searching official ASX announcements for {symbol}: {e}")
         return []
 
 

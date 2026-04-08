@@ -4,6 +4,7 @@ from .action_judge import ActionJudge
 from .document_reader import DocumentReader
 from .inbox_sentinel import InboxSentinel
 from .lab_scribe import LabScribe
+from .official_source_finder import OfficialSourceFinder
 from .models import (
     ActionDecision,
     AnnouncementAttachment,
@@ -37,6 +38,7 @@ __all__ = [
     "InboxSentinel",
     "LabScribe",
     "LatestRunSelector",
+    "OfficialSourceFinder",
     "ScenarioRouterDependencies",
     "ScenarioRouterService",
     "SourceResolver",

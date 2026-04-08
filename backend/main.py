@@ -241,18 +241,6 @@ def _check_scenario_router_webhook_secret(request: Request) -> None:
         )
     if not provided or not hmac.compare_digest(provided, configured):
         raise HTTPException(status_code=401, detail="Invalid scenario router webhook secret.")
-    from .scenario_router.source_resolver import SourceResolver
-    from .scenario_router.thesis_comparator import ThesisComparator
-
-    return ScenarioRouterService(
-        ScenarioRouterDependencies(
-            source_resolver=SourceResolver().resolve,
-            document_reader=DocumentReader().read,
-            run_selector=LatestRunSelector(limit=25).select_latest,
-            thesis_comparator=ThesisComparator().compare,
-            lab_scribe=LabScribe().persist,
-        )
-    )
 
 
 def _analysis_stage_rank(stage: Any) -> int:

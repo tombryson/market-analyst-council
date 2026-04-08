@@ -54,6 +54,14 @@ class DocumentReader:
 
     async def _read_text(self, packet: AnnouncementPacket) -> Tuple[str, List[str]]:
         local_path = Path(str(packet.document_path or "").strip())
+        prefer_remote_exchange_filing = (
+            str(packet.source_type or "").strip().lower() == "exchange_filing"
+            and str(packet.source_url or "").strip()
+        )
+        if prefer_remote_exchange_filing:
+            remote_text, remote_evidence = await self._read_remote(packet)
+            if str(remote_text or "").strip():
+                return remote_text, remote_evidence
         if local_path.exists() and local_path.is_file():
             return await self._read_local(local_path)
         if str(packet.source_url or "").strip():

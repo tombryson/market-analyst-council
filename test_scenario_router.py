@@ -1,6 +1,7 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from backend.scenario_router import (
     ActionJudge,
@@ -19,6 +20,7 @@ from backend.scenario_router import (
     InboxSentinel,
     LabScribe,
     LatestRunSelector,
+    OfficialSourceFinder,
     SourceResolver,
     ThesisComparator,
 )
@@ -139,14 +141,74 @@ class ActionJudgeTests(unittest.TestCase):
         self.assertIn("current path to bull", " ".join(decision.follow_up_steps).lower())
 
 
-class SourceResolverTests(unittest.TestCase):
-    def test_resolver_prefers_asx_url_and_normalizes_subject(self):
+class OfficialSourceFinderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_finder_prefers_title_matched_primary_source(self):
+        finder = OfficialSourceFinder()
+        event = AnnouncementEvent(
+            event_id="evt-hc-lookup-1",
+            ticker="ASX:TOR",
+            exchange="ASX",
+            subject="TOR (ASX) announcement on HotCopper",
+            body_text="TOR: Significant New Thick High-Grade Intercepts at Paris Gold",
+            received_at_utc="2026-04-08T09:16:00Z",
+        )
+
+        with (
+            patch(
+                "backend.scenario_router.official_source_finder.scrape_marketindex_announcements",
+                return_value=[
+                    {
+                        "title": "Appendix 3B",
+                        "url": "https://announcements.asx.com.au/asxpdf/20260408/pdf/wrong.pdf",
+                        "published_at": "2026-04-08",
+                        "category": "ignore",
+                        "priority": 4,
+                    },
+                    {
+                        "title": "Significant New Thick High-Grade Intercepts at Paris Gold",
+                        "url": "https://announcements.asx.com.au/asxpdf/20260408/pdf/right.pdf",
+                        "published_at": "2026-04-08",
+                        "category": "important",
+                        "priority": 2,
+                    },
+                ],
+            ),
+            patch(
+                "backend.scenario_router.official_source_finder.search_asx_announcements",
+                return_value=[],
+            ),
+        ):
+            candidate = await finder.find_best_source(
+                event,
+                title_hint="Significant New Thick High-Grade Intercepts at Paris Gold",
+            )
+
+        self.assertEqual(
+            candidate.get("url"),
+            "https://announcements.asx.com.au/asxpdf/20260408/pdf/right.pdf",
+        )
+        self.assertEqual(
+            candidate.get("title"),
+            "Significant New Thick High-Grade Intercepts at Paris Gold",
+        )
+
+
+class SourceResolverTests(unittest.IsolatedAsyncioTestCase):
+    async def test_resolver_prefers_official_asx_source_and_normalizes_subject(self):
         with TemporaryDirectory() as tmpdir:
             attachment_path = Path(tmpdir) / "btr-quarterly.txt"
             attachment_path.write_text("Quarterly update", encoding="utf-8")
 
-            resolver = SourceResolver()
-            packet = resolver.resolve(
+            class StubFinder:
+                async def find_best_source(self, event, *, title_hint: str = ""):
+                    return {
+                        "title": "Quarterly Activities Report",
+                        "url": "https://announcements.asx.com.au/asxpdf/20260406/pdf/example.pdf",
+                        "published_at": "2026-04-06",
+                    }
+
+            resolver = SourceResolver(official_source_finder=StubFinder())
+            packet = await resolver.resolve(
                 AnnouncementEvent(
                     event_id="evt-asx-1",
                     ticker="ASX:BTR",
@@ -168,6 +230,7 @@ class SourceResolverTests(unittest.TestCase):
 
         self.assertEqual(packet.exchange, "ASX")
         self.assertEqual(packet.title, "Quarterly Activities Report")
+        self.assertEqual(packet.published_at_utc, "2026-04-06")
         self.assertEqual(
             packet.source_url,
             "https://announcements.asx.com.au/asxpdf/20260406/pdf/example.pdf",
@@ -220,10 +283,10 @@ class InboxSentinelTests(unittest.TestCase):
         self.assertEqual(event.company_hint, "Torque Metals Limited")
 
 
-class HotCopperSourceResolverTests(unittest.TestCase):
-    def test_source_resolver_uses_hotcopper_body_headline_as_title(self):
+class HotCopperSourceResolverTests(unittest.IsolatedAsyncioTestCase):
+    async def test_source_resolver_uses_hotcopper_body_headline_as_title_when_official_lookup_missing(self):
         resolver = SourceResolver()
-        packet = resolver.resolve(
+        packet = await resolver.resolve(
             AnnouncementEvent(
                 event_id="evt-hc-1",
                 ticker="ASX:TOR",
@@ -243,9 +306,56 @@ class HotCopperSourceResolverTests(unittest.TestCase):
 
         self.assertEqual(packet.title, "Significant New Thick High-Grade Intercepts at Paris Gold")
         self.assertEqual(packet.company_name, "Torque Metals Limited")
+        self.assertEqual(packet.source_url, "")
 
 
 class DocumentReaderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_reader_prefers_remote_exchange_filing_over_local_or_body(self):
+        with TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "announcement.txt"
+            path.write_text("This local attachment should not win.", encoding="utf-8")
+
+            reader = DocumentReader()
+
+            async def fake_remote(packet):
+                return (
+                    "Official ASX filing text confirming project funding and permit progress.",
+                    ["Official ASX filing text confirming project funding and permit progress."],
+                )
+
+            reader._read_remote = fake_remote  # type: ignore[method-assign]
+            facts = await reader.read(
+                AnnouncementPacket(
+                    event_id="evt-doc-remote-1",
+                    ticker="ASX:BTR",
+                    exchange="ASX",
+                    title="Quarterly Activities Report",
+                    source_url="https://announcements.asx.com.au/asxpdf/20260406/pdf/example.pdf",
+                    source_type="exchange_filing",
+                    document_path=str(path),
+                    company_name="Brightstar Resources Limited",
+                    body_text="Email summary fallback only.",
+                )
+            )
+
+        self.assertIn("official asx filing", facts.raw_text_excerpt.lower())
+        self.assertIn("financing", facts.material_topics)
+
+    async def test_reader_uses_body_only_when_no_primary_source_exists(self):
+        reader = DocumentReader()
+        facts = await reader.read(
+            AnnouncementPacket(
+                event_id="evt-doc-body-1",
+                ticker="ASX:TOR",
+                exchange="ASX",
+                title="Significant New Thick High-Grade Intercepts at Paris Gold",
+                company_name="Torque Metals Limited",
+                body_text="The company announced new drill intercepts and exploration progress.",
+            )
+        )
+
+        self.assertIn("drill intercepts", facts.raw_text_excerpt.lower())
+
     async def test_reader_extracts_topics_and_facts_from_local_text_attachment(self):
         with TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "announcement.txt"
