@@ -16,6 +16,7 @@ from .models import (
     ComparisonReport,
     EvidenceRef,
     ScenarioRouterDecision,
+    StageTrace,
 )
 from .run_selector import LatestRunSelector
 from .service import ScenarioRouterDependencies, ScenarioRouterService
@@ -35,6 +36,7 @@ __all__ = [
     "DocumentReader",
     "EvidenceRef",
     "ScenarioRouterDecision",
+    "StageTrace",
     "InboxSentinel",
     "LabScribe",
     "LatestRunSelector",
