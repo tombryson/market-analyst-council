@@ -1273,9 +1273,6 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
   const selectedRouter = selectedPayload?.scenario_router || {};
   const overviewActionCounts = topCountEntries(scenarioOverview?.action_counts, 4);
   const overviewTransitionCounts = topCountEntries(scenarioOverview?.path_transition_counts, 4);
-  const evaluationResults = Array.isArray(scenarioEvaluations?.results) ? scenarioEvaluations.results : [];
-  const failedEvaluations = evaluationResults.filter((item) => !item?.passed);
-  const passedEvaluations = evaluationResults.filter((item) => item?.passed);
   const goToTimelineLab = useCallback(() => {
     navigateTo('/gantt-lab');
   }, []);
@@ -1638,9 +1635,9 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
             <span>end-to-end router latency</span>
           </div>
           <div className="scenario-router-card">
-            <label>Signal Fixture Pass Rate</label>
+            <label>Router QA</label>
             <strong>{fmtPct(scenarioEvaluations?.pass_rate_pct)}</strong>
-            <span>{scenarioEvaluations?.passed_cases ?? 0}/{scenarioEvaluations?.total_cases ?? 0} cases</span>
+            <span>{scenarioEvaluations?.passed_cases ?? 0}/{scenarioEvaluations?.total_cases ?? 0} regression checks</span>
           </div>
         </div>
 
@@ -1722,28 +1719,6 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
                 </div>
               ))}
               {!scenarioOverview?.recent_events?.length && <div className="watch-empty">No scenario-router events yet.</div>}
-            </div>
-          </article>
-
-          <article className="scenario-router-column scenario-router-column-wide">
-            <h4>Signal Fixture Pack</h4>
-            <div className="scenario-router-event-list">
-              {(failedEvaluations.length ? failedEvaluations : passedEvaluations).slice(0, 6).map((row) => (
-                <div className={`scenario-router-event ${row?.passed ? 'is-pass' : 'is-fail'}`} key={row.case_id}>
-                  <div className="scenario-router-event-top">
-                    <strong>{row.label}</strong>
-                    <span>{row.category}</span>
-                    <span>{row.passed ? 'PASS' : 'FAIL'}</span>
-                  </div>
-                  <div className="scenario-router-event-meta">
-                    Expected {row?.expected?.current_path}/{row?.expected?.action}/{row?.expected?.impact_level}
-                  </div>
-                  <div className="scenario-router-event-meta">
-                    Actual {row?.actual?.current_path}/{row?.actual?.action}/{row?.actual?.impact_level}
-                  </div>
-                </div>
-              ))}
-              {!evaluationResults.length && <div className="watch-empty">No evaluation fixtures loaded.</div>}
             </div>
           </article>
         </div>
