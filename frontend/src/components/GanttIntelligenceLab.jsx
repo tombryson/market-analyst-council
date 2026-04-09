@@ -1584,6 +1584,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
       </div>
       )}
 
+      {monitorOnly && (
       <section className="lab-panel scenario-router-monitor-panel">
         <div className="scenario-router-monitor-head">
           <div>
@@ -1725,6 +1726,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
 
         {scenarioError && <div className="run-meta-note run-meta-note-error">Scenario router monitor error: {scenarioError}</div>}
       </section>
+      )}
 
       {!monitorOnly && (
       <ScenarioTimelineUnit
@@ -1786,6 +1788,145 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
             </ul>
           </article>
         </div>
+      </section>
+      )}
+
+      {!monitorOnly && (
+      <section className="lab-panel scenario-router-monitor-panel">
+        <div className="scenario-router-monitor-head">
+          <div>
+            <h3>Scenario Router Monitor</h3>
+            <p className="scenario-router-monitor-copy">
+              Primary-source announcement routing, signal quality, and recent decision flow.
+            </p>
+          </div>
+          <div className="scenario-router-monitor-actions">
+            <input
+              type="text"
+              className="scenario-router-filter-input"
+              placeholder="Filter by ticker, e.g. ASX:TOR"
+              value={scenarioTickerFilter}
+              onChange={(e) => setScenarioTickerFilter(String(e.target.value || '').toUpperCase())}
+            />
+            <button
+              type="button"
+              className="gantt-lab-inline-retry"
+              onClick={() => setScenarioReloadToken((prev) => prev + 1)}
+              disabled={scenarioLoading}
+            >
+              {scenarioLoading ? 'Refreshing…' : 'Refresh Monitor'}
+            </button>
+            <button
+              type="button"
+              className="gantt-lab-inline-retry"
+              onClick={goToScenarioRouter}
+            >
+              Open Full Monitor
+            </button>
+          </div>
+        </div>
+
+        <div className="scenario-router-monitor-grid">
+          <div className="scenario-router-card">
+            <label>Total Events</label>
+            <strong>{scenarioOverview?.total_events ?? 'n/a'}</strong>
+            <span>{scenarioOverview?.unique_tickers ?? 'n/a'} tickers tracked</span>
+          </div>
+          <div className="scenario-router-card">
+            <label>Primary Source Rate</label>
+            <strong>{fmtPct(scenarioOverview?.official_source_rate_pct)}</strong>
+            <span>official ASX filing used</span>
+          </div>
+          <div className="scenario-router-card">
+            <label>Average Processing</label>
+            <strong>{fmtMs(scenarioOverview?.average_processing_ms)}</strong>
+            <span>end-to-end router latency</span>
+          </div>
+        </div>
+
+        <div className="scenario-router-columns">
+          <article className="scenario-router-column">
+            <h4>Selected Run Signal</h4>
+            <div className="scenario-router-detail-row"><span>Current Path</span><strong className={`tone-${scenarioTone(selectedRouter?.current_path)}`}>{selectedRouter?.current_path || 'n/a'}</strong></div>
+            <div className="scenario-router-detail-row"><span>Transition</span><strong>{selectedRouter?.path_transition || 'none'}</strong></div>
+            <div className="scenario-router-detail-row"><span>Action</span><strong>{selectedRouter?.action || 'n/a'}</strong></div>
+            <div className="scenario-router-detail-row"><span>Impact</span><strong>{selectedRouter?.impact_level || 'n/a'}</strong></div>
+            <div className="scenario-router-detail-row"><span>Latest Announcement</span><strong>{selectedRouter?.announcement_title || 'n/a'}</strong></div>
+            <div className="scenario-router-detail-row"><span>Last Evaluated</span><strong>{selectedRouter?.saved_at_utc ? fmtRelativeSince(selectedRouter.saved_at_utc) : 'n/a'}</strong></div>
+            {selectedRouter?.reason && <div className="scenario-router-detail-note">{selectedRouter.reason}</div>}
+            {!!selectedRouter?.matched_conditions?.length && (
+              <>
+                <h4>Matched Conditions</h4>
+                <div className="scenario-router-chip-list">
+                  {selectedRouter.matched_conditions.map((item, idx) => (
+                    <span key={`matched-lab-${idx}`} className="scenario-router-chip">{item}</span>
+                  ))}
+                </div>
+              </>
+            )}
+            {!!selectedRouter?.triggered_watchlist?.length && (
+              <>
+                <h4>Watchlist Hits</h4>
+                <div className="scenario-router-chip-list">
+                  {selectedRouter.triggered_watchlist.map((item, idx) => (
+                    <span key={`watch-lab-${idx}`} className="scenario-router-chip">{item}</span>
+                  ))}
+                </div>
+              </>
+            )}
+            {!!Object.keys(selectedRouter?.market_facts_used || {}).length && (
+              <>
+                <h4>Market Facts Used</h4>
+                <div className="scenario-router-chip-list">
+                  {Object.entries(selectedRouter.market_facts_used || {}).map(([key, value]) => (
+                    <span key={`market-lab-${key}`} className="scenario-router-chip">
+                      {titleizeKey(key)} · {typeof value === 'number' ? fmtNum(value, value >= 100 ? 0 : 2) : String(value)}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+          </article>
+
+          <article className="scenario-router-column">
+            <h4>Action Distribution</h4>
+            <div className="scenario-router-chip-list">
+              {overviewActionCounts.map(([key, value]) => (
+                <span key={`action-lab-${key}`} className="scenario-router-chip">{key} · {value}</span>
+              ))}
+              {!overviewActionCounts.length && <span className="watch-empty">No events yet.</span>}
+            </div>
+            <h4>Transition Distribution</h4>
+            <div className="scenario-router-chip-list">
+              {overviewTransitionCounts.map(([key, value]) => (
+                <span key={`transition-lab-${key}`} className="scenario-router-chip">{key} · {value}</span>
+              ))}
+              {!overviewTransitionCounts.length && <span className="watch-empty">No routed transitions yet.</span>}
+            </div>
+          </article>
+
+          <article className="scenario-router-column scenario-router-column-wide">
+            <h4>Recent Routed Announcements</h4>
+            <div className="scenario-router-event-list">
+              {(scenarioOverview?.recent_events || []).slice(0, 8).map((row) => (
+                <div className="scenario-router-event" key={row.event_id || `${row.ticker}-${row.saved_at_utc}`}>
+                  <div className="scenario-router-event-top">
+                    <strong>{row.ticker || 'n/a'}</strong>
+                    <span>{row.action || 'n/a'}</span>
+                    <span className={`tone-${scenarioTone(row.current_path)}`}>{row.current_path || 'n/a'}</span>
+                  </div>
+                  <div className="scenario-router-event-title">{row.title || 'Untitled announcement'}</div>
+                  <div className="scenario-router-event-meta">
+                    {row.path_transition || 'no transition'} · {row.source_type || 'unknown source'} · {fmtMs(row.processing_duration_ms)} · {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
+                  </div>
+                </div>
+              ))}
+              {!scenarioOverview?.recent_events?.length && <div className="watch-empty">No scenario-router events yet.</div>}
+            </div>
+          </article>
+        </div>
+
+        {scenarioError && <div className="run-meta-note run-meta-note-error">Scenario router monitor error: {scenarioError}</div>}
       </section>
       )}
 
