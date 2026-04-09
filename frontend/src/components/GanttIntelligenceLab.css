@@ -255,6 +255,34 @@
   margin-bottom: 12px;
 }
 
+.scenario-router-monitor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.scenario-router-filter-input {
+  min-width: 220px;
+  border: 1px solid rgba(170, 205, 228, 0.24);
+  background: rgba(7, 24, 34, 0.82);
+  color: #e4f4ff;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.scenario-router-filter-input::placeholder {
+  color: #9dbfd7;
+}
+
+.scenario-router-filter-input:focus {
+  outline: none;
+  border-color: rgba(122, 212, 255, 0.62);
+  box-shadow: 0 0 0 3px rgba(68, 151, 190, 0.18);
+}
+
 .scenario-router-monitor-head h3 {
   margin: 0;
 }

@@ -121,6 +121,10 @@ function CouncilApp() {
     navigate('/gantt-lab');
   };
 
+  const handleOpenScenarioRouter = () => {
+    navigate('/scenario-router');
+  };
+
   const handleSendMessage = async (
     content,
     enableSearch,
@@ -447,6 +451,7 @@ function CouncilApp() {
         onNewConversation={handleNewConversation}
         onOpenTimelineDemo={handleOpenTimelineDemo}
         onOpenTimelineLab={handleOpenTimelineLab}
+        onOpenScenarioRouter={handleOpenScenarioRouter}
       />
       <ChatInterface
         conversation={currentConversation}
@@ -475,6 +480,9 @@ function App() {
   }
   if (path === '/gantt-lab') {
     return <GanttIntelligenceLab />;
+  }
+  if (path === '/scenario-router') {
+    return <GanttIntelligenceLab monitorOnly />;
   }
   return <CouncilApp />;
 }

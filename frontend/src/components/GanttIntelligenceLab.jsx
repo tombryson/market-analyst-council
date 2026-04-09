@@ -12,6 +12,14 @@ function backToCouncilChat() {
   window.dispatchEvent(new Event('app:navigate'));
 }
 
+function navigateTo(pathname) {
+  if (typeof window === 'undefined') return;
+  const current = window.location.pathname;
+  if (current === pathname) return;
+  window.history.pushState({}, '', pathname);
+  window.dispatchEvent(new Event('app:navigate'));
+}
+
 function fmtNum(value, digits = 2) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 'n/a';
@@ -929,7 +937,7 @@ function normalizeWatchlist(stage3, thesisMap) {
   return out;
 }
 
-export default function GanttIntelligenceLab() {
+export default function GanttIntelligenceLab({ monitorOnly = false }) {
   const [locationSearch, setLocationSearch] = useState(() => (
     typeof window === 'undefined' ? '' : window.location.search || ''
   ));
@@ -949,6 +957,7 @@ export default function GanttIntelligenceLab() {
   const [scenarioLoading, setScenarioLoading] = useState(false);
   const [scenarioError, setScenarioError] = useState('');
   const [scenarioReloadToken, setScenarioReloadToken] = useState(0);
+  const [scenarioTickerFilter, setScenarioTickerFilter] = useState('');
   const preferredRunIdFromUrl = useMemo(() => {
     try {
       const params = new URLSearchParams(locationSearch || '');
@@ -980,6 +989,10 @@ export default function GanttIntelligenceLab() {
     }
     return out;
   }, [preferredTickerFromUrl]);
+  const effectiveScenarioTicker = useMemo(
+    () => String(scenarioTickerFilter || preferredTickerFromUrl || '').trim().toUpperCase(),
+    [scenarioTickerFilter, preferredTickerFromUrl]
+  );
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const sync = () => setLocationSearch(window.location.search || '');
@@ -1063,7 +1076,7 @@ export default function GanttIntelligenceLab() {
         setScenarioLoading(true);
         setScenarioError('');
         const [overview, evaluations] = await Promise.all([
-          api.getScenarioRouterOverview(120),
+          api.getScenarioRouterOverview(120, effectiveScenarioTicker),
           api.getScenarioRouterEvaluations(),
         ]);
         if (cancelled) return;
@@ -1080,7 +1093,7 @@ export default function GanttIntelligenceLab() {
     return () => {
       cancelled = true;
     };
-  }, [scenarioReloadToken]);
+  }, [effectiveScenarioTicker, scenarioReloadToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1263,6 +1276,12 @@ export default function GanttIntelligenceLab() {
   const evaluationResults = Array.isArray(scenarioEvaluations?.results) ? scenarioEvaluations.results : [];
   const failedEvaluations = evaluationResults.filter((item) => !item?.passed);
   const passedEvaluations = evaluationResults.filter((item) => item?.passed);
+  const goToTimelineLab = useCallback(() => {
+    navigateTo('/gantt-lab');
+  }, []);
+  const goToScenarioRouter = useCallback(() => {
+    navigateTo('/scenario-router');
+  }, []);
 
   const currency =
     stage3?.market_data_provenance?.prepass_currency ||
@@ -1430,7 +1449,7 @@ export default function GanttIntelligenceLab() {
     }
   };
 
-  if (!datasets.length) {
+  if (!datasets.length && !monitorOnly) {
     return (
       <div className="gantt-lab-root">
         <div className="gantt-lab-shell">
@@ -1468,6 +1487,7 @@ export default function GanttIntelligenceLab() {
     <div className="gantt-lab-root">
       <div className="gantt-lab-shell">
       <div className="gantt-lab-content">
+      {!monitorOnly && (
       <div className="gantt-lab-toolbar">
         <div className="gantt-lab-controls">
           <select value={visibleDatasetId} onChange={(e) => requestDatasetSelection(e.target.value)} className="gantt-lab-select">
@@ -1499,7 +1519,9 @@ export default function GanttIntelligenceLab() {
           </button>
         </div>
       </div>
+      )}
 
+      {!monitorOnly && (
       <div className="gantt-lab-banner">
         <div>
           <div className="banner-name">
@@ -1516,6 +1538,8 @@ export default function GanttIntelligenceLab() {
           <strong>{stage3?.investment_recommendation?.conviction || 'N/A'}</strong>
         </div>
       </div>
+      )}
+      {!monitorOnly && (
       <div className="score-grid">
         {scoreCards.map((card) => (
           <div key={card.label} className={`score-card tone-${card.tone}`}>
@@ -1561,6 +1585,7 @@ export default function GanttIntelligenceLab() {
           </div>
         </div>
       </div>
+      )}
 
       <section className="lab-panel scenario-router-monitor-panel">
         <div className="scenario-router-monitor-head">
@@ -1570,14 +1595,30 @@ export default function GanttIntelligenceLab() {
               Primary-source announcement routing, signal quality, and recent decision flow.
             </p>
           </div>
-          <button
-            type="button"
-            className="gantt-lab-inline-retry"
-            onClick={() => setScenarioReloadToken((prev) => prev + 1)}
-            disabled={scenarioLoading}
-          >
-            {scenarioLoading ? 'Refreshing…' : 'Refresh Monitor'}
-          </button>
+          <div className="scenario-router-monitor-actions">
+            <input
+              type="text"
+              className="scenario-router-filter-input"
+              placeholder="Filter by ticker, e.g. ASX:TOR"
+              value={scenarioTickerFilter}
+              onChange={(e) => setScenarioTickerFilter(String(e.target.value || '').toUpperCase())}
+            />
+            <button
+              type="button"
+              className="gantt-lab-inline-retry"
+              onClick={() => setScenarioReloadToken((prev) => prev + 1)}
+              disabled={scenarioLoading}
+            >
+              {scenarioLoading ? 'Refreshing…' : 'Refresh Monitor'}
+            </button>
+            <button
+              type="button"
+              className="gantt-lab-inline-retry"
+              onClick={monitorOnly ? goToTimelineLab : goToScenarioRouter}
+            >
+              {monitorOnly ? 'Open Timeline Lab' : 'Open Full Monitor'}
+            </button>
+          </div>
         </div>
 
         <div className="scenario-router-monitor-grid">
@@ -1678,13 +1719,16 @@ export default function GanttIntelligenceLab() {
         {scenarioError && <div className="run-meta-note run-meta-note-error">Scenario router monitor error: {scenarioError}</div>}
       </section>
 
+      {!monitorOnly && (
       <ScenarioTimelineUnit
         data={chartPayload}
         currency={currency}
         timelineBars={timelineBars}
         orientation={timelineOrientation}
       />
+      )}
 
+      {!monitorOnly && (
       <section className="lab-panel analyst-snapshot-panel">
         <h3>Analyst Snapshot</h3>
         <div className="analyst-snapshot-grid">
@@ -1736,7 +1780,9 @@ export default function GanttIntelligenceLab() {
           </article>
         </div>
       </section>
+      )}
 
+      {!monitorOnly && (
       <details className="debug-panels">
         <summary>Debug Panels (expand)</summary>
         <div className="lab-layout">
@@ -1992,13 +2038,16 @@ export default function GanttIntelligenceLab() {
         </section>
       </div>
       </details>
+      )}
       </div>
+      {!monitorOnly && (
       <aside className="gantt-memo-pane">
         {!memoStartsWithH1 && <h1 className="memo-h1">{memoTitle}</h1>}
         {selectionPending
           ? <p className="memo-empty">Loading selected run…</p>
           : renderMarkdownBlocks(analystMemoMarkdown)}
       </aside>
+      )}
       </div>
     </div>
   );

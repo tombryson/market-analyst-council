@@ -8,6 +8,7 @@ export default function Sidebar({
   onNewConversation,
   onOpenTimelineDemo,
   onOpenTimelineLab,
+  onOpenScenarioRouter,
 }) {
   return (
     <div className="sidebar">
@@ -29,6 +30,13 @@ export default function Sidebar({
           type="button"
         >
           Open Timeline Lab
+        </button>
+        <button
+          className="timeline-lab-btn"
+          onClick={onOpenScenarioRouter}
+          type="button"
+        >
+          Open Scenario Router
         </button>
       </div>
 
