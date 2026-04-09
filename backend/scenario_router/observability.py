@@ -43,6 +43,7 @@ class ScenarioRouterObservability:
     def build_overview(self, *, recent_limit: int = 100, ticker: str = "") -> Dict[str, Any]:
         rows = self.list_recent_events(limit=max(1, int(recent_limit)), ticker=ticker)
         total = len(rows)
+        status_counts = Counter(str(row.get("status") or "").strip() for row in rows if str(row.get("status") or "").strip())
         action_counts = Counter(str(row.get("action") or "").strip() for row in rows if str(row.get("action") or "").strip())
         impact_counts = Counter(str(row.get("impact_level") or "").strip() for row in rows if str(row.get("impact_level") or "").strip())
         current_path_counts = Counter(str(row.get("current_path") or "").strip() for row in rows if str(row.get("current_path") or "").strip())
@@ -61,6 +62,7 @@ class ScenarioRouterObservability:
         return {
             "total_events": total,
             "unique_tickers": len(unique_tickers),
+            "status_counts": dict(status_counts),
             "official_source_rate_pct": round((official_source_count / total) * 100.0, 1) if total else 0.0,
             "average_processing_ms": avg_processing_ms,
             "action_counts": dict(action_counts),
@@ -163,6 +165,7 @@ class ScenarioRouterObservability:
         )
 
         return {
+            "status": str(payload.get("status") or "ok").strip() or "ok",
             "event_id": str(event.get("event_id") or packet.get("event_id") or path.stem).strip(),
             "ticker": str(event.get("ticker") or packet.get("ticker") or "").strip(),
             "title": str(packet.get("title") or report.get("announcement_title") or "").strip(),
@@ -180,6 +183,7 @@ class ScenarioRouterObservability:
             "processing_duration_ms": int(payload.get("processing_duration_ms") or 0),
             "matched_conditions_count": matched_conditions,
             "triggered_watchlist_count": triggered_watchlist,
+            "error_reason": str(((payload.get("error") or {}) if isinstance(payload.get("error"), dict) else {}).get("reason") or "").strip(),
             "processing_trace": trace,
             "artifact_path": str(path),
         }

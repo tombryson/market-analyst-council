@@ -3044,10 +3044,13 @@ async def process_scenario_router_announcement(
                     "processed_at_utc": str(existing.get("processed_at_utc") or "").strip(),
                 },
             }
-    try:
-        from .scenario_router.inbox_sentinel import InboxSentinel
+    from .scenario_router.inbox_sentinel import InboxSentinel
+    from .scenario_router.lab_scribe import LabScribe
 
-        sentinel = InboxSentinel()
+    sentinel = InboxSentinel()
+    scribe = LabScribe()
+    event = None
+    try:
         event = sentinel.ingest_email_payload(payload)
         if not str(event.ticker or "").strip():
             raise HTTPException(
@@ -3057,9 +3060,54 @@ async def process_scenario_router_announcement(
 
         service = _build_scenario_router_service()
         decision = await service.process_announcement_event(event)
+    except RuntimeError as exc:
+        reason = str(exc or "").strip()
+        if event is not None and reason.startswith("No saved lab runs found for "):
+            processed_at_utc = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+            persisted = await scribe.persist_status(
+                event=event,
+                status="no_baseline_run",
+                reason=reason,
+                action="watch",
+            )
+            if dedupe_key:
+                _persist_scenario_router_dedupe(
+                    dedupe_key,
+                    {
+                        "event_key": dedupe_key,
+                        "processed_at_utc": processed_at_utc,
+                        "event_id": event.event_id,
+                        "ticker": event.ticker,
+                        "baseline_run_id": "",
+                        "current_path": "",
+                        "path_transition": "",
+                        "action": "watch",
+                        "status": "no_baseline_run",
+                    },
+                )
+            return {
+                "status": "no_baseline_run",
+                "ticker": event.ticker,
+                "baseline_run_id": "",
+                "current_path": "",
+                "path_transition": "",
+                "action": "watch",
+                "detail": reason,
+                "persisted_artifacts": persisted,
+            }
+        raise HTTPException(
+            status_code=500,
+            detail=f"Scenario router announcement processing failed: {exc}",
+        ) from exc
     except HTTPException:
         raise
     except Exception as exc:
+        if event is not None:
+            await scribe.persist_status(
+                event=event,
+                status="processing_error",
+                reason=str(exc or "").strip(),
+            )
         raise HTTPException(
             status_code=500,
             detail=f"Scenario router announcement processing failed: {exc}",
@@ -3078,6 +3126,7 @@ async def process_scenario_router_announcement(
                 "current_path": decision.comparison_report.current_path,
                 "path_transition": decision.comparison_report.path_transition,
                 "action": decision.action_decision.action,
+                "status": "ok",
             },
         )
 

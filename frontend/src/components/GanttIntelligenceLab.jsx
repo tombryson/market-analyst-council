@@ -1272,6 +1272,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
     : (stage3?.investment_recommendation?.summary || mapped.thesis || 'No thesis summary provided.');
   const selectedRouter = selectedPayload?.scenario_router || {};
   const overviewActionCounts = topCountEntries(scenarioOverview?.action_counts, 4);
+  const overviewStatusCounts = topCountEntries(scenarioOverview?.status_counts, 4);
   const overviewTransitionCounts = topCountEntries(scenarioOverview?.path_transition_counts, 4);
   const goToTimelineLab = useCallback(() => {
     navigateTo('/gantt-lab');
@@ -1636,6 +1637,11 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
             <span>end-to-end router latency</span>
           </div>
           <div className="scenario-router-card">
+            <label>Event Status</label>
+            <strong>{overviewStatusCounts[0]?.[0] || 'n/a'}</strong>
+            <span>{overviewStatusCounts[0]?.[1] || 0} latest-status count</span>
+          </div>
+          <div className="scenario-router-card">
             <label>Router QA</label>
             <strong>{fmtPct(scenarioEvaluations?.pass_rate_pct)}</strong>
             <span>{scenarioEvaluations?.passed_cases ?? 0}/{scenarioEvaluations?.total_cases ?? 0} regression checks</span>
@@ -1687,6 +1693,13 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
           </article>
 
           <article className="scenario-router-column">
+            <h4>Status Distribution</h4>
+            <div className="scenario-router-chip-list">
+              {overviewStatusCounts.map(([key, value]) => (
+                <span key={`status-${key}`} className="scenario-router-chip">{key} · {value}</span>
+              ))}
+              {!overviewStatusCounts.length && <span className="watch-empty">No events yet.</span>}
+            </div>
             <h4>Action Distribution</h4>
             <div className="scenario-router-chip-list">
               {overviewActionCounts.map(([key, value]) => (
@@ -1710,6 +1723,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
                 <div className="scenario-router-event" key={row.event_id || `${row.ticker}-${row.saved_at_utc}`}>
                   <div className="scenario-router-event-top">
                     <strong>{row.ticker || 'n/a'}</strong>
+                    <span>{row.status || 'ok'}</span>
                     <span>{row.action || 'n/a'}</span>
                     <span className={`tone-${scenarioTone(row.current_path)}`}>{row.current_path || 'n/a'}</span>
                   </div>
@@ -1717,6 +1731,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
                   <div className="scenario-router-event-meta">
                     {row.path_transition || 'no transition'} · {row.source_type || 'unknown source'} · {fmtMs(row.processing_duration_ms)} · {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
                   </div>
+                  {row.error_reason && <div className="scenario-router-detail-note">{row.error_reason}</div>}
                 </div>
               ))}
               {!scenarioOverview?.recent_events?.length && <div className="watch-empty">No scenario-router events yet.</div>}
@@ -1842,6 +1857,11 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
             <strong>{fmtMs(scenarioOverview?.average_processing_ms)}</strong>
             <span>end-to-end router latency</span>
           </div>
+          <div className="scenario-router-card">
+            <label>Event Status</label>
+            <strong>{overviewStatusCounts[0]?.[0] || 'n/a'}</strong>
+            <span>{overviewStatusCounts[0]?.[1] || 0} latest-status count</span>
+          </div>
         </div>
 
         <div className="scenario-router-columns">
@@ -1889,6 +1909,13 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
           </article>
 
           <article className="scenario-router-column">
+            <h4>Status Distribution</h4>
+            <div className="scenario-router-chip-list">
+              {overviewStatusCounts.map(([key, value]) => (
+                <span key={`status-lab-${key}`} className="scenario-router-chip">{key} · {value}</span>
+              ))}
+              {!overviewStatusCounts.length && <span className="watch-empty">No events yet.</span>}
+            </div>
             <h4>Action Distribution</h4>
             <div className="scenario-router-chip-list">
               {overviewActionCounts.map(([key, value]) => (
@@ -1912,6 +1939,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
                 <div className="scenario-router-event" key={row.event_id || `${row.ticker}-${row.saved_at_utc}`}>
                   <div className="scenario-router-event-top">
                     <strong>{row.ticker || 'n/a'}</strong>
+                    <span>{row.status || 'ok'}</span>
                     <span>{row.action || 'n/a'}</span>
                     <span className={`tone-${scenarioTone(row.current_path)}`}>{row.current_path || 'n/a'}</span>
                   </div>
@@ -1919,6 +1947,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
                   <div className="scenario-router-event-meta">
                     {row.path_transition || 'no transition'} · {row.source_type || 'unknown source'} · {fmtMs(row.processing_duration_ms)} · {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
                   </div>
+                  {row.error_reason && <div className="scenario-router-detail-note">{row.error_reason}</div>}
                 </div>
               ))}
               {!scenarioOverview?.recent_events?.length && <div className="watch-empty">No scenario-router events yet.</div>}

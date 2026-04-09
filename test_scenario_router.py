@@ -1,3 +1,4 @@
+import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -786,6 +787,29 @@ class LabScribeTests(unittest.IsolatedAsyncioTestCase):
             latest = LabScribe.load_latest_for_run("run-123", base_dir=Path(tmpdir))
             self.assertEqual(latest.get("comparison_report", {}).get("ticker"), "ASX:BTR")
 
+    async def test_lab_scribe_persists_status_only_event(self):
+        with TemporaryDirectory() as tmpdir:
+            scribe = LabScribe(base_dir=Path(tmpdir))
+            event = AnnouncementEvent(
+                event_id="evt-missing-run",
+                ticker="ASX:TOR",
+                exchange="ASX",
+                subject="TOR (ASX) announcement on HotCopper",
+                company_hint="Torque Metals Limited",
+            )
+
+            persisted = await scribe.persist_status(
+                event=event,
+                status="no_baseline_run",
+                reason="No saved lab runs found for ASX:TOR.",
+                action="watch",
+            )
+            payload = json.loads(Path(persisted["event_artifact"]).read_text(encoding="utf-8"))
+
+        self.assertEqual(payload.get("status"), "no_baseline_run")
+        self.assertEqual(payload.get("action_decision", {}).get("action"), "watch")
+        self.assertIn("No saved lab runs found", payload.get("error", {}).get("reason", ""))
+
     def _decision(self):
         from backend.scenario_router import ActionDecision
 
@@ -875,9 +899,30 @@ class ScenarioRouterObservabilityTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(overview.get("total_events"), 1)
         self.assertEqual(overview.get("unique_tickers"), 1)
+        self.assertEqual(overview.get("status_counts", {}).get("ok"), 1)
         self.assertEqual(events[0].get("path_transition"), "base->bull")
         self.assertEqual(events[0].get("source_type"), "exchange_filing")
         self.assertEqual(events[0].get("processing_duration_ms"), 1000)
+
+    async def test_observability_includes_status_only_failures(self):
+        from backend.scenario_router.observability import ScenarioRouterObservability
+
+        with TemporaryDirectory() as tmpdir:
+            scribe = LabScribe(base_dir=Path(tmpdir))
+            await scribe.persist_status(
+                event=AnnouncementEvent(event_id="evt-obs-2", ticker="ASX:TOR", exchange="ASX"),
+                status="no_baseline_run",
+                reason="No saved lab runs found for ASX:TOR.",
+                action="watch",
+            )
+
+            observer = ScenarioRouterObservability(base_dir=Path(tmpdir))
+            overview = observer.build_overview()
+            events = observer.list_recent_events()
+
+        self.assertEqual(overview.get("status_counts", {}).get("no_baseline_run"), 1)
+        self.assertEqual(events[0].get("status"), "no_baseline_run")
+        self.assertIn("No saved lab runs found", events[0].get("error_reason", ""))
 
     async def test_evaluation_suite_cases_pass(self):
         from backend.scenario_router.observability import ScenarioRouterObservability
