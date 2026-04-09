@@ -1,7 +1,7 @@
 const CHART_METRICS = {
-  width: 900,
-  height: 420,
-  margin: { top: 12, right: 30, bottom: 44, left: 62 },
+  width: 820,
+  height: 360,
+  margin: { top: 12, right: 24, bottom: 42, left: 58 },
 };
 
 const chartX = (months) => {
