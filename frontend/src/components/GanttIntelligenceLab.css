@@ -37,6 +37,7 @@
   top: 12px;
   max-height: calc(100vh - 40px);
   overflow: auto;
+  scrollbar-width: none;
   border-left: 1px solid rgba(171, 208, 231, 0.22);
   padding-left: 16px;
 }
@@ -1222,4 +1223,8 @@ details pre {
     max-height: none;
     overflow: visible;
   }
+}
+
+.gantt-memo-pane::-webkit-scrollbar {
+  display: none;
 }
