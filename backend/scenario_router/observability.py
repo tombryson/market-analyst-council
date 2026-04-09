@@ -146,6 +146,21 @@ class ScenarioRouterObservability:
         action = payload.get("action_decision") if isinstance(payload.get("action_decision"), dict) else {}
         baseline_run = payload.get("baseline_run") if isinstance(payload.get("baseline_run"), dict) else {}
         trace = payload.get("processing_trace") if isinstance(payload.get("processing_trace"), list) else []
+        evaluations = report.get("condition_evaluations") if isinstance(report.get("condition_evaluations"), list) else []
+        matched_conditions = sum(
+            1
+            for item in evaluations
+            if isinstance(item, dict)
+            and str(item.get("status") or "").strip() == "matched"
+            and str(item.get("group") or "").strip() in {"required", "failure"}
+        )
+        triggered_watchlist = sum(
+            1
+            for item in evaluations
+            if isinstance(item, dict)
+            and str(item.get("status") or "").strip() == "matched"
+            and str(item.get("group") or "").strip() in {"red_flag", "confirmatory"}
+        )
 
         return {
             "event_id": str(event.get("event_id") or packet.get("event_id") or path.stem).strip(),
@@ -163,6 +178,8 @@ class ScenarioRouterObservability:
             "source_url": str(packet.get("source_url") or "").strip(),
             "run_id": str(baseline_run.get("run_id") or "").strip(),
             "processing_duration_ms": int(payload.get("processing_duration_ms") or 0),
+            "matched_conditions_count": matched_conditions,
+            "triggered_watchlist_count": triggered_watchlist,
             "processing_trace": trace,
             "artifact_path": str(path),
         }

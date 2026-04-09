@@ -17,6 +17,7 @@ from backend.scenario_router import (
     ScenarioRouterDependencies,
     ScenarioRouterDecision,
     ScenarioRouterService,
+    ScenarioMarketFactsResolver,
     StageTrace,
     InboxSentinel,
     LabScribe,
@@ -505,6 +506,59 @@ class ThesisComparatorTests(unittest.TestCase):
         self.assertGreater(report.path_confidence, 0.0)
         self.assertEqual(report.thesis_effect, "accelerates")
         self.assertTrue(report.key_findings)
+        self.assertIn("bull_permit_fast", report.matched_condition_ids)
+
+    def test_comparator_uses_market_facts_for_asset_price_condition(self):
+        baseline_run = BaselineRunPacket(
+            run_id="run-market-1",
+            ticker="ASX:WWI",
+            exchange="ASX",
+            company_name="West Wits Mining Limited",
+            lab_payload={
+                "structured_data": {
+                    "extended_analysis": {
+                        "current_thesis_state": {
+                            "leaning": "base",
+                        }
+                    },
+                    "thesis_map": {
+                        "bull": {
+                            "required_conditions": [
+                                {
+                                    "condition_id": "bull_required_gold_us_5000",
+                                    "condition": "Gold >US$5,000/oz",
+                                }
+                            ],
+                            "failure_conditions": [],
+                        },
+                        "base": {"required_conditions": [], "failure_conditions": []},
+                        "bear": {"required_conditions": [], "failure_conditions": []},
+                    },
+                }
+            },
+        )
+        facts = AnnouncementFacts(
+            event_id="evt-market-1",
+            ticker="ASX:WWI",
+            title="Quarterly Activities Report",
+            summary="Operational update only.",
+            extracted_facts=["Operational update only."],
+            market_facts={
+                "normalized_facts": {
+                    "commodity_profile": "gold",
+                    "gold_price_usd_oz": 5100.0,
+                }
+            },
+        )
+
+        report = self.comparator.compare(facts, baseline_run)
+
+        self.assertEqual(report.current_path, "bull")
+        self.assertEqual(report.market_facts_used.get("gold_price_usd_oz"), 5100.0)
+        evals = [item for item in report.condition_evaluations if item.condition_id == "bull_required_gold_us_5000"]
+        self.assertEqual(len(evals), 1)
+        self.assertEqual(evals[0].status, "matched")
+        self.assertEqual(evals[0].matched_via, "market_facts")
 
 
 class ScenarioRouterServiceTests(unittest.IsolatedAsyncioTestCase):
@@ -569,6 +623,10 @@ class ScenarioRouterServiceTests(unittest.IsolatedAsyncioTestCase):
 
         async def thesis_comparator(facts: AnnouncementFacts, baseline_run: BaselineRunPacket) -> ComparisonReport:
             self.assertEqual(baseline_run.run_id, "run-123")
+            self.assertEqual(
+                (facts.market_facts or {}).get("normalized_facts", {}).get("gold_price_usd_oz"),
+                4850.0,
+            )
             return ComparisonReport(
                 ticker=facts.ticker,
                 baseline_run_id=baseline_run.run_id,
@@ -587,6 +645,15 @@ class ScenarioRouterServiceTests(unittest.IsolatedAsyncioTestCase):
                 ],
             )
 
+        async def market_facts_resolver(facts: AnnouncementFacts, baseline_run: BaselineRunPacket):
+            self.assertEqual(baseline_run.template_id, "resources_gold_monometallic")
+            return {
+                "normalized_facts": {
+                    "commodity_profile": "gold",
+                    "gold_price_usd_oz": 4850.0,
+                }
+            }
+
         async def lab_scribe(decision):
             return {
                 "event_artifact": f"scenario_router_events/{decision.event.event_id}.json",
@@ -598,6 +665,7 @@ class ScenarioRouterServiceTests(unittest.IsolatedAsyncioTestCase):
                 source_resolver=source_resolver,
                 document_reader=document_reader,
                 run_selector=run_selector,
+                market_facts_resolver=market_facts_resolver,
                 thesis_comparator=thesis_comparator,
                 lab_scribe=lab_scribe,
             )
@@ -611,7 +679,7 @@ class ScenarioRouterServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(result.processing_duration_ms, 0)
         self.assertEqual(
             [stage.stage for stage in result.processing_trace],
-            ["source_resolver", "document_reader", "run_selector", "thesis_comparator", "action_judge", "lab_scribe"],
+            ["source_resolver", "document_reader", "run_selector", "market_facts_resolver", "thesis_comparator", "action_judge", "lab_scribe"],
         )
 
 
@@ -662,6 +730,39 @@ class LatestRunSelectorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(packet.run_id, "run-123.json")
         self.assertEqual(packet.template_id, "resources_gold_monometallic")
         self.assertEqual(packet.freshness_status, "watch")
+
+
+class ScenarioMarketFactsResolverTests(unittest.IsolatedAsyncioTestCase):
+    async def test_market_facts_resolver_uses_prepass_pipeline(self):
+        resolver = ScenarioMarketFactsResolver()
+        facts = AnnouncementFacts(
+            event_id="evt-mf-1",
+            ticker="ASX:WWI",
+            company_name="West Wits Mining Limited",
+        )
+        baseline_run = BaselineRunPacket(
+            run_id="run-mf-1",
+            ticker="ASX:WWI",
+            exchange="ASX",
+            company_name="West Wits Mining Limited",
+            template_id="resources_gold_monometallic",
+            summary_fields={"company_type": "gold_miner"},
+        )
+
+        with patch(
+            "backend.scenario_router.market_facts_resolver.gather_market_facts_prepass",
+            return_value={
+                "normalized_facts": {
+                    "current_price": 0.19,
+                    "commodity_profile": "gold",
+                    "gold_price_usd_oz": 5001.0,
+                }
+            },
+        ) as mock_gather:
+            payload = await resolver.resolve(facts, baseline_run)
+
+        mock_gather.assert_awaited_once()
+        self.assertEqual(payload.get("normalized_facts", {}).get("gold_price_usd_oz"), 5001.0)
 
 
 class LabScribeTests(unittest.IsolatedAsyncioTestCase):

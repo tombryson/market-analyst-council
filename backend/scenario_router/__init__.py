@@ -4,6 +4,7 @@ from .action_judge import ActionJudge
 from .document_reader import DocumentReader
 from .inbox_sentinel import InboxSentinel
 from .lab_scribe import LabScribe
+from .market_facts_resolver import ScenarioMarketFactsResolver
 from .official_source_finder import OfficialSourceFinder
 from .models import (
     ActionDecision,
@@ -14,6 +15,7 @@ from .models import (
     BaselineRunPacket,
     ComparisonFinding,
     ComparisonReport,
+    ConditionEvaluation,
     EvidenceRef,
     ScenarioRouterDecision,
     StageTrace,
@@ -33,12 +35,14 @@ __all__ = [
     "BaselineRunPacket",
     "ComparisonFinding",
     "ComparisonReport",
+    "ConditionEvaluation",
     "DocumentReader",
     "EvidenceRef",
     "ScenarioRouterDecision",
     "StageTrace",
     "InboxSentinel",
     "LabScribe",
+    "ScenarioMarketFactsResolver",
     "LatestRunSelector",
     "OfficialSourceFinder",
     "ScenarioRouterDependencies",

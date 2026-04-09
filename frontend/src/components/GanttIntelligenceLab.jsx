@@ -1654,6 +1654,38 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
             <div className="scenario-router-detail-row"><span>Latest Announcement</span><strong>{selectedRouter?.announcement_title || 'n/a'}</strong></div>
             <div className="scenario-router-detail-row"><span>Last Evaluated</span><strong>{selectedRouter?.saved_at_utc ? fmtRelativeSince(selectedRouter.saved_at_utc) : 'n/a'}</strong></div>
             {selectedRouter?.reason && <div className="scenario-router-detail-note">{selectedRouter.reason}</div>}
+            {!!selectedRouter?.matched_conditions?.length && (
+              <>
+                <h4>Matched Conditions</h4>
+                <div className="scenario-router-chip-list">
+                  {selectedRouter.matched_conditions.map((item, idx) => (
+                    <span key={`matched-${idx}`} className="scenario-router-chip">{item}</span>
+                  ))}
+                </div>
+              </>
+            )}
+            {!!selectedRouter?.triggered_watchlist?.length && (
+              <>
+                <h4>Watchlist Hits</h4>
+                <div className="scenario-router-chip-list">
+                  {selectedRouter.triggered_watchlist.map((item, idx) => (
+                    <span key={`watch-${idx}`} className="scenario-router-chip">{item}</span>
+                  ))}
+                </div>
+              </>
+            )}
+            {!!Object.keys(selectedRouter?.market_facts_used || {}).length && (
+              <>
+                <h4>Market Facts Used</h4>
+                <div className="scenario-router-chip-list">
+                  {Object.entries(selectedRouter.market_facts_used || {}).map(([key, value]) => (
+                    <span key={`market-${key}`} className="scenario-router-chip">
+                      {titleizeKey(key)} · {typeof value === 'number' ? fmtNum(value, value >= 100 ? 0 : 2) : String(value)}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
           </article>
 
           <article className="scenario-router-column">

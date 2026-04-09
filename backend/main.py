@@ -149,6 +149,7 @@ _ANALYSIS_STAGE_RANGES: Dict[str, Tuple[int, int]] = {
 def _build_scenario_router_service():
     from .scenario_router.document_reader import DocumentReader
     from .scenario_router.lab_scribe import LabScribe
+    from .scenario_router.market_facts_resolver import ScenarioMarketFactsResolver
     from .scenario_router.run_selector import LatestRunSelector
     from .scenario_router.source_resolver import SourceResolver
     from .scenario_router.thesis_comparator import ThesisComparator
@@ -162,6 +163,7 @@ def _build_scenario_router_service():
             source_resolver=SourceResolver().resolve,
             document_reader=DocumentReader().read,
             run_selector=LatestRunSelector(limit=25).select_latest,
+            market_facts_resolver=ScenarioMarketFactsResolver().resolve,
             thesis_comparator=ThesisComparator().compare,
             lab_scribe=LabScribe().persist,
         )
@@ -2627,6 +2629,27 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         if isinstance(router_state.get("event"), dict)
         else {}
     )
+    condition_evaluations = (
+        comparison.get("condition_evaluations")
+        if isinstance(comparison.get("condition_evaluations"), list)
+        else []
+    )
+    matched_conditions = [
+        str(item.get("label") or item.get("condition_id") or "").strip()
+        for item in condition_evaluations
+        if isinstance(item, dict)
+        and str(item.get("status") or "").strip() == "matched"
+        and str(item.get("group") or "").strip() in {"required", "failure"}
+        and str(item.get("label") or item.get("condition_id") or "").strip()
+    ][:8]
+    triggered_watchlist = [
+        str(item.get("label") or item.get("condition_id") or "").strip()
+        for item in condition_evaluations
+        if isinstance(item, dict)
+        and str(item.get("status") or "").strip() == "matched"
+        and str(item.get("group") or "").strip() in {"red_flag", "confirmatory"}
+        and str(item.get("label") or item.get("condition_id") or "").strip()
+    ][:8]
     return {
         "current_path": str(comparison.get("current_path") or "").strip(),
         "baseline_path": str(comparison.get("baseline_path") or "").strip(),
@@ -2640,6 +2663,13 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         "announcement_title": str(
             comparison.get("announcement_title") or facts.get("title") or event.get("subject") or ""
         ).strip(),
+        "matched_conditions": matched_conditions,
+        "triggered_watchlist": triggered_watchlist,
+        "market_facts_used": (
+            comparison.get("market_facts_used")
+            if isinstance(comparison.get("market_facts_used"), dict)
+            else {}
+        ),
         "received_at_utc": str(event.get("received_at_utc") or "").strip(),
         "saved_at_utc": str(router_state.get("saved_at_utc") or "").strip(),
     }

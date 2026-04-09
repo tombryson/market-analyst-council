@@ -34,6 +34,7 @@ ActionType = Literal[
 ]
 ScenarioPath = Literal["unknown", "bull", "base", "bear", "mixed"]
 RunValidity = Literal["intact", "watch", "partial_invalidation", "invalidated"]
+ConditionStatus = Literal["matched", "not_matched", "contradicted", "unclear"]
 MaterialChangeType = Literal[
     "financing",
     "permitting",
@@ -121,6 +122,7 @@ class AnnouncementFacts:
     summary: str = ""
     extracted_facts: List[str] = field(default_factory=list)
     material_topics: List[str] = field(default_factory=list)
+    market_facts: Dict[str, Any] = field(default_factory=dict)
     evidence: List[EvidenceRef] = field(default_factory=list)
     raw_text_excerpt: str = ""
 
@@ -162,6 +164,30 @@ class ComparisonFinding:
 
 
 @dataclass
+class ConditionEvaluation:
+    condition_id: str
+    scenario: str = ""
+    group: str = ""
+    label: str = ""
+    status: ConditionStatus = "unclear"
+    reason: str = ""
+    confidence: float = 0.0
+    matched_via: str = ""
+    market_field: str = ""
+    observed_value: Any = None
+    comparator: str = ""
+    threshold_value: Any = None
+    severity: str = ""
+    linked_milestones: List[str] = field(default_factory=list)
+    evidence: EvidenceRef = field(default_factory=EvidenceRef)
+
+    def to_dict(self) -> Dict[str, Any]:
+        data = asdict(self)
+        data["evidence"] = self.evidence.to_dict()
+        return data
+
+
+@dataclass
 class ComparisonReport:
     ticker: str
     baseline_run_id: str
@@ -177,12 +203,17 @@ class ComparisonReport:
     capital_effect: CapitalEffect = "unknown"
     affected_domains: List[str] = field(default_factory=list)
     material_change_types: List[MaterialChangeType] = field(default_factory=list)
+    condition_evaluations: List[ConditionEvaluation] = field(default_factory=list)
+    matched_condition_ids: List[str] = field(default_factory=list)
+    triggered_watchlist_ids: List[str] = field(default_factory=list)
+    market_facts_used: Dict[str, Any] = field(default_factory=dict)
     key_findings: List[ComparisonFinding] = field(default_factory=list)
     conflicts_with_run: List[ComparisonFinding] = field(default_factory=list)
     notes: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         data = asdict(self)
+        data["condition_evaluations"] = [item.to_dict() for item in self.condition_evaluations]
         data["key_findings"] = [item.to_dict() for item in self.key_findings]
         data["conflicts_with_run"] = [item.to_dict() for item in self.conflicts_with_run]
         return data

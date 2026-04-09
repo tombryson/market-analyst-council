@@ -21,6 +21,7 @@ from .models import (
 ResolverFn = Callable[[AnnouncementEvent], Union[AnnouncementPacket, Awaitable[AnnouncementPacket]]]
 ReaderFn = Callable[[AnnouncementPacket], Union[AnnouncementFacts, Awaitable[AnnouncementFacts]]]
 RunSelectorFn = Callable[[str, str], Union[BaselineRunPacket, Awaitable[BaselineRunPacket]]]
+MarketFactsResolverFn = Callable[[AnnouncementFacts, BaselineRunPacket], Union[Dict[str, Any], Awaitable[Dict[str, Any]]]]
 ComparatorFn = Callable[[AnnouncementFacts, BaselineRunPacket], Union[ComparisonReport, Awaitable[ComparisonReport]]]
 ScribeFn = Callable[[ScenarioRouterDecision], Union[Dict[str, Any], Awaitable[Dict[str, Any]]]]
 
@@ -37,6 +38,7 @@ class ScenarioRouterDependencies:
     document_reader: ReaderFn
     run_selector: RunSelectorFn
     thesis_comparator: ComparatorFn
+    market_facts_resolver: Optional[MarketFactsResolverFn] = None
     lab_scribe: Optional[ScribeFn] = None
     action_judge: Optional[ActionJudge] = None
 
@@ -73,6 +75,12 @@ class ScenarioRouterService:
                         "run_id": str(getattr(result, "run_id", "") or ""),
                         "template_id": str(getattr(result, "template_id", "") or ""),
                     }
+                elif stage_name == "market_facts_resolver":
+                    normalized = result.get("normalized_facts") if isinstance(result, dict) else {}
+                    meta = {
+                        "market_fields": len([key for key, value in (normalized or {}).items() if value is not None]),
+                        "commodity_profile": str((normalized or {}).get("commodity_profile") or ""),
+                    }
                 elif stage_name == "thesis_comparator":
                     meta = {
                         "current_path": str(getattr(result, "current_path", "") or ""),
@@ -102,6 +110,10 @@ class ScenarioRouterService:
         packet = await run_stage("source_resolver", self._deps.source_resolver, event)
         facts = await run_stage("document_reader", self._deps.document_reader, packet)
         baseline_run = await run_stage("run_selector", self._deps.run_selector, event.ticker, event.exchange)
+        if self._deps.market_facts_resolver is not None:
+            market_facts = await run_stage("market_facts_resolver", self._deps.market_facts_resolver, facts, baseline_run)
+            if isinstance(market_facts, dict):
+                facts.market_facts = dict(market_facts)
         report = await run_stage("thesis_comparator", self._deps.thesis_comparator, facts, baseline_run)
         action = await run_stage("action_judge", self._judge.judge, report)
 
