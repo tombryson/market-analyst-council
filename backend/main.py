@@ -3064,12 +3064,6 @@ async def process_scenario_router_announcement(
         reason = str(exc or "").strip()
         if event is not None and reason.startswith("No saved lab runs found for "):
             processed_at_utc = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-            persisted = await scribe.persist_status(
-                event=event,
-                status="no_baseline_run",
-                reason=reason,
-                action="watch",
-            )
             if dedupe_key:
                 _persist_scenario_router_dedupe(
                     dedupe_key,
@@ -3081,19 +3075,19 @@ async def process_scenario_router_announcement(
                         "baseline_run_id": "",
                         "current_path": "",
                         "path_transition": "",
-                        "action": "watch",
-                        "status": "no_baseline_run",
+                        "action": "",
+                        "status": "skipped_no_baseline_run",
+                        "detail": reason,
                     },
                 )
             return {
-                "status": "no_baseline_run",
+                "status": "skipped_no_baseline_run",
                 "ticker": event.ticker,
                 "baseline_run_id": "",
                 "current_path": "",
                 "path_transition": "",
-                "action": "watch",
+                "action": "",
                 "detail": reason,
-                "persisted_artifacts": persisted,
             }
         raise HTTPException(
             status_code=500,

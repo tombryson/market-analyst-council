@@ -27,6 +27,8 @@ class ScenarioRouterObservability:
             except Exception:
                 continue
             row = self._summarize_event_payload(payload, path=path)
+            if self._is_skipped_status(row.get("status")):
+                continue
             if wanted and str(row.get("ticker") or "").strip().upper() != wanted:
                 continue
             rows.append(row)
@@ -39,6 +41,11 @@ class ScenarioRouterObservability:
             reverse=True,
         )
         return rows[: max(1, int(limit))]
+
+    @staticmethod
+    def _is_skipped_status(status: Any) -> bool:
+        normalized = str(status or "").strip().lower()
+        return normalized in {"no_baseline_run", "skipped_no_baseline_run"}
 
     def build_overview(self, *, recent_limit: int = 100, ticker: str = "") -> Dict[str, Any]:
         rows = self.list_recent_events(limit=max(1, int(recent_limit)), ticker=ticker)
