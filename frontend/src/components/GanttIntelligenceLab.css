@@ -18,40 +18,40 @@
 }
 
 .gantt-lab-content {
-  width: min(100%, 1120px);
-  margin: 0 auto;
+  width: min(100%, 780px);
+  margin: 0;
 }
 
 .gantt-lab-shell {
-  width: min(100%, 1200px);
+  width: min(100%, 1440px);
   margin: 0 auto;
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0, 780px) minmax(520px, 1fr);
+  gap: 18px;
+  align-items: start;
 }
 
 .gantt-memo-pane {
   min-width: 0;
-  position: static;
-  max-height: none;
-  overflow: visible;
-  border-left: 0;
-  padding-left: 0;
+  position: sticky;
+  top: 12px;
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  border-left: 1px solid rgba(171, 208, 231, 0.22);
+  padding-left: 16px;
 }
 
 .memo-h1 {
-  margin: 0 0 16px;
-  font-size: 28px;
+  margin: 2px 0 12px;
+  font-size: 22px;
   line-height: 1.25;
   color: #e8f4ff;
 }
 
-.gantt-memo-panel {
-  margin-bottom: 14px;
-}
-
 .gantt-memo-pane {
-  padding: 0.5rem 0.25rem;
+  padding: 0.75rem 1rem 0.75rem 1.5rem;
   color: #d6e8f6;
-  line-height: 1.65;
+  line-height: 1.55;
 }
 
 .gantt-memo-pane h1,
@@ -64,24 +64,24 @@
 }
 
 .gantt-memo-pane h1 {
-  font-size: 28px;
-}
-
-.gantt-memo-pane h2 {
   font-size: 22px;
 }
 
-.gantt-memo-pane h3 {
+.gantt-memo-pane h2 {
   font-size: 18px;
 }
 
+.gantt-memo-pane h3 {
+  font-size: 16px;
+}
+
 .gantt-memo-pane h4 {
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .gantt-memo-pane p {
-  margin: 10px 0;
-  font-size: 15px;
+  margin: 8px 0;
+  font-size: 14px;
 }
 
 .gantt-memo-pane ul,
@@ -89,8 +89,8 @@
   margin: 8px 0 10px 18px;
   padding: 0;
   display: grid;
-  gap: 6px;
-  font-size: 15px;
+  gap: 5px;
+  font-size: 14px;
 }
 
 .gantt-memo-pane li {
@@ -103,7 +103,7 @@
   border: 1px solid rgba(151, 197, 227, 0.22);
   border-radius: 4px;
   padding: 0 4px;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .memo-empty {
@@ -1135,6 +1135,10 @@ details pre {
 }
 
 @media (max-width: 1220px) {
+  .gantt-lab-shell {
+    grid-template-columns: 1fr;
+  }
+
   .gantt-memo-pane {
     position: static;
     max-height: none;

@@ -1585,17 +1585,6 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
       </div>
       )}
 
-      {!monitorOnly && (
-      <section className="lab-panel gantt-memo-panel">
-        <div className="gantt-memo-pane">
-          {!memoStartsWithH1 && <h1 className="memo-h1">{memoTitle}</h1>}
-          {selectionPending
-            ? <p className="memo-empty">Loading selected run…</p>
-            : renderMarkdownBlocks(analystMemoMarkdown)}
-        </div>
-      </section>
-      )}
-
       {monitorOnly && (
       <section className="lab-panel scenario-router-monitor-panel">
         <div className="scenario-router-monitor-head">
@@ -2228,6 +2217,14 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
       </details>
       )}
       </div>
+      {!monitorOnly && (
+      <aside className="gantt-memo-pane">
+        {!memoStartsWithH1 && <h1 className="memo-h1">{memoTitle}</h1>}
+        {selectionPending
+          ? <p className="memo-empty">Loading selected run…</p>
+          : renderMarkdownBlocks(analystMemoMarkdown)}
+      </aside>
+      )}
       </div>
     </div>
   );
