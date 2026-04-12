@@ -9,6 +9,8 @@ import yaml
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 
+from .template_prompt_library import get_template_prompt_fallback
+
 
 PREALLOCATED_COMPANY_TYPES: List[Dict[str, Any]] = [
     {
@@ -1648,10 +1650,12 @@ class TemplateLoader:
         Returns:
             Rubric text or None if not found
         """
-        template = self.get_template(template_id)
-        if template:
-            return template.get('rubric', '')
-        return None
+        template = self.get_template(template_id) or {}
+        rubric = str(template.get('rubric') or '').strip()
+        if rubric:
+            return rubric
+        fallback = get_template_prompt_fallback(template_id, template)
+        return fallback or None
 
     def _exchange_prompt_substitutions(self, exchange: Optional[str]) -> Dict[str, str]:
         """Return exchange-aware prompt substitutions with safe fallback defaults."""
@@ -1699,6 +1703,8 @@ class TemplateLoader:
         template = self.get_template(template_id) or {}
         rubric = str(template.get("rubric") or "").strip()
         if not rubric:
+            rubric = get_template_prompt_fallback(template_id, template)
+        if not rubric:
             return ""
         rubric = self.apply_prompt_substitutions(
             rubric,
@@ -1725,6 +1731,8 @@ class TemplateLoader:
         """
         template = self.get_template(template_id) or {}
         prompt = str(template.get("stage1_focus_prompt") or template.get("rubric") or "").strip()
+        if not prompt:
+            prompt = get_template_prompt_fallback(template_id, template)
         if not prompt:
             return ""
         prompt = self.apply_prompt_substitutions(
@@ -1794,6 +1802,8 @@ class TemplateLoader:
         rubric = ""
         if include_rubric:
             rubric = (template.get("stage1_focus_prompt") or template.get("rubric") or "").strip()
+            if not rubric:
+                rubric = get_template_prompt_fallback(template_id, template)
             rubric = self.apply_prompt_substitutions(
                 rubric,
                 company_name=company_name,
