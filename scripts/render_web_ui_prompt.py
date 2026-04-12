@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import sys
 from pathlib import Path
 
@@ -21,13 +23,14 @@ def main() -> int:
     parser.add_argument("--template-id", default="", help="Explicit template id override")
     args = parser.parse_args()
 
-    selection = resolve_template_selection(
+    with contextlib.redirect_stdout(io.StringIO()):
+        selection = resolve_template_selection(
         user_query=args.query or args.company or args.ticker,
         ticker=args.ticker or None,
         explicit_template_id=args.template_id or None,
         exchange=args.exchange or None,
     )
-    loader = get_template_loader()
+        loader = get_template_loader()
     template_id = selection["template_id"]
     company_name = args.company or selection.get("company_name") or "the company"
     exchange = args.exchange or selection.get("exchange") or ""
