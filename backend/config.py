@@ -122,8 +122,8 @@ _COUNCIL_MODELS = _get_csv("COUNCIL_MODELS")
 COUNCIL_MODELS = _COUNCIL_MODELS or [
     "minimax/minimax-m2.7",
     "x-ai/grok-4.20",
-    "qwen/qwen3.6-plus:free",
-    "z-ai/glm-5-turbo",
+    "qwen/qwen3.6-plus",
+    "z-ai/glm-5.1",
     "google/gemma-4-26b-a4b-it",
     "moonshotai/kimi-k2.5",
 ]

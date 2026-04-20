@@ -1,0 +1,204 @@
+id: semiconductors
+name: Semiconductors
+description: Investment analysis for semiconductor designers, manufacturers, equipment suppliers, and related hardware businesses
+category: technology
+version: '1.0'
+author: LLM Council
+company_types:
+- semiconductors
+template_behavior:
+  commodity_profile: none
+  supplementary_sector_label: semiconductor sector
+  cashflow_schema:
+    mode: auto
+    min_reporting_periods: 3
+    require_operating_cashflow: true
+    detection_max_sources: 28
+  stage1_research_lanes:
+  - 'Run a dedicated sector lane (semiconductors): capture 2-4 recent sources on inventory cycle, end-market demand, pricing/ASP trends, capex intensity, and export-control or supply-chain risk; tie each point to scenario assumptions.'
+  stage3_scoring_factors:
+    quality:
+    - Technology/IP Position
+    - End-Market Quality
+    - Management
+    - Cycle Execution
+    - Balance Sheet
+    - Governance
+    value:
+    - Intrinsic Value vs Market Cap
+    - Cycle-Normal Earnings Power
+    - Multiple vs Peers
+    - Margin Resilience
+    - Strategic Value
+auto_detect_keywords:
+- semiconductor
+- chip
+- foundry
+- wafer
+- fabless
+- asic
+- gpu
+- inventory days
+- utilization
+- node
+inputs:
+- ticker
+- company_name
+- market_data
+- pdf_documents
+output_schema:
+  type: object
+  required_fields:
+  - analysis_type
+  - ticker
+  - company_name
+  - quality_score
+  - value_score
+  - price_targets
+  - investment_recommendation
+  structure:
+    analysis_type: semiconductors
+    ticker: string
+    company_name: string
+    analysis_date: ISO-8601
+    market_data:
+      current_price: float
+      market_cap_m: float
+      shares_outstanding_m: float
+      enterprise_value_m: float
+      currency: string
+    quality_score:
+      total: float (0-100)
+      breakdown: object
+    value_score:
+      total: float (0-100)
+      breakdown: object
+    price_targets:
+      current_price: float
+      scenario_targets: object
+      scenario_probabilities: object
+      prob_weighted_target_12m: float
+      prob_weighted_target_24m: float
+    development_timeline: array
+    thesis_map: object
+    management_competition_assessment: object
+    verification_required_fields: array
+    investment_recommendation:
+      rating: BUY/HOLD/SELL
+      conviction: HIGH/MEDIUM/LOW
+      summary: string
+verification_schema:
+  fact_digest:
+    sections:
+      timelines_deadlines:
+        keywords:
+        - guidance
+        - launch
+        - tape-out
+        - q1
+        - q2
+        - q3
+        - q4
+        - fy
+      financing_deals:
+        keywords:
+        - capex
+        - debt
+        - subsidy
+        - buyback
+        - acquisition
+      project_economics:
+        keywords:
+        - revenue
+        - gross margin
+        - utilization
+        - wafer starts
+        - asp
+        - inventory
+        - free cash flow
+      market_share_structure:
+        keywords:
+        - market share
+        - node
+        - customer concentration
+        - valuation
+        - enterprise value
+      management_governance:
+        keywords:
+        - management
+        - board
+        - engineering
+        - roadmap
+        - governance
+      operational_objectives:
+        keywords:
+        - inventory correction
+        - utilization
+        - design wins
+        - node transition
+        - margin recovery
+      risks_constraints:
+        keywords:
+        - export controls
+        - oversupply
+        - inventory build
+        - customer pause
+        - pricing pressure
+      catalysts_tailwinds:
+        keywords:
+        - design win
+        - inventory normalization
+        - ai demand
+        - margin inflection
+        - product cycle
+    timeline_terms:
+    - q1
+    - q2
+    - q3
+    - q4
+    - fy
+    - launch
+    - tape-out
+    timeline_focus_terms:
+    - inventory
+    - utilization
+    - margin
+    - design wins
+    conflict:
+      field: operating_guidance_window
+      terms:
+      - guidance
+      - margin
+      - inventory
+      - utilization
+      max_shift_quarters: 2
+      resolution_rule: prefer newest dated primary-source guidance
+  compliance:
+    section_markers:
+      quality_score:
+        markers:
+        - quality score
+        - quality_score
+        critical: true
+      value_score:
+        markers:
+        - value score
+        - value_score
+        critical: true
+      price_targets:
+        markers:
+        - 12-month
+        - 24-month
+        - price target
+        - price_targets
+        - probability-weighted
+        - scenario probabilities
+        critical: true
+      development_timeline:
+        markers:
+        - development timeline
+        - timeline
+        - milestone
+        - guidance
+        - development_timeline
+        critical: true

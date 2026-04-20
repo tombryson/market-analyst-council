@@ -382,6 +382,152 @@ def _parse_json_from_text(raw_text: str) -> Tuple[Optional[Dict[str, Any]], Opti
         return None, f"No JSON found in response: {direct_error}"
 
 
+def _split_source_fact_candidates(text: str) -> List[str]:
+    """Return compact source lines/sentences suitable for deterministic guardrails."""
+    raw = str(text or "")
+    if not raw:
+        return []
+
+    candidates: List[str] = []
+    for raw_line in raw.splitlines():
+        line = re.sub(r"\s+", " ", raw_line).strip().strip('",')
+        if not line:
+            continue
+        if len(line) <= 650:
+            candidates.append(line)
+            continue
+        for sentence in re.split(r"(?<=[.!?])\s+", line):
+            sentence = re.sub(r"\s+", " ", sentence).strip().strip('",')
+            if sentence:
+                candidates.append(sentence[:650].rstrip())
+    return candidates
+
+
+def _dedupe_source_fact_lines(lines: List[str], *, limit: int = 12) -> List[str]:
+    seen: set[str] = set()
+    out: List[str] = []
+    for line in lines:
+        cleaned = _strip_markdown_formatting(line)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip(" -")
+        if not cleaned:
+            continue
+        key = re.sub(r"[^a-z0-9]+", " ", cleaned.lower()).strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(cleaned[:520].rstrip())
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _rank_energy_guardrail_line(line: str, *, kind: str) -> Tuple[int, int]:
+    lower = str(line or "").lower()
+    score = 0
+    if kind == "production":
+        if re.search(r"\bfy20\d{2}\b", lower):
+            score += 50
+        if re.search(r"\b(boepd|boe/day|boe/d)\b", lower):
+            score += 40
+        if re.search(r"\b(average|daily|baseline|track record|scaled)\b", lower):
+            score += 25
+        if re.search(r"\b(1,790|1790|1,814|1814|2,000|2000|3,000|3000)\b", lower):
+            score += 25
+        if "operational declines" in lower:
+            score -= 20
+        if "one_line" in lower or "key_facts_paragraph" in lower or "keyfactsparagraph" in lower:
+            score -= 10
+    elif kind == "hedge":
+        if re.search(r"\b(open|position|positions|contracted|settled)\b", lower):
+            score += 30
+        if re.search(r"\b(bbl|mmbtu|jan|jun|dec|avg|us\$)\b", lower):
+            score += 20
+        if "milestone" in lower or "source_snippet" in lower:
+            score -= 20
+    return (-score, len(line))
+
+
+def _build_stage3_source_fact_guardrails(
+    enhanced_context: str,
+    *,
+    template_id: str,
+    max_chars: int = 4500,
+) -> str:
+    """Extract compact primary-source facts that Stage 3 must not contradict."""
+    if str(template_id or "").strip() != "energy_oil_gas":
+        return ""
+
+    candidates = _split_source_fact_candidates(enhanced_context)
+    if not candidates:
+        return ""
+
+    hedge_lines: List[str] = []
+    production_lines: List[str] = []
+    well_rate_lines: List[str] = []
+    financing_lines: List[str] = []
+
+    for line in candidates:
+        lower = line.lower()
+        has_boe_rate = bool(
+            re.search(r"\bboe\s*/?\s*d(?:ay)?\b|\bboepd\b|\bboe/day\b", lower)
+        )
+        if "hedg" in lower:
+            hedge_lines.append(line)
+        if (
+            ("production" in lower and ("boe" in lower or "boepd" in lower))
+            or has_boe_rate
+            or re.search(r"\bnet production\b", lower)
+        ):
+            production_lines.append(line)
+        if re.search(r"\bip(?:24|30|90)?\b", lower) and ("boe" in lower or "bbl" in lower):
+            well_rate_lines.append(line)
+        if (
+            ("debt" in lower or "facility" in lower or "cash" in lower)
+            and re.search(r"\b(a\$|us\$|\$)\s*[0-9]", lower)
+        ):
+            financing_lines.append(line)
+
+    sections: List[str] = []
+    hedge_lines = sorted(hedge_lines, key=lambda line: _rank_energy_guardrail_line(line, kind="hedge"))
+    production_lines = sorted(
+        production_lines,
+        key=lambda line: _rank_energy_guardrail_line(line, kind="production"),
+    )
+
+    hedge_facts = _dedupe_source_fact_lines(hedge_lines, limit=6)
+    production_facts = _dedupe_source_fact_lines(production_lines, limit=6)
+    well_rate_facts = _dedupe_source_fact_lines(well_rate_lines, limit=3)
+    financing_facts = _dedupe_source_fact_lines(financing_lines, limit=4)
+
+    if hedge_facts:
+        sections.append(
+            "Hedging facts present in source packet:\n"
+            + "\n".join(f"- {item}" for item in hedge_facts)
+            + "\nInstruction: do not call the company unhedged or hedging unknown. If coverage is incomplete, say partial hedge coverage with residual commodity exposure."
+        )
+    if production_facts:
+        sections.append(
+            "Production baseline facts present in source packet:\n"
+            + "\n".join(f"- {item}" for item in production_facts)
+            + "\nInstruction: do not use a production trigger below the latest disclosed baseline as a future bull/base milestone."
+        )
+    if well_rate_facts:
+        sections.append(
+            "Well-rate facts present in source packet:\n"
+            + "\n".join(f"- {item}" for item in well_rate_facts)
+        )
+    if financing_facts:
+        sections.append(
+            "Balance-sheet facts present in source packet:\n"
+            + "\n".join(f"- {item}" for item in financing_facts)
+        )
+
+    rendered = "\n\n".join(sections).strip()
+    if max_chars > 0 and len(rendered) > max_chars:
+        rendered = rendered[: max_chars - 3].rstrip() + "..."
+    return rendered
+
+
 def _build_chairman_xml_prompt(
     *,
     original_user_question: str,
@@ -390,10 +536,12 @@ def _build_chairman_xml_prompt(
     consensus_nudge: str = "",
     rubric: str,
     template_contract_guidance: str = "",
+    source_fact_guardrails: str = "",
 ) -> str:
     """Prompt chairman for structured plain text (XML-like tags), not JSON."""
     contract_block = ""
     consensus_block = ""
+    source_guardrail_block = ""
     if str(template_contract_guidance or "").strip():
         contract_block = f"""
 TEMPLATE-SPECIFIC COVERAGE CONTRACT:
@@ -406,6 +554,13 @@ You must preserve the analytical intent of the selected Stage 1 template through
 TOP-RANKED PANEL NUMERIC ANCHOR:
 {consensus_nudge}
 """
+    if str(source_fact_guardrails or "").strip():
+        source_guardrail_block = f"""
+PRIMARY-SOURCE FACT GUARDRAILS:
+{source_fact_guardrails}
+
+These guardrails are deterministic extracts from the injected primary-source packet. Treat them as higher priority than council paraphrases. If a council response conflicts with these guardrails, identify it as a council error and do not carry the conflicting claim into the final memo.
+"""
     return f"""You are the Chairman of an LLM Investment Council. Multiple AI models have analyzed a company and peer-ranked each other.
 
 ORIGINAL USER QUESTION:
@@ -416,6 +571,7 @@ ORIGINAL USER QUESTION:
 PEER RANKINGS SUMMARY:
 {rankings_summary}
 {consensus_block}
+{source_guardrail_block}
 
 YOUR TASK AS CHAIRMAN:
 Synthesize a single neutral, decision-useful analysis using the rubric below and the council evidence only.
@@ -440,6 +596,8 @@ CRITICAL REQUIREMENTS:
 10. Preserve dissent and uncertainty. Do not smooth over real disagreements.
 11. Keep the output analytical, concise, and non-promotional.
 12. Use the top-ranked numeric cluster as the default starting point for base-case targets. If you land materially away from that cluster, explain why briefly in <dissenting_views> and <investment_verdict>.
+13. Do not list a field as a data gap when the primary-source fact guardrails already disclose it. For hedging, distinguish "partial hedge coverage with residual commodity exposure" from "unhedged" or "hedging unknown".
+14. Do not set a bull/base trigger below the latest disclosed production baseline. If current production already exceeds a candidate threshold, restate the trigger as an incremental uplift or a higher total production threshold.
 
 OUTPUT FORMAT:
 Return plain text only using the following XML tags exactly once each:
@@ -1933,6 +2091,63 @@ def _inject_stage3_audit_context(
             "family": str(contract.get("family", "") or ""),
             "industry_label": str(contract.get("industry_label", "") or ""),
         }
+
+
+def _apply_energy_source_fact_guardrails(
+    structured_data: Dict[str, Any],
+    source_fact_guardrails: str,
+) -> None:
+    """Record deterministic source guardrails and clean obvious hedge-gap contradictions."""
+    if not isinstance(structured_data, dict):
+        return
+    guardrails = str(source_fact_guardrails or "").strip()
+    if not guardrails:
+        return
+
+    metadata = structured_data.get("council_metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+        structured_data["council_metadata"] = metadata
+    metadata["source_fact_guardrails"] = {
+        "kind": "energy_oil_gas_primary_source_guardrails",
+        "has_explicit_hedging_facts": "hedging facts present in source packet" in guardrails.lower(),
+        "has_explicit_production_baseline": "production baseline facts present in source packet" in guardrails.lower(),
+        "excerpt": guardrails[:2500],
+    }
+
+    if "hedging facts present in source packet" not in guardrails.lower():
+        return
+
+    queue = structured_data.get("verification_queue")
+    if not isinstance(queue, list):
+        return
+
+    patched = False
+    for item in queue:
+        if not isinstance(item, dict):
+            continue
+        combined = " ".join(
+            str(item.get(key) or "")
+            for key in ("field", "reason", "required_source")
+        ).lower()
+        if "hedg" not in combined:
+            continue
+        if re.search(r"\b(unknown|not disclosed|absent|no data|unhedged|if hedged)\b", combined):
+            item["field"] = "Residual hedge coverage / commodity exposure"
+            item["reason"] = (
+                "Primary filings disclose hedge positions; verify current coverage ratio "
+                "and residual unhedged exposure rather than whether a hedge book exists."
+            )
+            item["required_source"] = "Latest quarterly hedge table / annual financial risk notes"
+            item["priority"] = str(item.get("priority") or "high").lower()
+            if item["priority"] not in {"high", "medium", "low"}:
+                item["priority"] = "high"
+            patched = True
+
+    if patched:
+        metadata.setdefault("source_fact_guardrail_warnings", []).append(
+            "Hedging verification queue was rewritten because source guardrails contained explicit hedge positions."
+        )
 
 
 def _strip_markdown_formatting(value: Any) -> str:
@@ -4801,8 +5016,20 @@ async def synthesize_structured_analysis(
         label_to_model,
         top_n=3,
     )
+    source_fact_guardrails = _build_stage3_source_fact_guardrails(
+        enhanced_context,
+        template_id=template_id,
+    )
     output_style = str(CHAIRMAN_OUTPUT_STYLE or "text_xml").strip().lower()
     if output_style == "json":
+        source_guardrail_block = ""
+        if source_fact_guardrails:
+            source_guardrail_block = f"""
+PRIMARY-SOURCE FACT GUARDRAILS:
+{source_fact_guardrails}
+
+These guardrails are deterministic extracts from the injected primary-source packet. Treat them as higher priority than council paraphrases. If a council response conflicts with these guardrails, identify it as a council error and do not carry the conflicting claim into the final memo.
+"""
         chairman_prompt = f"""You are the Chairman of an LLM Investment Council. Multiple AI models have analyzed a company and provided detailed responses. They have also peer-reviewed each other's responses. Your task is to synthesize their insights into a single, structured investment analysis.
 
 ORIGINAL USER QUESTION:
@@ -4815,6 +5042,7 @@ PEER RANKINGS SUMMARY:
 
 TOP-RANKED PANEL NUMERIC ANCHOR:
 {consensus_nudge}
+{source_guardrail_block}
 
 CHAIRMAN OPERATING RULES:
 1. Use ONLY council evidence already provided above.
@@ -4824,6 +5052,9 @@ CHAIRMAN OPERATING RULES:
 5. Your job is adjudication and consolidation, not first-principles re-analysis.
 6. If data is missing, continue with explicit "Unavailable"/null values and record verification gaps.
 7. Use the top-ranked numeric cluster as the default starting point for base-case targets. If you land materially away from it, explain why briefly in dissent-oriented fields.
+8. Do not list a field as a data gap when the primary-source fact guardrails already disclose it.
+9. For hedging, distinguish partial hedge coverage with residual commodity exposure from "unhedged" or "hedging unknown".
+10. Do not set a bull/base trigger below the latest disclosed production baseline. If current production already exceeds a candidate threshold, restate the trigger as an incremental uplift or a higher total production threshold.
 
 CRITICAL REQUIREMENTS:
 1. Where members disagree materially, record dissent in `extended_analysis.dissenting_views`.
@@ -4868,6 +5099,7 @@ Begin your JSON output now:"""
             consensus_nudge=consensus_nudge,
             rubric=rubric,
             template_contract_guidance=chairman_contract_guidance,
+            source_fact_guardrails=source_fact_guardrails,
         )
 
     messages = [{"role": "user", "content": chairman_prompt}]
@@ -4998,6 +5230,7 @@ Begin your JSON output now:"""
             template_id,
             chairman_text=response_text,
         )
+        _apply_energy_source_fact_guardrails(structured_data, source_fact_guardrails)
         _inject_stage3_audit_context(structured_data, market_facts, template_contract)
         structured_data["council_metadata"]["normalization"] = normalization_meta
         structured_data["template_id"] = str(template_contract.get("id", "") or template_id or "")

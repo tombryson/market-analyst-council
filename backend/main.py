@@ -72,7 +72,9 @@ from .delta_monitor import (
 
 app = FastAPI(title="LLM Council API")
 research_service = ResearchService()
-OUTPUTS_DIR = Path(__file__).resolve().parents[1] / "outputs"
+OUTPUTS_DIR = Path(
+    os.getenv("ANALYSIS_OUTPUTS_DIR", str(Path(__file__).resolve().parents[1] / "outputs"))
+)
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 JOBS_OUTPUTS_DIR = Path(os.getenv("ANALYSIS_JOBS_DIR", str(OUTPUTS_DIR / "jobs")))
 JOBS_META_DIR = JOBS_OUTPUTS_DIR / "meta"
@@ -117,6 +119,8 @@ _ANALYSIS_PROGRESS_MARKERS: List[Tuple[str, str, int]] = [
     ("stage 2.5 revision pass done", "stage2_5", 84),
     ("stage 3 start", "stage3", 88),
     ("stage 3 primary done", "stage3", 95),
+    ("stage 4 start", "stage4", 96),
+    ("stage 4 done", "stage4", 98),
     ("stage 3 secondary start", "stage3_secondary", 96),
     ("stage 3 secondary done", "stage3_secondary", 98),
     ("run complete", "complete", 100),
@@ -131,9 +135,10 @@ _ANALYSIS_STAGE_ORDER: Dict[str, int] = {
     "stage2": 4,
     "stage2_5": 5,
     "stage3": 6,
-    "stage3_secondary": 7,
-    "complete": 8,
-    "failed": 9,
+    "stage4": 7,
+    "stage3_secondary": 8,
+    "complete": 9,
+    "failed": 10,
 }
 
 _ANALYSIS_STAGE_RANGES: Dict[str, Tuple[int, int]] = {
@@ -142,6 +147,7 @@ _ANALYSIS_STAGE_RANGES: Dict[str, Tuple[int, int]] = {
     "stage2": (60, 72),
     "stage2_5": (76, 84),
     "stage3": (88, 95),
+    "stage4": (96, 98),
     "stage3_secondary": (96, 98),
 }
 
@@ -387,6 +393,22 @@ async def _store_supplementary_upload_for_job(
     return target, filename
 
 
+def _store_portfolio_context_for_job(
+    portfolio_context: Optional[Dict[str, Any]],
+    *,
+    job_id: str,
+) -> Optional[Path]:
+    """Persist normalized portfolio context for async portfolio-positioning jobs."""
+    if not isinstance(portfolio_context, dict) or not portfolio_context:
+        return None
+
+    contexts_dir = JOBS_OUTPUTS_DIR / "portfolio_context"
+    contexts_dir.mkdir(parents=True, exist_ok=True)
+    target = contexts_dir / f"{job_id}_portfolio_context.json"
+    target.write_text(json.dumps(portfolio_context, ensure_ascii=False, indent=2), encoding="utf-8")
+    return target
+
+
 async def _prepare_generated_supplementary_for_job(
     *,
     job_id: str,
@@ -515,6 +537,7 @@ class CompanyTypeDetectRequest(BaseModel):
 
 class CreateAnalysisJobRequest(BaseModel):
     """Request payload for async full-analysis job submission."""
+    job_type: Optional[str] = None
     query: Optional[str] = None
     ticker: Optional[str] = None
     company_name: Optional[str] = None
@@ -529,6 +552,8 @@ class CreateAnalysisJobRequest(BaseModel):
     reuse_recent_bundle: bool = False
     reuse_supplementary_from_job_id: Optional[str] = None
     supplementary_mode: Optional[str] = None
+    portfolio_context: Optional[Dict[str, Any]] = None
+    portfolio_positioning_mode: Optional[str] = None
 
 
 class ScenarioRouterAttachmentPayload(BaseModel):
@@ -690,6 +715,10 @@ def _extract_memo_content(
         if isinstance(chairman_doc, dict)
         else ""
     )
+    if not analyst_markdown:
+        analyst_markdown = str(payload.get("analyst_memo_markdown") or "").strip()
+    if not chairman_markdown:
+        chairman_markdown = str(payload.get("chairman_memo_markdown") or "").strip()
 
     def _memo_priority(path: Path, *, analyst: bool) -> Tuple[int, float]:
         """
@@ -1256,13 +1285,36 @@ def _slugify_label(value: str, fallback: str) -> str:
     return cleaned[:48] if cleaned else fallback
 
 
+def _validate_job_type(value: Any) -> str:
+    job_type = str(value or "company_analysis").strip().lower()
+    if job_type not in {"company_analysis", "portfolio_positioning"}:
+        raise HTTPException(
+            status_code=400,
+            detail="job_type must be one of: company_analysis, portfolio_positioning",
+        )
+    return job_type
+
+
+def _validate_portfolio_positioning_mode(value: Any) -> str:
+    mode = str(value or "fast").strip().lower()
+    if mode not in {"fast", "deep"}:
+        raise HTTPException(
+            status_code=400,
+            detail="portfolio_positioning_mode must be one of: fast, deep",
+        )
+    return mode
+
+
 def _build_job_run_filename(request: CreateAnalysisJobRequest) -> str:
+    job_type = _validate_job_type(getattr(request, "job_type", None))
     ticker = str(request.ticker or "").strip()
     query = str(request.query or "").strip()
     base_hint = str(request.run_label or "").strip() or ticker or query or "analysis"
-    base = _slugify_label(base_hint, fallback="analysis")
+    fallback = "portfolio_positioning" if job_type == "portfolio_positioning" else "analysis"
+    base = _slugify_label(base_hint, fallback=fallback)
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    return f"quality_job_{base}_{timestamp}.json"
+    prefix = "portfolio_positioning_job" if job_type == "portfolio_positioning" else "quality_job"
+    return f"{prefix}_{base}_{timestamp}.json"
 
 
 def _validate_stage2_revision_mode(value: str) -> str:
@@ -1280,7 +1332,23 @@ def _build_analysis_job_command(
     output_path: Path,
     *,
     supplementary_context_path: Optional[Path] = None,
+    portfolio_context_path: Optional[Path] = None,
 ) -> List[str]:
+    job_type = _validate_job_type(getattr(request, "job_type", None))
+    if job_type == "portfolio_positioning":
+        if not portfolio_context_path:
+            raise HTTPException(status_code=400, detail="Portfolio positioning requires portfolio_context")
+        cmd = [sys.executable, str(PROJECT_ROOT / "portfolio_positioning_memo.py")]
+        request_query = str(request.query or "").strip()
+        if request_query:
+            cmd.extend(["--query", request_query])
+        cmd.extend(["--portfolio-context-file", str(portfolio_context_path)])
+        cmd.extend(["--mode", _validate_portfolio_positioning_mode(request.portfolio_positioning_mode)])
+        if request.run_label:
+            cmd.extend(["--run-label", str(request.run_label)])
+        cmd.extend(["--dump-json", str(output_path)])
+        return cmd
+
     cmd: List[str] = [sys.executable, str(PROJECT_ROOT / "test_quality_mvp.py")]
 
     request_query = str(request.query or "").strip()
@@ -2498,6 +2566,21 @@ def _compute_prob_weighted_target(
 
 
 def _build_summary_fields(structured: Dict[str, Any], freshness: Dict[str, Any]) -> Dict[str, Any]:
+    if str(structured.get("analysis_kind") or "").strip() == "portfolio_positioning":
+        diagnosis = structured.get("portfolio_diagnosis") if isinstance(structured.get("portfolio_diagnosis"), dict) else {}
+        strategic_view = structured.get("strategic_view") if isinstance(structured.get("strategic_view"), dict) else {}
+        current_vs_ideal = structured.get("current_vs_ideal") if isinstance(structured.get("current_vs_ideal"), dict) else {}
+        return {
+            "analysis_kind": "portfolio_positioning",
+            "analysis_date": str(structured.get("analysis_date") or "").strip(),
+            "current_cash_pct": _safe_float(diagnosis.get("current_cash_pct")),
+            "cash_target_pct": _safe_float(strategic_view.get("cash_target_pct")),
+            "primary_theme": str(strategic_view.get("primary_theme") or "").strip(),
+            "secondary_theme": str(strategic_view.get("secondary_theme") or "").strip(),
+            "main_overweights": current_vs_ideal.get("main_overweights") if isinstance(current_vs_ideal.get("main_overweights"), list) else [],
+            "main_underweights": current_vs_ideal.get("main_underweights") if isinstance(current_vs_ideal.get("main_underweights"), list) else [],
+        }
+
     market_data = structured.get("market_data") if isinstance(structured.get("market_data"), dict) else {}
     council_meta = structured.get("council_metadata") if isinstance(structured.get("council_metadata"), dict) else {}
     council_contract = council_meta.get("template_contract") if isinstance(council_meta.get("template_contract"), dict) else {}
@@ -2640,6 +2723,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         if isinstance(item, dict)
         and str(item.get("status") or "").strip() == "matched"
         and str(item.get("group") or "").strip() in {"required", "failure"}
+        and str(item.get("matched_via") or "").strip() != "market_facts"
         and str(item.get("label") or item.get("condition_id") or "").strip()
     ][:8]
     triggered_watchlist = [
@@ -2648,16 +2732,55 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         if isinstance(item, dict)
         and str(item.get("status") or "").strip() == "matched"
         and str(item.get("group") or "").strip() in {"red_flag", "confirmatory"}
+        and str(item.get("matched_via") or "").strip() != "market_facts"
         and str(item.get("label") or item.get("condition_id") or "").strip()
     ][:8]
+    market_context_conditions = [
+        {
+            "label": str(item.get("label") or item.get("condition_id") or "").strip(),
+            "scenario": str(item.get("scenario") or "").strip(),
+            "group": str(item.get("group") or "").strip(),
+            "field": str(item.get("market_field") or "").strip(),
+            "observed_value": item.get("observed_value"),
+            "comparator": str(item.get("comparator") or "").strip(),
+            "threshold_value": item.get("threshold_value"),
+            "status": str(item.get("status") or "").strip(),
+        }
+        for item in condition_evaluations
+        if isinstance(item, dict)
+        and str(item.get("matched_via") or "").strip() == "market_facts"
+        and str(item.get("status") or "").strip() in {"matched", "contradicted"}
+        and str(item.get("label") or item.get("condition_id") or "").strip()
+    ][:8]
+    packet = (
+        router_state.get("announcement_packet")
+        if isinstance(router_state.get("announcement_packet"), dict)
+        else {}
+    )
+    raw_action = str(action.get("action") or "").strip()
+    raw_current_path = str(comparison.get("current_path") or "").strip()
+    raw_baseline_path = str(comparison.get("baseline_path") or "").strip()
+    raw_impact = str(comparison.get("impact_level") or "").strip()
+    has_direct_announcement_hit = bool(matched_conditions or triggered_watchlist)
+    suppress_stale_market_only_reroute = (
+        not has_direct_announcement_hit
+        and raw_action in {"full_rerun", "rerun_stage1", "run_delta_only"}
+    )
+    display_current_path = (
+        raw_baseline_path or raw_current_path
+        if suppress_stale_market_only_reroute
+        else raw_current_path
+    )
+    display_action = "watch" if suppress_stale_market_only_reroute else raw_action
+    display_impact = "low" if suppress_stale_market_only_reroute and raw_impact != "critical" else raw_impact
     return {
-        "current_path": str(comparison.get("current_path") or "").strip(),
-        "baseline_path": str(comparison.get("baseline_path") or "").strip(),
-        "path_transition": str(comparison.get("path_transition") or "").strip(),
+        "current_path": display_current_path,
+        "baseline_path": raw_baseline_path,
+        "path_transition": "" if suppress_stale_market_only_reroute else str(comparison.get("path_transition") or "").strip(),
         "path_confidence": comparison.get("path_confidence"),
         "run_validity": str(comparison.get("run_validity") or "").strip(),
-        "impact_level": str(comparison.get("impact_level") or "").strip(),
-        "action": str(action.get("action") or "").strip(),
+        "impact_level": display_impact,
+        "action": display_action,
         "action_confidence": action.get("confidence"),
         "reason": str(action.get("reason") or "").strip(),
         "announcement_title": str(
@@ -2665,6 +2788,16 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         ).strip(),
         "matched_conditions": matched_conditions,
         "triggered_watchlist": triggered_watchlist,
+        "market_context_conditions": market_context_conditions,
+        "affected_domains": (
+            comparison.get("affected_domains")
+            if isinstance(comparison.get("affected_domains"), list)
+            else []
+        ),
+        "thesis_effect": str(comparison.get("thesis_effect") or "").strip(),
+        "run_validity": str(comparison.get("run_validity") or "").strip(),
+        "source_type": str(packet.get("source_type") or "").strip(),
+        "source_url": str(packet.get("source_url") or "").strip(),
         "market_facts_used": (
             comparison.get("market_facts_used")
             if isinstance(comparison.get("market_facts_used"), dict)
@@ -3206,6 +3339,7 @@ async def get_memo_file(memo_name: str):
 @app.post("/api/analysis-jobs", status_code=202)
 async def create_analysis_job(
     request: Request,
+    job_type: Optional[str] = Form(None),
     query: Optional[str] = Form(None),
     ticker: Optional[str] = Form(None),
     company_name: Optional[str] = Form(None),
@@ -3220,6 +3354,7 @@ async def create_analysis_job(
     reuse_recent_bundle: Optional[str] = Form(None),
     reuse_supplementary_from_job_id: Optional[str] = Form(None),
     supplementary_mode: Optional[str] = Form(None),
+    portfolio_positioning_mode: Optional[str] = Form(None),
     supplementary_file: UploadFile = File(None),
 ):
     """
@@ -3230,6 +3365,7 @@ async def create_analysis_job(
     content_type = str(request.headers.get("content-type") or "").lower()
     if "multipart/form-data" in content_type:
         job_request = CreateAnalysisJobRequest(
+            job_type=job_type,
             query=query,
             ticker=ticker,
             company_name=company_name,
@@ -3244,6 +3380,7 @@ async def create_analysis_job(
             reuse_recent_bundle=_coerce_form_bool(reuse_recent_bundle, default=False),
             reuse_supplementary_from_job_id=str(reuse_supplementary_from_job_id or "").strip() or None,
             supplementary_mode=_validate_supplementary_mode(supplementary_mode),
+            portfolio_positioning_mode=_validate_portfolio_positioning_mode(portfolio_positioning_mode),
         )
     else:
         try:
@@ -3253,7 +3390,17 @@ async def create_analysis_job(
         job_request = CreateAnalysisJobRequest(**(body or {}))
         supplementary_file = None
 
-    if not str(job_request.query or "").strip() and not str(job_request.ticker or "").strip():
+    job_kind = _validate_job_type(job_request.job_type)
+    if job_kind == "portfolio_positioning":
+        if not isinstance(job_request.portfolio_context, dict) or not job_request.portfolio_context:
+            raise HTTPException(
+                status_code=400,
+                detail="Portfolio positioning requires portfolio_context",
+            )
+        job_request.portfolio_positioning_mode = _validate_portfolio_positioning_mode(
+            job_request.portfolio_positioning_mode
+        )
+    elif not str(job_request.query or "").strip() and not str(job_request.ticker or "").strip():
         raise HTTPException(
             status_code=400,
             detail="Provide at least one of: query, ticker",
@@ -3263,12 +3410,12 @@ async def create_analysis_job(
     loader = get_template_loader()
     requested_exchange = str(job_request.exchange or "").strip()
     requested_ticker = str(job_request.ticker or "").strip().upper()
-    if requested_exchange and not loader.normalize_exchange(requested_exchange):
+    if job_kind != "portfolio_positioning" and requested_exchange and not loader.normalize_exchange(requested_exchange):
         raise HTTPException(
             status_code=400,
             detail=f"Invalid exchange value: {requested_exchange}",
         )
-    if requested_ticker and ":" not in requested_ticker and not requested_exchange:
+    if job_kind != "portfolio_positioning" and requested_ticker and ":" not in requested_ticker and not requested_exchange:
         raise HTTPException(
             status_code=400,
             detail="Ticker must include an exchange prefix (e.g. ASX:BHM) or provide a valid exchange.",
@@ -3279,6 +3426,7 @@ async def create_analysis_job(
     output_path = JOBS_OUTPUTS_DIR / output_name
     job_id = str(uuid.uuid4())
     supplementary_upload_path: Optional[Path] = None
+    portfolio_context_path: Optional[Path] = None
     supplementary_filename = ""
     if supplementary_file is not None:
         supplementary_upload_path, supplementary_filename = await _store_supplementary_upload_for_job(
@@ -3298,10 +3446,19 @@ async def create_analysis_job(
             supplementary_upload_path = matches[0]
             supplementary_filename = supplementary_upload_path.name
 
+    if job_kind == "portfolio_positioning":
+        portfolio_context_path = _store_portfolio_context_for_job(
+            job_request.portfolio_context,
+            job_id=job_id,
+        )
+        if portfolio_context_path is None:
+            raise HTTPException(status_code=400, detail="Failed to persist portfolio_context")
+
     command = _build_analysis_job_command(
         job_request,
         output_path,
         supplementary_context_path=supplementary_upload_path,
+        portfolio_context_path=portfolio_context_path,
     )
     request_payload = (
         job_request.model_dump()
@@ -3342,7 +3499,11 @@ async def create_analysis_job(
             command=command,
             output_path=output_path,
             request_payload=request_payload,
-            cleanup_paths=[supplementary_upload_path] if supplementary_upload_path else [],
+            cleanup_paths=[
+                path
+                for path in [supplementary_upload_path, portfolio_context_path]
+                if path is not None
+            ],
         )
     )
     return _public_job_view(job_record)

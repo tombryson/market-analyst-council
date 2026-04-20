@@ -1,0 +1,668 @@
+# Gold Miner
+
+- Template ID: `gold_miner`
+- Category: `resources`
+- Default exchange context: `ASX`
+- Placeholder: `[company_name]`
+
+## Full Deep Research Prompt
+
+```md
+Financial analysis framing:
+- Template: gold_miner
+- Company name: [company_name].
+- Company type: gold_miner.
+- Exchange: ASX.
+- Gather evidence needed for scoring and investment judgment, not generic summaries.
+- Prioritize recent primary documents with quantitative data.
+- Run a dedicated management/governance evidence lane: board and executive bios, prior operating track record, insider ownership/alignment, leadership changes, and governance red flags.
+
+- Run a dedicated sector-macro lane (gold): capture 2-4 recent sources on gold market drivers (real yields, USD trend, central-bank demand, geopolitical risk) and tie each macro point to scenario assumptions.
+Exchange assumptions:
+Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
+
+Template rubric:
+Can you run an investment analysis on [company_name] following this rubric exactly? Do not deviate unless data is unavailable; if data is missing, state assumptions explicitly and continue. Adjust for Polymetallic Resource Equivalents where relevant.
+
+Include:
+* 12-month and 24-month price targets with bull/base/bear scenarios.
+* Quality and Value scores out of 100 using the formulas and scoring tables below.
+* Current development stage and timeline to key milestones (specific date or quarter).
+* Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+* Investment recommendation (BUY/HOLD/SELL) + conviction (HIGH/MEDIUM/LOW) + one-paragraph justification.
+* Key risks and key opportunities.
+
+Data sourcing rules:
+* Source market data from asx.com.au and/or marketindex.com.au.
+* Source project data from ASX announcements, quarterly/annual reports, investor presentations, and technical studies (PFS/FS/DFS).
+* For every key numeric input used in NPV, Quality, or Value scoring, provide:
+  1) value used
+  2) source URL + document date
+  3) ESTIMATE tag with one-line justification if inferred.
+* Use current AUD spot gold and current AUD/USD conversion rate (or project-local FX where applicable); state source and timestamp.
+
+Polymetallic adjustment rule:
+* If multiple payable metals exist, compute AuEq before NPV:
+  AuEq oz = Au oz + (metal oz * metal spot price / gold spot price * recovery adjustment factor).
+* Apply AuEq consistently in NPV and EV/oz. State net AISC effect from by-product credits.
+
+Document review (complete before valuation):
+For each major document (investor presentation, quarterly, DFS/PFS/FS update), provide:
+* Document title/date/announcement reference.
+* 4-6 extracted key points.
+* Relevance to valuation inputs (what changed and why it matters).
+* Implications for investment outlook (positives and negatives).
+* Market pricing assessment: one separate paragraph on whether market pricing appears to reflect the document's information.
+
+Step 1: Project-Level NPV Calculation
+For each major project (up to 3):
+* Populate inputs: Resource Tonnes, Grade, Recovery, Mine Life, Annual Production, AISC, Initial Capex, Sustaining Capex, Discount Rate (5%), Gold Price (spot and study case), Royalty, Tax, Working Capital (5%), Ramp-up (Year 1 = 50% unless stated), Ownership (%).
+* If missing:
+  - Recovery: 85-90% underground hard rock; 80-85% heap leach.
+  - AISC: 2,000-2,800 AUD/oz (West Africa open pit) or 1,500-2,200 AUD/oz (Australian underground), unless better regional evidence.
+  - Initial capex: 2,500-4,000 AUD per annual oz (open pit) or 4,000-7,000 AUD per annual oz (underground), unless better regional evidence.
+  - Sustaining capex: 5-10% of initial capex annually.
+* Existing infrastructure adjustment (mandatory for brownfield assets):
+  - If usable plant, mill, processing infrastructure, roads, grid connection, camp, decline, tailings, rail, port, or other major site infrastructure already exists, state whether Initial Capex already reflects that advantage.
+  - If not fully reflected in the sourced study/base case, estimate the avoided replacement capex separately, explain the basis, and show the brownfield capex advantage explicitly instead of relying only on generic capex intensity assumptions.
+* Show formulas explicitly:
+  - Recovered Ounces (Moz) = Resource Tonnes * 1,000,000 * Grade / 31.1034768 * Recovery / 1,000,000
+  - Effective Annual Production (koz) = Recovered Moz * 1000 / Mine Life
+  - Revenue = Production * Gold Price / 1000
+  - Royalties = Royalty Rate * Revenue
+  - AISC Costs = AISC * Production / 1000
+  - Pre-tax CF = (Revenue - Royalties - AISC Costs - Sustaining Capex)
+  - Depreciation = Initial Capex / Mine Life
+  - Taxable Profit = Pre-tax CF - Depreciation
+  - Tax = max(Tax Rate * Taxable Profit, 0)
+  - After-tax CF = Pre-tax CF - Tax
+  - Initial WC outflow = 5% * full-year Revenue (recovered in final year)
+* Full DCF timeline:
+  - Year 0: -Capex - Working Capital
+  - Year 1: ramp-adjusted after-tax CF
+  - Years 2..MineLife-1: full after-tax CF
+  - Final year: full after-tax CF + WC recovery
+* Output for both gold price cases:
+  - Post-tax NPV (100%) at study/reference gold price
+  - Post-tax NPV (100%) at spot/current gold price
+  - Attributable NPV (ownership-adjusted)
+  - Probability-weighted NPV: compute ratio R = spot_gold / study_gold, then:
+      R < 0.95 (spot below study): weight_spot=0.40, weight_study=0.60
+      R 0.95–1.10 (spot within 10% of study): weight_spot=0.50, weight_study=0.50
+      R 1.10–1.25 (spot materially above study): weight_spot=0.65, weight_study=0.35
+      R > 1.25 (spot significantly above study): weight_spot=0.75, weight_study=0.25
+    State R, the selected weights, and the resulting blended NPV explicitly.
+  - Risked NPV = Final Multiplier (from two-step method above) × probability-weighted NPV
+  - Equity Value/Share = (Risked NPV + Surplus Cash) / shares_basic
+      Surplus Cash = Total Committed Liquidity − Remaining Phase-1 Capex Requirement − drawn debt
+      Total Committed Liquidity = cash on hand + committed undrawn facilities (include only if drawdown conditions are likely to be met)
+      Remaining Phase-1 Capex = total approved capex not yet spent
+      Note: capex is already embedded as a Year 0 negative cash flow inside the NPV. Do NOT subtract remaining capex again from the NAV — use Surplus Cash to avoid double-counting.
+      Subtract only obligations that are not already reflected in project cash flow or capex assumptions. Do not deduct the same funding burden twice across NPV, capex, debt, and Surplus Cash calculations.
+  - Share count: use shares_basic (shares outstanding) for Market Cap and EV. For per-share value, use treasury-method diluted shares: shares_basic + in-the-money options − (aggregate exercise proceeds / current price). Do NOT use fully diluted shares including deep out-of-the-money instruments unless all are in-the-money. State the dilution source and quantity.
+  - If funding gap is material, show post-dilution Equity Value/Share using one base financing bridge plus a brief 3-row financing sensitivity (conservative/base/constructive)
+  - Discount/premium to current share price
+
+Stage multiplier (two-step method):
+
+Step A — Development Base (technical de-risking):
+* Scoping no MRE: 0.10 | Scoping has MRE: 0.15 | PFS: 0.25 | DFS complete: 0.42
+* FEED underway: 0.47 | FEED complete: 0.54 | FID declared / construction commencing: 0.62
+* Construction >50%: 0.72 | First gold / commissioning: 0.82 | Ramp-up: 0.91 | Peak production: 1.00
+Evidence threshold: use the highest stage supported by presently achieved evidence, not management target state. Planned or guided milestones may inform 12m/24m target multipliers, but not the current multiplier. Cap at 0.82 for all pre-production stages regardless of funding.
+
+Step B — Funding Adjustment (apply as a multiplier to Step A result):
+* No funding, gap >50% of Phase-1 capex: × 0.70
+* Partial funding, gap 15–50% of capex: × 0.85
+* Mostly funded, gap <15% of capex or clear near-term path: × 0.95
+* Fully funded (committed debt + equity, no material gap, drawdown conditions likely met): × 1.05
+* Fully funded with working capital buffer ≥20% above peak capex: × 1.10
+Final Multiplier = Development_Base × Funding_Adjustment. State both components explicitly.
+
+Portfolio summary:
+* Show project-level and total risked NPV.
+* Show Risked NPV / Market Cap at study-price case, spot-price case, and probability-weighted case.
+* For projects not yet at DFS stage, do not include in the primary NPV. Instead value them separately using an in-situ resource method:
+    Risked Project Value = Resource oz (M+I) × Unit Value × Ownership% × Risk_Factor
+    Unit Value by resource stage (AUD/oz; scale proportionally for non-AUD jurisdictions):
+      Exploration target, no code-compliant resource: $5–15/oz
+      Inferred code-compliant resource only: $15–35/oz
+      Indicated code-compliant resource: $30–60/oz
+      M+I resource, pre-PFS: $40–80/oz
+      M+I resource, PFS underway or complete: $60–120/oz
+    Risk_Factor by jurisdiction tier: Tier-1 = 0.90–1.00 | Tier-2 = 0.70–0.85 | Tier-3 = 0.50–0.70
+    Adjust unit value upward (up to 25%) for: recent high-grade drilling results, strong resource growth trajectory, or proximity to existing processing infrastructure.
+    State assumed unit value, risk factor, and rationale. Sum all sub-project risked values and add to total portfolio equity value.
+* Clearly separate: (a) DFS-stage NPV projects, (b) in-situ valued projects, (c) any projects with no resource (option value only with $0 ascribed).
+* If a non-DFS asset is valued separately using the in-situ method, do not give it full credit again through ad hoc EV/oz denominator expansion.
+
+Step 2: Quality Score (0-100)
+Formula:
+= (0.20 * Jurisdiction) + (0.10 * Infrastructure) + (0.20 * Management) + (0.10 * Development Stage) + (0.30 * Funding) + (0.10 * ESG)
+
+* When scoring Infrastructure and Funding, explicitly credit usable existing plant/site infrastructure only where it is relevant to the current development plan and demonstrably reduces capex and/or development timing.
+Score each factor with raw score, weight, weighted contribution, and evidence using these anchors:
+* Jurisdiction (20%):
+  - Tier 1 = 100 | Tier 2 = 90 | Tier 3 = 80 | Tier 4 = 60
+  - Sub-adjustments: +/-5 for power instability, mandatory equity obligations, or documented government endorsement.
+* Infrastructure (10%):
+  - Excellent = 100 | Good = 80 | Moderate = 60 | Poor = 40
+  - Brownfield sites or owned processing infrastructure should receive explicit credit here only if the infrastructure is usable, relevant to the current plan, and materially lowers capex and/or timeline.
+* Management (20%): average of three sub-factors:
+  - Track record: proven multi-project success 100 | experienced 85 | mixed 75 | unproven 60
+  - Insider ownership: >10% = 100 | 5-10% = 80 | 2-5% = 65 | <2% = 50
+  - Capital discipline: on-budget/limited dilution 100 | minor overruns/modest dilution 80 | material overruns/repeated heavy dilution 60 | no track record 70
+* Development Stage (10%): score mirrors the Development Base from Step A of the stage multiplier × 100. Scoping no MRE 10 | Scoping has MRE 15 | PFS 25 | DFS 42 | FEED underway 47 | FEED complete 54 | FID declared / construction commencing 62 | Construction >50% 72 | First gold 82 | Ramp-up 91 | Peak 100. The Funding factor is captured separately in the Funding sub-score — do not conflate.
+* Funding (30%): Funding Gap = (Phase-1 capex - cash - expected 24m FCF) / capex
+  - If existing infrastructure lowers Phase-1 capex, reflect that lower capex in the funding-gap calculation and state the adjustment clearly.
+  - <10M AUD or fully funded = 100
+  - 10-25M AUD with clear path = 80
+  - 25-50M AUD = 60
+  - >50M AUD or unclear path = 40
+  - If debt is binding but drawdown conditions remain, cap practical score at 85-90 (not 100).
+* ESG (10%): average of permitting, social license, and safety anchors:
+  - Permitting: fully approved 100 | key permits received 80 | applications submitted 60 | limited progress 40
+  - Social license: formal agreements/no disputes 90-100 | engagement/no disputes 70-80 | active disputes 40-60
+  - Safety: LTIFR disclosed and below peers 90-100 | limited disclosure but no known incidents 70-80 | incidents/legacy issues 40-60
+
+Step 3: Value Score (0-100)
+Formula:
+= (0.30 * NPV Ratio Score) + (0.20 * EV/Resource Score) + (0.20 * Exploration Upside Score) + (0.15 * Cost Competitiveness Score) + (0.15 * M&A/Strategic Score)
+
+* NPV/Market Cap (30%): use (Risked NPV + Surplus Cash) / Market Cap as primary; show study and spot cases separately as context. Do not include non-DFS optionality in this ratio.
+  - >3x = 100 | 2-3x = 80 | 1-2x = 60 | <1x = 40
+* EV/Resource oz (20%): EV = Market Cap + Debt - Cash; use the currently disclosed attributable code-compliant AuEq inventory only where applicable. Do not substitute mine-plan output, recovered ounces, exploration targets, or non-code-compliant conceptual inventory for the disclosed inventory base.
+  - <50 AUD/oz = 100 | 50-100 AUD/oz = 70 | 100-150 AUD/oz = 50 | >150 AUD/oz = 40
+* Exploration Upside (20%): score growth beyond the current code-compliant resource base, not ounces already captured in the EV/Resource denominator.
+  - >50% potential = 100 | 25-50% = 80 | 10-25% = 60 | <10% = 40
+* Cost Competitiveness (15%): use disclosed or defensible net AISC; do not infer low-cost status from strong project FCF alone.
+  - <1,500 AUD/oz = 100 | 1,500-2,000 AUD/oz = 80 | 2,000-2,500 AUD/oz = 60 | >2,500 AUD/oz = 40
+* M&A/Strategic (15%) by sub-factors:
+  - Proximity to majors, formal agreements, and acquirability.
+  - High = 100 | Moderate = 80 | Low = 60 | None = 40
+
+Step 4: Required Outputs
+* Price targets:
+  - 12m and 24m bull/base/bear targets
+  - scenario probabilities (each horizon sums to 100%)
+  - probability-weighted target for 12m and 24m
+  - explicit scenario drivers (gold price, case weighting, costs, capex, timing, funding, dilution)
+  - financing bridge for material funding gaps:
+    one base financing bridge plus a brief 3-row financing sensitivity (conservative/base/constructive) with debt tranche, equity tranche + raise price/discount, new shares issued, and post-dilution risked NAV/share
+  - target reconciliation:
+    each base target should reconcile explicitly to a post-dilution NAV/share anchor or one financing-sensitivity row; keep this compact rather than building a full separate financing model for every scenario unless evidence strongly supports it
+  - re-rating anchor logic:
+    Use two-step multiplier values as re-rating anchors.
+    State the current Final Multiplier and the base-case 12m and 24m Final Multipliers separately.
+    FEED completion: Development Base moves to 0.54x; fully funded company reaches ~0.57x Final.
+    FID declared with committed full funding: Development Base 0.62x × 1.05+ Funding = ~0.65–0.68x Final.
+    Construction >50% with full funding: ~0.72–0.79x Final.
+    First gold: ~0.82–0.91x Final depending on ramp-up trajectory.
+* Development timeline:
+  - current stage
+  - key milestones to 24m with status (on-track/at-risk/speculative)
+  - milestone impact on 24m probability-weighted target
+  - goal
+  - primary risk
+* Headwinds/tailwinds:
+  - include threshold-driven quantitative factors with directional NPV/cashflow impact
+  - include material qualitative factors with evidence and expected duration
+* Investment recommendation paragraph:
+  - core thesis reason
+  - key 12m catalyst
+  - key invalidation risk
+  - sizing context (speculative/core/avoid)
+* Key risks: ranked list with probability and impact.
+* Key opportunities: ranked list with trigger and potential value impact.
+
+Step 5: Additional Metrics
+* Resource conversion rate (M+I / total)
+* Corporate cash runway (months)
+* Debt/financing mix and implied repayment profile
+* ESG composite with subfactor comments
+* Peer EV/oz vs relevant regional/stage cohort
+* Drill success rate (or explicit data gap)
+* Offtake/M&A potential
+* Hedge/derivatives disclosures (if any)
+* Polymetallic credit contribution (if any)
+
+Cross-check requirements before final output:
+* Recovered ounces should broadly align with study production profile; explain material differences.
+* NPV comparison vs company-stated study NPV: explain major variance drivers.
+* EV arithmetic must be consistent across sections.
+* Quality and Value weighted totals must equal stated final scores.
+* Stage multiplier: confirm Development Base matches actual technical stage and Funding Adjustment matches documented funding status. State both components and the Final Multiplier.
+* Price targets must be mathematically anchored to valuation/scenario assumptions (not arbitrary).
+```
+
+## Core Rubric
+
+```md
+Can you run an investment analysis on [company_name] following this rubric exactly? Do not deviate unless data is unavailable; if data is missing, state assumptions explicitly and continue. Adjust for Polymetallic Resource Equivalents where relevant.
+
+Include:
+* 12-month and 24-month price targets with bull/base/bear scenarios.
+* Quality and Value scores out of 100 using the formulas and scoring tables below.
+* Current development stage and timeline to key milestones (specific date or quarter).
+* Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+* Investment recommendation (BUY/HOLD/SELL) + conviction (HIGH/MEDIUM/LOW) + one-paragraph justification.
+* Key risks and key opportunities.
+
+Data sourcing rules:
+* Source market data from asx.com.au and/or marketindex.com.au.
+* Source project data from ASX announcements, quarterly/annual reports, investor presentations, and technical studies (PFS/FS/DFS).
+* For every key numeric input used in NPV, Quality, or Value scoring, provide:
+  1) value used
+  2) source URL + document date
+  3) ESTIMATE tag with one-line justification if inferred.
+* Use current AUD spot gold and current AUD/USD conversion rate (or project-local FX where applicable); state source and timestamp.
+
+Polymetallic adjustment rule:
+* If multiple payable metals exist, compute AuEq before NPV:
+  AuEq oz = Au oz + (metal oz * metal spot price / gold spot price * recovery adjustment factor).
+* Apply AuEq consistently in NPV and EV/oz. State net AISC effect from by-product credits.
+
+Document review (complete before valuation):
+For each major document (investor presentation, quarterly, DFS/PFS/FS update), provide:
+* Document title/date/announcement reference.
+* 4-6 extracted key points.
+* Relevance to valuation inputs (what changed and why it matters).
+* Implications for investment outlook (positives and negatives).
+* Market pricing assessment: one separate paragraph on whether market pricing appears to reflect the document's information.
+
+Step 1: Project-Level NPV Calculation
+For each major project (up to 3):
+* Populate inputs: Resource Tonnes, Grade, Recovery, Mine Life, Annual Production, AISC, Initial Capex, Sustaining Capex, Discount Rate (5%), Gold Price (spot and study case), Royalty, Tax, Working Capital (5%), Ramp-up (Year 1 = 50% unless stated), Ownership (%).
+* If missing:
+  - Recovery: 85-90% underground hard rock; 80-85% heap leach.
+  - AISC: 2,000-2,800 AUD/oz (West Africa open pit) or 1,500-2,200 AUD/oz (Australian underground), unless better regional evidence.
+  - Initial capex: 2,500-4,000 AUD per annual oz (open pit) or 4,000-7,000 AUD per annual oz (underground), unless better regional evidence.
+  - Sustaining capex: 5-10% of initial capex annually.
+* Existing infrastructure adjustment (mandatory for brownfield assets):
+  - If usable plant, mill, processing infrastructure, roads, grid connection, camp, decline, tailings, rail, port, or other major site infrastructure already exists, state whether Initial Capex already reflects that advantage.
+  - If not fully reflected in the sourced study/base case, estimate the avoided replacement capex separately, explain the basis, and show the brownfield capex advantage explicitly instead of relying only on generic capex intensity assumptions.
+* Show formulas explicitly:
+  - Recovered Ounces (Moz) = Resource Tonnes * 1,000,000 * Grade / 31.1034768 * Recovery / 1,000,000
+  - Effective Annual Production (koz) = Recovered Moz * 1000 / Mine Life
+  - Revenue = Production * Gold Price / 1000
+  - Royalties = Royalty Rate * Revenue
+  - AISC Costs = AISC * Production / 1000
+  - Pre-tax CF = (Revenue - Royalties - AISC Costs - Sustaining Capex)
+  - Depreciation = Initial Capex / Mine Life
+  - Taxable Profit = Pre-tax CF - Depreciation
+  - Tax = max(Tax Rate * Taxable Profit, 0)
+  - After-tax CF = Pre-tax CF - Tax
+  - Initial WC outflow = 5% * full-year Revenue (recovered in final year)
+* Full DCF timeline:
+  - Year 0: -Capex - Working Capital
+  - Year 1: ramp-adjusted after-tax CF
+  - Years 2..MineLife-1: full after-tax CF
+  - Final year: full after-tax CF + WC recovery
+* Output for both gold price cases:
+  - Post-tax NPV (100%) at study/reference gold price
+  - Post-tax NPV (100%) at spot/current gold price
+  - Attributable NPV (ownership-adjusted)
+  - Probability-weighted NPV: compute ratio R = spot_gold / study_gold, then:
+      R < 0.95 (spot below study): weight_spot=0.40, weight_study=0.60
+      R 0.95–1.10 (spot within 10% of study): weight_spot=0.50, weight_study=0.50
+      R 1.10–1.25 (spot materially above study): weight_spot=0.65, weight_study=0.35
+      R > 1.25 (spot significantly above study): weight_spot=0.75, weight_study=0.25
+    State R, the selected weights, and the resulting blended NPV explicitly.
+  - Risked NPV = Final Multiplier (from two-step method above) × probability-weighted NPV
+  - Equity Value/Share = (Risked NPV + Surplus Cash) / shares_basic
+      Surplus Cash = Total Committed Liquidity − Remaining Phase-1 Capex Requirement − drawn debt
+      Total Committed Liquidity = cash on hand + committed undrawn facilities (include only if drawdown conditions are likely to be met)
+      Remaining Phase-1 Capex = total approved capex not yet spent
+      Note: capex is already embedded as a Year 0 negative cash flow inside the NPV. Do NOT subtract remaining capex again from the NAV — use Surplus Cash to avoid double-counting.
+      Subtract only obligations that are not already reflected in project cash flow or capex assumptions. Do not deduct the same funding burden twice across NPV, capex, debt, and Surplus Cash calculations.
+  - Share count: use shares_basic (shares outstanding) for Market Cap and EV. For per-share value, use treasury-method diluted shares: shares_basic + in-the-money options − (aggregate exercise proceeds / current price). Do NOT use fully diluted shares including deep out-of-the-money instruments unless all are in-the-money. State the dilution source and quantity.
+  - If funding gap is material, show post-dilution Equity Value/Share using one base financing bridge plus a brief 3-row financing sensitivity (conservative/base/constructive)
+  - Discount/premium to current share price
+
+Stage multiplier (two-step method):
+
+Step A — Development Base (technical de-risking):
+* Scoping no MRE: 0.10 | Scoping has MRE: 0.15 | PFS: 0.25 | DFS complete: 0.42
+* FEED underway: 0.47 | FEED complete: 0.54 | FID declared / construction commencing: 0.62
+* Construction >50%: 0.72 | First gold / commissioning: 0.82 | Ramp-up: 0.91 | Peak production: 1.00
+Evidence threshold: use the highest stage supported by presently achieved evidence, not management target state. Planned or guided milestones may inform 12m/24m target multipliers, but not the current multiplier. Cap at 0.82 for all pre-production stages regardless of funding.
+
+Step B — Funding Adjustment (apply as a multiplier to Step A result):
+* No funding, gap >50% of Phase-1 capex: × 0.70
+* Partial funding, gap 15–50% of capex: × 0.85
+* Mostly funded, gap <15% of capex or clear near-term path: × 0.95
+* Fully funded (committed debt + equity, no material gap, drawdown conditions likely met): × 1.05
+* Fully funded with working capital buffer ≥20% above peak capex: × 1.10
+Final Multiplier = Development_Base × Funding_Adjustment. State both components explicitly.
+
+Portfolio summary:
+* Show project-level and total risked NPV.
+* Show Risked NPV / Market Cap at study-price case, spot-price case, and probability-weighted case.
+* For projects not yet at DFS stage, do not include in the primary NPV. Instead value them separately using an in-situ resource method:
+    Risked Project Value = Resource oz (M+I) × Unit Value × Ownership% × Risk_Factor
+    Unit Value by resource stage (AUD/oz; scale proportionally for non-AUD jurisdictions):
+      Exploration target, no code-compliant resource: $5–15/oz
+      Inferred code-compliant resource only: $15–35/oz
+      Indicated code-compliant resource: $30–60/oz
+      M+I resource, pre-PFS: $40–80/oz
+      M+I resource, PFS underway or complete: $60–120/oz
+    Risk_Factor by jurisdiction tier: Tier-1 = 0.90–1.00 | Tier-2 = 0.70–0.85 | Tier-3 = 0.50–0.70
+    Adjust unit value upward (up to 25%) for: recent high-grade drilling results, strong resource growth trajectory, or proximity to existing processing infrastructure.
+    State assumed unit value, risk factor, and rationale. Sum all sub-project risked values and add to total portfolio equity value.
+* Clearly separate: (a) DFS-stage NPV projects, (b) in-situ valued projects, (c) any projects with no resource (option value only with $0 ascribed).
+* If a non-DFS asset is valued separately using the in-situ method, do not give it full credit again through ad hoc EV/oz denominator expansion.
+
+Step 2: Quality Score (0-100)
+Formula:
+= (0.20 * Jurisdiction) + (0.10 * Infrastructure) + (0.20 * Management) + (0.10 * Development Stage) + (0.30 * Funding) + (0.10 * ESG)
+
+* When scoring Infrastructure and Funding, explicitly credit usable existing plant/site infrastructure only where it is relevant to the current development plan and demonstrably reduces capex and/or development timing.
+Score each factor with raw score, weight, weighted contribution, and evidence using these anchors:
+* Jurisdiction (20%):
+  - Tier 1 = 100 | Tier 2 = 90 | Tier 3 = 80 | Tier 4 = 60
+  - Sub-adjustments: +/-5 for power instability, mandatory equity obligations, or documented government endorsement.
+* Infrastructure (10%):
+  - Excellent = 100 | Good = 80 | Moderate = 60 | Poor = 40
+  - Brownfield sites or owned processing infrastructure should receive explicit credit here only if the infrastructure is usable, relevant to the current plan, and materially lowers capex and/or timeline.
+* Management (20%): average of three sub-factors:
+  - Track record: proven multi-project success 100 | experienced 85 | mixed 75 | unproven 60
+  - Insider ownership: >10% = 100 | 5-10% = 80 | 2-5% = 65 | <2% = 50
+  - Capital discipline: on-budget/limited dilution 100 | minor overruns/modest dilution 80 | material overruns/repeated heavy dilution 60 | no track record 70
+* Development Stage (10%): score mirrors the Development Base from Step A of the stage multiplier × 100. Scoping no MRE 10 | Scoping has MRE 15 | PFS 25 | DFS 42 | FEED underway 47 | FEED complete 54 | FID declared / construction commencing 62 | Construction >50% 72 | First gold 82 | Ramp-up 91 | Peak 100. The Funding factor is captured separately in the Funding sub-score — do not conflate.
+* Funding (30%): Funding Gap = (Phase-1 capex - cash - expected 24m FCF) / capex
+  - If existing infrastructure lowers Phase-1 capex, reflect that lower capex in the funding-gap calculation and state the adjustment clearly.
+  - <10M AUD or fully funded = 100
+  - 10-25M AUD with clear path = 80
+  - 25-50M AUD = 60
+  - >50M AUD or unclear path = 40
+  - If debt is binding but drawdown conditions remain, cap practical score at 85-90 (not 100).
+* ESG (10%): average of permitting, social license, and safety anchors:
+  - Permitting: fully approved 100 | key permits received 80 | applications submitted 60 | limited progress 40
+  - Social license: formal agreements/no disputes 90-100 | engagement/no disputes 70-80 | active disputes 40-60
+  - Safety: LTIFR disclosed and below peers 90-100 | limited disclosure but no known incidents 70-80 | incidents/legacy issues 40-60
+
+Step 3: Value Score (0-100)
+Formula:
+= (0.30 * NPV Ratio Score) + (0.20 * EV/Resource Score) + (0.20 * Exploration Upside Score) + (0.15 * Cost Competitiveness Score) + (0.15 * M&A/Strategic Score)
+
+* NPV/Market Cap (30%): use (Risked NPV + Surplus Cash) / Market Cap as primary; show study and spot cases separately as context. Do not include non-DFS optionality in this ratio.
+  - >3x = 100 | 2-3x = 80 | 1-2x = 60 | <1x = 40
+* EV/Resource oz (20%): EV = Market Cap + Debt - Cash; use the currently disclosed attributable code-compliant AuEq inventory only where applicable. Do not substitute mine-plan output, recovered ounces, exploration targets, or non-code-compliant conceptual inventory for the disclosed inventory base.
+  - <50 AUD/oz = 100 | 50-100 AUD/oz = 70 | 100-150 AUD/oz = 50 | >150 AUD/oz = 40
+* Exploration Upside (20%): score growth beyond the current code-compliant resource base, not ounces already captured in the EV/Resource denominator.
+  - >50% potential = 100 | 25-50% = 80 | 10-25% = 60 | <10% = 40
+* Cost Competitiveness (15%): use disclosed or defensible net AISC; do not infer low-cost status from strong project FCF alone.
+  - <1,500 AUD/oz = 100 | 1,500-2,000 AUD/oz = 80 | 2,000-2,500 AUD/oz = 60 | >2,500 AUD/oz = 40
+* M&A/Strategic (15%) by sub-factors:
+  - Proximity to majors, formal agreements, and acquirability.
+  - High = 100 | Moderate = 80 | Low = 60 | None = 40
+
+Step 4: Required Outputs
+* Price targets:
+  - 12m and 24m bull/base/bear targets
+  - scenario probabilities (each horizon sums to 100%)
+  - probability-weighted target for 12m and 24m
+  - explicit scenario drivers (gold price, case weighting, costs, capex, timing, funding, dilution)
+  - financing bridge for material funding gaps:
+    one base financing bridge plus a brief 3-row financing sensitivity (conservative/base/constructive) with debt tranche, equity tranche + raise price/discount, new shares issued, and post-dilution risked NAV/share
+  - target reconciliation:
+    each base target should reconcile explicitly to a post-dilution NAV/share anchor or one financing-sensitivity row; keep this compact rather than building a full separate financing model for every scenario unless evidence strongly supports it
+  - re-rating anchor logic:
+    Use two-step multiplier values as re-rating anchors.
+    State the current Final Multiplier and the base-case 12m and 24m Final Multipliers separately.
+    FEED completion: Development Base moves to 0.54x; fully funded company reaches ~0.57x Final.
+    FID declared with committed full funding: Development Base 0.62x × 1.05+ Funding = ~0.65–0.68x Final.
+    Construction >50% with full funding: ~0.72–0.79x Final.
+    First gold: ~0.82–0.91x Final depending on ramp-up trajectory.
+* Development timeline:
+  - current stage
+  - key milestones to 24m with status (on-track/at-risk/speculative)
+  - milestone impact on 24m probability-weighted target
+  - goal
+  - primary risk
+* Headwinds/tailwinds:
+  - include threshold-driven quantitative factors with directional NPV/cashflow impact
+  - include material qualitative factors with evidence and expected duration
+* Investment recommendation paragraph:
+  - core thesis reason
+  - key 12m catalyst
+  - key invalidation risk
+  - sizing context (speculative/core/avoid)
+* Key risks: ranked list with probability and impact.
+* Key opportunities: ranked list with trigger and potential value impact.
+
+Step 5: Additional Metrics
+* Resource conversion rate (M+I / total)
+* Corporate cash runway (months)
+* Debt/financing mix and implied repayment profile
+* ESG composite with subfactor comments
+* Peer EV/oz vs relevant regional/stage cohort
+* Drill success rate (or explicit data gap)
+* Offtake/M&A potential
+* Hedge/derivatives disclosures (if any)
+* Polymetallic credit contribution (if any)
+
+Cross-check requirements before final output:
+* Recovered ounces should broadly align with study production profile; explain material differences.
+* NPV comparison vs company-stated study NPV: explain major variance drivers.
+* EV arithmetic must be consistent across sections.
+* Quality and Value weighted totals must equal stated final scores.
+* Stage multiplier: confirm Development Base matches actual technical stage and Funding Adjustment matches documented funding status. State both components and the Final Multiplier.
+* Price targets must be mathematically anchored to valuation/scenario assumptions (not arbitrary).
+```
+
+## Stage 1 Query Prompt
+
+```md
+Can you run an investment analysis on [company_name] following this rubric exactly? Do not deviate unless data is unavailable; if data is missing, state assumptions explicitly and continue. Adjust for Polymetallic Resource Equivalents where relevant.
+
+Include:
+* 12-month and 24-month price targets with bull/base/bear scenarios.
+* Quality and Value scores out of 100 using the formulas and scoring tables below.
+* Current development stage and timeline to key milestones (specific date or quarter).
+* Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+* Investment recommendation (BUY/HOLD/SELL) + conviction (HIGH/MEDIUM/LOW) + one-paragraph justification.
+* Key risks and key opportunities.
+
+Data sourcing rules:
+* Source market data from asx.com.au and/or marketindex.com.au.
+* Source project data from ASX announcements, quarterly/annual reports, investor presentations, and technical studies (PFS/FS/DFS).
+* For every key numeric input used in NPV, Quality, or Value scoring, provide:
+  1) value used
+  2) source URL + document date
+  3) ESTIMATE tag with one-line justification if inferred.
+* Use current AUD spot gold and current AUD/USD conversion rate (or project-local FX where applicable); state source and timestamp.
+
+Polymetallic adjustment rule:
+* If multiple payable metals exist, compute AuEq before NPV:
+  AuEq oz = Au oz + (metal oz * metal spot price / gold spot price * recovery adjustment factor).
+* Apply AuEq consistently in NPV and EV/oz. State net AISC effect from by-product credits.
+
+Document review (complete before valuation):
+For each major document (investor presentation, quarterly, DFS/PFS/FS update), provide:
+* Document title/date/announcement reference.
+* 4-6 extracted key points.
+* Relevance to valuation inputs (what changed and why it matters).
+* Implications for investment outlook (positives and negatives).
+* Market pricing assessment: one separate paragraph on whether market pricing appears to reflect the document's information.
+
+Step 1: Project-Level NPV Calculation
+For each major project (up to 3):
+* Populate inputs: Resource Tonnes, Grade, Recovery, Mine Life, Annual Production, AISC, Initial Capex, Sustaining Capex, Discount Rate (5%), Gold Price (spot and study case), Royalty, Tax, Working Capital (5%), Ramp-up (Year 1 = 50% unless stated), Ownership (%).
+* If missing:
+  - Recovery: 85-90% underground hard rock; 80-85% heap leach.
+  - AISC: 2,000-2,800 AUD/oz (West Africa open pit) or 1,500-2,200 AUD/oz (Australian underground), unless better regional evidence.
+  - Initial capex: 2,500-4,000 AUD per annual oz (open pit) or 4,000-7,000 AUD per annual oz (underground), unless better regional evidence.
+  - Sustaining capex: 5-10% of initial capex annually.
+* Existing infrastructure adjustment (mandatory for brownfield assets):
+  - If usable plant, mill, processing infrastructure, roads, grid connection, camp, decline, tailings, rail, port, or other major site infrastructure already exists, state whether Initial Capex already reflects that advantage.
+  - If not fully reflected in the sourced study/base case, estimate the avoided replacement capex separately, explain the basis, and show the brownfield capex advantage explicitly instead of relying only on generic capex intensity assumptions.
+* Show formulas explicitly:
+  - Recovered Ounces (Moz) = Resource Tonnes * 1,000,000 * Grade / 31.1034768 * Recovery / 1,000,000
+  - Effective Annual Production (koz) = Recovered Moz * 1000 / Mine Life
+  - Revenue = Production * Gold Price / 1000
+  - Royalties = Royalty Rate * Revenue
+  - AISC Costs = AISC * Production / 1000
+  - Pre-tax CF = (Revenue - Royalties - AISC Costs - Sustaining Capex)
+  - Depreciation = Initial Capex / Mine Life
+  - Taxable Profit = Pre-tax CF - Depreciation
+  - Tax = max(Tax Rate * Taxable Profit, 0)
+  - After-tax CF = Pre-tax CF - Tax
+  - Initial WC outflow = 5% * full-year Revenue (recovered in final year)
+* Full DCF timeline:
+  - Year 0: -Capex - Working Capital
+  - Year 1: ramp-adjusted after-tax CF
+  - Years 2..MineLife-1: full after-tax CF
+  - Final year: full after-tax CF + WC recovery
+* Output for both gold price cases:
+  - Post-tax NPV (100%) at study/reference gold price
+  - Post-tax NPV (100%) at spot/current gold price
+  - Attributable NPV (ownership-adjusted)
+  - Probability-weighted NPV: compute ratio R = spot_gold / study_gold, then:
+      R < 0.95 (spot below study): weight_spot=0.40, weight_study=0.60
+      R 0.95–1.10 (spot within 10% of study): weight_spot=0.50, weight_study=0.50
+      R 1.10–1.25 (spot materially above study): weight_spot=0.65, weight_study=0.35
+      R > 1.25 (spot significantly above study): weight_spot=0.75, weight_study=0.25
+    State R, the selected weights, and the resulting blended NPV explicitly.
+  - Risked NPV = Final Multiplier (from two-step method above) × probability-weighted NPV
+  - Equity Value/Share = (Risked NPV + Surplus Cash) / shares_basic
+      Surplus Cash = Total Committed Liquidity − Remaining Phase-1 Capex Requirement − drawn debt
+      Total Committed Liquidity = cash on hand + committed undrawn facilities (include only if drawdown conditions are likely to be met)
+      Remaining Phase-1 Capex = total approved capex not yet spent
+      Note: capex is already embedded as a Year 0 negative cash flow inside the NPV. Do NOT subtract remaining capex again from the NAV — use Surplus Cash to avoid double-counting.
+      Subtract only obligations that are not already reflected in project cash flow or capex assumptions. Do not deduct the same funding burden twice across NPV, capex, debt, and Surplus Cash calculations.
+  - Share count: use shares_basic (shares outstanding) for Market Cap and EV. For per-share value, use treasury-method diluted shares: shares_basic + in-the-money options − (aggregate exercise proceeds / current price). Do NOT use fully diluted shares including deep out-of-the-money instruments unless all are in-the-money. State the dilution source and quantity.
+  - If funding gap is material, show post-dilution Equity Value/Share using one base financing bridge plus a brief 3-row financing sensitivity (conservative/base/constructive)
+  - Discount/premium to current share price
+
+Stage multiplier (two-step method):
+
+Step A — Development Base (technical de-risking):
+* Scoping no MRE: 0.10 | Scoping has MRE: 0.15 | PFS: 0.25 | DFS complete: 0.42
+* FEED underway: 0.47 | FEED complete: 0.54 | FID declared / construction commencing: 0.62
+* Construction >50%: 0.72 | First gold / commissioning: 0.82 | Ramp-up: 0.91 | Peak production: 1.00
+Evidence threshold: use the highest stage supported by presently achieved evidence, not management target state. Planned or guided milestones may inform 12m/24m target multipliers, but not the current multiplier. Cap at 0.82 for all pre-production stages regardless of funding.
+
+Step B — Funding Adjustment (apply as a multiplier to Step A result):
+* No funding, gap >50% of Phase-1 capex: × 0.70
+* Partial funding, gap 15–50% of capex: × 0.85
+* Mostly funded, gap <15% of capex or clear near-term path: × 0.95
+* Fully funded (committed debt + equity, no material gap, drawdown conditions likely met): × 1.05
+* Fully funded with working capital buffer ≥20% above peak capex: × 1.10
+Final Multiplier = Development_Base × Funding_Adjustment. State both components explicitly.
+
+Portfolio summary:
+* Show project-level and total risked NPV.
+* Show Risked NPV / Market Cap at study-price case, spot-price case, and probability-weighted case.
+* For projects not yet at DFS stage, do not include in the primary NPV. Instead value them separately using an in-situ resource method:
+    Risked Project Value = Resource oz (M+I) × Unit Value × Ownership% × Risk_Factor
+    Unit Value by resource stage (AUD/oz; scale proportionally for non-AUD jurisdictions):
+      Exploration target, no code-compliant resource: $5–15/oz
+      Inferred code-compliant resource only: $15–35/oz
+      Indicated code-compliant resource: $30–60/oz
+      M+I resource, pre-PFS: $40–80/oz
+      M+I resource, PFS underway or complete: $60–120/oz
+    Risk_Factor by jurisdiction tier: Tier-1 = 0.90–1.00 | Tier-2 = 0.70–0.85 | Tier-3 = 0.50–0.70
+    Adjust unit value upward (up to 25%) for: recent high-grade drilling results, strong resource growth trajectory, or proximity to existing processing infrastructure.
+    State assumed unit value, risk factor, and rationale. Sum all sub-project risked values and add to total portfolio equity value.
+* Clearly separate: (a) DFS-stage NPV projects, (b) in-situ valued projects, (c) any projects with no resource (option value only with $0 ascribed).
+* If a non-DFS asset is valued separately using the in-situ method, do not give it full credit again through ad hoc EV/oz denominator expansion.
+
+Step 2: Quality Score (0-100)
+Formula:
+= (0.20 * Jurisdiction) + (0.10 * Infrastructure) + (0.20 * Management) + (0.10 * Development Stage) + (0.30 * Funding) + (0.10 * ESG)
+
+* When scoring Infrastructure and Funding, explicitly credit usable existing plant/site infrastructure only where it is relevant to the current development plan and demonstrably reduces capex and/or development timing.
+Score each factor with raw score, weight, weighted contribution, and evidence using these anchors:
+* Jurisdiction (20%):
+  - Tier 1 = 100 | Tier 2 = 90 | Tier 3 = 80 | Tier 4 = 60
+  - Sub-adjustments: +/-5 for power instability, mandatory equity obligations, or documented government endorsement.
+* Infrastructure (10%):
+  - Excellent = 100 | Good = 80 | Moderate = 60 | Poor = 40
+  - Brownfield sites or owned processing infrastructure should receive explicit credit here only if the infrastructure is usable, relevant to the current plan, and materially lowers capex and/or timeline.
+* Management (20%): average of three sub-factors:
+  - Track record: proven multi-project success 100 | experienced 85 | mixed 75 | unproven 60
+  - Insider ownership: >10% = 100 | 5-10% = 80 | 2-5% = 65 | <2% = 50
+  - Capital discipline: on-budget/limited dilution 100 | minor overruns/modest dilution 80 | material overruns/repeated heavy dilution 60 | no track record 70
+* Development Stage (10%): score mirrors the Development Base from Step A of the stage multiplier × 100. Scoping no MRE 10 | Scoping has MRE 15 | PFS 25 | DFS 42 | FEED underway 47 | FEED complete 54 | FID declared / construction commencing 62 | Construction >50% 72 | First gold 82 | Ramp-up 91 | Peak 100. The Funding factor is captured separately in the Funding sub-score — do not conflate.
+* Funding (30%): Funding Gap = (Phase-1 capex - cash - expected 24m FCF) / capex
+  - If existing infrastructure lowers Phase-1 capex, reflect that lower capex in the funding-gap calculation and state the adjustment clearly.
+  - <10M AUD or fully funded = 100
+  - 10-25M AUD with clear path = 80
+  - 25-50M AUD = 60
+  - >50M AUD or unclear path = 40
+  - If debt is binding but drawdown conditions remain, cap practical score at 85-90 (not 100).
+* ESG (10%): average of permitting, social license, and safety anchors:
+  - Permitting: fully approved 100 | key permits received 80 | applications submitted 60 | limited progress 40
+  - Social license: formal agreements/no disputes 90-100 | engagement/no disputes 70-80 | active disputes 40-60
+  - Safety: LTIFR disclosed and below peers 90-100 | limited disclosure but no known incidents 70-80 | incidents/legacy issues 40-60
+
+Step 3: Value Score (0-100)
+Formula:
+= (0.30 * NPV Ratio Score) + (0.20 * EV/Resource Score) + (0.20 * Exploration Upside Score) + (0.15 * Cost Competitiveness Score) + (0.15 * M&A/Strategic Score)
+
+* NPV/Market Cap (30%): use (Risked NPV + Surplus Cash) / Market Cap as primary; show study and spot cases separately as context. Do not include non-DFS optionality in this ratio.
+  - >3x = 100 | 2-3x = 80 | 1-2x = 60 | <1x = 40
+* EV/Resource oz (20%): EV = Market Cap + Debt - Cash; use the currently disclosed attributable code-compliant AuEq inventory only where applicable. Do not substitute mine-plan output, recovered ounces, exploration targets, or non-code-compliant conceptual inventory for the disclosed inventory base.
+  - <50 AUD/oz = 100 | 50-100 AUD/oz = 70 | 100-150 AUD/oz = 50 | >150 AUD/oz = 40
+* Exploration Upside (20%): score growth beyond the current code-compliant resource base, not ounces already captured in the EV/Resource denominator.
+  - >50% potential = 100 | 25-50% = 80 | 10-25% = 60 | <10% = 40
+* Cost Competitiveness (15%): use disclosed or defensible net AISC; do not infer low-cost status from strong project FCF alone.
+  - <1,500 AUD/oz = 100 | 1,500-2,000 AUD/oz = 80 | 2,000-2,500 AUD/oz = 60 | >2,500 AUD/oz = 40
+* M&A/Strategic (15%) by sub-factors:
+  - Proximity to majors, formal agreements, and acquirability.
+  - High = 100 | Moderate = 80 | Low = 60 | None = 40
+
+Step 4: Required Outputs
+* Price targets:
+  - 12m and 24m bull/base/bear targets
+  - scenario probabilities (each horizon sums to 100%)
+  - probability-weighted target for 12m and 24m
+  - explicit scenario drivers (gold price, case weighting, costs, capex, timing, funding, dilution)
+  - financing bridge for material funding gaps:
+    one base financing bridge plus a brief 3-row financing sensitivity (conservative/base/constructive) with debt tranche, equity tranche + raise price/discount, new shares issued, and post-dilution risked NAV/share
+  - target reconciliation:
+    each base target should reconcile explicitly to a post-dilution NAV/share anchor or one financing-sensitivity row; keep this compact rather than building a full separate financing model for every scenario unless evidence strongly supports it
+  - re-rating anchor logic:
+    Use two-step multiplier values as re-rating anchors.
+    State the current Final Multiplier and the base-case 12m and 24m Final Multipliers separately.
+    FEED completion: Development Base moves to 0.54x; fully funded company reaches ~0.57x Final.
+    FID declared with committed full funding: Development Base 0.62x × 1.05+ Funding = ~0.65–0.68x Final.
+    Construction >50% with full funding: ~0.72–0.79x Final.
+    First gold: ~0.82–0.91x Final depending on ramp-up trajectory.
+* Development timeline:
+  - current stage
+  - key milestones to 24m with status (on-track/at-risk/speculative)
+  - milestone impact on 24m probability-weighted target
+  - goal
+  - primary risk
+* Headwinds/tailwinds:
+  - include threshold-driven quantitative factors with directional NPV/cashflow impact
+  - include material qualitative factors with evidence and expected duration
+* Investment recommendation paragraph:
+  - core thesis reason
+  - key 12m catalyst
+  - key invalidation risk
+  - sizing context (speculative/core/avoid)
+* Key risks: ranked list with probability and impact.
+* Key opportunities: ranked list with trigger and potential value impact.
+
+Step 5: Additional Metrics
+* Resource conversion rate (M+I / total)
+* Corporate cash runway (months)
+* Debt/financing mix and implied repayment profile
+* ESG composite with subfactor comments
+* Peer EV/oz vs relevant regional/stage cohort
+* Drill success rate (or explicit data gap)
+* Offtake/M&A potential
+* Hedge/derivatives disclosures (if any)
+* Polymetallic credit contribution (if any)
+
+Cross-check requirements before final output:
+* Recovered ounces should broadly align with study production profile; explain material differences.
+* NPV comparison vs company-stated study NPV: explain major variance drivers.
+* EV arithmetic must be consistent across sections.
+* Quality and Value weighted totals must equal stated final scores.
+* Stage multiplier: confirm Development Base matches actual technical stage and Funding Adjustment matches documented funding status. State both components and the Final Multiplier.
+* Price targets must be mathematically anchored to valuation/scenario assumptions (not arbitrary).
+```

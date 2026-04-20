@@ -1,0 +1,209 @@
+id: consumer_staples
+name: Consumer Staples
+description: Investment analysis for staples, food, beverage, and other demand-resilient consumer businesses
+category: equity
+version: '1.0'
+author: LLM Council
+company_types:
+- consumer_staples
+template_behavior:
+  commodity_profile: none
+  supplementary_sector_label: consumer staples and food sector
+  cashflow_schema:
+    mode: auto
+    min_reporting_periods: 3
+    require_operating_cashflow: true
+    detection_max_sources: 28
+  stage1_research_lanes:
+  - 'Run a dedicated sector lane (consumer staples): capture 2-4 recent sources on volume resilience, pricing pass-through, input-cost inflation, retailer/private-label pressure, and channel inventory; tie each point to scenario assumptions.'
+  stage3_scoring_factors:
+    quality:
+    - Demand Resilience
+    - Pricing Power
+    - Brand/Distribution Strength
+    - Management
+    - Balance Sheet
+    - Governance
+    value:
+    - Intrinsic Value vs Market Cap
+    - Earnings/FCF Yield
+    - Multiple vs Peers
+    - Margin Durability
+    - Strategic Value
+auto_detect_keywords:
+- staples
+- food
+- beverage
+- grocery
+- pricing power
+- private label
+- volume
+- channel inventory
+- input cost
+- distribution
+inputs:
+- ticker
+- company_name
+- market_data
+- pdf_documents
+output_schema:
+  type: object
+  required_fields:
+  - analysis_type
+  - ticker
+  - company_name
+  - quality_score
+  - value_score
+  - price_targets
+  - investment_recommendation
+  structure:
+    analysis_type: consumer_staples
+    ticker: string
+    company_name: string
+    analysis_date: ISO-8601
+    market_data:
+      current_price: float
+      market_cap_m: float
+      shares_outstanding_m: float
+      enterprise_value_m: float
+      currency: string
+    quality_score:
+      total: float (0-100)
+      breakdown: object
+    value_score:
+      total: float (0-100)
+      breakdown: object
+    price_targets:
+      current_price: float
+      scenario_targets: object
+      scenario_probabilities: object
+      prob_weighted_target_12m: float
+      prob_weighted_target_24m: float
+    development_timeline: array
+    thesis_map: object
+    management_competition_assessment: object
+    verification_required_fields: array
+    investment_recommendation:
+      rating: BUY/HOLD/SELL
+      conviction: HIGH/MEDIUM/LOW
+      summary: string
+verification_schema:
+  fact_digest:
+    sections:
+      timelines_deadlines:
+        keywords:
+        - timeline
+        - guidance
+        - q1
+        - q2
+        - q3
+        - q4
+        - h1
+        - h2
+        - fy
+      financing_deals:
+        keywords:
+        - debt
+        - refinance
+        - dividend
+        - buyback
+        - acquisition
+        - facility
+      project_economics:
+        keywords:
+        - revenue
+        - volume
+        - gross margin
+        - ebitda
+        - free cash flow
+        - pricing
+        - input costs
+      market_share_structure:
+        keywords:
+        - market share
+        - share price
+        - market cap
+        - enterprise value
+        - valuation
+        - multiple
+      management_governance:
+        keywords:
+        - management
+        - board
+        - ceo
+        - cfo
+        - governance
+        - insider
+      operational_objectives:
+        keywords:
+        - volume growth
+        - pricing
+        - distribution
+        - inventory
+        - margin
+      risks_constraints:
+        keywords:
+        - private label
+        - cost inflation
+        - retailer pressure
+        - demand slowdown
+        - execution
+      catalysts_tailwinds:
+        keywords:
+        - pricing realization
+        - mix improvement
+        - cost normalization
+        - channel refill
+        - margin expansion
+    timeline_terms:
+    - q1
+    - q2
+    - q3
+    - q4
+    - h1
+    - h2
+    - fy
+    - guidance
+    timeline_focus_terms:
+    - pricing
+    - volume
+    - margin
+    - free cash flow
+    conflict:
+      field: operating_guidance_window
+      terms:
+      - guidance
+      - pricing
+      - margin
+      - volume
+      max_shift_quarters: 2
+      resolution_rule: prefer newest dated primary-source guidance
+  compliance:
+    section_markers:
+      quality_score:
+        markers:
+        - quality score
+        - quality_score
+        critical: true
+      value_score:
+        markers:
+        - value score
+        - value_score
+        critical: true
+      price_targets:
+        markers:
+        - 12-month
+        - 24-month
+        - price target
+        - price_targets
+        - probability-weighted
+        - scenario probabilities
+        critical: true
+      development_timeline:
+        markers:
+        - development timeline
+        - timeline
+        - milestone
+        - guidance
+        - development_timeline
+        critical: true

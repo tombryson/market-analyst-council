@@ -120,6 +120,13 @@
   margin-bottom: 10px;
 }
 
+.gantt-lab-toolbar-bottom {
+  justify-content: flex-start;
+  margin: 18px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid rgba(195, 232, 255, 0.18);
+}
+
 .gantt-empty-state {
   border: 1px solid rgba(169, 206, 230, 0.2);
   border-radius: 14px;

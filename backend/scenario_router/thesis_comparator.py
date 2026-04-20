@@ -96,21 +96,32 @@ class ThesisComparator:
         evaluations.extend(self._evaluate_watchlist(watchlist.get("confirmatory_signals") or [], "confirmatory", haystack, market_facts, evidence))
 
         matched_evals = [item for item in evaluations if item.status == "matched"]
-        matched_condition_ids = [item.condition_id for item in matched_evals if item.group in {"required", "failure"} and item.condition_id]
-        triggered_watchlist_ids = [item.condition_id for item in matched_evals if item.group in {"red_flag", "confirmatory"} and item.condition_id]
+        announcement_matched_evals = [
+            item for item in matched_evals if str(item.matched_via or "").strip() != "market_facts"
+        ]
+        matched_condition_ids = [
+            item.condition_id
+            for item in announcement_matched_evals
+            if item.group in {"required", "failure"} and item.condition_id
+        ]
+        triggered_watchlist_ids = [
+            item.condition_id
+            for item in announcement_matched_evals
+            if item.group in {"red_flag", "confirmatory"} and item.condition_id
+        ]
 
-        bull_required = self._matched_count(evaluations, scenario="bull", group="required")
-        base_required = self._matched_count(evaluations, scenario="base", group="required")
-        bear_required = self._matched_count(evaluations, scenario="bear", group="required")
-        bull_failure = self._matched_count(evaluations, scenario="bull", group="failure")
-        base_failure = self._matched_count(evaluations, scenario="base", group="failure")
-        red_flag_hits = self._matched_count(evaluations, group="red_flag")
-        confirmatory_hits = self._matched_count(evaluations, group="confirmatory")
+        bull_required = self._matched_count(announcement_matched_evals, scenario="bull", group="required")
+        base_required = self._matched_count(announcement_matched_evals, scenario="base", group="required")
+        bear_required = self._matched_count(announcement_matched_evals, scenario="bear", group="required")
+        bull_failure = self._matched_count(announcement_matched_evals, scenario="bull", group="failure")
+        base_failure = self._matched_count(announcement_matched_evals, scenario="base", group="failure")
+        red_flag_hits = self._matched_count(announcement_matched_evals, group="red_flag")
+        confirmatory_hits = self._matched_count(announcement_matched_evals, group="confirmatory")
 
         positive = self._contains_any(haystack, POSITIVE_TOKENS)
         negative = self._contains_any(haystack, NEGATIVE_TOKENS)
         affected_domains = self._infer_domains(
-            haystack + "\n" + "\n".join(item.label for item in matched_evals),
+            haystack + "\n" + "\n".join(item.label for item in announcement_matched_evals),
             facts.material_topics,
         )
 
@@ -128,7 +139,7 @@ class ThesisComparator:
         )
         path_transition = f"{baseline_path}->{current_path}" if baseline_path and current_path and baseline_path != current_path else ""
 
-        key_findings, conflicts = self._build_findings(evaluations)
+        key_findings, conflicts = self._build_findings(announcement_matched_evals)
         material_change_types = list(sorted(affected_domains))
         impact_level = self._impact_level(affected_domains, current_path, baseline_path, conflicts, red_flag_hits, confirmatory_hits)
         thesis_effect = self._thesis_effect(baseline_path, current_path, conflicts, confirmatory_hits, red_flag_hits, positive, negative)
@@ -142,11 +153,12 @@ class ThesisComparator:
             if item.market_field and market_facts.get(item.market_field) is not None
         }
         notes = [
-            f"bull_required_matches={bull_required}",
-            f"base_required_matches={base_required}",
-            f"bear_required_matches={bear_required}",
-            f"red_flag_hits={red_flag_hits}",
-            f"confirmatory_hits={confirmatory_hits}",
+            f"announcement_bull_required_matches={bull_required}",
+            f"announcement_base_required_matches={base_required}",
+            f"announcement_bear_required_matches={bear_required}",
+            f"announcement_red_flag_hits={red_flag_hits}",
+            f"announcement_confirmatory_hits={confirmatory_hits}",
+            f"market_condition_matches={self._matched_count([item for item in matched_evals if str(item.matched_via or '').strip() == 'market_facts'])}",
         ]
 
         return ComparisonReport(

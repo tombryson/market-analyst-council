@@ -425,6 +425,54 @@ templates:
     chairman_contract:
       valuation_methods:
         primary: [ev_ebitda, same_store_sales, gross_margin, free_cash_flow_yield]
+  consumer_staples:
+    family: consumer
+    industry_label: consumer staples and food
+    chairman_contract:
+      valuation_methods:
+        primary: [ev_ebitda, free_cash_flow_yield, gross_margin, pricing_power]
+  gambling:
+    family: consumer
+    industry_label: gambling and wagering
+    chairman_contract:
+      valuation_methods:
+        primary: [ev_ebitda, free_cash_flow_yield, market_share, recurring_revenue_quality]
+  gaming_interactive:
+    family: software
+    industry_label: interactive gaming and digital entertainment
+    chairman_contract:
+      valuation_methods:
+        primary: [ev_bookings, free_cash_flow_yield, franchise_value, engagement_quality]
+  technology_platforms:
+    family: software
+    industry_label: technology platforms
+    chairman_contract:
+      valuation_methods:
+        primary: [ev_sales, free_cash_flow_yield, take_rate_quality, margin_path, network_effects]
+  semiconductors:
+    family: industrials
+    industry_label: semiconductors
+    chairman_contract:
+      valuation_methods:
+        primary: [cycle_normal_earnings, ev_ebitda, gross_margin, inventory_cycle, strategic_scarcity]
+  defence:
+    family: industrials
+    industry_label: defence and aerospace
+    chairman_contract:
+      valuation_methods:
+        primary: [ev_ebitda, free_cash_flow_yield, backlog_quality, sovereign_optionality]
+  healthcare_services:
+    family: medtech
+    industry_label: healthcare services
+    chairman_contract:
+      valuation_methods:
+        primary: [ev_ebitda, free_cash_flow_yield, reimbursement_quality, utilization_uplift]
+  fixed_income:
+    family: general
+    industry_label: fixed income and credit
+    chairman_contract:
+      valuation_methods:
+        primary: [yield_to_risk, nav_discount, distribution_sustainability, duration_sensitivity]
   real_estate_reit:
     family: reit
     industry_label: real estate and reit

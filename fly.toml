@@ -10,6 +10,7 @@ primary_region = 'syd'
   dockerfile = 'Dockerfile.analysis'
 
 [env]
+  ANALYSIS_OUTPUTS_DIR = '/data/outputs'
   ANALYSIS_JOBS_DIR = '/data/jobs'
   ENV_PRECEDENCE = 'file'
   PORT = '8001'

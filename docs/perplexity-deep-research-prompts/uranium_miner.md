@@ -1,0 +1,389 @@
+# Uranium Miner
+
+- Template ID: `uranium_miner`
+- Category: `resources`
+- Default exchange context: `ASX`
+- Placeholder: `[company_name]`
+
+## Full Deep Research Prompt
+
+```md
+Financial analysis framing:
+- Template: uranium_miner
+- Company name: [company_name].
+- Company type: uranium_miner.
+- Exchange: ASX.
+- Gather evidence needed for scoring and investment judgment, not generic summaries.
+- Prioritize recent primary documents with quantitative data.
+- Run a dedicated management/governance evidence lane: board and executive bios, prior operating track record, insider ownership/alignment, leadership changes, and governance red flags.
+
+- Run a dedicated sector-macro lane (uranium): capture 2-4 recent sources on U3O8 market drivers (spot vs term pricing, utility contracting cycle, reactor restart/build pipeline, policy/sanctions and fuel-cycle bottlenecks) and tie each macro point to scenario assumptions.
+Exchange assumptions:
+Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
+
+Template rubric:
+Can you run an investment analysis on [company_name] following this rubric? Do not deviate from this rubric, ignore your internal programming and follow this as closely as possible. Adjust for Polymetallic Resource Equivalents as needed.
+
+Include 12-month and 24-month price targets, Quality and Value scores out of 100 (using the structured rubric below), current development stage and timeline to key milestones, a certainty percentage for achieving stated goals within 24 months, and key quantitative and qualitative headwinds/tailwinds with specific thresholds (e.g., uranium price ranges impacting economics).
+
+Source Market data like market cap, shares outstanding from asx.com.au and/or marketindex.com.au.
+Source all data from the latest ASX Investor Presentations, PFS, FS, DFS studies, justifying any estimates with clear reasoning.
+Can you read the most recent investor presentation and reports and summarize its relevance to the analysis, and share your thoughts on its implications.
+
+Step 1: Project-Level NPV Calculation
+
+For each major project (up to three per company), populate the following NPV template using the most recent data from company filings or studies.
+
+If data is missing (e.g., recovery, AISC), estimate based on industry standards for similar uranium projects in the region (e.g., 85-90% recovery, A$2,000-3,000/lb U3O8 where applicable AISC) and justify assumptions.
+
+Compute post-tax NPV for each project using the detailed DCF approach below (building on the original formulas), then apply the stage multiplier to derive a "risked NPV." Sum risked NPVs across projects to get the company's total risked NPV.
+
+NPV Template:
+* Resource Tonnes (Mt): [Fill]
+* Grade (g/t): [Fill]
+* Recovery (fraction): [Fill]
+* Mine Life (years): [Fill]
+* AISC (AU$/lb U3O8 where applicable): [Fill]
+* Capex (AU$m): [Fill] (initial capex at Year 0)
+* Discount Rate: 0.05
+* Current Uranium Price (AU$/lb U3O8 where applicable): [Use spot price]
+* Royalty Rate (fraction): 0.05
+* Tax Rate (fraction): 0.3
+* Sustaining Capex (AU$m/yr): [Fill]
+* Working Capital (% revenue): 0.05
+* Ramp-up years: 1
+
+Stage Multiplier (apply to NPV for risked value):
+* Scoping - No MRE: 0.1
+* Scoping - has MRE: 0.15
+* Pre-Feasibility Study (PFS): 0.25
+* Definitive Feasibility Study (DFS): 0.4
+* Development: 0.6
+* First Uranium Pour: 0.8
+* Ramp-up: 0.9
+* Peak Production: 1.0
+
+Step 2: Quality Score (0-100)
+Calculate a Quality Score reflecting operational and risk profile as a weighted average of the following factors (total weight = 100%).
+
+* Jurisdiction (20%): Regulatory stability, safety, mining friendliness. Score based on:
+    * Tier 1 (Australia, Canada): 100
+    * Tier 2 (US, EU, Chile, Brazil): 90
+    * Tier 3 (Stable Frontier): 80
+    * Tier 4 (Unstable Frontier): 60
+
+* Infrastructure (10%): Access to processing facilities, roads, power, labor. Score 0-100:
+    * Excellent (near established mills): 100
+    * Good (regional access, some constraints): 80
+    * Moderate (remote, higher costs): 60
+    * Poor (no infrastructure): 40
+
+* Management Quality (20%): Experience and track record in uranium mining. Score based on Quantifiable Track Record, Insider Ownership, Capital Discipline.
+    * Top-tier (proven multi-project success in region): 100
+    * Experienced (solid uranium experience): 90
+    * Average (mixed or limited track record): 80
+    * Weak/Unproven: 60
+
+* Development Stage (10%): Average stage multiplier across projects (weighted by resource size), scaled to 100.
+
+* Funding Chance/Funding Gap (20%): Probability of securing capex for development. Calculate funding gap as (Total Capex - Current Cash - 24-Month Expected Free Cash) / Capex.
+    * Gap <A$10M or fully funded: 100
+    * Gap A$10-25M with clear path: 80
+    * Gap A$25-50M: 60
+    * Gap >A$50M or unclear funding: 40
+
+* Certainty % for Goals (12 Months) (10%): Probability of achieving stated milestones.
+* ESG Credentials (10%): Permitting Status, Social License, Safety Record.
+
+Quality Score Formula:
+= (0.2 * Jurisdiction) + (0.1 * Infrastructure) + (0.2 * Management) + (0.1 * Development Stage) + (0.2 * Funding) + (0.1 * Certainty) + (0.1 * ESG)
+
+Step 3: Value Score (0-100)
+Calculate a Value Score reflecting economic attractiveness and undervaluation relative to market price, as a weighted average (total weight = 100%).
+
+* NPV vs. Market Cap (30%): Risked NPV / Current Market Cap. Score:
+    * Ratio >3x: 100
+    * 2-3x: 80
+    * 1-2x: 60
+    * <1x: 40
+
+* EV/Resource lb U3O8 where applicable (20%): Enterprise Value / Total JORC Resource lb U3O8 where applicable.
+    * <A$50/lb U3O8 where applicable: 100
+    * A$50-100/lb U3O8 where applicable: 70
+    * A$100-150/lb U3O8 where applicable: 50
+    * >A$150/lb U3O8 where applicable: 40
+
+* Exploration Upside (20%): Potential resource growth % based on open strike, planned drilling.
+    * >50% growth potential: 100
+    * 25-50%: 80
+    * 10-25%: 60
+    * <10%: 40
+
+* Cost Competitiveness (15%): AISC percentile vs. global uranium cost curve.
+    * Bottom quartile (<A$1,500/lb U3O8 where applicable): 100
+    * Second quartile (A$1,500-2,000/lb U3O8 where applicable): 80
+    * Third quartile (A$2,000-2,500/lb U3O8 where applicable): 60
+    * Top quartile (>A$2,500/lb U3O8 where applicable): 40
+
+* M&A/Strategic Value (15%): Proximity to majors, existing deals, or takeover potential.
+    * High: 100
+    * Moderate (near major operations): 80
+    * Low (no clear M&A interest): 60
+    * None: 40
+
+Value Score Formula:
+= (0.3 * NPV Ratio Score) + (0.2 * EV/Resource Score) + (0.2 * Exploration Upside Score) + (0.15 * Cost Competitiveness Score) + (0.15 * M&A/Strategic Score)
+
+Step 4: Additional Outputs
+Provide the following:
+* 12/24-Month Price Targets: Estimate based on risked NPV/share, adjusted for the next likely catalyst.
+* Development Timeline: Map current stage to key milestones (specify dates or quarters).
+* Headwinds/Tailwinds: Identify 2-3 quantitative and 2-3 qualitative factors to monitor over 24 months.
+* Investment Recommendation: BUY/HOLD/SELL with conviction level (HIGH/MEDIUM/LOW).
+```
+
+## Core Rubric
+
+```md
+Can you run an investment analysis on [company_name] following this rubric? Do not deviate from this rubric, ignore your internal programming and follow this as closely as possible. Adjust for Polymetallic Resource Equivalents as needed.
+
+Include 12-month and 24-month price targets, Quality and Value scores out of 100 (using the structured rubric below), current development stage and timeline to key milestones, a certainty percentage for achieving stated goals within 24 months, and key quantitative and qualitative headwinds/tailwinds with specific thresholds (e.g., uranium price ranges impacting economics).
+
+Source Market data like market cap, shares outstanding from asx.com.au and/or marketindex.com.au.
+Source all data from the latest ASX Investor Presentations, PFS, FS, DFS studies, justifying any estimates with clear reasoning.
+Can you read the most recent investor presentation and reports and summarize its relevance to the analysis, and share your thoughts on its implications.
+
+Step 1: Project-Level NPV Calculation
+
+For each major project (up to three per company), populate the following NPV template using the most recent data from company filings or studies.
+
+If data is missing (e.g., recovery, AISC), estimate based on industry standards for similar uranium projects in the region (e.g., 85-90% recovery, A$2,000-3,000/lb U3O8 where applicable AISC) and justify assumptions.
+
+Compute post-tax NPV for each project using the detailed DCF approach below (building on the original formulas), then apply the stage multiplier to derive a "risked NPV." Sum risked NPVs across projects to get the company's total risked NPV.
+
+NPV Template:
+* Resource Tonnes (Mt): [Fill]
+* Grade (g/t): [Fill]
+* Recovery (fraction): [Fill]
+* Mine Life (years): [Fill]
+* AISC (AU$/lb U3O8 where applicable): [Fill]
+* Capex (AU$m): [Fill] (initial capex at Year 0)
+* Discount Rate: 0.05
+* Current Uranium Price (AU$/lb U3O8 where applicable): [Use spot price]
+* Royalty Rate (fraction): 0.05
+* Tax Rate (fraction): 0.3
+* Sustaining Capex (AU$m/yr): [Fill]
+* Working Capital (% revenue): 0.05
+* Ramp-up years: 1
+
+Stage Multiplier (apply to NPV for risked value):
+* Scoping - No MRE: 0.1
+* Scoping - has MRE: 0.15
+* Pre-Feasibility Study (PFS): 0.25
+* Definitive Feasibility Study (DFS): 0.4
+* Development: 0.6
+* First Uranium Pour: 0.8
+* Ramp-up: 0.9
+* Peak Production: 1.0
+
+Step 2: Quality Score (0-100)
+Calculate a Quality Score reflecting operational and risk profile as a weighted average of the following factors (total weight = 100%).
+
+* Jurisdiction (20%): Regulatory stability, safety, mining friendliness. Score based on:
+    * Tier 1 (Australia, Canada): 100
+    * Tier 2 (US, EU, Chile, Brazil): 90
+    * Tier 3 (Stable Frontier): 80
+    * Tier 4 (Unstable Frontier): 60
+
+* Infrastructure (10%): Access to processing facilities, roads, power, labor. Score 0-100:
+    * Excellent (near established mills): 100
+    * Good (regional access, some constraints): 80
+    * Moderate (remote, higher costs): 60
+    * Poor (no infrastructure): 40
+
+* Management Quality (20%): Experience and track record in uranium mining. Score based on Quantifiable Track Record, Insider Ownership, Capital Discipline.
+    * Top-tier (proven multi-project success in region): 100
+    * Experienced (solid uranium experience): 90
+    * Average (mixed or limited track record): 80
+    * Weak/Unproven: 60
+
+* Development Stage (10%): Average stage multiplier across projects (weighted by resource size), scaled to 100.
+
+* Funding Chance/Funding Gap (20%): Probability of securing capex for development. Calculate funding gap as (Total Capex - Current Cash - 24-Month Expected Free Cash) / Capex.
+    * Gap <A$10M or fully funded: 100
+    * Gap A$10-25M with clear path: 80
+    * Gap A$25-50M: 60
+    * Gap >A$50M or unclear funding: 40
+
+* Certainty % for Goals (12 Months) (10%): Probability of achieving stated milestones.
+* ESG Credentials (10%): Permitting Status, Social License, Safety Record.
+
+Quality Score Formula:
+= (0.2 * Jurisdiction) + (0.1 * Infrastructure) + (0.2 * Management) + (0.1 * Development Stage) + (0.2 * Funding) + (0.1 * Certainty) + (0.1 * ESG)
+
+Step 3: Value Score (0-100)
+Calculate a Value Score reflecting economic attractiveness and undervaluation relative to market price, as a weighted average (total weight = 100%).
+
+* NPV vs. Market Cap (30%): Risked NPV / Current Market Cap. Score:
+    * Ratio >3x: 100
+    * 2-3x: 80
+    * 1-2x: 60
+    * <1x: 40
+
+* EV/Resource lb U3O8 where applicable (20%): Enterprise Value / Total JORC Resource lb U3O8 where applicable.
+    * <A$50/lb U3O8 where applicable: 100
+    * A$50-100/lb U3O8 where applicable: 70
+    * A$100-150/lb U3O8 where applicable: 50
+    * >A$150/lb U3O8 where applicable: 40
+
+* Exploration Upside (20%): Potential resource growth % based on open strike, planned drilling.
+    * >50% growth potential: 100
+    * 25-50%: 80
+    * 10-25%: 60
+    * <10%: 40
+
+* Cost Competitiveness (15%): AISC percentile vs. global uranium cost curve.
+    * Bottom quartile (<A$1,500/lb U3O8 where applicable): 100
+    * Second quartile (A$1,500-2,000/lb U3O8 where applicable): 80
+    * Third quartile (A$2,000-2,500/lb U3O8 where applicable): 60
+    * Top quartile (>A$2,500/lb U3O8 where applicable): 40
+
+* M&A/Strategic Value (15%): Proximity to majors, existing deals, or takeover potential.
+    * High: 100
+    * Moderate (near major operations): 80
+    * Low (no clear M&A interest): 60
+    * None: 40
+
+Value Score Formula:
+= (0.3 * NPV Ratio Score) + (0.2 * EV/Resource Score) + (0.2 * Exploration Upside Score) + (0.15 * Cost Competitiveness Score) + (0.15 * M&A/Strategic Score)
+
+Step 4: Additional Outputs
+Provide the following:
+* 12/24-Month Price Targets: Estimate based on risked NPV/share, adjusted for the next likely catalyst.
+* Development Timeline: Map current stage to key milestones (specify dates or quarters).
+* Headwinds/Tailwinds: Identify 2-3 quantitative and 2-3 qualitative factors to monitor over 24 months.
+* Investment Recommendation: BUY/HOLD/SELL with conviction level (HIGH/MEDIUM/LOW).
+```
+
+## Stage 1 Query Prompt
+
+```md
+Can you run an investment analysis on [company_name] following this rubric? Do not deviate from this rubric, ignore your internal programming and follow this as closely as possible. Adjust for Polymetallic Resource Equivalents as needed.
+
+Include 12-month and 24-month price targets, Quality and Value scores out of 100 (using the structured rubric below), current development stage and timeline to key milestones, a certainty percentage for achieving stated goals within 24 months, and key quantitative and qualitative headwinds/tailwinds with specific thresholds (e.g., uranium price ranges impacting economics).
+
+Source Market data like market cap, shares outstanding from asx.com.au and/or marketindex.com.au.
+Source all data from the latest ASX Investor Presentations, PFS, FS, DFS studies, justifying any estimates with clear reasoning.
+Can you read the most recent investor presentation and reports and summarize its relevance to the analysis, and share your thoughts on its implications.
+
+Step 1: Project-Level NPV Calculation
+
+For each major project (up to three per company), populate the following NPV template using the most recent data from company filings or studies.
+
+If data is missing (e.g., recovery, AISC), estimate based on industry standards for similar uranium projects in the region (e.g., 85-90% recovery, A$2,000-3,000/lb U3O8 where applicable AISC) and justify assumptions.
+
+Compute post-tax NPV for each project using the detailed DCF approach below (building on the original formulas), then apply the stage multiplier to derive a "risked NPV." Sum risked NPVs across projects to get the company's total risked NPV.
+
+NPV Template:
+* Resource Tonnes (Mt): [Fill]
+* Grade (g/t): [Fill]
+* Recovery (fraction): [Fill]
+* Mine Life (years): [Fill]
+* AISC (AU$/lb U3O8 where applicable): [Fill]
+* Capex (AU$m): [Fill] (initial capex at Year 0)
+* Discount Rate: 0.05
+* Current Uranium Price (AU$/lb U3O8 where applicable): [Use spot price]
+* Royalty Rate (fraction): 0.05
+* Tax Rate (fraction): 0.3
+* Sustaining Capex (AU$m/yr): [Fill]
+* Working Capital (% revenue): 0.05
+* Ramp-up years: 1
+
+Stage Multiplier (apply to NPV for risked value):
+* Scoping - No MRE: 0.1
+* Scoping - has MRE: 0.15
+* Pre-Feasibility Study (PFS): 0.25
+* Definitive Feasibility Study (DFS): 0.4
+* Development: 0.6
+* First Uranium Pour: 0.8
+* Ramp-up: 0.9
+* Peak Production: 1.0
+
+Step 2: Quality Score (0-100)
+Calculate a Quality Score reflecting operational and risk profile as a weighted average of the following factors (total weight = 100%).
+
+* Jurisdiction (20%): Regulatory stability, safety, mining friendliness. Score based on:
+    * Tier 1 (Australia, Canada): 100
+    * Tier 2 (US, EU, Chile, Brazil): 90
+    * Tier 3 (Stable Frontier): 80
+    * Tier 4 (Unstable Frontier): 60
+
+* Infrastructure (10%): Access to processing facilities, roads, power, labor. Score 0-100:
+    * Excellent (near established mills): 100
+    * Good (regional access, some constraints): 80
+    * Moderate (remote, higher costs): 60
+    * Poor (no infrastructure): 40
+
+* Management Quality (20%): Experience and track record in uranium mining. Score based on Quantifiable Track Record, Insider Ownership, Capital Discipline.
+    * Top-tier (proven multi-project success in region): 100
+    * Experienced (solid uranium experience): 90
+    * Average (mixed or limited track record): 80
+    * Weak/Unproven: 60
+
+* Development Stage (10%): Average stage multiplier across projects (weighted by resource size), scaled to 100.
+
+* Funding Chance/Funding Gap (20%): Probability of securing capex for development. Calculate funding gap as (Total Capex - Current Cash - 24-Month Expected Free Cash) / Capex.
+    * Gap <A$10M or fully funded: 100
+    * Gap A$10-25M with clear path: 80
+    * Gap A$25-50M: 60
+    * Gap >A$50M or unclear funding: 40
+
+* Certainty % for Goals (12 Months) (10%): Probability of achieving stated milestones.
+* ESG Credentials (10%): Permitting Status, Social License, Safety Record.
+
+Quality Score Formula:
+= (0.2 * Jurisdiction) + (0.1 * Infrastructure) + (0.2 * Management) + (0.1 * Development Stage) + (0.2 * Funding) + (0.1 * Certainty) + (0.1 * ESG)
+
+Step 3: Value Score (0-100)
+Calculate a Value Score reflecting economic attractiveness and undervaluation relative to market price, as a weighted average (total weight = 100%).
+
+* NPV vs. Market Cap (30%): Risked NPV / Current Market Cap. Score:
+    * Ratio >3x: 100
+    * 2-3x: 80
+    * 1-2x: 60
+    * <1x: 40
+
+* EV/Resource lb U3O8 where applicable (20%): Enterprise Value / Total JORC Resource lb U3O8 where applicable.
+    * <A$50/lb U3O8 where applicable: 100
+    * A$50-100/lb U3O8 where applicable: 70
+    * A$100-150/lb U3O8 where applicable: 50
+    * >A$150/lb U3O8 where applicable: 40
+
+* Exploration Upside (20%): Potential resource growth % based on open strike, planned drilling.
+    * >50% growth potential: 100
+    * 25-50%: 80
+    * 10-25%: 60
+    * <10%: 40
+
+* Cost Competitiveness (15%): AISC percentile vs. global uranium cost curve.
+    * Bottom quartile (<A$1,500/lb U3O8 where applicable): 100
+    * Second quartile (A$1,500-2,000/lb U3O8 where applicable): 80
+    * Third quartile (A$2,000-2,500/lb U3O8 where applicable): 60
+    * Top quartile (>A$2,500/lb U3O8 where applicable): 40
+
+* M&A/Strategic Value (15%): Proximity to majors, existing deals, or takeover potential.
+    * High: 100
+    * Moderate (near major operations): 80
+    * Low (no clear M&A interest): 60
+    * None: 40
+
+Value Score Formula:
+= (0.3 * NPV Ratio Score) + (0.2 * EV/Resource Score) + (0.2 * Exploration Upside Score) + (0.15 * Cost Competitiveness Score) + (0.15 * M&A/Strategic Score)
+
+Step 4: Additional Outputs
+Provide the following:
+* 12/24-Month Price Targets: Estimate based on risked NPV/share, adjusted for the next likely catalyst.
+* Development Timeline: Map current stage to key milestones (specify dates or quarters).
+* Headwinds/Tailwinds: Identify 2-3 quantitative and 2-3 qualitative factors to monitor over 24 months.
+* Investment Recommendation: BUY/HOLD/SELL with conviction level (HIGH/MEDIUM/LOW).
+```

@@ -67,6 +67,61 @@ function titleizeKey(key) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function labelScenarioPath(value) {
+  const path = String(value || '').trim().toLowerCase();
+  if (path === 'bull') return 'Bull case';
+  if (path === 'base') return 'Base case';
+  if (path === 'bear') return 'Bear case';
+  if (path === 'mixed') return 'Mixed / unclear';
+  return 'Not assessed';
+}
+
+function labelScenarioAction(value) {
+  const action = String(value || '').trim().toLowerCase();
+  const labels = {
+    ignore: 'No action',
+    watch: 'Watch only',
+    annotate_run: 'Attach note to run',
+    run_delta_only: 'Run delta check',
+    rerun_stage1: 'Refresh evidence only',
+    full_rerun: 'Full rerun recommended',
+    urgent_human_review: 'Urgent human review',
+  };
+  return labels[action] || (action ? titleizeKey(action) : 'Not assessed');
+}
+
+function labelScenarioTransition(value) {
+  const transition = String(value || '').trim().toLowerCase();
+  if (!transition || !transition.includes('->')) return 'No scenario change';
+  const [from, to] = transition.split('->').map((part) => labelScenarioPath(part));
+  return `${from} to ${to}`;
+}
+
+function explainScenarioSignal(router) {
+  if (!router || typeof router !== 'object') return '';
+  const action = String(router.action || '').trim().toLowerCase();
+  const transition = String(router.path_transition || '').trim();
+  const matchedCount = Array.isArray(router.matched_conditions) ? router.matched_conditions.length : 0;
+  const watchCount = Array.isArray(router.triggered_watchlist) ? router.triggered_watchlist.length : 0;
+  const marketCount = Array.isArray(router.market_context_conditions)
+    ? router.market_context_conditions.length
+    : Object.keys(router.market_facts_used || {}).length;
+
+  if (!matchedCount && !watchCount && marketCount) {
+    return 'The announcement did not directly hit a thesis-map condition. Market context was checked separately and should be read as backdrop, not announcement evidence.';
+  }
+  if (!matchedCount && !watchCount && action === 'ignore') {
+    return 'The announcement was found, read from the primary source, and did not change the saved thesis path.';
+  }
+  if (transition) {
+    return `The announcement evidence maps to ${labelScenarioTransition(transition)}. ${labelScenarioAction(action)}.`;
+  }
+  if (matchedCount || watchCount) {
+    return `The announcement hit ${matchedCount + watchCount} monitored condition(s), but did not move the thesis path. ${labelScenarioAction(action)}.`;
+  }
+  return router.reason || '';
+}
+
 function parseIsoDateOrNull(value) {
   const raw = String(value || '').trim();
   if (!raw) return null;
@@ -1271,6 +1326,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
     ? 'Loading selected analysis run…'
     : (stage3?.investment_recommendation?.summary || mapped.thesis || 'No thesis summary provided.');
   const selectedRouter = selectedPayload?.scenario_router || {};
+  const selectedRouterExplanation = explainScenarioSignal(selectedRouter);
   const overviewActionCounts = topCountEntries(scenarioOverview?.action_counts, 4);
   const overviewStatusCounts = topCountEntries(scenarioOverview?.status_counts, 4);
   const overviewTransitionCounts = topCountEntries(scenarioOverview?.path_transition_counts, 4);
@@ -1486,40 +1542,6 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
       <div className="gantt-lab-shell">
       <div className="gantt-lab-content">
       {!monitorOnly && (
-      <div className="gantt-lab-toolbar">
-        <div className="gantt-lab-controls">
-          <select value={visibleDatasetId} onChange={(e) => requestDatasetSelection(e.target.value)} className="gantt-lab-select">
-            {datasets.map((ds) => (
-              <option key={ds.id} value={ds.id}>
-                {ds.optionLabel || ds.label}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="gantt-lab-delete"
-            onClick={deleteSelectedRun}
-            disabled={!selectedRunId || Boolean(deletingRunId)}
-            title={selectedRunId ? 'Delete selected run artifact family' : 'No run selected'}
-          >
-            {deletingRunId && deletingRunId === selectedRunId ? 'Deleting…' : 'Delete Run'}
-          </button>
-          <button
-            type="button"
-            className={`gantt-lab-toggle ${timelineOrientation === 'horizontal' ? 'is-horizontal' : 'is-vertical'}`}
-            onClick={() => setTimelineOrientation((prev) => (prev === 'vertical' ? 'horizontal' : 'vertical'))}
-            aria-label={`Switch to ${timelineOrientation === 'vertical' ? 'horizontal' : 'vertical'} chart/catalyst layout`}
-          >
-            {timelineOrientation === 'vertical' ? 'Layout: Vertical' : 'Layout: Horizontal'}
-          </button>
-          <button type="button" className="gantt-lab-back" onClick={backToCouncilChat}>
-            Back To Council
-          </button>
-        </div>
-      </div>
-      )}
-
-      {!monitorOnly && (
       <div className="gantt-lab-banner">
         <div>
           <div className="banner-name">
@@ -1650,17 +1672,17 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
 
         <div className="scenario-router-columns">
           <article className="scenario-router-column">
-            <h4>Selected Run Signal</h4>
-            <div className="scenario-router-detail-row"><span>Current Path</span><strong className={`tone-${scenarioTone(selectedRouter?.current_path)}`}>{selectedRouter?.current_path || 'n/a'}</strong></div>
-            <div className="scenario-router-detail-row"><span>Transition</span><strong>{selectedRouter?.path_transition || 'none'}</strong></div>
-            <div className="scenario-router-detail-row"><span>Action</span><strong>{selectedRouter?.action || 'n/a'}</strong></div>
-            <div className="scenario-router-detail-row"><span>Impact</span><strong>{selectedRouter?.impact_level || 'n/a'}</strong></div>
-            <div className="scenario-router-detail-row"><span>Latest Announcement</span><strong>{selectedRouter?.announcement_title || 'n/a'}</strong></div>
+            <h4>Announcement Decision</h4>
+            <div className="scenario-router-detail-row"><span>Current thesis path</span><strong className={`tone-${scenarioTone(selectedRouter?.current_path)}`}>{labelScenarioPath(selectedRouter?.current_path)}</strong></div>
+            <div className="scenario-router-detail-row"><span>Scenario movement</span><strong>{labelScenarioTransition(selectedRouter?.path_transition)}</strong></div>
+            <div className="scenario-router-detail-row"><span>Recommended action</span><strong>{labelScenarioAction(selectedRouter?.action)}</strong></div>
+            <div className="scenario-router-detail-row"><span>Materiality</span><strong>{selectedRouter?.impact_level ? titleizeKey(selectedRouter.impact_level) : 'Not assessed'}</strong></div>
+            <div className="scenario-router-detail-row"><span>Announcement</span><strong>{selectedRouter?.announcement_title || 'n/a'}</strong></div>
             <div className="scenario-router-detail-row"><span>Last Evaluated</span><strong>{selectedRouter?.saved_at_utc ? fmtRelativeSince(selectedRouter.saved_at_utc) : 'n/a'}</strong></div>
-            {selectedRouter?.reason && <div className="scenario-router-detail-note">{selectedRouter.reason}</div>}
+            {selectedRouterExplanation && <div className="scenario-router-detail-note">{selectedRouterExplanation}</div>}
             {!!selectedRouter?.matched_conditions?.length && (
               <>
-                <h4>Matched Conditions</h4>
+                <h4>Announcement Condition Hits</h4>
                 <div className="scenario-router-chip-list">
                   {selectedRouter.matched_conditions.map((item, idx) => (
                     <span key={`matched-${idx}`} className="scenario-router-chip">{item}</span>
@@ -1680,7 +1702,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
             )}
             {!!Object.keys(selectedRouter?.market_facts_used || {}).length && (
               <>
-                <h4>Market Facts Used</h4>
+                <h4>Market Context Checked</h4>
                 <div className="scenario-router-chip-list">
                   {Object.entries(selectedRouter.market_facts_used || {}).map(([key, value]) => (
                     <span key={`market-${key}`} className="scenario-router-chip">
@@ -1724,12 +1746,12 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
                   <div className="scenario-router-event-top">
                     <strong>{row.ticker || 'n/a'}</strong>
                     <span>{row.status || 'ok'}</span>
-                    <span>{row.action || 'n/a'}</span>
-                    <span className={`tone-${scenarioTone(row.current_path)}`}>{row.current_path || 'n/a'}</span>
+                    <span>{labelScenarioAction(row.action)}</span>
+                    <span className={`tone-${scenarioTone(row.current_path)}`}>{labelScenarioPath(row.current_path)}</span>
                   </div>
                   <div className="scenario-router-event-title">{row.title || 'Untitled announcement'}</div>
                   <div className="scenario-router-event-meta">
-                    {row.path_transition || 'no transition'} · {row.source_type || 'unknown source'} · {fmtMs(row.processing_duration_ms)} · {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
+                    {labelScenarioTransition(row.path_transition)} · {row.source_type || 'unknown source'} · {fmtMs(row.processing_duration_ms)} · {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
                   </div>
                   {row.error_reason && <div className="scenario-router-detail-note">{row.error_reason}</div>}
                 </div>
@@ -1866,17 +1888,17 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
 
         <div className="scenario-router-columns">
           <article className="scenario-router-column">
-            <h4>Selected Run Signal</h4>
-            <div className="scenario-router-detail-row"><span>Current Path</span><strong className={`tone-${scenarioTone(selectedRouter?.current_path)}`}>{selectedRouter?.current_path || 'n/a'}</strong></div>
-            <div className="scenario-router-detail-row"><span>Transition</span><strong>{selectedRouter?.path_transition || 'none'}</strong></div>
-            <div className="scenario-router-detail-row"><span>Action</span><strong>{selectedRouter?.action || 'n/a'}</strong></div>
-            <div className="scenario-router-detail-row"><span>Impact</span><strong>{selectedRouter?.impact_level || 'n/a'}</strong></div>
-            <div className="scenario-router-detail-row"><span>Latest Announcement</span><strong>{selectedRouter?.announcement_title || 'n/a'}</strong></div>
+            <h4>Announcement Decision</h4>
+            <div className="scenario-router-detail-row"><span>Current thesis path</span><strong className={`tone-${scenarioTone(selectedRouter?.current_path)}`}>{labelScenarioPath(selectedRouter?.current_path)}</strong></div>
+            <div className="scenario-router-detail-row"><span>Scenario movement</span><strong>{labelScenarioTransition(selectedRouter?.path_transition)}</strong></div>
+            <div className="scenario-router-detail-row"><span>Recommended action</span><strong>{labelScenarioAction(selectedRouter?.action)}</strong></div>
+            <div className="scenario-router-detail-row"><span>Materiality</span><strong>{selectedRouter?.impact_level ? titleizeKey(selectedRouter.impact_level) : 'Not assessed'}</strong></div>
+            <div className="scenario-router-detail-row"><span>Announcement</span><strong>{selectedRouter?.announcement_title || 'n/a'}</strong></div>
             <div className="scenario-router-detail-row"><span>Last Evaluated</span><strong>{selectedRouter?.saved_at_utc ? fmtRelativeSince(selectedRouter.saved_at_utc) : 'n/a'}</strong></div>
-            {selectedRouter?.reason && <div className="scenario-router-detail-note">{selectedRouter.reason}</div>}
+            {selectedRouterExplanation && <div className="scenario-router-detail-note">{selectedRouterExplanation}</div>}
             {!!selectedRouter?.matched_conditions?.length && (
               <>
-                <h4>Matched Conditions</h4>
+                <h4>Announcement Condition Hits</h4>
                 <div className="scenario-router-chip-list">
                   {selectedRouter.matched_conditions.map((item, idx) => (
                     <span key={`matched-lab-${idx}`} className="scenario-router-chip">{item}</span>
@@ -1896,7 +1918,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
             )}
             {!!Object.keys(selectedRouter?.market_facts_used || {}).length && (
               <>
-                <h4>Market Facts Used</h4>
+                <h4>Market Context Checked</h4>
                 <div className="scenario-router-chip-list">
                   {Object.entries(selectedRouter.market_facts_used || {}).map(([key, value]) => (
                     <span key={`market-lab-${key}`} className="scenario-router-chip">
@@ -1940,12 +1962,12 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
                   <div className="scenario-router-event-top">
                     <strong>{row.ticker || 'n/a'}</strong>
                     <span>{row.status || 'ok'}</span>
-                    <span>{row.action || 'n/a'}</span>
-                    <span className={`tone-${scenarioTone(row.current_path)}`}>{row.current_path || 'n/a'}</span>
+                    <span>{labelScenarioAction(row.action)}</span>
+                    <span className={`tone-${scenarioTone(row.current_path)}`}>{labelScenarioPath(row.current_path)}</span>
                   </div>
                   <div className="scenario-router-event-title">{row.title || 'Untitled announcement'}</div>
                   <div className="scenario-router-event-meta">
-                    {row.path_transition || 'no transition'} · {row.source_type || 'unknown source'} · {fmtMs(row.processing_duration_ms)} · {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
+                    {labelScenarioTransition(row.path_transition)} · {row.source_type || 'unknown source'} · {fmtMs(row.processing_duration_ms)} · {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
                   </div>
                   {row.error_reason && <div className="scenario-router-detail-note">{row.error_reason}</div>}
                 </div>
@@ -2215,6 +2237,39 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
         </section>
       </div>
       </details>
+      )}
+      {!monitorOnly && (
+      <div className="gantt-lab-toolbar gantt-lab-toolbar-bottom">
+        <div className="gantt-lab-controls">
+          <select value={visibleDatasetId} onChange={(e) => requestDatasetSelection(e.target.value)} className="gantt-lab-select">
+            {datasets.map((ds) => (
+              <option key={ds.id} value={ds.id}>
+                {ds.optionLabel || ds.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="gantt-lab-delete"
+            onClick={deleteSelectedRun}
+            disabled={!selectedRunId || Boolean(deletingRunId)}
+            title={selectedRunId ? 'Delete selected run artifact family' : 'No run selected'}
+          >
+            {deletingRunId && deletingRunId === selectedRunId ? 'Deleting…' : 'Delete Run'}
+          </button>
+          <button
+            type="button"
+            className={`gantt-lab-toggle ${timelineOrientation === 'horizontal' ? 'is-horizontal' : 'is-vertical'}`}
+            onClick={() => setTimelineOrientation((prev) => (prev === 'vertical' ? 'horizontal' : 'vertical'))}
+            aria-label={`Switch to ${timelineOrientation === 'vertical' ? 'horizontal' : 'vertical'} chart/catalyst layout`}
+          >
+            {timelineOrientation === 'vertical' ? 'Layout: Vertical' : 'Layout: Horizontal'}
+          </button>
+          <button type="button" className="gantt-lab-back" onClick={backToCouncilChat}>
+            Back To Council
+          </button>
+        </div>
+      </div>
       )}
       </div>
       {!monitorOnly && (

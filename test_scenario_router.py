@@ -509,7 +509,7 @@ class ThesisComparatorTests(unittest.TestCase):
         self.assertTrue(report.key_findings)
         self.assertIn("bull_permit_fast", report.matched_condition_ids)
 
-    def test_comparator_uses_market_facts_for_asset_price_condition(self):
+    def test_comparator_reports_market_facts_without_rerouting_announcement(self):
         baseline_run = BaselineRunPacket(
             run_id="run-market-1",
             ticker="ASX:WWI",
@@ -554,8 +554,10 @@ class ThesisComparatorTests(unittest.TestCase):
 
         report = self.comparator.compare(facts, baseline_run)
 
-        self.assertEqual(report.current_path, "bull")
+        self.assertEqual(report.current_path, "base")
+        self.assertEqual(report.path_transition, "")
         self.assertEqual(report.market_facts_used.get("gold_price_usd_oz"), 5100.0)
+        self.assertNotIn("bull_required_gold_us_5000", report.matched_condition_ids)
         evals = [item for item in report.condition_evaluations if item.condition_id == "bull_required_gold_us_5000"]
         self.assertEqual(len(evals), 1)
         self.assertEqual(evals[0].status, "matched")

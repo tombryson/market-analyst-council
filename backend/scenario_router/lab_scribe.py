@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -9,7 +10,9 @@ from typing import Any, Dict
 
 from .models import AnnouncementEvent, AnnouncementPacket, ScenarioRouterDecision
 
-OUTPUTS_DIR = Path(__file__).resolve().parents[2] / "outputs"
+OUTPUTS_DIR = Path(
+    os.getenv("ANALYSIS_OUTPUTS_DIR", str(Path(__file__).resolve().parents[2] / "outputs"))
+)
 SCENARIO_ROUTER_EVENTS_DIR = OUTPUTS_DIR / "scenario_router_events"
 LEGACY_FRESHNESS_EVENTS_DIR = OUTPUTS_DIR / "freshness_events"
 

@@ -162,6 +162,7 @@ class ScenarioRouterObservability:
             if isinstance(item, dict)
             and str(item.get("status") or "").strip() == "matched"
             and str(item.get("group") or "").strip() in {"required", "failure"}
+            and str(item.get("matched_via") or "").strip() != "market_facts"
         )
         triggered_watchlist = sum(
             1
@@ -169,6 +170,23 @@ class ScenarioRouterObservability:
             if isinstance(item, dict)
             and str(item.get("status") or "").strip() == "matched"
             and str(item.get("group") or "").strip() in {"red_flag", "confirmatory"}
+            and str(item.get("matched_via") or "").strip() != "market_facts"
+        )
+        market_conditions = sum(
+            1
+            for item in evaluations
+            if isinstance(item, dict)
+            and str(item.get("matched_via") or "").strip() == "market_facts"
+            and str(item.get("status") or "").strip() in {"matched", "contradicted"}
+        )
+        raw_action = str(action.get("action") or "").strip()
+        raw_current_path = str(report.get("current_path") or "").strip()
+        raw_baseline_path = str(report.get("baseline_path") or "").strip()
+        suppress_stale_market_only_reroute = (
+            matched_conditions == 0
+            and triggered_watchlist == 0
+            and market_conditions > 0
+            and raw_action in {"full_rerun", "rerun_stage1", "run_delta_only"}
         )
 
         return {
@@ -179,17 +197,18 @@ class ScenarioRouterObservability:
             "company_name": str(packet.get("company_name") or "").strip(),
             "saved_at_utc": str(payload.get("saved_at_utc") or "").strip(),
             "received_at_utc": str(event.get("received_at_utc") or "").strip(),
-            "action": str(action.get("action") or "").strip(),
-            "impact_level": str(report.get("impact_level") or "").strip(),
-            "current_path": str(report.get("current_path") or "").strip(),
-            "baseline_path": str(report.get("baseline_path") or "").strip(),
-            "path_transition": str(report.get("path_transition") or "").strip(),
+            "action": "watch" if suppress_stale_market_only_reroute else raw_action,
+            "impact_level": "low" if suppress_stale_market_only_reroute else str(report.get("impact_level") or "").strip(),
+            "current_path": (raw_baseline_path or raw_current_path) if suppress_stale_market_only_reroute else raw_current_path,
+            "baseline_path": raw_baseline_path,
+            "path_transition": "" if suppress_stale_market_only_reroute else str(report.get("path_transition") or "").strip(),
             "source_type": str(packet.get("source_type") or "").strip(),
             "source_url": str(packet.get("source_url") or "").strip(),
             "run_id": str(baseline_run.get("run_id") or "").strip(),
             "processing_duration_ms": int(payload.get("processing_duration_ms") or 0),
             "matched_conditions_count": matched_conditions,
             "triggered_watchlist_count": triggered_watchlist,
+            "market_conditions_count": market_conditions,
             "error_reason": str(((payload.get("error") or {}) if isinstance(payload.get("error"), dict) else {}).get("reason") or "").strip(),
             "processing_trace": trace,
             "artifact_path": str(path),

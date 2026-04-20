@@ -1,0 +1,208 @@
+id: gambling
+name: Gambling
+description: Investment analysis for wagering, lotteries, gaming machines, casinos, and gambling technology businesses
+category: equity
+version: '1.0'
+author: LLM Council
+company_types:
+- gambling
+template_behavior:
+  commodity_profile: none
+  supplementary_sector_label: gambling and wagering sector
+  cashflow_schema:
+    mode: auto
+    min_reporting_periods: 3
+    require_operating_cashflow: true
+    detection_max_sources: 28
+  stage1_research_lanes:
+  - 'Run a dedicated sector lane (gambling): capture 2-4 recent sources on regulatory/tax changes, wagering turnover trends, hold margins, venue or digital mix, and consumer resilience; tie each point to scenario assumptions.'
+  stage3_scoring_factors:
+    quality:
+    - Regulatory Position
+    - Product/Distribution Quality
+    - Management
+    - Revenue Resilience
+    - Balance Sheet
+    - Governance
+    value:
+    - Intrinsic Value vs Market Cap
+    - Earnings/FCF Yield
+    - Multiple vs Peers
+    - Recurring Revenue Quality
+    - Strategic Value
+auto_detect_keywords:
+- wagering
+- sportsbook
+- lottery
+- casino
+- pokie
+- gaming machine
+- turnover
+- gross gaming revenue
+- hold
+- regulatory
+inputs:
+- ticker
+- company_name
+- market_data
+- pdf_documents
+output_schema:
+  type: object
+  required_fields:
+  - analysis_type
+  - ticker
+  - company_name
+  - quality_score
+  - value_score
+  - price_targets
+  - investment_recommendation
+  structure:
+    analysis_type: gambling
+    ticker: string
+    company_name: string
+    analysis_date: ISO-8601
+    market_data:
+      current_price: float
+      market_cap_m: float
+      shares_outstanding_m: float
+      enterprise_value_m: float
+      currency: string
+    quality_score:
+      total: float (0-100)
+      breakdown: object
+    value_score:
+      total: float (0-100)
+      breakdown: object
+    price_targets:
+      current_price: float
+      scenario_targets: object
+      scenario_probabilities: object
+      prob_weighted_target_12m: float
+      prob_weighted_target_24m: float
+    development_timeline: array
+    thesis_map: object
+    management_competition_assessment: object
+    verification_required_fields: array
+    investment_recommendation:
+      rating: BUY/HOLD/SELL
+      conviction: HIGH/MEDIUM/LOW
+      summary: string
+verification_schema:
+  fact_digest:
+    sections:
+      timelines_deadlines:
+        keywords:
+        - guidance
+        - quarter
+        - half-year
+        - full-year
+        - launch
+        - licence
+      financing_deals:
+        keywords:
+        - debt
+        - refinance
+        - dividend
+        - buyback
+        - acquisition
+        - facility
+      project_economics:
+        keywords:
+        - turnover
+        - gross gaming revenue
+        - net win
+        - hold
+        - take rate
+        - ebitda
+        - free cash flow
+      market_share_structure:
+        keywords:
+        - market share
+        - installed base
+        - share price
+        - market cap
+        - enterprise value
+        - multiple
+      management_governance:
+        keywords:
+        - management
+        - board
+        - ceo
+        - cfo
+        - licence
+        - governance
+      operational_objectives:
+        keywords:
+        - user growth
+        - wallet share
+        - installed base
+        - venue mix
+        - digital mix
+      risks_constraints:
+        keywords:
+        - regulation
+        - point of consumption tax
+        - tax
+        - licence review
+        - compliance
+        - consumer weakness
+      catalysts_tailwinds:
+        keywords:
+        - market share gains
+        - product launch
+        - licence win
+        - tax reset
+        - digital growth
+    timeline_terms:
+    - q1
+    - q2
+    - q3
+    - q4
+    - h1
+    - h2
+    - fy
+    - guidance
+    - launch
+    timeline_focus_terms:
+    - turnover
+    - hold
+    - market share
+    - cash flow
+    conflict:
+      field: operating_guidance_window
+      terms:
+      - guidance
+      - turnover
+      - hold
+      - margin
+      max_shift_quarters: 2
+      resolution_rule: prefer newest dated primary-source guidance
+  compliance:
+    section_markers:
+      quality_score:
+        markers:
+        - quality score
+        - quality_score
+        critical: true
+      value_score:
+        markers:
+        - value score
+        - value_score
+        critical: true
+      price_targets:
+        markers:
+        - 12-month
+        - 24-month
+        - price target
+        - price_targets
+        - probability-weighted
+        - scenario probabilities
+        critical: true
+      development_timeline:
+        markers:
+        - development timeline
+        - timeline
+        - milestone
+        - guidance
+        - development_timeline
+        critical: true
