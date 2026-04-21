@@ -48,13 +48,6 @@ export default function ChatInterface({
   const [availableExchanges, setAvailableExchanges] = useState([]);
   const [selectedExchange, setSelectedExchange] = useState('');
   const [councilMode, setCouncilMode] = useState('local');
-  const [copyLibraryOpen, setCopyLibraryOpen] = useState(false);
-  const [copyTemplates, setCopyTemplates] = useState([]);
-  const [copyTemplateId, setCopyTemplateId] = useState('');
-  const [copyTemplate, setCopyTemplate] = useState(null);
-  const [copyLibraryLoading, setCopyLibraryLoading] = useState(false);
-  const [copyLibraryError, setCopyLibraryError] = useState('');
-  const [copyStatus, setCopyStatus] = useState('');
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -81,70 +74,6 @@ export default function ChatInterface({
     };
     loadSelectors();
   }, []);
-
-  useEffect(() => {
-    if (!copyLibraryOpen || copyTemplates.length) return;
-    const loadCopyTemplates = async () => {
-      try {
-        setCopyLibraryLoading(true);
-        setCopyLibraryError('');
-        const payload = await api.listCopyTemplates();
-        const templates = Array.isArray(payload?.templates) ? payload.templates : [];
-        setCopyTemplates(templates);
-        if (!copyTemplateId && templates.length) {
-          setCopyTemplateId(templates[0].id);
-        }
-      } catch (error) {
-        setCopyLibraryError(error?.message || 'Failed to load copy templates');
-      } finally {
-        setCopyLibraryLoading(false);
-      }
-    };
-    loadCopyTemplates();
-  }, [copyLibraryOpen, copyTemplates.length, copyTemplateId]);
-
-  useEffect(() => {
-    if (!copyLibraryOpen || !copyTemplateId) return;
-    let cancelled = false;
-    const loadTemplate = async () => {
-      try {
-        setCopyLibraryLoading(true);
-        setCopyLibraryError('');
-        setCopyStatus('');
-        const payload = await api.getCopyTemplate(copyTemplateId);
-        if (!cancelled) setCopyTemplate(payload);
-      } catch (error) {
-        if (!cancelled) {
-          setCopyLibraryError(error?.message || 'Failed to load copy template');
-          setCopyTemplate(null);
-        }
-      } finally {
-        if (!cancelled) setCopyLibraryLoading(false);
-      }
-    };
-    loadTemplate();
-    return () => {
-      cancelled = true;
-    };
-  }, [copyLibraryOpen, copyTemplateId]);
-
-  const groupedCopyTemplates = copyTemplates.reduce((acc, item) => {
-    const key = item.kind_label || item.kind || 'Templates';
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(item);
-    return acc;
-  }, {});
-
-  const handleCopyTemplate = async () => {
-    const content = String(copyTemplate?.content || '');
-    if (!content) return;
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopyStatus('Copied to clipboard.');
-    } catch (_) {
-      setCopyStatus('Copy failed. Select the text and copy manually.');
-    }
-  };
 
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
@@ -526,20 +455,6 @@ export default function ChatInterface({
             </span>
           </div>
 
-          <div className="template-library-container">
-            <button
-              type="button"
-              className="template-library-button"
-              onClick={() => setCopyLibraryOpen(true)}
-              disabled={isLoading}
-            >
-              Open Copyable Templates
-            </button>
-            <span className="template-hint">
-              Copy enrichment prompts or raw YAML analysis templates for external AI web UIs.
-            </span>
-          </div>
-
           {/* Exchange Selector */}
           <div className="template-selector-container">
             <label htmlFor="exchange-select" className="template-label">
@@ -658,82 +573,6 @@ export default function ChatInterface({
           </div>
         </div>
       </form>
-
-      {copyLibraryOpen && (
-        <div className="template-library-backdrop" role="presentation">
-          <div className="template-library-modal" role="dialog" aria-modal="true" aria-label="Copyable templates">
-            <div className="template-library-header">
-              <div>
-                <h3>Copyable Templates</h3>
-                <p>Use these for Perplexity, ChatGPT, Claude, Manus, or manual enrichment workflows.</p>
-              </div>
-              <button
-                type="button"
-                className="template-library-close"
-                onClick={() => setCopyLibraryOpen(false)}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="template-library-body">
-              <aside className="template-library-sidebar">
-                {Object.entries(groupedCopyTemplates).map(([group, items]) => (
-                  <div key={group} className="template-library-group">
-                    <div className="template-library-group-title">{group}</div>
-                    {items.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={`template-library-item ${copyTemplateId === item.id ? 'is-active' : ''}`}
-                        onClick={() => setCopyTemplateId(item.id)}
-                      >
-                        <strong>{item.name}</strong>
-                        <span>{item.filename}</span>
-                      </button>
-                    ))}
-                  </div>
-                ))}
-                {!copyTemplates.length && !copyLibraryLoading && (
-                  <div className="template-library-empty">No copyable templates found.</div>
-                )}
-              </aside>
-
-              <main className="template-library-preview">
-                {copyLibraryError && <div className="template-library-error">{copyLibraryError}</div>}
-                {copyTemplate && (
-                  <>
-                    <div className="template-library-preview-head">
-                      <div>
-                        <h4>{copyTemplate.name}</h4>
-                        <p>{copyTemplate.kind_label} · {copyTemplate.relative_path}</p>
-                      </div>
-                      <button
-                        type="button"
-                        className="template-library-copy"
-                        onClick={handleCopyTemplate}
-                        disabled={!copyTemplate.content}
-                      >
-                        Copy
-                      </button>
-                    </div>
-                    {copyTemplate.description && (
-                      <div className="template-library-description">{copyTemplate.description}</div>
-                    )}
-                    {copyStatus && <div className="template-library-status">{copyStatus}</div>}
-                    <textarea
-                      className="template-library-textarea"
-                      value={copyTemplate.content || ''}
-                      readOnly
-                    />
-                  </>
-                )}
-                {copyLibraryLoading && <div className="template-library-empty">Loading template…</div>}
-              </main>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

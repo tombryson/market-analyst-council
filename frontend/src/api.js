@@ -85,32 +85,6 @@ export const api = {
     return response.json();
   },
 
-  async listCopyTemplates() {
-    const { response, body } = await fetchJsonWithRetry(
-      `${API_BASE}/api/copy-templates`,
-      { method: 'GET' },
-      { retries: 2, timeoutMs: 30000 }
-    );
-    if (!response.ok) {
-      const detail = errorDetailFromPayload(body);
-      throw new Error(detail ? `Failed to list copy templates: ${detail}` : 'Failed to list copy templates');
-    }
-    return body;
-  },
-
-  async getCopyTemplate(templateId) {
-    const { response, body } = await fetchJsonWithRetry(
-      `${API_BASE}/api/copy-templates/${encodeURIComponent(templateId)}`,
-      { method: 'GET' },
-      { retries: 2, timeoutMs: 30000 }
-    );
-    if (!response.ok) {
-      const detail = errorDetailFromPayload(body);
-      throw new Error(detail ? `Failed to load copy template: ${detail}` : 'Failed to load copy template');
-    }
-    return body;
-  },
-
   /**
    * List recent Stage 3 run artifacts suitable for gantt-lab.
    */
