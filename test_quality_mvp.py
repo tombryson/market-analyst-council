@@ -1284,6 +1284,35 @@ def _print_stage2_revision(
         )
 
 
+def _print_stage2_reconciliation(stage2_reconciliation: Dict[str, Any]) -> None:
+    print("\nSTAGE 2.5 (DISCREPANCY REVIEW)")
+    print("-" * 90)
+    if not stage2_reconciliation or not stage2_reconciliation.get("enabled"):
+        print("Discrepancy review disabled.")
+        return
+    print(
+        "Review summary: "
+        f"accepted={stage2_reconciliation.get('accepted')} "
+        f"status={stage2_reconciliation.get('status')} "
+        f"issues={stage2_reconciliation.get('issue_count', 0)} "
+        f"model={stage2_reconciliation.get('model', '')}"
+    )
+    summary = str(stage2_reconciliation.get("summary") or "").strip()
+    if summary:
+        print(f"Summary: {summary}")
+    for key in ("blocking", "material", "unresolved", "topic_overrides"):
+        rows = stage2_reconciliation.get(key) or []
+        if not rows:
+            continue
+        print(f"{key}:")
+        for row in rows[:5]:
+            print(
+                "  - "
+                f"{row.get('topic') or 'general'}: "
+                f"{row.get('stage3_instruction') or row.get('issue')}"
+            )
+
+
 def _print_stage3(stage3_result: Dict[str, Any], *, title: str = "STAGE 3") -> None:
     print(f"\n{title}")
     print("-" * 90)
@@ -1814,6 +1843,7 @@ async def _run(args: argparse.Namespace) -> None:
         stage1_collect_perplexity_research_responses,
         stage2_collect_rankings,
         stage2_collect_revision_deltas,
+        stage2_collect_reconciliation,
         apply_stage2_revision_deltas,
         stage3_synthesize_final,
         calculate_aggregate_rankings,
@@ -1821,6 +1851,7 @@ async def _run(args: argparse.Namespace) -> None:
     from backend.config import CHAIRMAN_MODEL
     from backend.config import ENABLE_MARKET_FACTS_PREPASS
     from backend.config import STAGE2_REVISION_PASS_ENABLED
+    from backend.config import STAGE2_RECONCILIATION_ENABLED
     from backend.config import PERPLEXITY_API_URL, PERPLEXITY_COUNCIL_MODELS, MAX_SOURCES
     from backend.main import build_enhanced_context
     from backend.search import extract_ticker_from_query
@@ -2152,6 +2183,28 @@ async def _run(args: argparse.Namespace) -> None:
     if stage25_checkpoint:
         print(f"Saved checkpoint to: {stage25_checkpoint}")
 
+    reconciliation_mode = (args.stage2_reconciliation or "auto").strip().lower()
+    reconciliation_enabled = (
+        bool(STAGE2_RECONCILIATION_ENABLED)
+        if reconciliation_mode == "auto"
+        else (reconciliation_mode == "on")
+    )
+    stage2_reconciliation: Dict[str, Any] = {"enabled": False, "accepted": False}
+    if reconciliation_enabled:
+        _progress("Stage 2.5 discrepancy review start")
+        stage2_reconciliation_start = perf_counter()
+        stage2_reconciliation = await stage2_collect_reconciliation(
+            enhanced_context,
+            stage1_results_for_stage3,
+            stage2_results,
+            label_to_model,
+        )
+        _progress(
+            "Stage 2.5 discrepancy review done in "
+            f"{perf_counter() - stage2_reconciliation_start:.1f}s"
+        )
+    _print_stage2_reconciliation(stage2_reconciliation)
+
     _progress("Stage 3 start")
     stage3_primary_start = perf_counter()
     stage3_result_primary = await stage3_synthesize_final(
@@ -2167,6 +2220,7 @@ async def _run(args: argparse.Namespace) -> None:
         chairman_model=primary_chairman_model,
         market_facts=market_facts,
         evidence_pack=search_results.get("evidence_pack", {}),
+        stage2_reconciliation=stage2_reconciliation,
     )
     stage3_primary_elapsed = perf_counter() - stage3_primary_start
     _progress(f"Stage 3 primary done in {stage3_primary_elapsed:.1f}s")
@@ -2215,6 +2269,7 @@ async def _run(args: argparse.Namespace) -> None:
             chairman_model=secondary_chairman_model,
             market_facts=market_facts,
             evidence_pack=search_results.get("evidence_pack", {}),
+            stage2_reconciliation=stage2_reconciliation,
         )
         stage3_secondary_elapsed = perf_counter() - stage3_secondary_start
         _progress(f"Stage 3 secondary done in {stage3_secondary_elapsed:.1f}s")
@@ -2258,6 +2313,7 @@ async def _run(args: argparse.Namespace) -> None:
             "stage2_aggregate_rankings": aggregate_rankings,
             "stage2_revision_results": stage2_revision_results,
             "stage2_revision_summary": stage2_revision_summary,
+            "stage2_reconciliation": stage2_reconciliation,
             "stage3_primary_model": primary_chairman_model,
             "stage3_secondary_model": secondary_chairman_model,
             "stage3_timing_seconds": {
@@ -2378,6 +2434,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Reuse a recent injection bundle (<=24h) for the same ticker. "
             "Default behavior is fresh prepass for each run."
+        ),
+    )
+    parser.add_argument(
+        "--stage2-reconciliation",
+        type=str,
+        choices=["auto", "on", "off"],
+        default="auto",
+        help=(
+            "Run the single-pass Stage 2.5 discrepancy review before Stage 3. "
+            "auto=use .env STAGE2_RECONCILIATION_ENABLED."
         ),
     )
     parser.add_argument(
