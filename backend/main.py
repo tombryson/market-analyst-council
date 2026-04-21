@@ -2694,16 +2694,21 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
     if not isinstance(router_state, dict) or not router_state:
         return {}
 
-    comparison = (
-        router_state.get("comparison_report")
-        if isinstance(router_state.get("comparison_report"), dict)
-        else {}
-    )
-    action = (
-        router_state.get("action_decision")
-        if isinstance(router_state.get("action_decision"), dict)
-        else {}
-    )
+    try:
+        from .scenario_router.artifact_replay import replay_comparison_from_artifact
+
+        comparison, action = replay_comparison_from_artifact(router_state)
+    except Exception:
+        comparison = (
+            router_state.get("comparison_report")
+            if isinstance(router_state.get("comparison_report"), dict)
+            else {}
+        )
+        action = (
+            router_state.get("action_decision")
+            if isinstance(router_state.get("action_decision"), dict)
+            else {}
+        )
     facts = (
         router_state.get("announcement_facts")
         if isinstance(router_state.get("announcement_facts"), dict)

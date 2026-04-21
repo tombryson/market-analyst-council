@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .action_judge import ActionJudge
+from .artifact_replay import replay_comparison_from_artifact
 from .lab_scribe import SCENARIO_ROUTER_EVENTS_DIR
 from .models import AnnouncementFacts, BaselineRunPacket, EvidenceRef
 from .thesis_comparator import ThesisComparator
@@ -151,8 +152,7 @@ class ScenarioRouterObservability:
     def _summarize_event_payload(payload: Dict[str, Any], *, path: Path) -> Dict[str, Any]:
         event = payload.get("event") if isinstance(payload.get("event"), dict) else {}
         packet = payload.get("announcement_packet") if isinstance(payload.get("announcement_packet"), dict) else {}
-        report = payload.get("comparison_report") if isinstance(payload.get("comparison_report"), dict) else {}
-        action = payload.get("action_decision") if isinstance(payload.get("action_decision"), dict) else {}
+        report, action = replay_comparison_from_artifact(payload)
         baseline_run = payload.get("baseline_run") if isinstance(payload.get("baseline_run"), dict) else {}
         trace = payload.get("processing_trace") if isinstance(payload.get("processing_trace"), list) else []
         evaluations = report.get("condition_evaluations") if isinstance(report.get("condition_evaluations"), list) else []

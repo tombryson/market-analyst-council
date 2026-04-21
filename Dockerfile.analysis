@@ -1,3 +1,12 @@
+FROM node:22-slim AS frontend-builder
+
+WORKDIR /frontend
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend ./
+RUN npm run build
+
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -17,8 +26,8 @@ COPY scripts ./scripts
 COPY docs ./docs
 COPY .env.example ./.env.example
 
-# Copy pre-built frontend (run `cd frontend && npm run build` before deploying)
-COPY frontend/dist ./frontend/dist
+# Build frontend in the remote builder so deployed UI matches source changes.
+COPY --from=frontend-builder /frontend/dist ./frontend/dist
 
 RUN pip install --no-cache-dir --upgrade pip uv && \
     python3 -c "import tomllib; d=tomllib.load(open('pyproject.toml','rb')); open('/tmp/reqs.txt','w').write('\n'.join(d['project']['dependencies']))" && \
