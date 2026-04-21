@@ -638,6 +638,25 @@ async def list_exchanges():
     return list_available_exchanges()
 
 
+@app.get("/api/copy-templates")
+async def list_copyable_templates():
+    """List markdown enrichment prompts and YAML templates for copy/paste use."""
+    from .copy_templates import list_copy_templates
+
+    return {"templates": list_copy_templates()}
+
+
+@app.get("/api/copy-templates/{template_id:path}")
+async def get_copyable_template(template_id: str):
+    """Return one copyable prompt/template body."""
+    from .copy_templates import get_copy_template
+
+    try:
+        return get_copy_template(template_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Copyable template not found")
+
+
 def _extract_stage3_structured_from_artifact(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Extract Stage 3 structured JSON from known artifact shapes."""
     if not isinstance(payload, dict):
