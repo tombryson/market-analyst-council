@@ -81,6 +81,13 @@ from .config import (
     STAGE2_REVISION_PASS_ENABLED,
     STAGE2_REVISION_PASS_TIMEOUT_SECONDS,
     STAGE2_REVISION_PASS_MAX_OUTPUT_TOKENS,
+    STAGE2_RECONCILIATION_ENABLED,
+    STAGE2_RECONCILIATION_MODEL,
+    STAGE2_RECONCILIATION_TIMEOUT_SECONDS,
+    STAGE2_RECONCILIATION_MAX_OUTPUT_TOKENS,
+    STAGE2_RECONCILIATION_MAX_SOURCE_CHARS,
+    STAGE2_RECONCILIATION_MAX_RESPONSE_CHARS,
+    STAGE2_RECONCILIATION_TOP_N,
     PERPLEXITY_PRESET_STRATEGY,
     PERPLEXITY_PRESET_DEEP,
     PERPLEXITY_PRESET_ADVANCED,
@@ -8015,6 +8022,348 @@ def apply_stage2_revision_deltas(
     return updated, summary
 
 
+def _clip_for_reconciliation(text: Any, limit: int, marker: str) -> str:
+    payload = str(text or "").strip()
+    if limit <= 0 or len(payload) <= limit:
+        return payload
+    head = max(1000, int(limit * 0.62))
+    tail = max(1000, limit - head)
+    if head + tail >= len(payload):
+        return payload
+    return (
+        payload[:head].rstrip()
+        + f"\n\n[{marker}: {len(payload) - head - tail} chars omitted]\n\n"
+        + payload[-tail:].lstrip()
+    )
+
+
+def _normalize_reconciliation_issue(item: Any) -> Optional[Dict[str, Any]]:
+    if isinstance(item, str):
+        issue = item.strip()
+        if not issue:
+            return None
+        return {
+            "topic": "",
+            "issue": issue,
+            "source_resolved_position": "",
+            "prefer_models": [],
+            "downweight_models": [],
+            "affected_claims": [],
+            "stage3_instruction": issue,
+            "confidence": None,
+        }
+    if not isinstance(item, dict):
+        return None
+
+    def _string_list(value: Any, max_items: int = 8) -> List[str]:
+        if isinstance(value, str):
+            return [value.strip()] if value.strip() else []
+        if not isinstance(value, list):
+            return []
+        return [str(part).strip() for part in value[:max_items] if str(part).strip()]
+
+    confidence = _coerce_float(item.get("confidence"))
+    if confidence is not None:
+        if confidence > 1.0 and confidence <= 100.0:
+            confidence = confidence / 100.0
+        if confidence < 0.0 or confidence > 1.0:
+            confidence = None
+
+    topic = str(item.get("topic") or "").strip()
+    issue = str(item.get("issue") or item.get("finding") or "").strip()
+    instruction = str(item.get("stage3_instruction") or item.get("instruction") or "").strip()
+    if not issue and not instruction:
+        return None
+    return {
+        "topic": topic,
+        "issue": issue or instruction,
+        "source_resolved_position": str(item.get("source_resolved_position") or "").strip(),
+        "prefer_models": _string_list(item.get("prefer_models")),
+        "downweight_models": _string_list(item.get("downweight_models")),
+        "affected_claims": _string_list(item.get("affected_claims"), max_items=12),
+        "stage3_instruction": instruction or issue,
+        "confidence": round(confidence, 4) if confidence is not None else None,
+    }
+
+
+def _normalize_stage2_reconciliation_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
+    allowed_status = {
+        "issues_found",
+        "no_material_issues",
+        "insufficient_source_context",
+    }
+    status = str(raw.get("status") or "").strip().lower()
+    if status not in allowed_status:
+        has_issues = any(raw.get(key) for key in ("blocking", "material", "unresolved", "topic_overrides"))
+        status = "issues_found" if has_issues else "no_material_issues"
+
+    def _issue_list(key: str, max_items: int = 10) -> List[Dict[str, Any]]:
+        values = raw.get(key) if isinstance(raw.get(key), list) else []
+        normalized: List[Dict[str, Any]] = []
+        for value in values[:max_items]:
+            row = _normalize_reconciliation_issue(value)
+            if row:
+                normalized.append(row)
+        return normalized
+
+    def _string_list(key: str, max_items: int = 12) -> List[str]:
+        values = raw.get(key)
+        if isinstance(values, str):
+            return [values.strip()] if values.strip() else []
+        if not isinstance(values, list):
+            return []
+        return [str(value).strip() for value in values[:max_items] if str(value).strip()]
+
+    topic_overrides: List[Dict[str, Any]] = []
+    values = raw.get("topic_overrides") if isinstance(raw.get("topic_overrides"), list) else []
+    for value in values[:10]:
+        if not isinstance(value, dict):
+            continue
+        issue = _normalize_reconciliation_issue(value)
+        if not issue:
+            continue
+        topic_overrides.append(issue)
+
+    normalized = {
+        "status": status,
+        "blocking": _issue_list("blocking", max_items=8),
+        "material": _issue_list("material", max_items=12),
+        "minor": _issue_list("minor", max_items=8),
+        "unresolved": _issue_list("unresolved", max_items=10),
+        "topic_overrides": topic_overrides,
+        "stage3_constraints": _string_list("stage3_constraints", max_items=14),
+        "summary": str(raw.get("summary") or "").strip(),
+    }
+    if (
+        status == "no_material_issues"
+        and (
+            normalized["blocking"]
+            or normalized["material"]
+            or normalized["unresolved"]
+            or normalized["topic_overrides"]
+        )
+    ):
+        normalized["status"] = "issues_found"
+    return normalized
+
+
+def _build_stage2_reconciliation_prompt(
+    *,
+    source_context: str,
+    responses_text: str,
+    rankings_text: str,
+) -> str:
+    return f"""You are a lightweight discrepancy reviewer for an investment-analysis council.
+
+You are NOT writing the investment memo. You are NOT re-running research. You are checking whether Stage 3 should trust, distrust, or qualify specific council claims.
+
+INPUT A - PRIMARY/PREPASS CONTEXT
+This may contain filings, attachment excerpts, deterministic market facts, injection bundles, and source summaries:
+{source_context}
+
+INPUT B - STAGE 1 COUNCIL RESPONSES
+{responses_text}
+
+INPUT C - STAGE 2 PEER RANKINGS
+{rankings_text}
+
+TASK
+Run one compact pass across all inputs and identify:
+1. Claims in Stage 1 that conflict with the primary/prepass context.
+2. Stale assumptions, especially production, financing, hedging, reserves/resources, commodity exposure, or project-stage baselines that look superseded by dated source material.
+3. Cases where a model says "unknown", "not disclosed", or "data gap" but the primary/prepass context appears to contain the answer.
+4. Material disagreements between Stage 1 models that Stage 3 must explicitly adjudicate.
+5. Topic-specific overrides where a lower-ranked response appears better aligned with source evidence than a higher-ranked response.
+
+Rules:
+- Do not introduce external facts not present in the inputs.
+- Do not perform valuation or write a replacement memo.
+- Prefer primary/prepass context over peer ranking when they conflict.
+- Preserve uncertainty. If the source context is too thin, say so.
+- Be strict: only list issues that could materially change the final synthesis or prevent a misleading memo.
+
+Return JSON only with this schema:
+{{
+  "status": "issues_found | no_material_issues | insufficient_source_context",
+  "blocking": [
+    {{
+      "topic": "short topic",
+      "issue": "what is wrong or contradictory",
+      "source_resolved_position": "what the primary/prepass context supports, if clear",
+      "prefer_models": ["model names whose claim is more evidence-aligned"],
+      "downweight_models": ["model names whose claim is contradicted or stale"],
+      "affected_claims": ["short quoted/paraphrased claims"],
+      "stage3_instruction": "specific instruction for the chairman",
+      "confidence": 0.0
+    }}
+  ],
+  "material": [],
+  "minor": [],
+  "unresolved": [
+    {{
+      "topic": "short topic",
+      "issue": "what remains unresolved",
+      "source_resolved_position": "",
+      "prefer_models": [],
+      "downweight_models": [],
+      "affected_claims": [],
+      "stage3_instruction": "how Stage 3 should qualify it",
+      "confidence": 0.0
+    }}
+  ],
+  "topic_overrides": [
+    {{
+      "topic": "short topic",
+      "issue": "why ranking should be overridden for this topic",
+      "source_resolved_position": "evidence-aligned position",
+      "prefer_models": ["lower-ranked but better-supported models"],
+      "downweight_models": ["higher-ranked but contradicted models"],
+      "affected_claims": [],
+      "stage3_instruction": "topic-specific synthesis rule",
+      "confidence": 0.0
+    }}
+  ],
+  "stage3_constraints": [
+    "hard synthesis constraint the chairman must follow"
+  ],
+  "summary": "one-paragraph summary"
+}}
+"""
+
+
+async def stage2_collect_reconciliation(
+    enhanced_context: str,
+    stage1_results: List[Dict[str, Any]],
+    stage2_results: List[Dict[str, Any]],
+    label_to_model: Dict[str, str],
+    reconciliation_model: Optional[str] = None,
+    enabled: Optional[bool] = None,
+) -> Dict[str, Any]:
+    """Single cheap discrepancy pass before Stage 3 synthesis."""
+    should_run = bool(STAGE2_RECONCILIATION_ENABLED) if enabled is None else bool(enabled)
+    if not should_run:
+        return {"enabled": False, "accepted": False, "status": "disabled"}
+    if not stage1_results:
+        return {"enabled": True, "accepted": False, "status": "no_stage1_results"}
+
+    aggregate = calculate_aggregate_rankings(stage2_results, label_to_model)
+    rank_by_model = {
+        str(row.get("model") or ""): row
+        for row in aggregate
+        if row.get("model")
+    }
+    labels = [chr(65 + i) for i in range(len(stage1_results or []))]
+    model_to_label = {
+        str(result.get("model") or ""): f"Response {label}"
+        for label, result in zip(labels, stage1_results or [])
+    }
+    result_by_model = {
+        str(result.get("model") or ""): result
+        for result in stage1_results or []
+        if result.get("model")
+    }
+
+    ordered_models = [row["model"] for row in aggregate if row.get("model") in result_by_model]
+    for result in stage1_results or []:
+        model = str(result.get("model") or "").strip()
+        if model and model not in ordered_models:
+            ordered_models.append(model)
+    top_n = int(STAGE2_RECONCILIATION_TOP_N)
+    if top_n > 0:
+        ordered_models = ordered_models[:top_n]
+
+    max_response_chars = int(STAGE2_RECONCILIATION_MAX_RESPONSE_CHARS)
+    response_blocks: List[str] = []
+    for model in ordered_models:
+        result = result_by_model.get(model) or {}
+        rank = rank_by_model.get(model) or {}
+        rank_text = (
+            f"average_rank={rank.get('average_rank')} "
+            f"rankings_count={rank.get('rankings_count')}"
+            if rank
+            else "not_ranked"
+        )
+        response_blocks.append(
+            f"{model_to_label.get(model, '')} | model={model} | {rank_text}\n"
+            f"{_clip_for_reconciliation(result.get('response', ''), max_response_chars, 'TRUNCATED RESPONSE')}"
+        )
+
+    ranking_lines = ["Aggregate peer ranking:"]
+    if aggregate:
+        for i, item in enumerate(aggregate, start=1):
+            ranking_lines.append(
+                f"{i}. {item.get('model')} "
+                f"(avg_rank={item.get('average_rank')}, votes={item.get('rankings_count')})"
+            )
+    else:
+        ranking_lines.append("(no parseable aggregate ranking)")
+
+    source_context = _clip_for_reconciliation(
+        enhanced_context,
+        int(STAGE2_RECONCILIATION_MAX_SOURCE_CHARS),
+        "TRUNCATED SOURCE/PREPASS CONTEXT",
+    )
+    prompt = _build_stage2_reconciliation_prompt(
+        source_context=source_context,
+        responses_text="\n\n---\n\n".join(response_blocks),
+        rankings_text="\n".join(ranking_lines),
+    )
+
+    selected_model = (reconciliation_model or STAGE2_RECONCILIATION_MODEL or CHAIRMAN_MODEL).strip()
+    timeout = float(STAGE2_RECONCILIATION_TIMEOUT_SECONDS)
+    max_tokens = int(STAGE2_RECONCILIATION_MAX_OUTPUT_TOKENS)
+    _progress_log(
+        "Stage2.5 reconciliation start: "
+        f"model={selected_model}, responses={len(ordered_models)}, "
+        f"prompt_chars={len(prompt)}, timeout={timeout:.1f}s"
+    )
+    response = await query_model(
+        selected_model,
+        [{"role": "user", "content": prompt}],
+        timeout=timeout,
+        max_tokens=max_tokens if max_tokens > 0 else None,
+    )
+    raw_text = (response or {}).get("content", "") if response else ""
+    parsed, parse_error = _parse_json_object_from_text(raw_text)
+    if not parsed:
+        _progress_log(
+            "Stage2.5 reconciliation failed: "
+            f"model={selected_model}, parse_error={parse_error}"
+        )
+        return {
+            "enabled": True,
+            "accepted": False,
+            "status": "parse_failed" if raw_text else "model_failed",
+            "model": selected_model,
+            "selected_models": ordered_models,
+            "prompt_chars": len(prompt),
+            "response_chars": len(raw_text or ""),
+            "parse_error": parse_error or "empty_response",
+            "raw_response": raw_text,
+        }
+
+    normalized = _normalize_stage2_reconciliation_payload(parsed)
+    issue_count = sum(
+        len(normalized.get(key) or [])
+        for key in ("blocking", "material", "minor", "unresolved", "topic_overrides")
+    )
+    out = {
+        "enabled": True,
+        "accepted": True,
+        "model": selected_model,
+        "selected_models": ordered_models,
+        "prompt_chars": len(prompt),
+        "response_chars": len(raw_text or ""),
+        "issue_count": int(issue_count),
+        **normalized,
+    }
+    _progress_log(
+        "Stage2.5 reconciliation done: "
+        f"status={out.get('status')}, issues={issue_count}"
+    )
+    return out
+
+
 async def stage3_synthesize_final(
     enhanced_context: str,
     stage1_results: List[Dict[str, Any]],
@@ -8028,6 +8377,7 @@ async def stage3_synthesize_final(
     chairman_model: Optional[str] = None,
     market_facts: Optional[Dict[str, Any]] = None,
     evidence_pack: Optional[Dict[str, Any]] = None,
+    stage2_reconciliation: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Stage 3: Chairman synthesizes final response.
@@ -8065,6 +8415,7 @@ async def stage3_synthesize_final(
             chairman_model=selected_chairman_model,
             market_facts=market_facts,
             evidence_pack=evidence_pack,
+            stage2_reconciliation=stage2_reconciliation,
         )
 
     # Otherwise use standard synthesis
@@ -8078,6 +8429,14 @@ async def stage3_synthesize_final(
         f"Model: {result['model']}\nRanking: {result['ranking']}"
         for result in stage2_results
     ])
+    reconciliation_text = ""
+    if isinstance(stage2_reconciliation, dict) and stage2_reconciliation.get("accepted"):
+        reconciliation_text = (
+            "\n\nSTAGE 2.5 - Discrepancy Review:\n"
+            f"{json.dumps(stage2_reconciliation, indent=2)[:8000]}\n\n"
+            "Instruction: peer rankings are useful, but source-evidence contradictions "
+            "and topic-specific overrides in this review must take precedence."
+        )
 
     chairman_prompt = f"""You are the Chairman of an LLM Council. Multiple AI models have provided responses to a user's question, and then ranked each other's responses.
 
@@ -8089,10 +8448,12 @@ STAGE 1 - Individual Responses:
 
 STAGE 2 - Peer Rankings:
 {stage2_text}
+{reconciliation_text}
 
 Your task as Chairman is to synthesize all of this information into a single, comprehensive, accurate answer to the user's original question. Consider:
 - The individual responses and their insights
 - The peer rankings and what they reveal about response quality
+- Any Stage 2.5 discrepancy review constraints, which can override peer ranking on specific evidence conflicts
 - Any patterns of agreement or disagreement
 
 Provide a clear, well-reasoned final answer that represents the council's collective wisdom:"""
@@ -8106,12 +8467,14 @@ Provide a clear, well-reasoned final answer that represents the council's collec
         # Fallback if chairman fails
         return {
             "model": selected_chairman_model,
-            "response": "Error: Unable to generate final synthesis."
+            "response": "Error: Unable to generate final synthesis.",
+            "stage2_reconciliation": stage2_reconciliation,
         }
 
     return {
         "model": selected_chairman_model,
-        "response": response.get('content', '')
+        "response": response.get('content', ''),
+        "stage2_reconciliation": stage2_reconciliation,
     }
 
 
@@ -8290,6 +8653,13 @@ async def run_full_council(
         )
         stage2_revision_summary["apply"] = apply_summary
 
+    stage2_reconciliation = await stage2_collect_reconciliation(
+        enhanced_context,
+        stage1_results_for_stage3,
+        stage2_results,
+        label_to_model,
+    )
+
     # Stage 3: Synthesize final answer (with optional structured analysis)
     stage3_result = await stage3_synthesize_final(
         enhanced_context,
@@ -8302,6 +8672,7 @@ async def run_full_council(
         company_name=company_name,
         exchange=exchange,
         evidence_pack=None,
+        stage2_reconciliation=stage2_reconciliation,
     )
 
     # Prepare metadata
@@ -8311,6 +8682,7 @@ async def run_full_council(
         "stage2_revision_pass_enabled": bool(STAGE2_REVISION_PASS_ENABLED),
         "stage2_revision_summary": stage2_revision_summary,
         "stage2_revision_results": stage2_revision_results,
+        "stage2_reconciliation": stage2_reconciliation,
     }
 
     return stage1_results_for_stage3, stage2_results, stage3_result, metadata

@@ -432,6 +432,38 @@ def _deterministic_finance_prompt_block(evidence_pack: Optional[Dict[str, Any]])
     return "\n".join(blocks)
 
 
+def _stage2_reconciliation_prompt_block(
+    stage2_reconciliation: Optional[Dict[str, Any]],
+) -> str:
+    """Render the compact discrepancy review for chairman synthesis."""
+    if not isinstance(stage2_reconciliation, dict):
+        return ""
+    if not stage2_reconciliation.get("accepted"):
+        return ""
+
+    payload = {
+        "status": stage2_reconciliation.get("status"),
+        "summary": stage2_reconciliation.get("summary"),
+        "blocking": stage2_reconciliation.get("blocking") or [],
+        "material": stage2_reconciliation.get("material") or [],
+        "unresolved": stage2_reconciliation.get("unresolved") or [],
+        "topic_overrides": stage2_reconciliation.get("topic_overrides") or [],
+        "stage3_constraints": stage2_reconciliation.get("stage3_constraints") or [],
+    }
+    rendered = json.dumps(payload, indent=2, ensure_ascii=False)
+    if len(rendered) > 9000:
+        rendered = rendered[:9000].rstrip() + "\n...[TRUNCATED STAGE 2.5 REVIEW]"
+    return (
+        "STAGE 2.5 DISCREPANCY REVIEW (single-pass evidence check):\n"
+        f"{rendered}\n\n"
+        "Evidence precedence for Stage 3:\n"
+        "- Peer rankings are a quality signal, not a fact source.\n"
+        "- If this review identifies a source-evidence contradiction, resolve or qualify it before synthesis.\n"
+        "- If this review identifies a topic override, prefer the evidence-aligned model on that topic even if it ranked lower overall.\n"
+        "- Preserve unresolved disputes rather than smoothing them into false certainty.\n"
+    )
+
+
 def _extract_user_question_from_enhanced_context(enhanced_context: str) -> str:
     """Extract the original user question line to avoid duplicating large context in Stage 3."""
     text = str(enhanced_context or "").strip()
@@ -488,6 +520,7 @@ def _build_chairman_xml_prompt(
     weighted_responses: str,
     rankings_summary: str,
     rubric: str,
+    reconciliation_context: str = "",
 ) -> str:
     """Prompt chairman for structured plain text (XML-like tags), not JSON."""
     return f"""You are the Chairman of an LLM Investment Council. Multiple AI models have analyzed a company and peer-ranked each other.
@@ -500,9 +533,12 @@ ORIGINAL USER QUESTION:
 PEER RANKINGS SUMMARY:
 {rankings_summary}
 
+{reconciliation_context}
+
 YOUR TASK AS CHAIRMAN:
 Synthesize a single neutral, decision-useful analysis using the rubric below and the council evidence only.
 Do not run new retrieval. Do not add unrelated facts.
+Use peer rankings as a weighting signal, except where the Stage 2.5 discrepancy review identifies a source-evidence contradiction or topic-specific override.
 
 RUBRIC TO HONOR:
 {rubric}
@@ -1085,6 +1121,7 @@ async def synthesize_structured_analysis(
     chairman_model: str = None,
     market_facts: Optional[Dict[str, Any]] = None,
     evidence_pack: Optional[Dict[str, Any]] = None,
+    stage2_reconciliation: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Synthesize a structured investment analysis following template rubric.
@@ -1100,6 +1137,7 @@ async def synthesize_structured_analysis(
         exchange: Optional exchange id/name
         chairman_model: Optional chairman model override for this run
         evidence_pack: Optional evidence pack containing claim ledger + deterministic lane
+        stage2_reconciliation: Optional single-pass discrepancy review from Stage 2.5
 
     Returns:
         Dict with structured analysis + JSON output
@@ -1125,7 +1163,8 @@ async def synthesize_structured_analysis(
             "model": CHAIRMAN_MODEL,
             "response": f"Error: Template '{template_id}' not found.",
             "structured_data": None,
-            "parse_error": "Template not found"
+            "parse_error": "Template not found",
+            "stage2_reconciliation": stage2_reconciliation,
         }
 
     # Resolve company name and apply placeholder substitutions.
@@ -1147,6 +1186,7 @@ async def synthesize_structured_analysis(
     original_user_question = _extract_user_question_from_enhanced_context(enhanced_context)
 
     rankings_summary = create_rankings_summary(stage2_results, label_to_model)
+    reconciliation_context = _stage2_reconciliation_prompt_block(stage2_reconciliation)
     output_style = str(CHAIRMAN_OUTPUT_STYLE or "text_xml").strip().lower()
     if output_style == "json":
         chairman_prompt = f"""You are the Chairman of an LLM Investment Council. Multiple AI models have analyzed a company and provided detailed responses. They have also peer-reviewed each other's responses. Your task is to synthesize their insights into a single, structured investment analysis.
@@ -1159,13 +1199,15 @@ ORIGINAL USER QUESTION:
 PEER RANKINGS SUMMARY:
 {rankings_summary}
 
+{reconciliation_context}
+
 YOUR TASK AS CHAIRMAN:
 You must produce a structured investment analysis following this detailed rubric:
 
 {rubric}
 
 CRITICAL REQUIREMENTS:
-1. Use the council responses as the primary evidence source and weight higher-ranked responses more heavily.
+1. Use the council responses as the primary evidence source and weight higher-ranked responses more heavily, except where the Stage 2.5 discrepancy review identifies a source-evidence contradiction or topic-specific override.
 2. Do not re-run retrieval or introduce unrelated facts; synthesize and adjudicate what the council already produced.
 3. Where members disagree materially, record dissent in `extended_analysis.dissenting_views`.
 4. Output valid JSON matching this structure:
@@ -1185,6 +1227,7 @@ Begin your JSON output now:"""
             weighted_responses=weighted_responses,
             rankings_summary=rankings_summary,
             rubric=rubric,
+            reconciliation_context=reconciliation_context,
         )
 
     messages = [{"role": "user", "content": chairman_prompt}]
@@ -1208,7 +1251,8 @@ Begin your JSON output now:"""
             "model": selected_chairman_model,
             "response": "Error: Unable to generate structured analysis.",
             "structured_data": None,
-            "parse_error": "Chairman model failed to respond"
+            "parse_error": "Chairman model failed to respond",
+            "stage2_reconciliation": stage2_reconciliation,
         }
 
     response_text = response.get('content', '')
@@ -1298,6 +1342,20 @@ Begin your JSON output now:"""
                 f"{r['model']} (avg rank: {r['average_rank']:.2f})"
                 for r in aggregate[:3]
             ]
+        if isinstance(stage2_reconciliation, dict):
+            structured_data["council_metadata"]["stage2_reconciliation"] = {
+                "enabled": bool(stage2_reconciliation.get("enabled")),
+                "accepted": bool(stage2_reconciliation.get("accepted")),
+                "status": stage2_reconciliation.get("status"),
+                "issue_count": stage2_reconciliation.get("issue_count"),
+                "model": stage2_reconciliation.get("model"),
+                "summary": stage2_reconciliation.get("summary"),
+                "blocking": stage2_reconciliation.get("blocking") or [],
+                "material": stage2_reconciliation.get("material") or [],
+                "unresolved": stage2_reconciliation.get("unresolved") or [],
+                "topic_overrides": stage2_reconciliation.get("topic_overrides") or [],
+                "stage3_constraints": stage2_reconciliation.get("stage3_constraints") or [],
+            }
 
         _apply_market_facts_guardrails(structured_data, market_facts)
         _apply_deterministic_finance_lane(structured_data, evidence_pack)
@@ -1311,6 +1369,7 @@ Begin your JSON output now:"""
         "structured_data": structured_data,
         "parse_error": parse_error,
         "normalization": normalization_meta,
+        "stage2_reconciliation": stage2_reconciliation,
     }
 
 

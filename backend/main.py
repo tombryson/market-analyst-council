@@ -17,6 +17,7 @@ from .council import (
     stage1_collect_perplexity_research_responses,
     stage2_collect_rankings,
     stage2_collect_revision_deltas,
+    stage2_collect_reconciliation,
     apply_stage2_revision_deltas,
     stage3_synthesize_final,
     calculate_aggregate_rankings,
@@ -37,6 +38,7 @@ from .config import (
     CHAIRMAN_MODEL,
     ENABLE_MARKET_FACTS_PREPASS,
     STAGE2_REVISION_PASS_ENABLED,
+    STAGE2_RECONCILIATION_ENABLED,
     PROGRESS_LOGGING,
     SYSTEM_ENABLED,
     SYSTEM_SHUTDOWN_REASON,
@@ -586,9 +588,22 @@ async def send_message_stream(
                     "data: "
                     f"{json.dumps({'type': 'stage2_revision_complete', 'data': stage2_revision_results, 'summary': stage2_revision_summary})}\n\n"
                 )
+            stage2_reconciliation: Dict[str, Any] = {"enabled": False, "accepted": False}
+            if STAGE2_RECONCILIATION_ENABLED:
+                yield f"data: {json.dumps({'type': 'stage2_reconciliation_start'})}\n\n"
+                stage2_reconciliation = await stage2_collect_reconciliation(
+                    enhanced_context,
+                    stage1_results_for_stage3,
+                    stage2_results,
+                    label_to_model,
+                )
+                yield (
+                    "data: "
+                    f"{json.dumps({'type': 'stage2_reconciliation_complete', 'data': stage2_reconciliation})}\n\n"
+                )
             yield (
                 "data: "
-                f"{json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings, 'council_mode': selected_council_mode, 'research_depth': selected_research_depth, 'ranking_models': stage2_ranking_models or [], 'chairman_model': stage3_chairman_model or CHAIRMAN_MODEL, 'template_id': selected_template_id, 'company_name': selected_company_name, 'company_type': selected_company_type, 'template_selection_source': template_selection_source, 'exchange': selected_exchange, 'exchange_selection_source': exchange_selection_source, 'stage2_revision_pass_enabled': bool(STAGE2_REVISION_PASS_ENABLED), 'stage2_revision_summary': stage2_revision_summary}})}\n\n"
+                f"{json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings, 'council_mode': selected_council_mode, 'research_depth': selected_research_depth, 'ranking_models': stage2_ranking_models or [], 'chairman_model': stage3_chairman_model or CHAIRMAN_MODEL, 'template_id': selected_template_id, 'company_name': selected_company_name, 'company_type': selected_company_type, 'template_selection_source': template_selection_source, 'exchange': selected_exchange, 'exchange_selection_source': exchange_selection_source, 'stage2_revision_pass_enabled': bool(STAGE2_REVISION_PASS_ENABLED), 'stage2_revision_summary': stage2_revision_summary, 'stage2_reconciliation_enabled': bool(STAGE2_RECONCILIATION_ENABLED), 'stage2_reconciliation': stage2_reconciliation}})}\n\n"
             )
 
             # Stage 3: Synthesize final answer (with optional structured analysis)
@@ -606,6 +621,7 @@ async def send_message_stream(
                 chairman_model=stage3_chairman_model,
                 market_facts=market_facts,
                 evidence_pack=(search_results or {}).get("evidence_pack"),
+                stage2_reconciliation=stage2_reconciliation,
             )
             yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
