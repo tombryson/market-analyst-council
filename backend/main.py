@@ -2742,6 +2742,8 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
             "label": str(item.get("label") or item.get("condition_id") or "").strip(),
             "scenario": str(item.get("scenario") or "").strip(),
             "group": str(item.get("group") or "").strip(),
+            "reason": str(item.get("reason") or "").strip(),
+            "matched_via": str(item.get("matched_via") or "").strip(),
             "field": str(item.get("market_field") or "").strip(),
             "observed_value": item.get("observed_value"),
             "comparator": str(item.get("comparator") or "").strip(),
@@ -2753,6 +2755,56 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         and str(item.get("matched_via") or "").strip() == "market_facts"
         and str(item.get("status") or "").strip() in {"matched", "contradicted"}
         and str(item.get("label") or item.get("condition_id") or "").strip()
+    ][:8]
+    matched_condition_details = [
+        {
+            "label": str(item.get("label") or item.get("condition_id") or "").strip(),
+            "scenario": str(item.get("scenario") or "").strip(),
+            "group": str(item.get("group") or "").strip(),
+            "reason": str(item.get("reason") or "").strip(),
+            "matched_via": str(item.get("matched_via") or "").strip(),
+            "confidence": item.get("confidence"),
+        }
+        for item in condition_evaluations
+        if isinstance(item, dict)
+        and str(item.get("status") or "").strip() == "matched"
+        and str(item.get("group") or "").strip() in {"required", "failure"}
+        and str(item.get("matched_via") or "").strip() != "market_facts"
+        and str(item.get("label") or item.get("condition_id") or "").strip()
+    ][:8]
+    triggered_watchlist_details = [
+        {
+            "label": str(item.get("label") or item.get("condition_id") or "").strip(),
+            "scenario": str(item.get("scenario") or "").strip(),
+            "group": str(item.get("group") or "").strip(),
+            "reason": str(item.get("reason") or "").strip(),
+            "matched_via": str(item.get("matched_via") or "").strip(),
+            "confidence": item.get("confidence"),
+        }
+        for item in condition_evaluations
+        if isinstance(item, dict)
+        and str(item.get("status") or "").strip() == "matched"
+        and str(item.get("group") or "").strip() in {"red_flag", "confirmatory"}
+        and str(item.get("matched_via") or "").strip() != "market_facts"
+        and str(item.get("label") or item.get("condition_id") or "").strip()
+    ][:8]
+    key_findings = [
+        {
+            "type": str(item.get("type") or "").strip(),
+            "summary": str(item.get("summary") or "").strip(),
+            "severity": str(item.get("severity") or "").strip(),
+        }
+        for item in (comparison.get("key_findings") or [])
+        if isinstance(item, dict) and str(item.get("summary") or "").strip()
+    ][:8]
+    conflicts_with_run = [
+        {
+            "type": str(item.get("type") or "").strip(),
+            "summary": str(item.get("summary") or "").strip(),
+            "severity": str(item.get("severity") or "").strip(),
+        }
+        for item in (comparison.get("conflicts_with_run") or [])
+        if isinstance(item, dict) and str(item.get("summary") or "").strip()
     ][:8]
     packet = (
         router_state.get("announcement_packet")
@@ -2789,8 +2841,12 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
             comparison.get("announcement_title") or facts.get("title") or event.get("subject") or ""
         ).strip(),
         "matched_conditions": matched_conditions,
+        "matched_condition_details": matched_condition_details,
         "triggered_watchlist": triggered_watchlist,
+        "triggered_watchlist_details": triggered_watchlist_details,
         "market_context_conditions": market_context_conditions,
+        "key_findings": key_findings,
+        "conflicts_with_run": conflicts_with_run,
         "affected_domains": (
             comparison.get("affected_domains")
             if isinstance(comparison.get("affected_domains"), list)
@@ -2805,6 +2861,16 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
             if isinstance(comparison.get("market_facts_used"), dict)
             else {}
         ),
+        "invalidated_sections": [
+            str(item or "").strip()
+            for item in (action.get("invalidated_sections") or [])
+            if str(item or "").strip()
+        ][:8],
+        "follow_up_steps": [
+            str(item or "").strip()
+            for item in (action.get("follow_up_steps") or [])
+            if str(item or "").strip()
+        ][:5],
         "received_at_utc": str(event.get("received_at_utc") or "").strip(),
         "saved_at_utc": str(router_state.get("saved_at_utc") or "").strip(),
     }

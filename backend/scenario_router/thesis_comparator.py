@@ -33,7 +33,7 @@ NEGATIVE_TOKENS = {
 DOMAIN_KEYWORDS = {
     "financing": {"funding", "facility", "debt", "loan", "placement", "capital", "liquidity", "covenant"},
     "permitting": {"permit", "approval", "license", "licence", "heritage", "environmental", "regulator"},
-    "timeline": {"timeline", "quarter", "milestone", "delay", "delayed", "ahead of schedule", "on track", "mid-2027", "2028"},
+    "timeline": {"timeline", "milestone", "delay", "delayed", "ahead of schedule", "on track", "mid-2027", "2028"},
     "resource": {"resource", "reserve", "jorc", "ore reserve", "mineral resource"},
     "production": {"production", "throughput", "first gold", "ramp-up", "ramp up", "processing", "run-rate", "run rate", "kozpa"},
     "guidance": {"guidance", "forecast", "outlook", "aisc", "cost guidance", "cash margin"},
@@ -45,6 +45,12 @@ DOMAIN_KEYWORDS = {
 MARKET_RULE_RE = re.compile(
     r"\b(?P<asset>gold|silver|copper|lithium|uranium|brent|wti|henry hub|henry_hub|natural gas)\b"
     r"[^<>]{0,60}?(?P<op>>=|<=|>|<)\s*(?P<currency>US\$|USD|A\$|AU\$|AUD)\s*(?P<value>[0-9][0-9,]*(?:\.[0-9]+)?)",
+    flags=re.IGNORECASE,
+)
+MARKET_NATURAL_RULE_RE = re.compile(
+    r"\b(?P<asset>gold|silver|copper|lithium|uranium|brent|wti|henry hub|henry_hub|natural gas)\b"
+    r"[^0-9]{0,60}?\b(?P<word>above|over|greater than|exceeds|exceeding|below|under|less than)\b"
+    r"[^0-9]{0,30}?(?P<currency>US\$|USD|A\$|AU\$|AUD)\s*(?P<value>[0-9][0-9,]*(?:\.[0-9]+)?)",
     flags=re.IGNORECASE,
 )
 MARKET_FIELD_MAP = {
@@ -121,8 +127,8 @@ class ThesisComparator:
         positive = self._contains_any(haystack, POSITIVE_TOKENS)
         negative = self._contains_any(haystack, NEGATIVE_TOKENS)
         affected_domains = self._infer_domains(
-            haystack + "\n" + "\n".join(item.label for item in announcement_matched_evals),
-            facts.material_topics,
+            facts=facts,
+            matched_evaluations=announcement_matched_evals,
         )
 
         current_path = self._choose_current_path(
@@ -285,6 +291,21 @@ class ThesisComparator:
         if market_eval is not None:
             return market_eval
 
+        if self._is_market_condition(label):
+            return ConditionEvaluation(
+                condition_id=condition_id,
+                scenario=scenario,
+                group=group,
+                label=label,
+                status="unclear",
+                reason="Market-price condition was not text-matched; no parseable market rule was available.",
+                confidence=0.35,
+                matched_via="market_facts",
+                severity=severity,
+                linked_milestones=linked_milestones,
+                evidence=evidence,
+            )
+
         phrases = self._condition_phrases(item)
         matched_phrase = next((phrase for phrase in phrases if self._phrase_matches(phrase, haystack)), "")
         if matched_phrase:
@@ -328,12 +349,14 @@ class ThesisComparator:
         market_facts: Dict[str, Any],
         evidence: EvidenceRef,
     ) -> Optional[ConditionEvaluation]:
-        match = MARKET_RULE_RE.search(label or "")
+        match = MARKET_RULE_RE.search(label or "") or MARKET_NATURAL_RULE_RE.search(label or "")
         if not match:
             return None
 
         asset = str(match.group("asset") or "").strip().lower()
-        op = str(match.group("op") or "").strip()
+        op = str(match.groupdict().get("op") or "").strip()
+        if not op:
+            op = self._natural_market_comparator(str(match.groupdict().get("word") or ""))
         currency = str(match.group("currency") or "").strip().lower()
         currency_key = "aud" if currency in {"a$", "au$", "aud"} else "usd"
         raw_value = str(match.group("value") or "").replace(",", "")
@@ -402,12 +425,32 @@ class ThesisComparator:
         return False
 
     @staticmethod
+    def _natural_market_comparator(word: str) -> str:
+        normalized = str(word or "").strip().lower()
+        if normalized in {"above", "over", "greater than", "exceeds", "exceeding"}:
+            return ">"
+        if normalized in {"below", "under", "less than"}:
+            return "<"
+        return ""
+
+    @staticmethod
+    def _is_market_condition(label: str) -> bool:
+        text = str(label or "").strip().lower()
+        if not text:
+            return False
+        if re.search(r"\b(gold|silver|copper|lithium|uranium|brent|wti|henry hub|natural gas)\b", text) and re.search(
+            r"(us\$|usd|a\$|au\$|aud|\$)\s*[0-9]|[<>]|above|below|under|over|greater than|less than",
+            text,
+        ):
+            return True
+        return False
+
+    @staticmethod
     def _condition_phrases(item: Dict[str, Any]) -> List[str]:
         phrases: List[str] = []
-        for key in ("condition", "condition_id"):
-            value = str(item.get(key) or "").strip()
-            if value:
-                phrases.append(value)
+        value = str(item.get("condition") or "").strip()
+        if value and ThesisComparator._is_meaningful_support_phrase(value):
+            phrases.append(value)
         for value in item.get("evidence_hooks") or []:
             text = str(value or "").strip()
             if ThesisComparator._is_meaningful_support_phrase(text):
@@ -430,11 +473,13 @@ class ThesisComparator:
             return False
         if low in haystack:
             return True
-        terms = [term for term in re.split(r"[^a-z0-9]+", low) if len(term) >= 4]
-        if not terms:
+        terms = [term for term in re.split(r"[^a-z0-9]+", low) if len(term) >= 5]
+        if len(terms) < 3:
             return False
-        required = terms[:3]
-        return all(term in haystack for term in required)
+        # Loose token matching is only a fallback for explicit evidence hooks.
+        # Requiring all meaningful terms avoids matching conditions on generic
+        # words like "gold", "quarter", "resource", or dates.
+        return all(term in haystack for term in terms)
 
     @staticmethod
     def _condition_label(item: Dict[str, Any]) -> str:
@@ -445,12 +490,30 @@ class ThesisComparator:
         return any(token in haystack for token in tokens)
 
     @staticmethod
-    def _infer_domains(haystack: str, material_topics: List[str]) -> Set[str]:
-        domains: Set[str] = {str(item or "").strip().lower() for item in (material_topics or []) if str(item or "").strip()}
+    def _infer_domains(facts: AnnouncementFacts, matched_evaluations: List[ConditionEvaluation]) -> Set[str]:
+        labels = "\n".join(item.label for item in matched_evaluations if str(item.label or "").strip()).lower()
+        fact_text = "\n".join(
+            [facts.title or "", facts.summary or ""] + [str(item or "") for item in (facts.extracted_facts or [])]
+        ).lower()
+        haystack = f"{fact_text}\n{labels}"
+        domains: Set[str] = set()
         for domain, keywords in DOMAIN_KEYWORDS.items():
-            if any(keyword in haystack for keyword in keywords):
+            if any(ThesisComparator._keyword_in_text(keyword, haystack) for keyword in keywords):
                 domains.add(domain)
+        if not domains:
+            topics = [str(item or "").strip().lower() for item in (facts.material_topics or []) if str(item or "").strip()]
+            if len(topics) <= 3:
+                domains.update(topics)
         return domains
+
+    @staticmethod
+    def _keyword_in_text(keyword: str, haystack: str) -> bool:
+        term = str(keyword or "").strip().lower()
+        if not term:
+            return False
+        if " " in term or "-" in term:
+            return term in haystack
+        return re.search(rf"\b{re.escape(term)}\b", haystack) is not None
 
     @staticmethod
     def _matched_count(evaluations: List[ConditionEvaluation], *, scenario: str = "", group: str = "") -> int:

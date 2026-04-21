@@ -381,6 +381,43 @@
   line-height: 1.4;
 }
 
+.scenario-router-detail-note strong {
+  color: #e8f4ff;
+}
+
+.scenario-router-detail-list {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+
+.scenario-router-detail-item {
+  border: 1px solid rgba(171, 208, 231, 0.14);
+  border-radius: 9px;
+  padding: 8px;
+  background: rgba(12, 34, 47, 0.5);
+}
+
+.scenario-router-detail-item.is-conflict {
+  border-color: rgba(235, 116, 98, 0.32);
+  background: rgba(78, 27, 25, 0.28);
+}
+
+.scenario-router-detail-item strong {
+  display: block;
+  color: #e8f4ff;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.scenario-router-detail-item span {
+  display: block;
+  color: #9fc4df;
+  font-size: 11px;
+  line-height: 1.35;
+  margin-top: 3px;
+}
+
 .scenario-router-chip-list {
   display: flex;
   flex-wrap: wrap;
@@ -407,6 +444,10 @@
   border-radius: 10px;
   padding: 10px;
   background: rgba(6, 17, 27, 0.64);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
 }
 
 .scenario-router-event.is-pass {
@@ -415,6 +456,15 @@
 
 .scenario-router-event.is-fail {
   border-color: rgba(224, 89, 82, 0.34);
+}
+
+.scenario-router-event.is-selected {
+  border-color: rgba(122, 212, 255, 0.54);
+  box-shadow: 0 0 0 2px rgba(72, 158, 202, 0.16);
+}
+
+.scenario-router-event:hover {
+  border-color: rgba(171, 208, 231, 0.34);
 }
 
 .scenario-router-event-top {
@@ -434,6 +484,13 @@
 
 .scenario-router-event-meta {
   color: #9fc4df;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.scenario-router-event-reason {
+  margin-top: 6px;
+  color: #b7d4e8;
   font-size: 11px;
   line-height: 1.35;
 }

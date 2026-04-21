@@ -122,6 +122,40 @@ function explainScenarioSignal(router) {
   return router.reason || '';
 }
 
+function routerDetailItems(router, detailKey, fallbackKey) {
+  const details = router?.[detailKey];
+  if (Array.isArray(details) && details.length) return details;
+  const fallback = router?.[fallbackKey];
+  return Array.isArray(fallback) ? fallback : [];
+}
+
+function routerItemLabel(item) {
+  if (item && typeof item === 'object') return String(item.label || item.summary || item.condition_id || '').trim();
+  return String(item || '').trim();
+}
+
+function routerItemMeta(item) {
+  if (!item || typeof item !== 'object') return '';
+  const parts = [];
+  if (item.scenario) parts.push(labelScenarioPath(item.scenario));
+  if (item.group) parts.push(titleizeKey(item.group));
+  if (item.status) parts.push(titleizeKey(item.status));
+  if (item.reason) parts.push(String(item.reason));
+  return parts.filter(Boolean).join(' · ');
+}
+
+function formatRouterMarketCondition(item) {
+  if (!item || typeof item !== 'object') return '';
+  const observed = typeof item.observed_value === 'number'
+    ? fmtNum(item.observed_value, item.observed_value >= 100 ? 0 : 2)
+    : String(item.observed_value ?? 'n/a');
+  const threshold = typeof item.threshold_value === 'number'
+    ? fmtNum(item.threshold_value, item.threshold_value >= 100 ? 0 : 2)
+    : String(item.threshold_value ?? 'n/a');
+  const field = item.field || item.market_field || 'market fact';
+  return `${titleizeKey(field)} observed ${observed}; condition ${item.comparator || '?'} ${threshold} was ${item.status || 'checked'}.`;
+}
+
 function parseIsoDateOrNull(value) {
   const raw = String(value || '').trim();
   if (!raw) return null;
@@ -1013,6 +1047,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
   const [scenarioError, setScenarioError] = useState('');
   const [scenarioReloadToken, setScenarioReloadToken] = useState(0);
   const [scenarioTickerFilter, setScenarioTickerFilter] = useState('');
+  const [selectedScenarioEventId, setSelectedScenarioEventId] = useState('');
   const preferredRunIdFromUrl = useMemo(() => {
     try {
       const params = new URLSearchParams(locationSearch || '');
@@ -1325,8 +1360,25 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
   const bannerThesis = selectionPending
     ? 'Loading selected analysis run…'
     : (stage3?.investment_recommendation?.summary || mapped.thesis || 'No thesis summary provided.');
-  const selectedRouter = selectedPayload?.scenario_router || {};
+  const recentScenarioEvents = Array.isArray(scenarioOverview?.recent_events) ? scenarioOverview.recent_events : [];
+  const selectedScenarioEvent = recentScenarioEvents.find((row) => row?.event_id === selectedScenarioEventId) || recentScenarioEvents[0] || {};
+  const selectedRunRouter = selectedPayload?.scenario_router || {};
+  const selectedRunRouterHasDecision = Boolean(
+    selectedRunRouter
+    && typeof selectedRunRouter === 'object'
+    && (selectedRunRouter.action || selectedRunRouter.current_path || selectedRunRouter.announcement_title)
+  );
+  const selectedRouter = selectedScenarioEventId
+    ? selectedScenarioEvent
+    : (selectedRunRouterHasDecision ? selectedRunRouter : selectedScenarioEvent);
   const selectedRouterExplanation = explainScenarioSignal(selectedRouter);
+  const selectedRouterConditionHits = routerDetailItems(selectedRouter, 'matched_condition_details', 'matched_conditions');
+  const selectedRouterWatchHits = routerDetailItems(selectedRouter, 'triggered_watchlist_details', 'triggered_watchlist');
+  const selectedRouterFindings = Array.isArray(selectedRouter?.key_findings) ? selectedRouter.key_findings : [];
+  const selectedRouterConflicts = Array.isArray(selectedRouter?.conflicts_with_run) ? selectedRouter.conflicts_with_run : [];
+  const selectedRouterMarketConditions = Array.isArray(selectedRouter?.market_context_conditions) ? selectedRouter.market_context_conditions : [];
+  const selectedRouterTitle = selectedRouter?.announcement_title || selectedRouter?.title || '';
+  const selectedRouterReason = selectedRouter?.reason || selectedRouter?.action_reason || '';
   const overviewActionCounts = topCountEntries(scenarioOverview?.action_counts, 4);
   const overviewStatusCounts = topCountEntries(scenarioOverview?.status_counts, 4);
   const overviewTransitionCounts = topCountEntries(scenarioOverview?.path_transition_counts, 4);
@@ -1677,32 +1729,78 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
             <div className="scenario-router-detail-row"><span>Scenario movement</span><strong>{labelScenarioTransition(selectedRouter?.path_transition)}</strong></div>
             <div className="scenario-router-detail-row"><span>Recommended action</span><strong>{labelScenarioAction(selectedRouter?.action)}</strong></div>
             <div className="scenario-router-detail-row"><span>Materiality</span><strong>{selectedRouter?.impact_level ? titleizeKey(selectedRouter.impact_level) : 'Not assessed'}</strong></div>
-            <div className="scenario-router-detail-row"><span>Announcement</span><strong>{selectedRouter?.announcement_title || 'n/a'}</strong></div>
+            <div className="scenario-router-detail-row"><span>Announcement</span><strong>{selectedRouterTitle || 'n/a'}</strong></div>
             <div className="scenario-router-detail-row"><span>Last Evaluated</span><strong>{selectedRouter?.saved_at_utc ? fmtRelativeSince(selectedRouter.saved_at_utc) : 'n/a'}</strong></div>
             {selectedRouterExplanation && <div className="scenario-router-detail-note">{selectedRouterExplanation}</div>}
-            {!!selectedRouter?.matched_conditions?.length && (
+            {selectedRouterReason && <div className="scenario-router-detail-note"><strong>Why:</strong> {selectedRouterReason}</div>}
+            {!!selectedRouterConditionHits.length && (
               <>
-                <h4>Announcement Condition Hits</h4>
-                <div className="scenario-router-chip-list">
-                  {selectedRouter.matched_conditions.map((item, idx) => (
-                    <span key={`matched-${idx}`} className="scenario-router-chip">{item}</span>
+                <h4>Matched Thesis Conditions</h4>
+                <div className="scenario-router-detail-list">
+                  {selectedRouterConditionHits.map((item, idx) => (
+                    <div key={`matched-${idx}`} className="scenario-router-detail-item">
+                      <strong>{routerItemLabel(item)}</strong>
+                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
+                    </div>
                   ))}
                 </div>
               </>
             )}
-            {!!selectedRouter?.triggered_watchlist?.length && (
+            {!!selectedRouterConflicts.length && (
+              <>
+                <h4>Conflicts With Saved Run</h4>
+                <div className="scenario-router-detail-list">
+                  {selectedRouterConflicts.map((item, idx) => (
+                    <div key={`conflict-${idx}`} className="scenario-router-detail-item is-conflict">
+                      <strong>{routerItemLabel(item)}</strong>
+                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {!!selectedRouterFindings.length && (
+              <>
+                <h4>Supporting Findings</h4>
+                <div className="scenario-router-detail-list">
+                  {selectedRouterFindings.map((item, idx) => (
+                    <div key={`finding-${idx}`} className="scenario-router-detail-item">
+                      <strong>{routerItemLabel(item)}</strong>
+                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {!!selectedRouterWatchHits.length && (
               <>
                 <h4>Watchlist Hits</h4>
-                <div className="scenario-router-chip-list">
-                  {selectedRouter.triggered_watchlist.map((item, idx) => (
-                    <span key={`watch-${idx}`} className="scenario-router-chip">{item}</span>
+                <div className="scenario-router-detail-list">
+                  {selectedRouterWatchHits.map((item, idx) => (
+                    <div key={`watch-${idx}`} className="scenario-router-detail-item">
+                      <strong>{routerItemLabel(item)}</strong>
+                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {!!selectedRouterMarketConditions.length && (
+              <>
+                <h4>Market Conditions Checked</h4>
+                <div className="scenario-router-detail-list">
+                  {selectedRouterMarketConditions.map((item, idx) => (
+                    <div key={`market-condition-${idx}`} className="scenario-router-detail-item">
+                      <strong>{routerItemLabel(item)}</strong>
+                      <span>{formatRouterMarketCondition(item)}</span>
+                    </div>
                   ))}
                 </div>
               </>
             )}
             {!!Object.keys(selectedRouter?.market_facts_used || {}).length && (
               <>
-                <h4>Market Context Checked</h4>
+                <h4>Market Facts Used</h4>
                 <div className="scenario-router-chip-list">
                   {Object.entries(selectedRouter.market_facts_used || {}).map(([key, value]) => (
                     <span key={`market-${key}`} className="scenario-router-chip">
@@ -1741,8 +1839,13 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
           <article className="scenario-router-column scenario-router-column-wide">
             <h4>Recent Routed Announcements</h4>
             <div className="scenario-router-event-list">
-              {(scenarioOverview?.recent_events || []).slice(0, 8).map((row) => (
-                <div className="scenario-router-event" key={row.event_id || `${row.ticker}-${row.saved_at_utc}`}>
+              {recentScenarioEvents.slice(0, 8).map((row) => (
+                <button
+                  type="button"
+                  className={`scenario-router-event ${selectedScenarioEvent?.event_id === row.event_id ? 'is-selected' : ''}`}
+                  key={row.event_id || `${row.ticker}-${row.saved_at_utc}`}
+                  onClick={() => setSelectedScenarioEventId(row.event_id || '')}
+                >
                   <div className="scenario-router-event-top">
                     <strong>{row.ticker || 'n/a'}</strong>
                     <span>{row.status || 'ok'}</span>
@@ -1753,10 +1856,11 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
                   <div className="scenario-router-event-meta">
                     {labelScenarioTransition(row.path_transition)} · {row.source_type || 'unknown source'} · {fmtMs(row.processing_duration_ms)} · {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
                   </div>
+                  {row.action_reason && <div className="scenario-router-event-reason">{row.action_reason}</div>}
                   {row.error_reason && <div className="scenario-router-detail-note">{row.error_reason}</div>}
-                </div>
+                </button>
               ))}
-              {!scenarioOverview?.recent_events?.length && <div className="watch-empty">No scenario-router events yet.</div>}
+              {!recentScenarioEvents.length && <div className="watch-empty">No scenario-router events yet.</div>}
             </div>
           </article>
         </div>
@@ -1893,32 +1997,78 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
             <div className="scenario-router-detail-row"><span>Scenario movement</span><strong>{labelScenarioTransition(selectedRouter?.path_transition)}</strong></div>
             <div className="scenario-router-detail-row"><span>Recommended action</span><strong>{labelScenarioAction(selectedRouter?.action)}</strong></div>
             <div className="scenario-router-detail-row"><span>Materiality</span><strong>{selectedRouter?.impact_level ? titleizeKey(selectedRouter.impact_level) : 'Not assessed'}</strong></div>
-            <div className="scenario-router-detail-row"><span>Announcement</span><strong>{selectedRouter?.announcement_title || 'n/a'}</strong></div>
+            <div className="scenario-router-detail-row"><span>Announcement</span><strong>{selectedRouterTitle || 'n/a'}</strong></div>
             <div className="scenario-router-detail-row"><span>Last Evaluated</span><strong>{selectedRouter?.saved_at_utc ? fmtRelativeSince(selectedRouter.saved_at_utc) : 'n/a'}</strong></div>
             {selectedRouterExplanation && <div className="scenario-router-detail-note">{selectedRouterExplanation}</div>}
-            {!!selectedRouter?.matched_conditions?.length && (
+            {selectedRouterReason && <div className="scenario-router-detail-note"><strong>Why:</strong> {selectedRouterReason}</div>}
+            {!!selectedRouterConditionHits.length && (
               <>
-                <h4>Announcement Condition Hits</h4>
-                <div className="scenario-router-chip-list">
-                  {selectedRouter.matched_conditions.map((item, idx) => (
-                    <span key={`matched-lab-${idx}`} className="scenario-router-chip">{item}</span>
+                <h4>Matched Thesis Conditions</h4>
+                <div className="scenario-router-detail-list">
+                  {selectedRouterConditionHits.map((item, idx) => (
+                    <div key={`matched-lab-${idx}`} className="scenario-router-detail-item">
+                      <strong>{routerItemLabel(item)}</strong>
+                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
+                    </div>
                   ))}
                 </div>
               </>
             )}
-            {!!selectedRouter?.triggered_watchlist?.length && (
+            {!!selectedRouterConflicts.length && (
+              <>
+                <h4>Conflicts With Saved Run</h4>
+                <div className="scenario-router-detail-list">
+                  {selectedRouterConflicts.map((item, idx) => (
+                    <div key={`conflict-lab-${idx}`} className="scenario-router-detail-item is-conflict">
+                      <strong>{routerItemLabel(item)}</strong>
+                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {!!selectedRouterFindings.length && (
+              <>
+                <h4>Supporting Findings</h4>
+                <div className="scenario-router-detail-list">
+                  {selectedRouterFindings.map((item, idx) => (
+                    <div key={`finding-lab-${idx}`} className="scenario-router-detail-item">
+                      <strong>{routerItemLabel(item)}</strong>
+                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {!!selectedRouterWatchHits.length && (
               <>
                 <h4>Watchlist Hits</h4>
-                <div className="scenario-router-chip-list">
-                  {selectedRouter.triggered_watchlist.map((item, idx) => (
-                    <span key={`watch-lab-${idx}`} className="scenario-router-chip">{item}</span>
+                <div className="scenario-router-detail-list">
+                  {selectedRouterWatchHits.map((item, idx) => (
+                    <div key={`watch-lab-${idx}`} className="scenario-router-detail-item">
+                      <strong>{routerItemLabel(item)}</strong>
+                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {!!selectedRouterMarketConditions.length && (
+              <>
+                <h4>Market Conditions Checked</h4>
+                <div className="scenario-router-detail-list">
+                  {selectedRouterMarketConditions.map((item, idx) => (
+                    <div key={`market-condition-lab-${idx}`} className="scenario-router-detail-item">
+                      <strong>{routerItemLabel(item)}</strong>
+                      <span>{formatRouterMarketCondition(item)}</span>
+                    </div>
                   ))}
                 </div>
               </>
             )}
             {!!Object.keys(selectedRouter?.market_facts_used || {}).length && (
               <>
-                <h4>Market Context Checked</h4>
+                <h4>Market Facts Used</h4>
                 <div className="scenario-router-chip-list">
                   {Object.entries(selectedRouter.market_facts_used || {}).map(([key, value]) => (
                     <span key={`market-lab-${key}`} className="scenario-router-chip">
@@ -1957,8 +2107,13 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
           <article className="scenario-router-column scenario-router-column-wide">
             <h4>Recent Routed Announcements</h4>
             <div className="scenario-router-event-list">
-              {(scenarioOverview?.recent_events || []).slice(0, 8).map((row) => (
-                <div className="scenario-router-event" key={row.event_id || `${row.ticker}-${row.saved_at_utc}`}>
+              {recentScenarioEvents.slice(0, 8).map((row) => (
+                <button
+                  type="button"
+                  className={`scenario-router-event ${selectedScenarioEvent?.event_id === row.event_id ? 'is-selected' : ''}`}
+                  key={row.event_id || `${row.ticker}-${row.saved_at_utc}`}
+                  onClick={() => setSelectedScenarioEventId(row.event_id || '')}
+                >
                   <div className="scenario-router-event-top">
                     <strong>{row.ticker || 'n/a'}</strong>
                     <span>{row.status || 'ok'}</span>
@@ -1969,10 +2124,11 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
                   <div className="scenario-router-event-meta">
                     {labelScenarioTransition(row.path_transition)} · {row.source_type || 'unknown source'} · {fmtMs(row.processing_duration_ms)} · {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
                   </div>
+                  {row.action_reason && <div className="scenario-router-event-reason">{row.action_reason}</div>}
                   {row.error_reason && <div className="scenario-router-detail-note">{row.error_reason}</div>}
-                </div>
+                </button>
               ))}
-              {!scenarioOverview?.recent_events?.length && <div className="watch-empty">No scenario-router events yet.</div>}
+              {!recentScenarioEvents.length && <div className="watch-empty">No scenario-router events yet.</div>}
             </div>
           </article>
         </div>

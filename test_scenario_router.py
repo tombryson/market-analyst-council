@@ -395,6 +395,40 @@ class DocumentReaderTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(facts.evidence)
         self.assertIn("debt facility", facts.raw_text_excerpt.lower())
 
+    async def test_reader_skips_header_boilerplate_before_fact_lines(self):
+        with TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "announcement.txt"
+            path.write_text(
+                "\n".join(
+                    [
+                        "Level 2, 123 Example Street Perth WA 6000",
+                        "Phone: +61 8 1111 2222",
+                        "Email: info@example.com",
+                        "www.example.com.au",
+                        "MINERAL RESOURCE INCREASED TO 2.07 MILLION OUNCES",
+                        "Mandilla now contains 54Mt at 1.0g/t Au for 1.74Moz under JORC.",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            reader = DocumentReader()
+            facts = await reader.read(
+                AnnouncementPacket(
+                    event_id="evt-doc-boilerplate-1",
+                    ticker="ASX:AAR",
+                    exchange="ASX",
+                    title="Mineral Resource Increased to 2.07 Million Ounces",
+                    document_path=str(path),
+                    company_name="Astral Resources NL",
+                )
+            )
+
+        self.assertTrue(facts.extracted_facts)
+        self.assertNotIn("phone", facts.summary.lower())
+        self.assertIn("mineral resource", facts.summary.lower())
+        self.assertEqual(facts.material_topics, ["resource"])
+
 
 class ThesisComparatorTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -562,6 +596,100 @@ class ThesisComparatorTests(unittest.TestCase):
         self.assertEqual(len(evals), 1)
         self.assertEqual(evals[0].status, "matched")
         self.assertEqual(evals[0].matched_via, "market_facts")
+
+    def test_market_price_failure_condition_is_not_text_matched(self):
+        baseline_run = BaselineRunPacket(
+            run_id="run-market-natural-1",
+            ticker="ASX:AAR",
+            exchange="ASX",
+            company_name="Astral Resources NL",
+            lab_payload={
+                "structured_data": {
+                    "extended_analysis": {"current_thesis_state": {"leaning": "base"}},
+                    "thesis_map": {
+                        "bull": {"required_conditions": [], "failure_conditions": []},
+                        "base": {
+                            "required_conditions": [],
+                            "failure_conditions": [
+                                {
+                                    "condition_id": "base_failure_gold_below_a_5000_oz",
+                                    "condition": "Gold below A$5,000/oz",
+                                }
+                            ],
+                        },
+                        "bear": {"required_conditions": [], "failure_conditions": []},
+                    },
+                }
+            },
+        )
+        facts = AnnouncementFacts(
+            event_id="evt-market-natural-1",
+            ticker="ASX:AAR",
+            title="Quarterly Activities & Cashflow Report",
+            summary="Quarterly report discusses gold exploration activities.",
+            extracted_facts=["Gold drilling continued during the March quarter."],
+            raw_text_excerpt="Gold exploration continued below historical workings during 2026.",
+            material_topics=["resource", "timeline", "production", "financing", "permitting"],
+            market_facts={
+                "normalized_facts": {
+                    "commodity_profile": "gold",
+                    "gold_price_aud_oz": 6730.81,
+                }
+            },
+        )
+
+        report = self.comparator.compare(facts, baseline_run)
+
+        self.assertEqual(report.current_path, "base")
+        self.assertEqual(report.path_transition, "")
+        self.assertNotIn("base_failure_gold_below_a_5000_oz", report.matched_condition_ids)
+        evals = [item for item in report.condition_evaluations if item.condition_id == "base_failure_gold_below_a_5000_oz"]
+        self.assertEqual(len(evals), 1)
+        self.assertEqual(evals[0].status, "contradicted")
+        self.assertEqual(evals[0].matched_via, "market_facts")
+        self.assertEqual(report.market_facts_used.get("gold_price_aud_oz"), 6730.81)
+
+    def test_condition_id_is_not_used_as_evidence_phrase(self):
+        baseline_run = BaselineRunPacket(
+            run_id="run-condition-id-1",
+            ticker="ASX:AAR",
+            exchange="ASX",
+            company_name="Astral Resources NL",
+            lab_payload={
+                "structured_data": {
+                    "extended_analysis": {"current_thesis_state": {"leaning": "base"}},
+                    "thesis_map": {
+                        "bull": {"required_conditions": [], "failure_conditions": []},
+                        "base": {
+                            "required_conditions": [
+                                {
+                                    "condition_id": "base_required_fid_by_dec_2026",
+                                    "condition": "FID by Dec 2026",
+                                }
+                            ],
+                            "failure_conditions": [],
+                        },
+                        "bear": {"required_conditions": [], "failure_conditions": []},
+                    },
+                }
+            },
+        )
+        facts = AnnouncementFacts(
+            event_id="evt-resource-1",
+            ticker="ASX:AAR",
+            title="Mineral Resource Increased to 2.07 Million Ounces",
+            summary="Mandilla now contains 1.74 million ounces gold.",
+            extracted_facts=["Updated JORC mineral resource is 54Mt at 1.0g/t Au for 1.74Moz."],
+            raw_text_excerpt="Updated mineral resource statement released in April 2026.",
+            material_topics=["resource"],
+        )
+
+        report = self.comparator.compare(facts, baseline_run)
+
+        self.assertEqual(report.current_path, "base")
+        self.assertEqual(report.path_transition, "")
+        self.assertNotIn("base_required_fid_by_dec_2026", report.matched_condition_ids)
+        self.assertEqual(report.affected_domains, ["resource"])
 
 
 class ScenarioRouterServiceTests(unittest.IsolatedAsyncioTestCase):

@@ -12,7 +12,7 @@ from .models import AnnouncementFacts, AnnouncementPacket, EvidenceRef
 TOPIC_KEYWORDS: Dict[str, Tuple[str, ...]] = {
     "financing": ("funding", "facility", "debt", "loan", "placement", "capital raise", "liquidity"),
     "permitting": ("permit", "approval", "licence", "license", "regulator", "environmental", "heritage"),
-    "timeline": ("timeline", "quarter", "delay", "accelerat", "ahead of schedule", "on track", "milestone"),
+    "timeline": ("timeline", "delay", "accelerat", "ahead of schedule", "on track", "milestone"),
     "resource": ("resource", "reserve", "jorc", "ore reserve", "mineral resource"),
     "production": ("production", "throughput", "first gold", "ramp-up", "ramp up", "processing"),
     "guidance": ("guidance", "forecast", "outlook", "aisc", "cost guidance"),
@@ -20,6 +20,27 @@ TOPIC_KEYWORDS: Dict[str, Tuple[str, ...]] = {
     "management": ("director", "ceo", "cfo", "chair", "management", "executive"),
     "m_and_a": ("acquisition", "merger", "scheme", "takeover", "farm-in", "farm in", "joint venture"),
 }
+
+BOILERPLATE_PATTERNS = (
+    r"\bregistered office\b",
+    r"\bcorporate directory\b",
+    r"\bwww\.",
+    r"\bhttps?://",
+    r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",
+    r"\btelephone\b|\bphone\b",
+    r"\bacn\b|\babn\b",
+    r"\bpage\s+\d+\b",
+    r"\basx\s*:\s*[a-z]{2,5}\b",
+)
+
+FACT_SIGNAL_RE = re.compile(
+    r"\b("
+    r"resource|reserve|jorc|production|produced|guidance|cash|funding|facility|permit|approval|"
+    r"drill|intercept|grade|ounce|koz|moz|boe|bbl|revenue|cost|aisc|capex|quarter|completed|increased|"
+    r"commenced|achieved|acquisition|placement|raise|debt|milestone|commissioning|timeline|schedule|on track"
+    r")\b|[0-9]",
+    flags=re.IGNORECASE,
+)
 
 
 @dataclass
@@ -119,7 +140,7 @@ class DocumentReader:
     @staticmethod
     def _pick_evidence_excerpts(text: str) -> List[str]:
         lines = [re.sub(r"\s+", " ", line).strip() for line in str(text or "").splitlines()]
-        lines = [line for line in lines if len(line) >= 30]
+        lines = [line for line in lines if len(line) >= 30 and not DocumentReader._is_boilerplate_line(line)]
         return lines[:6]
 
     @staticmethod
@@ -133,7 +154,11 @@ class DocumentReader:
             low = line.lower()
             if low in seen:
                 continue
+            if DocumentReader._is_boilerplate_line(line):
+                continue
             if re.fullmatch(r"[A-Z0-9 .,:;()/-]+", line) and len(line.split()) <= 4:
+                continue
+            if not FACT_SIGNAL_RE.search(line):
                 continue
             seen.add(low)
             facts.append(line)
@@ -143,13 +168,14 @@ class DocumentReader:
 
     @staticmethod
     def _infer_material_topics(text: str, facts: List[str]) -> List[str]:
-        haystack = f"{text}\n" + "\n".join(facts)
+        haystack = "\n".join(facts) or str(text or "")[:2500]
         low = haystack.lower()
         topics: List[str] = []
         for topic, keywords in TOPIC_KEYWORDS.items():
-            if any(keyword in low for keyword in keywords):
+            hit_count = sum(1 for keyword in keywords if DocumentReader._keyword_in_text(keyword, low))
+            if hit_count >= 2 or any(DocumentReader._is_strong_topic_hit(topic, keyword, low) for keyword in keywords):
                 topics.append(topic)
-        return topics
+        return topics[:4]
 
     @staticmethod
     def _build_summary(text: str, facts: List[str]) -> str:
@@ -157,3 +183,35 @@ class DocumentReader:
             return " ".join(facts[:3])[:500]
         snippet = re.sub(r"\s+", " ", str(text or "")).strip()
         return snippet[:500]
+
+    @staticmethod
+    def _is_boilerplate_line(line: str) -> bool:
+        low = str(line or "").strip().lower()
+        if not low:
+            return True
+        if any(re.search(pattern, low, flags=re.IGNORECASE) for pattern in BOILERPLATE_PATTERNS):
+            return True
+        if len(low.split()) <= 3 and re.fullmatch(r"[a-z0-9 .,:;()/-]+", low):
+            return True
+        return False
+
+    @staticmethod
+    def _is_strong_topic_hit(topic: str, keyword: str, haystack: str) -> bool:
+        strong_keywords = {
+            "financing": {"funding", "debt", "loan", "placement", "capital raise"},
+            "permitting": {"permit", "approval", "licence", "license"},
+            "resource": {"mineral resource", "ore reserve", "jorc", "reserve"},
+            "production": {"production", "throughput", "first gold", "ramp-up", "ramp up"},
+            "guidance": {"guidance", "aisc", "cost guidance"},
+            "m_and_a": {"acquisition", "merger", "takeover", "joint venture"},
+        }
+        return keyword in strong_keywords.get(topic, set()) and DocumentReader._keyword_in_text(keyword, haystack)
+
+    @staticmethod
+    def _keyword_in_text(keyword: str, haystack: str) -> bool:
+        term = str(keyword or "").strip().lower()
+        if not term:
+            return False
+        if " " in term or "-" in term:
+            return term in haystack
+        return re.search(rf"\b{re.escape(term)}\b", haystack) is not None

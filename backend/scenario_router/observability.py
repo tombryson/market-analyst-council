@@ -209,6 +209,31 @@ class ScenarioRouterObservability:
             "matched_conditions_count": matched_conditions,
             "triggered_watchlist_count": triggered_watchlist,
             "market_conditions_count": market_conditions,
+            "matched_conditions": _condition_details(evaluations, groups={"required", "failure"}, exclude_market=True),
+            "triggered_watchlist": _condition_details(evaluations, groups={"red_flag", "confirmatory"}, exclude_market=True),
+            "market_context_conditions": _condition_details(
+                evaluations,
+                matched_via="market_facts",
+                statuses={"matched", "contradicted", "unclear"},
+            ),
+            "key_findings": _finding_details(report.get("key_findings")),
+            "conflicts_with_run": _finding_details(report.get("conflicts_with_run")),
+            "action_reason": str(action.get("reason") or "").strip(),
+            "action_confidence": action.get("confidence"),
+            "follow_up_steps": [str(item or "").strip() for item in (action.get("follow_up_steps") or []) if str(item or "").strip()][:5],
+            "invalidated_sections": [
+                str(item or "").strip()
+                for item in (action.get("invalidated_sections") or [])
+                if str(item or "").strip()
+            ][:8],
+            "affected_domains": [
+                str(item or "").strip()
+                for item in (report.get("affected_domains") or [])
+                if str(item or "").strip()
+            ][:8],
+            "thesis_effect": str(report.get("thesis_effect") or "").strip(),
+            "run_validity": str(report.get("run_validity") or "").strip(),
+            "market_facts_used": report.get("market_facts_used") if isinstance(report.get("market_facts_used"), dict) else {},
             "error_reason": str(((payload.get("error") or {}) if isinstance(payload.get("error"), dict) else {}).get("reason") or "").strip(),
             "processing_trace": trace,
             "artifact_path": str(path),
@@ -223,6 +248,77 @@ class ScenarioRouterObservability:
         except Exception:
             return []
         return payload if isinstance(payload, list) else []
+
+
+def _condition_details(
+    evaluations: List[Dict[str, Any]],
+    *,
+    groups: set[str] | None = None,
+    matched_via: str = "",
+    statuses: set[str] | None = None,
+    exclude_market: bool = False,
+) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for item in evaluations:
+        if not isinstance(item, dict):
+            continue
+        group = str(item.get("group") or "").strip()
+        status = str(item.get("status") or "").strip()
+        via = str(item.get("matched_via") or "").strip()
+        if groups is not None and group not in groups:
+            continue
+        if statuses is not None and status not in statuses:
+            continue
+        if statuses is None and status != "matched":
+            continue
+        if matched_via and via != matched_via:
+            continue
+        if exclude_market and via == "market_facts":
+            continue
+        label = str(item.get("label") or item.get("condition_id") or "").strip()
+        if not label:
+            continue
+        rows.append(
+            {
+                "label": label,
+                "condition_id": str(item.get("condition_id") or "").strip(),
+                "scenario": str(item.get("scenario") or "").strip(),
+                "group": group,
+                "status": status,
+                "reason": str(item.get("reason") or "").strip(),
+                "matched_via": via,
+                "confidence": item.get("confidence"),
+                "market_field": str(item.get("market_field") or "").strip(),
+                "observed_value": item.get("observed_value"),
+                "comparator": str(item.get("comparator") or "").strip(),
+                "threshold_value": item.get("threshold_value"),
+            }
+        )
+        if len(rows) >= 10:
+            break
+    return rows
+
+
+def _finding_details(payload: Any) -> List[Dict[str, Any]]:
+    if not isinstance(payload, list):
+        return []
+    rows: List[Dict[str, Any]] = []
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        summary = str(item.get("summary") or "").strip()
+        if not summary:
+            continue
+        rows.append(
+            {
+                "type": str(item.get("type") or "").strip(),
+                "summary": summary,
+                "severity": str(item.get("severity") or "").strip(),
+            }
+        )
+        if len(rows) >= 8:
+            break
+    return rows
 
 
 def _build_baseline_run(case: Dict[str, Any]) -> BaselineRunPacket:
