@@ -274,3 +274,255 @@ verification_schema:
       development_timeline:
         markers: ["development timeline", "timeline", "milestone", "development_timeline", "listing", "uplisting", "adr"]
         critical: true
+
+# The full rubric/prompt
+rubric: |
+  Run an investment analysis on [Company Name] using this oil and gas rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to valuation, funding risk, operating risk, commodity-price sensitivity, reserve/resource confidence, or scenario confidence.
+
+  First classify the company:
+  * Explorer: acreage or prospects with no commercial production and no booked development-ready reserves.
+  * Appraisal: discovery/resource base exists, but commerciality, flow rates, development plan, or funding remain unresolved.
+  * Developer: sanctioned or near-sanctioned project moving toward first production.
+  * Producer: recurring oil/gas production and operating cash flow.
+  * Hybrid: producing cash-flow base plus material exploration/appraisal/development optionality.
+  * Integrated/LNG: upstream exposure plus material processing, LNG, downstream, infrastructure, or marketing exposure.
+
+  Use that classification to decide the valuation emphasis:
+  * Explorers: acreage quality, prospect inventory, geological chance of success, funding runway, farm-out potential, drill timing, and risked exploration value.
+  * Appraisal companies: test rates, reservoir continuity, contingent resources, development concept, commercial thresholds, partner/farm-out terms, and path to reserves.
+  * Developers: 2P/P50 reserves/resources, development capex, fiscal terms, funding, execution risk, offtake/transport, and first-production timeline.
+  * Producers: current production baseline, decline, reserve life, realised prices, LOE/opex, netbacks, sustaining capex, FCF, hedging, and balance sheet.
+  * Hybrids: separate producing cash flow from exploration/appraisal/development optionality. Do not double count reserves, resources, wells, acreage, or production uplift.
+  * Integrated/LNG names: separate upstream production economics from processing, LNG/offtake, infrastructure tariffs, downstream margins, and marketing exposure.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Current operating/development stage and timeline to key milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source project, production, reserves/resources, financing, and hedging data from [PRIMARY_FILING_SOURCES].
+  * For every key numeric input used in NAV, Quality, Value, production, or price targets, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] Brent, WTI, Henry Hub, LNG/JKM, local gas, and relevant basin differential data where applicable; state source and timestamp.
+  * Use company-disclosed production, reserves/resources, realised price, LOE/opex, capex, hedging, debt, and balance-sheet data where available. Use generic assumptions only where no better source exists.
+
+  Production baseline discipline:
+  * Establish the current production baseline before creating scenarios.
+  * Use the latest disclosed quarter, month, or annualised run-rate, and state whether production is gross, net, working-interest, royalty-interest, WI, NRI, boe/d, bbl/d, Mcf/d, MMscf/d, or another basis.
+  * Do not treat an already-achieved production level as a future bull-case milestone.
+  * Reconcile any conflict between old presentations, recent quarterlies, and current guidance. Prefer newest dated primary-source operating disclosure.
+  * If the company discloses a current run-rate and a future target, value the incremental change from the current baseline, not the full future target as though starting from zero.
+
+  Commodity and unit rules:
+  * Keep oil, gas, NGL, condensate, and LNG units explicit. Convert to boe only when the conversion basis is stated or standard 6:1 energy equivalence is appropriate.
+  * Do not let boe conversion hide product mix, realised pricing, gas basis risk, NGL discounts, or oil/gas weighting.
+  * Distinguish reserves and resources:
+    - PDP/PDNP/PUD if disclosed
+    - 1P / 2P / 3P reserves
+    - 1C / 2C / 3C contingent resources
+    - prospective resources and risked/unrisked prospective resources
+  * Prefer PRMS/SPE-PRMS qualified reserve/resource reports or company filings with named competent/reserve evaluator support.
+  * Do not value prospective resources like reserves. Apply geological chance of success and commercial chance of development separately.
+
+  Hedging and price exposure:
+  * Identify whether the company is hedged, partially hedged, or deliberately unhedged.
+  * If the company affirmatively discloses that it is unhedged, treat that as a deliberate exposure choice, not as a disclosure gap.
+  * For hedged volumes, state commodity, volume, tenor, strike/swap/collar terms, and mark-to-market impact where disclosed.
+  * For unhedged exposure, quantify sensitivity to Brent/WTI/Henry Hub/LNG/local price moves where possible.
+  * Do not penalise absence of a hedge book unless hedging is material to debt covenants, near-term liquidity, development funding, or downside survival.
+
+  Evidence review before valuation:
+  Use the available prepass, PDF context, primary filings, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, production, reserves/resources, funding, operating risk, hedge exposure, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/announcement reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Asset-Level Operating and Valuation Workup
+  For each major producing asset, development project, appraisal asset, or exploration option, up to 5:
+  * Populate inputs where applicable: ownership/WI/NRI, production, decline, reserves/resources, realised price, price differential, royalty, production taxes, LOE/opex, transport/gathering/processing, G&A, sustaining capex, development capex, abandonment/ARO, working capital, fiscal terms, and development timeline.
+  * If disclosed production/cost guidance exists, use it before generic assumptions.
+  * If no reserve/resource report exists, do not force reserve-based valuation. Use acreage, well inventory, farm-out/comparable transaction, or risked exploration methods as appropriate.
+  * If no production history exists, do not infer producer-level cash flow.
+
+  Missing-data assumptions:
+  Use only when no disclosed operating or study data exists, and label clearly as ESTIMATE:
+  * Decline rate, LOE/opex, transport, royalties, production taxes, development capex, well cost, type curve, EUR, abandonment cost, and working capital must be based on company filings, basin peers, reserve reports, or comparable transactions where possible.
+  * Do not create false precision from generic basin assumptions if the company disclosure is too thin.
+  * If assumptions are too weak for a defensible DCF, use a conservative comparable/risked-resource method and flag DCF as not reliable.
+
+  Operating cost and netback discipline:
+  * Build netback from realised price, less royalties, production taxes, LOE/opex, gathering/processing/transport, and other field-level costs where disclosed.
+  * Separate field netback from corporate FCF by adding G&A, interest, exploration expense, sustaining capex, development capex, and taxes.
+  * If LOE or operating cost is missing, state whether that materially impairs valuation confidence. Do not mark the company down just because the template asks for LOE if cash-flow data or netback data already answers the economics.
+  * For gas-heavy names, show sensitivity to local gas pricing, Henry Hub, LNG linkage, basis differentials, and transport constraints.
+  * For oil-heavy names, show sensitivity to Brent/WTI, basin differential, NGL realisations, and royalties/taxes.
+
+  Development and infrastructure adjustment:
+  * If pipelines, processing plants, compression, water handling, gathering systems, export terminals, LNG capacity, FPSO, drilling inventory, or shared infrastructure already exists, state whether capex and timing assumptions reflect that advantage.
+  * If not reflected in the base case, estimate avoided replacement capex or reduced execution risk separately and explain the basis.
+  * Do not award infrastructure credit unless it is usable, contracted/owned, relevant to the current development plan, and materially lowers capex, operating cost, marketing risk, or timeline.
+
+  NAV / DCF discipline:
+  * Show a compact DCF/NAV summary rather than a long mechanical formula dump.
+  * Include production forecast, decline, realised price, netback, LOE/opex, sustaining capex, development capex, tax, abandonment/ARO where material, and after-tax cash flow.
+  * Value producing reserves using PDP/1P/2P reserve cash flows where sufficient data exists.
+  * Value development projects using study-backed or reserve-report-backed DCF where sufficient data exists.
+  * Value appraisal and exploration assets separately using risked-resource, acreage, well-inventory, or comparable transaction methods.
+  * Output at least:
+    - NAV at current/strip commodity prices
+    - NAV at company or reserve-report price deck where disclosed
+    - sensitivity to at least one downside and upside commodity case
+
+  Probability-weighted commodity-price NAV:
+  Compute R = current_price_or_strip / study_or_reserve_report_price:
+  * R < 0.95: weight_current=0.40, weight_reference=0.60
+  * R 0.95-1.10: weight_current=0.50, weight_reference=0.50
+  * R 1.10-1.25: weight_current=0.65, weight_reference=0.35
+  * R > 1.25: weight_current=0.75, weight_reference=0.25
+  State R, selected weights, and blended NAV. If multiple commodities drive value, apply this by commodity or explain a basket approach.
+
+  Equity value discipline:
+  * Risked NAV = sum of producing reserve value, development value, appraisal value, exploration option value, and corporate adjustments.
+  * Equity Value/Share = (Risked NAV + Surplus Cash) / shares_basic.
+  * Surplus Cash = cash + committed undrawn liquidity - remaining committed capex - drawn debt - near-term obligations not already in NAV.
+  * Capex already embedded in asset DCF must not be subtracted again from NAV.
+  * Subtract only obligations not already reflected in asset cash flow or capex assumptions.
+  * Do not deduct the same funding burden twice across NAV, capex, debt, RBL availability, abandonment liabilities, and Surplus Cash calculations.
+  * Use shares_basic for Market Cap and EV.
+  * For per-share value, use treasury-method diluted shares: shares_basic + in-the-money options - (aggregate exercise proceeds / current price). Do not use fully diluted shares including deep out-of-the-money instruments unless they are in-the-money.
+
+  Balance sheet, RBL, and funding discipline:
+  * Identify cash, debt, net debt, RBL or reserve-based lending capacity, covenants, maturities, interest burden, and undrawn liquidity.
+  * For producers, test whether operating cash flow at base and bear commodity cases covers sustaining capex, interest, and required development spending.
+  * For developers/appraisal companies, show the funding gap to first production or next value-inflection milestone.
+  * Treat farm-outs, carried interests, partner funding, and joint-venture promotes as funding offsets only where binding or highly credible.
+  * Do not treat non-binding funding discussions as cash.
+
+  Stage multiplier:
+  Step A - Development/Commercial Base:
+  * Prospect only: 0.08 | Drill-ready exploration: 0.12 | Discovery/appraisal: 0.18 | 2C resource with concept: 0.25
+  * PEA/scoping or concept select: 0.30 | FEED/pre-FID: 0.42 | FID/sanctioned: 0.58
+  * Construction/development >50%: 0.72 | First production: 0.82 | Ramp-up: 0.91 | Steady-state production: 1.00
+  Evidence threshold: use the highest stage supported by achieved evidence, not management targets. Planned milestones may inform 12m/24m target multipliers, but not the current multiplier.
+
+  Step B - Funding Adjustment:
+  * No funding, gap >50% of development capex or drilling program: x 0.70
+  * Partial funding, gap 15-50%: x 0.85
+  * Mostly funded, gap <15% or clear near-term self-funded path: x 0.95
+  * Fully funded with committed debt/equity/farm-out and no material gap: x 1.05
+  * Fully funded with working capital buffer >=20% above peak capex: x 1.10
+  Final Multiplier = Development_Base x Funding_Adjustment. State both components for material development/appraisal assets.
+
+  Producer adjustment:
+  * For established producers, do not rely mainly on the development stage multiplier.
+  * Anchor valuation to current production, decline, realised prices, LOE/opex, netbacks, FCF, reserve life, sustaining capex, hedging, guidance, and balance-sheet risk.
+  * Use the stage multiplier only for material development, appraisal, exploration, or expansion assets.
+
+  Step 2: Quality Score (0-100)
+  Formula:
+  = (0.20 * Jurisdiction) + (0.25 * Asset Quality) + (0.20 * Cost Position) + (0.15 * Management) + (0.20 * Funding/Balance Sheet)
+
+  Score each factor with raw score, weight, weighted contribution, and evidence:
+  * Jurisdiction:
+    - Tier 1 = 100 | Tier 2 = 85 | Tier 3 = 70 | Tier 4 = 50
+    - Adjust for fiscal stability, royalty/tax burden, permitting, environmental rules, security, export constraints, pipeline/LNG access, and government intervention risk.
+  * Asset Quality:
+    - Producers: reserve life, decline, production stability, well productivity, operating uptime, acreage depth, drilling inventory, and reserve replacement.
+    - Developers/appraisal: resource confidence, flow tests, reservoir quality, development concept, commercial thresholds, partner quality, and path to FID.
+    - Explorers: prospect quality, basin analogues, chance of success, scale, drilling readiness, and farm-out potential.
+  * Cost Position:
+    - Use LOE/opex, netback, transport, royalties/taxes, sustaining capex, finding/development cost, and breakeven where disclosed.
+    - Score against relevant basin/product peers.
+  * Management:
+    - Operating track record, capital discipline, technical capability, insider ownership, dilution history, hedging discipline, and guidance credibility.
+  * Funding/Balance Sheet:
+    - Cash runway, net debt, RBL/covenants, maturities, liquidity, funding gap, self-funded drilling/development capacity, and downside survival.
+
+  Step 3: Value Score (0-100)
+  Formula:
+  = (0.30 * NAV vs Market Cap) + (0.20 * EV/2P or Resource Value) + (0.20 * EV/Production) + (0.15 * FCF Yield at Strip) + (0.15 * Strategic Value)
+
+  * NAV vs Market Cap:
+    - Use (Risked NAV + Surplus Cash) / Market Cap as primary.
+    - Show strip/current, reference, downside, and upside commodity cases where practical.
+    - Do not include unrisked exploration upside in the primary ratio.
+    - >2.0x = 100 | 1.5-2.0x = 80 | 1.0-1.5x = 60 | <1.0x = 40, adjusted for asset quality and funding risk.
+  * EV/2P or Resource Value:
+    - Use EV / 2P reserves for producers and developers with booked reserves.
+    - Use EV / risked 2C or risked prospective resource only where reserves are absent, and label clearly.
+    - Do not mix 2P reserves, 2C resources, and prospective resources without risk adjustment.
+  * EV/Production:
+    - Use EV / current net production, not stale production or future target production.
+    - Show boe/d and product mix. Do not hide gas/oil weighting inside one boe number.
+  * FCF Yield at Strip:
+    - Use operating cash flow less sustaining capex, interest, cash taxes, and required maintenance/development spend as appropriate.
+    - If strip pricing is unavailable, use current commodity prices and state the limitation.
+  * Strategic Value:
+    - Consider basin position, infrastructure, reserve/resource scale, LNG/export optionality, partner quality, farm-out/M&A appeal, and scarcity value.
+
+  Step 4: Scenario Framework and Price Targets
+  * Price targets:
+    - 12m and 24m bull/base/bear targets
+    - scenario probabilities, each horizon summing to 100%
+    - probability-weighted target for 12m and 24m
+    - explicit scenario drivers: commodity price deck, production baseline, decline, drilling success, capex, costs, hedging, funding, dilution, reserves/resources, permitting, and timeline
+    - target reconciliation to NAV/share, FCF multiple, EV/2P, EV/production, or another stated anchor
+  * For material funding gaps, include one compact financing bridge with:
+    - conservative/base/constructive cases
+    - debt/RBL/farm-out/equity components
+    - equity tranche and raise price/discount if needed
+    - new shares issued
+    - post-dilution NAV/share
+  * Development or operating timeline:
+    - current stage/status
+    - key milestones to 24m: drilling, spud, flow test, reserve update, FID, first production, ramp-up, acquisition/divestment, debt refinancing, or listing/uplisting
+    - status: on-track/at-risk/speculative
+    - impact on 24m probability-weighted target
+    - primary risk
+  * Headwinds/tailwinds:
+    - threshold-driven quantitative factors with directional NAV/FCF impact
+    - material qualitative factors with evidence and expected duration
+  * Investment recommendation paragraph:
+    - core thesis reason
+    - key 12m catalyst
+    - key invalidation risk
+    - sizing context: speculative/core/avoid
+  * Key risks: ranked list with probability and impact.
+  * Key opportunities: ranked list with trigger and potential value impact.
+
+  Step 5: Additional Metrics
+  Include where relevant:
+  * Current production baseline and product mix
+  * Production trend and guidance accuracy
+  * Reserve life index: 2P reserves / annual production
+  * PDP / 1P / 2P / 2C / prospective resource split
+  * Decline rate and sustaining capex need
+  * LOE/opex, transport, royalties/taxes, and field netback
+  * Operating cash flow, FCF, and FCF yield at current/strip prices
+  * Hedge book or explicit unhedged exposure
+  * Debt/RBL capacity, covenants, maturities, and liquidity runway
+  * Development capex remaining and funding gap
+  * Drilling inventory, well costs, EUR/type curve, and success rate
+  * Abandonment/ARO or decommissioning liabilities
+  * ESG, methane/flaring, permitting, water, and community/regulatory exposure
+  * Peer EV/2P, EV/boe/d, EV/EBITDA, and FCF yield vs relevant basin/product cohort
+
+  Cross-check requirements before final output:
+  * Current production baseline must be current and must not be confused with old milestone targets.
+  * Reserve/resource units must be internally consistent.
+  * EV arithmetic must be consistent across sections.
+  * NAV comparison vs reserve report/company-stated study values: explain major variance drivers.
+  * Quality and Value weighted totals must equal stated final scores.
+  * Stage multipliers must match actual evidence and documented funding status for development/appraisal assets.
+  * Price targets must be mathematically anchored to scenario assumptions.
+  * Hedging must be treated as evidence: unhedged-by-disclosure is a deliberate commodity exposure, not an unresolved data gap.
+  * Do not create a risk from template structure alone. If a data point is missing but immaterial, state that it is immaterial rather than treating it as a governance or valuation failure.
