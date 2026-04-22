@@ -244,3 +244,231 @@ verification_schema:
       development_timeline:
         markers: ["development timeline", "timeline", "milestone", "development_timeline"]
         critical: true
+
+# The full rubric/prompt
+rubric: |
+  Run an investment analysis on [Company Name] using this pharmaceutical and biotech rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to valuation, clinical risk, regulatory risk, funding risk, commercial risk, or scenario confidence.
+
+  First classify the company:
+  * Discovery/platform: preclinical platform, discovery engine, or early research assets with no clinical proof of concept.
+  * Clinical-stage biotech: one or more active clinical candidates, no meaningful commercial revenue.
+  * Late-stage biotech: pivotal/registrational asset, NDA/BLA/MAA pathway, or clear approval catalyst within 24 months.
+  * Commercial pharma/biotech: approved product revenue, launch execution, lifecycle management, or marketed portfolio.
+  * Hybrid: commercial or partnered asset base plus material clinical/preclinical optionality.
+  * Royalty/licensing model: economics mainly from royalties, milestones, profit share, or out-licensed assets rather than direct commercialization.
+
+  Use that classification to decide valuation emphasis:
+  * Discovery/platform: platform validity, target biology, modality risk, preclinical package, IP, partner validation, cash runway, and probability of reaching clinic.
+  * Clinical-stage: trial design, endpoint quality, enrolment, safety, effect size, comparator relevance, regulatory path, and funding to next catalyst.
+  * Late-stage: pivotal endpoint risk, statistical powering, CMC/manufacturing readiness, regulatory interactions, filing timeline, launch readiness, and dilution risk.
+  * Commercial: revenue trend, prescription/volume growth, gross-to-net, reimbursement, margin, lifecycle/IP, competition, and operating cash flow.
+  * Hybrid: separate commercial cash flow from clinical pipeline optionality. Do not double count assets, indications, milestone economics, or platform expansion.
+  * Royalty/licensing: contract terms, counterparty quality, milestone probability, royalty duration, patent/exclusivity life, and revenue concentration.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Pipeline summary and timeline to key clinical, regulatory, commercial, and financing milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source pipeline, financial, regulatory, clinical, partnership, and IP data from [PRIMARY_FILING_SOURCES].
+  * Prefer primary sources: exchange filings, annual/interim reports, investor presentations, trial protocols, clinical trial registries, regulatory announcements, FDA/EMA/TGA documents, peer-reviewed publications, conference abstracts, patent/exclusivity databases, and company releases.
+  * For every key numeric input used in rNPV, Quality, Value, cash runway, or price targets, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker price targets or analyst probability assumptions as primary evidence. They may be cited only as secondary sentiment/context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, trial documents, regulatory disclosures, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, clinical risk, regulatory risk, funding, commercialization, IP, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Pipeline and Asset Inventory
+  For each material asset or program, up to 5:
+  * Identify asset name, modality, target/mechanism, indication, stage, geography, sponsor, ownership, commercial rights, partner/counterparty, and next milestone.
+  * State whether the asset is preclinical, Phase 1, Phase 2, Phase 3, submitted, approved, launched, partnered, discontinued, or on hold.
+  * For each clinical asset, capture trial name/identifier, design, randomisation/blinding, comparator/control, patient population, N, inclusion/exclusion criteria, primary endpoint, key secondary endpoints, follow-up duration, enrolment status, expected readout, and statistical powering where disclosed.
+  * For each commercial asset, capture approved indication, label restrictions, launch geography, pricing/reimbursement, volume/prescription trend, revenue trend, gross-to-net where available, margin, competition, and lifecycle events.
+  * If the company reports platform optionality, separate platform validation from named asset value. Do not value vague platform potential as if it were a de-risked pipeline asset.
+
+  Clinical evidence discipline:
+  * Distinguish biomarker/surrogate evidence from clinically meaningful outcomes.
+  * For efficacy, state effect size, absolute/relative improvement, p-value/confidence interval if available, endpoint hierarchy, and whether the endpoint was pre-specified.
+  * For safety, state serious adverse events, discontinuations, dose-limiting toxicities, black-box/label risk, and class-specific safety issues.
+  * Penalise open-label, uncontrolled, underpowered, post-hoc, single-site, or highly selected-population results unless explicitly justified.
+  * Do not extrapolate animal/in-vitro evidence into clinical probability without a clear translational bridge.
+  * For oncology, specify line of therapy, mutation/biomarker status, response rate, duration of response, PFS/OS where available, and comparator relevance.
+  * For rare disease, specify natural history, endpoint validation, patient identification, and regulatory precedent.
+  * For infectious disease/vaccines, specify strain/variant relevance, immunogenicity versus clinical efficacy, durability, safety, and public-health procurement risk.
+
+  Regulatory and CMC discipline:
+  * Identify the relevant regulators and pathway: FDA, EMA, TGA, MHRA, PMDA, NMPA, or other.
+  * Capture IND/CTA status, end-of-Phase 2 meetings, special protocol assessment, orphan drug, fast track, breakthrough, RMAT, priority review, accelerated approval, conditional approval, or equivalent designations where disclosed.
+  * State next regulatory decision points: trial clearance, pivotal start, pre-NDA/BLA meeting, filing, PDUFA/CHMP, approval, label expansion, or post-marketing requirement.
+  * Assess CMC/manufacturing readiness: GMP status, scale-up, tech transfer, batch consistency, device/combination-product issues, cold-chain, fill-finish, and supply constraints.
+  * Do not assume regulatory approval from positive trial data alone; consider endpoint acceptability, safety, CMC, inspection, and benefit-risk.
+
+  Intellectual property and exclusivity:
+  * Identify composition-of-matter, method-of-use, formulation, manufacturing, device, data exclusivity, orphan exclusivity, biologic exclusivity, and patent expiry where available.
+  * Separate patent life from commercial exclusivity and from practical competitive moat.
+  * If patents are weak, narrow, expiring, licensed-in, disputed, or only method/formulation based, reflect that in rNPV and strategic value.
+  * For licensed assets, state royalty rates, milestone obligations, sublicensing rights, territory, change-of-control terms, and termination rights where disclosed.
+
+  Step 2: rNPV / Valuation Workup
+  For each major asset, build a compact risk-adjusted NPV. Do not force a full rNPV for assets with insufficient evidence; use clearly labelled option value instead.
+  Populate where applicable:
+  * Target patient population and addressable segment.
+  * Diagnosis/treatment rate and eligible population.
+  * Peak market share and launch ramp.
+  * Gross price, net price after rebates/discounts, and gross-to-net assumption.
+  * Peak sales, time to peak, and revenue duration.
+  * Patent/exclusivity life and loss-of-exclusivity timing.
+  * COGS, SG&A/commercialization burden, royalties, milestone obligations, tax, and post-launch lifecycle R&D.
+  * Remaining R&D and trial costs to approval.
+  * Discount rate, probability of success, and launch timing.
+  * Ownership/royalty/profit-share economics.
+
+  Probability of Success (PoS) discipline:
+  Use stage anchors as starting points, then adjust for modality, indication, endpoint quality, safety, precedent, trial design, and regulatory feedback:
+  * Discovery/preclinical: 0.03-0.10
+  * IND/Phase 1: 0.10-0.18
+  * Phase 2 before proof of concept: 0.20-0.30
+  * Phase 2 with credible proof of concept: 0.30-0.45
+  * Phase 3/pivotal: 0.50-0.70
+  * Submitted for approval: 0.75-0.90
+  * Approved/marketed: 1.00, adjusted for launch/commercial risk
+  State the selected PoS and why. Do not mechanically apply stage PoS when the evidence is unusually strong or weak.
+
+  rNPV discipline:
+  * rNPV = probability-adjusted asset NPV minus remaining required corporate costs/funding burden where not already included.
+  * For partnered assets, value only the company's economic share: royalties, milestones, profit split, territory rights, or retained commercialization rights.
+  * Do not double count the same asset through both rNPV and platform optionality.
+  * Do not count future milestone receipts at 100% unless the triggering event is already achieved.
+  * If a trial readout is within 12 months, show pre-catalyst and post-catalyst valuation sensitivity.
+  * If cash runway is short, show post-dilution rNPV/share using a realistic financing bridge.
+
+  Cash runway and dilution:
+  * Calculate cash runway from latest cash, quarterly operating cash burn, R&D spend, G&A, expected trial costs, debt service, and committed payments.
+  * State whether cash reaches the next major value-inflection catalyst.
+  * If runway is under 18 months or funding gap is material, model conservative/base/constructive financing cases with raise size, issue price/discount, new shares, and post-dilution rNPV/share.
+  * Treat non-binding partnerships, grants, or financing discussions as upside only, not available cash.
+  * Include debt, convertibles, warrants/options, ATM/equity lines, and contingent liabilities where material.
+
+  Step 3: Quality Score (0-100)
+  Formula:
+  = (0.20 * Regulatory Environment) + (0.20 * Scientific/Clinical Quality) + (0.15 * Management) + (0.15 * Pipeline Maturity) + (0.20 * Cash Runway/Funding) + (0.10 * Clinical/Ethical Standards)
+
+  Score each factor with raw score, weight, weighted contribution, and evidence:
+  * Regulatory Environment:
+    - Tier 1 regulators and clear pathway = 90-100
+    - credible developed-market pathway but some uncertainty = 75-90
+    - unclear pathway, novel endpoint, or limited precedent = 50-75
+    - high regulatory uncertainty or weak disclosure = 30-50
+  * Scientific/Clinical Quality:
+    - Strong controlled clinical evidence with meaningful endpoints = 90-100
+    - credible early clinical proof of concept = 70-90
+    - preclinical/translational package only = 40-70
+    - weak, post-hoc, uncontrolled, or biologically speculative = 20-50
+  * Management:
+    - Proven approvals/launches/deals and disciplined capital allocation = 90-100
+    - experienced development team = 75-90
+    - mixed track record = 55-75
+    - unproven or promotional = 30-55
+  * Pipeline Maturity:
+    - marketed/registrational weighted pipeline = 85-100
+    - Phase 2/3 with credible proof of concept = 65-85
+    - early clinical = 45-65
+    - mostly preclinical = 20-45
+  * Cash Runway/Funding:
+    - >24 months or funded through key catalyst = 90-100
+    - 12-24 months = 70-90
+    - 6-12 months or likely raise before catalyst = 45-70
+    - <6 months or major funding gap = 20-45
+  * Clinical/Ethical Standards:
+    - GCP, transparent safety reporting, credible trial governance, and acceptable pricing/reimbursement posture = 80-100
+    - adequate but limited disclosure = 60-80
+    - safety/reporting/pricing concerns = 30-60
+
+  Step 4: Value Score (0-100)
+  Formula:
+  = (0.30 * rNPV vs Market Cap) + (0.20 * EV / Risk-Adjusted Peak Sales) + (0.20 * Pipeline Optionality) + (0.15 * Competitive Position) + (0.15 * Strategic Value)
+
+  * rNPV vs Market Cap:
+    - Use total risk-adjusted rNPV / market cap as primary.
+    - Show pre-dilution and post-dilution where funding gap is material.
+    - >3x = 100 | 2-3x = 80 | 1-2x = 60 | <1x = 40, adjusted for evidence quality and funding risk.
+  * EV / Risk-Adjusted Peak Sales:
+    - EV divided by risk-adjusted peak sales for material assets.
+    - Do not use unrisked peak sales without clear labelling.
+    - Compare to relevant stage, modality, indication, and commercial-risk peers.
+  * Pipeline Optionality:
+    - Score expansion indications, platform replication, additional assets, and lifecycle potential beyond the core rNPV.
+    - Do not double count assets already included in rNPV.
+  * Competitive Position:
+    - Consider standard of care, efficacy/safety differentiation, convenience, pricing, reimbursement, patents, speed to market, and competitor readouts.
+  * Strategic Value:
+    - Consider major-pharma fit, unmet need, scarcity, partner validation, licensing interest, M&A comparables, and platform value.
+
+  Step 5: Scenario Framework and Price Targets
+  * Price targets:
+    - 12m and 24m bull/base/bear targets
+    - scenario probabilities, each horizon summing to 100%
+    - probability-weighted target for 12m and 24m
+    - explicit scenario drivers: trial readout, regulatory decision, commercial traction, financing, dilution, partnership, patent/exclusivity, and sector financing window
+    - target reconciliation to rNPV/share, post-dilution rNPV/share, EV/sales, or another stated anchor
+  * For material funding gaps, include one compact financing bridge with:
+    - conservative/base/constructive cases
+    - raise size and timing
+    - equity/debt/partner/grant components
+    - issue price/discount and new shares
+    - post-dilution rNPV/share
+  * Pipeline timeline:
+    - current stage/status by material asset
+    - key milestones to 24m: enrolment, readout, regulatory filing, PDUFA/CHMP/TGA decision, launch, partnership, financing, patent decision, or commercial update
+    - status: on-track/at-risk/speculative
+    - impact on 24m probability-weighted target
+    - primary risk
+  * Headwinds/tailwinds:
+    - threshold-driven quantitative factors with directional rNPV/cash-flow impact
+    - material qualitative factors with evidence and expected duration
+  * Investment recommendation paragraph:
+    - core thesis reason
+    - key 12m catalyst
+    - key invalidation risk
+    - sizing context: speculative/core/avoid
+  * Key risks: ranked list with probability and impact.
+  * Key opportunities: ranked list with trigger and potential value impact.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Cash runway in months and next-catalyst funding coverage.
+  * Quarterly cash burn and R&D intensity.
+  * Pipeline table with asset, indication, stage, next milestone, PoS, and rNPV contribution.
+  * Trial endpoint quality and safety summary.
+  * Regulatory designation/status and next decision point.
+  * Patent/exclusivity runway and licensing economics.
+  * Commercial market size, addressable population, pricing, reimbursement, and competition.
+  * Partnering/licensing/M&A comparables.
+  * Insider ownership, options/warrants, and likely dilution.
+  * For commercial companies: revenue growth, gross margin, gross-to-net, prescriptions/volumes, operating cash flow, and launch trajectory.
+
+  Cross-check requirements before final output:
+  * Pipeline stage and next milestone must match newest dated primary-source disclosure.
+  * Trial endpoint interpretation must distinguish statistical significance from clinical relevance.
+  * Safety profile must be discussed for every material clinical asset.
+  * PoS assumptions must be justified and not purely mechanical.
+  * rNPV arithmetic must reconcile to asset values and total company value.
+  * Cash runway must reconcile to latest cash and burn rate.
+  * EV/market cap/share count arithmetic must be internally consistent.
+  * Quality and Value weighted totals must equal stated final scores.
+  * Price targets must be mathematically anchored to scenario assumptions.
+  * Do not create a risk from template structure alone. If a data point is missing but immaterial, state that it is immaterial rather than treating it as a governance or valuation failure.
