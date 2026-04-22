@@ -1858,6 +1858,37 @@ class TemplateLoader:
             rubric = rubric[:max_chars]
         return rubric.strip()
 
+    def render_copy_paste_rubric(
+        self,
+        template_id: str,
+        company_name: Optional[str] = None,
+        exchange: Optional[str] = None,
+        max_chars: int = 0,
+    ) -> str:
+        """
+        Render the manual Web UI rubric with placeholder substitutions applied.
+
+        Priority:
+        1) `copy_paste_rubric` (manual Web UI / external-model workflow)
+        2) `rubric` / prompt fallback (for templates not yet split)
+
+        Runtime Stage 1 does not call this method.
+        """
+        template = self.get_template(template_id) or {}
+        rubric = str(template.get("copy_paste_rubric") or template.get("rubric") or "").strip()
+        if not rubric:
+            rubric = get_template_prompt_fallback(template_id, template)
+        if not rubric:
+            return ""
+        rubric = self.apply_prompt_substitutions(
+            rubric,
+            company_name=company_name,
+            exchange=exchange,
+        )
+        if max_chars > 0:
+            rubric = rubric[:max_chars]
+        return rubric.strip()
+
     def render_stage1_query_prompt(
         self,
         template_id: str,
@@ -2001,6 +2032,84 @@ class TemplateLoader:
                 f"{rubric}"
                 if include_rubric and rubric
                 else "Template rubric:\n(omitted in brief; expected in main query)"
+            )
+        ).strip()
+
+    def get_copy_paste_research_brief(
+        self,
+        template_id: str,
+        company_type: Optional[str] = None,
+        exchange: Optional[str] = None,
+        company_name: Optional[str] = None,
+        include_rubric: bool = True,
+        max_chars: int = 0,
+    ) -> str:
+        """
+        Build the manual Web UI copy/paste prompt.
+
+        This deliberately prefers `copy_paste_rubric` so external Web UI lanes can
+        ask for standalone document/source review without changing runtime Stage 1.
+        """
+        template = self.get_template(template_id) or {}
+        rubric = ""
+        if include_rubric:
+            rubric = str(template.get("copy_paste_rubric") or template.get("rubric") or "").strip()
+            if not rubric:
+                rubric = get_template_prompt_fallback(template_id, template)
+            rubric = self.apply_prompt_substitutions(
+                rubric,
+                company_name=company_name,
+                exchange=exchange,
+            )
+            if max_chars > 0:
+                rubric = rubric[:max_chars]
+
+        company_type_line = (
+            f"Company type: {company_type}."
+            if company_type
+            else "Company type: unspecified."
+        )
+        exchange_line = (
+            f"Exchange: {exchange}."
+            if exchange
+            else "Exchange: unknown."
+        )
+        exchange_assumptions = self.get_exchange_assumptions(exchange)
+        behavior = self.get_template_behavior(template_id)
+        extra_lane_lines: List[str] = []
+        for lane in (behavior.get("stage1_research_lanes") or []):
+            lane_text = str(lane or "").strip()
+            if not lane_text:
+                continue
+            lane_text = self.apply_prompt_substitutions(
+                lane_text,
+                company_name=company_name,
+                exchange=exchange,
+            )
+            if not lane_text:
+                continue
+            if lane_text.startswith("-"):
+                extra_lane_lines.append(f"{lane_text}\n")
+            else:
+                extra_lane_lines.append(f"- {lane_text}\n")
+        extra_research_lanes = "".join(extra_lane_lines)
+        return (
+            "Manual Web UI analysis prompt:\n"
+            f"- Template: {template_id}\n"
+            f"- Company name: {company_name or 'unknown'}.\n"
+            f"- {company_type_line}\n"
+            f"- {exchange_line}\n"
+            "- Use this prompt when pasting into external model Web UIs.\n"
+            "- Perform standalone source/document research if documents are not already attached.\n"
+            "- Keep outputs decision-grade, evidence-linked, and explicit about assumptions.\n\n"
+            f"{extra_research_lanes}"
+            "Exchange assumptions:\n"
+            f"{exchange_assumptions}\n\n"
+            + (
+                "Copy/paste rubric:\n"
+                f"{rubric}"
+                if include_rubric and rubric
+                else "Copy/paste rubric:\n(omitted)"
             )
         ).strip()
 

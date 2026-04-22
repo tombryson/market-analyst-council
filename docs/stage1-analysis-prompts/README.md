@@ -1,8 +1,8 @@
-# Stage 1 Analysis Prompt YAMLs
+# Manual Web UI Analysis Prompt YAMLs
 
 Generated from the live `llm-council` template loader, not hand-written copies.
 
-Use the `copy_paste_prompt` field for manual Web UI runs. The runtime source remains `backend/templates/*.yaml` and `backend/template_loader.py`.
+Use the `copy_paste_prompt` field for manual Web UI runs. If a template defines `copy_paste_rubric`, that Web UI-specific rubric is used. Runtime Stage 1 continues to use `rubric` / `stage1_focus_prompt` through `TemplateLoader.get_stage1_research_brief(...)`.
 
 Regenerate with:
 

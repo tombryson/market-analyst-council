@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export runtime Stage 1 analysis prompts as copy/paste YAML files."""
+"""Export manual Web UI analysis prompts as copy/paste YAML files."""
 
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ def _export_payload(template: Dict[str, Any], source_path: str) -> Dict[str, Any
     behavior = template.get("template_behavior") or {}
     scoring = behavior.get("stage3_scoring_factors") or {}
 
-    copy_paste_prompt = loader.get_stage1_research_brief(
+    copy_paste_prompt = loader.get_copy_paste_research_brief(
         template_id,
         company_type=company_types[0] if company_types else template_id,
         exchange=DEFAULT_EXCHANGE.upper(),
@@ -74,8 +74,8 @@ def _export_payload(template: Dict[str, Any], source_path: str) -> Dict[str, Any
         "runtime_source": {
             "generated_by": "scripts/export_stage1_analysis_prompts.py",
             "source_of_truth": "backend/templates/*.yaml plus backend/template_loader.py",
-            "copy_paste_prompt_renderer": "TemplateLoader.get_stage1_research_brief(..., include_rubric=True)",
-            "core_rubric_renderer_used_inside_prompt": "TemplateLoader.render_template_rubric(...) / fallback rubric builder",
+            "copy_paste_prompt_renderer": "TemplateLoader.get_copy_paste_research_brief(..., include_rubric=True)",
+            "core_rubric_renderer_used_inside_prompt": "TemplateLoader.render_copy_paste_rubric(...) / fallback rubric builder",
             "runtime_stage1_injection_changed": False,
         },
         "company_types": company_types,
@@ -121,11 +121,11 @@ def main() -> int:
         written.append(out_path)
 
     index_lines = [
-        "# Stage 1 Analysis Prompt YAMLs",
+        "# Manual Web UI Analysis Prompt YAMLs",
         "",
         "Generated from the live `llm-council` template loader, not hand-written copies.",
         "",
-        "Use the `copy_paste_prompt` field for manual Web UI runs. The runtime source remains `backend/templates/*.yaml` and `backend/template_loader.py`.",
+        "Use the `copy_paste_prompt` field for manual Web UI runs. If a template defines `copy_paste_rubric`, that Web UI-specific rubric is used. Runtime Stage 1 continues to use `rubric` / `stage1_focus_prompt` through `TemplateLoader.get_stage1_research_brief(...)`.",
         "",
         "Regenerate with:",
         "",

@@ -45,13 +45,13 @@ def main() -> int:
     company_type = selection.get("company_type") or template_id
 
     if args.core_rubric_only:
-        prompt = loader.render_template_rubric(
+        prompt = loader.render_copy_paste_rubric(
             template_id,
             company_name=company_name,
             exchange=exchange,
         ).strip()
     else:
-        prompt = loader.get_stage1_research_brief(
+        prompt = loader.get_copy_paste_research_brief(
             template_id,
             company_type=company_type,
             exchange=exchange,

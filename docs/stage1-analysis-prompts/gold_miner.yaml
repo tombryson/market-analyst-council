@@ -10,8 +10,8 @@ placeholders:
 runtime_source:
   generated_by: scripts/export_stage1_analysis_prompts.py
   source_of_truth: backend/templates/*.yaml plus backend/template_loader.py
-  copy_paste_prompt_renderer: TemplateLoader.get_stage1_research_brief(..., include_rubric=True)
-  core_rubric_renderer_used_inside_prompt: TemplateLoader.render_template_rubric(...) / fallback rubric builder
+  copy_paste_prompt_renderer: TemplateLoader.get_copy_paste_research_brief(..., include_rubric=True)
+  core_rubric_renderer_used_inside_prompt: TemplateLoader.render_copy_paste_rubric(...) / fallback rubric builder
   runtime_stage1_injection_changed: false
 company_types:
 - gold_miner
@@ -34,20 +34,20 @@ usage:
   copy_this_field: copy_paste_prompt
   note: This is a generated manual-use artifact. It does not alter llm-council runtime Stage 1 injection.
 copy_paste_prompt: |-
-  Financial analysis framing:
+  Manual Web UI analysis prompt:
   - Template: gold_miner
   - Company name: [COMPANY_NAME].
   - Company type: gold_miner.
   - Exchange: ASX.
-  - Gather evidence needed for scoring and investment judgment, not generic summaries.
-  - Prioritize recent primary documents with quantitative data.
-  - Run a dedicated management/governance evidence lane: board and executive bios, prior operating track record, insider ownership/alignment, leadership changes, and governance red flags.
+  - Use this prompt when pasting into external model Web UIs.
+  - Perform standalone source/document research if documents are not already attached.
+  - Keep outputs decision-grade, evidence-linked, and explicit about assumptions.
 
   - Run a dedicated sector-macro lane (gold): capture 2-4 recent sources on gold market drivers (real yields, USD trend, central-bank demand, geopolitical risk) and tie each macro point to scenario assumptions.
   Exchange assumptions:
   Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
 
-  Template rubric:
+  Copy/paste rubric:
   Run an investment analysis on [COMPANY_NAME] using this gold mining rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to valuation, funding risk, operating risk, or scenario confidence.
 
   First classify the company:
