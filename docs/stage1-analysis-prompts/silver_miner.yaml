@@ -45,13 +45,6 @@ copy_paste_prompt: |-
   Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
 
   Analysis rubric:
-  Source research instructions:
-  * If source documents are not attached, actively retrieve and review primary sources before analysis.
-  * Prioritise exchange filings, annual/interim reports, quarterly updates, investor presentations, official company materials, regulator filings, and named primary-source documents.
-  * Use secondary sources only where they add factual context not available in primary filings; label secondary-source facts clearly.
-  * Perform source/document review before valuation.
-  * Do not summarise every document mechanically; surface only documents and facts that materially affect valuation, scenario probabilities, funding, operating risk, or the investment thesis.
-
   Run an investment analysis on [COMPANY_NAME] using this silver mining rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to valuation, funding risk, operating risk, commodity-price sensitivity, or scenario confidence.
 
   First classify the company:
@@ -75,6 +68,7 @@ copy_paste_prompt: |-
   * Key risks and key opportunities.
 
   Data sourcing rules:
+  * If source documents are not attached, actively retrieve and review primary sources before analysis.
   * Source market data from asx.com.au and/or marketindex.com.au.
   * Source project data from ASX announcements, quarterly/annual reports, investor presentations, and technical studies (PFS/FS/DFS).
   * For every key numeric input used in NPV, Quality, Value, or price targets, provide:
@@ -90,13 +84,13 @@ copy_paste_prompt: |-
   * Apply equivalent-unit conversions consistently in NPV, EV/resource, production, cost, and scenario tables.
   * State by-product credits separately from primary-product cost performance.
 
-  Standalone document/source review before valuation:
-  Use attached documents, retrieved primary filings, official company materials, and cited source evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, funding, operating risk, commodity leverage, or the investment thesis.
-  For each valuation-relevant document, provide:
+  Document review (complete before valuation):
+  For each major valuation-relevant document (annual/interim report, quarterly update, investor presentation, technical report, financing update, operating update, regulatory filing, or material announcement), provide:
   * Document title/date/announcement reference.
-  * 3-5 material facts.
-  * Which valuation/scenario input changed, if any.
-  * One sentence on whether market pricing appears to reflect the information.
+  * 4-6 extracted key points.
+  * Relevance to valuation inputs (what changed and why it matters).
+  * Implications for investment outlook (positives and negatives).
+  * Market pricing assessment: one separate paragraph on whether market pricing appears to reflect the document's information.
 
   Step 1: Project-Level Valuation
   For each major project or producing asset, up to 3:

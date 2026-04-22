@@ -43,13 +43,6 @@ copy_paste_prompt: |-
   Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
 
   Analysis rubric:
-  Source research instructions:
-  * If source documents are not attached, actively retrieve and review primary sources before analysis.
-  * Prioritise exchange filings, annual/interim reports, quarterly updates, investor presentations, official company materials, regulator filings, and named primary-source documents.
-  * Use secondary sources only where they add factual context not available in primary filings; label secondary-source facts clearly.
-  * Perform source/document review before valuation.
-  * Do not summarise every document mechanically; surface only documents and facts that materially affect valuation, scenario probabilities, funding, operating risk, or the investment thesis.
-
   Run an investment analysis on [COMPANY_NAME] using this oil and gas rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to valuation, funding risk, operating risk, commodity-price sensitivity, reserve/resource confidence, or scenario confidence.
 
   First classify the company:
@@ -76,8 +69,8 @@ copy_paste_prompt: |-
   * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
   * Key risks and key opportunities.
 
-  Data sourcing and retrieval rules for Web UI use:
-  * This prompt is designed for external Web UI models. If source documents are not attached, actively retrieve and review primary sources before analysis.
+  Data sourcing rules:
+  * If source documents are not attached, actively retrieve and review primary sources before analysis.
   * Source market data from asx.com.au and/or marketindex.com.au.
   * Source project, production, reserves/resources, financing, and hedging data from ASX announcements, quarterly/annual reports, investor presentations, and technical studies (PFS/FS/DFS).
   * For ASX companies, prioritise ASX announcements, quarterly activities/cashflow reports, annual reports, investor presentations lodged on ASX, reserve/resource reports, and company operating updates.
@@ -114,13 +107,13 @@ copy_paste_prompt: |-
   * For unhedged exposure, quantify sensitivity to Brent/WTI/Henry Hub/LNG/local price moves where possible.
   * Do not penalise absence of a hedge book unless hedging is material to debt covenants, near-term liquidity, development funding, or downside survival.
 
-  Standalone document/source review before valuation:
-  Because this is the manual Web UI lane, first retrieve or read the available source documents before valuation. Review the latest annual report, latest quarterly, latest investor presentation, reserve/resource report, production update, financing update, and any material drilling/acquisition/divestment announcement where available. Do not summarise every document mechanically; focus on documents that materially affect valuation, scenario probabilities, production, reserves/resources, funding, operating risk, hedge exposure, or the investment thesis.
-  For each valuation-relevant document, provide:
+  Document review (complete before valuation):
+  For each major valuation-relevant document (annual/interim report, quarterly update, investor presentation, technical report, financing update, operating update, regulatory filing, or material announcement), provide:
   * Document title/date/announcement reference.
-  * 3-5 material facts.
-  * Which valuation/scenario input changed, if any.
-  * One sentence on whether market pricing appears to reflect the information.
+  * 4-6 extracted key points.
+  * Relevance to valuation inputs (what changed and why it matters).
+  * Implications for investment outlook (positives and negatives).
+  * Market pricing assessment: one separate paragraph on whether market pricing appears to reflect the document's information.
 
   Step 1: Asset-Level Operating and Valuation Workup
   For each major producing asset, development project, appraisal asset, or exploration option, up to 5:

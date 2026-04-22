@@ -44,13 +44,6 @@ copy_paste_prompt: |-
   Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
 
   Analysis rubric:
-  Source research instructions:
-  * If source documents are not attached, actively retrieve and review primary sources before analysis.
-  * Prioritise exchange filings, annual/interim reports, quarterly updates, investor presentations, official company materials, regulator filings, and named primary-source documents.
-  * Use secondary sources only where they add factual context not available in primary filings; label secondary-source facts clearly.
-  * Perform source/document review before valuation.
-  * Do not summarise every document mechanically; surface only documents and facts that materially affect valuation, scenario probabilities, funding, operating risk, or the investment thesis.
-
   Run an investment analysis on [COMPANY_NAME] following this rubric exactly. Keep the output investment-grade, explicit, and scenario-based. Use ASX-appropriate primary filings first and only use secondary sources where they add real value.
 
   Template focus:
@@ -71,6 +64,7 @@ copy_paste_prompt: |-
   * Investment Recommendation: BUY / HOLD / SELL with conviction and a short justification.
 
   Data sourcing rules:
+  * If source documents are not attached, actively retrieve and review primary sources before analysis.
   * Use official exchange filings, official company investor materials, statutory reports, and primary operating disclosures first.
   * Use market-data providers only for current price / market cap / share count / enterprise value inputs.
   * For every key numeric input, state the value used, the source, the filing date, and whether it is estimated.
@@ -78,6 +72,14 @@ copy_paste_prompt: |-
 
   Sector research lanes:
     * Run a dedicated sector lane (fixed income): capture 2-4 recent sources on duration/rate sensitivity, credit spreads, portfolio quality, refinancing risk, and distribution sustainability; tie each point to scenario assumptions.
+
+  Document review (complete before valuation):
+  For each major valuation-relevant document (annual/interim report, quarterly update, investor presentation, technical report, financing update, operating update, regulatory filing, or material announcement), provide:
+  * Document title/date/announcement reference.
+  * 4-6 extracted key points.
+  * Relevance to valuation inputs (what changed and why it matters).
+  * Implications for investment outlook (positives and negatives).
+  * Market pricing assessment: one separate paragraph on whether market pricing appears to reflect the document's information.
 
   Step 1: Core operating and valuation workup
   * Build the operating picture from current filings and primary disclosures.

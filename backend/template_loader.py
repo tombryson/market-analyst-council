@@ -1892,22 +1892,12 @@ class TemplateLoader:
         Return the manual Web UI rubric for a template.
 
         `copy_paste_rubric` is the explicit override. Templates without one still
-        get source-research instructions so copied prompts can stand alone.
+        get concrete data-sourcing and document-review sections so copied prompts
+        can stand alone in external model interfaces.
         """
-        webui_preamble = (
-            "Source research instructions:\n"
-            "* If source documents are not attached, actively retrieve and review primary sources before analysis.\n"
-            "* Prioritise exchange filings, annual/interim reports, quarterly updates, investor presentations, official company materials, regulator filings, and named primary-source documents.\n"
-            "* Use secondary sources only where they add factual context not available in primary filings; label secondary-source facts clearly.\n"
-            "* Perform source/document review before valuation.\n"
-            "* Do not summarise every document mechanically; surface only documents and facts that materially affect valuation, scenario probabilities, funding, operating risk, or the investment thesis.\n"
-        )
-
         explicit = str(template.get("copy_paste_rubric") or "").strip()
         if explicit:
-            if "Source research instructions:" not in explicit:
-                explicit = f"{webui_preamble}\n{explicit}"
-            return explicit.strip()
+            return self._apply_copy_paste_source_sections(explicit).strip()
 
         rubric = str(template.get("rubric") or "").strip()
         if not rubric:
@@ -1916,7 +1906,42 @@ class TemplateLoader:
         if not rubric:
             return ""
 
+        return self._apply_copy_paste_source_sections(rubric).strip()
+
+    def _apply_copy_paste_source_sections(self, rubric: str) -> str:
+        """Add/normalise source and document-review instructions for copy-paste prompts."""
+        rubric = str(rubric or "").strip()
+        if not rubric:
+            return ""
+
+        data_sourcing_block = (
+            "Data sourcing rules:\n"
+            "* If source documents are not attached, actively retrieve and review primary sources before analysis.\n"
+            "* Source market data from [MARKET_DATA_SOURCES].\n"
+            "* Source company, project, operating, financial, and industry data from [PRIMARY_FILING_SOURCES].\n"
+            "* Prioritise exchange filings, annual/interim reports, quarterly updates, investor presentations, official company materials, regulator filings, and named primary-source documents.\n"
+            "* Use secondary sources only where they add factual context not available in primary filings; label secondary-source facts clearly.\n"
+            "* For every key numeric input used in valuation, Quality, Value, or price targets, provide:\n"
+            "  1) value used\n"
+            "  2) source URL + document date\n"
+            "  3) ESTIMATE tag with one-line justification if inferred.\n"
+            "* Use current [DEFAULT_CURRENCY] market and sector inputs and [FX_CONVERSION_GUIDANCE] where relevant; state source and timestamp."
+        )
+        document_review_block = (
+            "Document review (complete before valuation):\n"
+            "For each major valuation-relevant document (annual/interim report, quarterly update, investor presentation, technical report, financing update, operating update, regulatory filing, or material announcement), provide:\n"
+            "* Document title/date/announcement reference.\n"
+            "* 4-6 extracted key points.\n"
+            "* Relevance to valuation inputs (what changed and why it matters).\n"
+            "* Implications for investment outlook (positives and negatives).\n"
+            "* Market pricing assessment: one separate paragraph on whether market pricing appears to reflect the document's information."
+        )
+
         replacements = {
+            "Data sourcing and retrieval rules for Web UI use:": "Data sourcing rules:",
+            "* This prompt is designed for external Web UI models. If source documents are not attached, actively retrieve and review primary sources before analysis.\n": (
+                "* If source documents are not attached, actively retrieve and review primary sources before analysis.\n"
+            ),
             "Evidence review before valuation:": "Standalone document/source review before valuation:",
             "Use the available prepass, PDF context, primary filings, and retrieved evidence.": (
                 "Use attached documents, retrieved primary filings, official company materials, "
@@ -1930,8 +1955,34 @@ class TemplateLoader:
         for old, new in replacements.items():
             rubric = rubric.replace(old, new)
 
-        if "Source research instructions:" not in rubric:
-            rubric = f"{webui_preamble}\n{rubric}"
+        rubric = re.sub(
+            r"(?ms)^Source research instructions:\n.*?(?=^[A-Z][^\n]*:\n|\Z)",
+            "",
+            rubric,
+        ).strip()
+
+        if "Data sourcing rules:" in rubric:
+            if "If source documents are not attached" not in rubric:
+                rubric = rubric.replace(
+                    "Data sourcing rules:\n",
+                    "Data sourcing rules:\n"
+                    "* If source documents are not attached, actively retrieve and review primary sources before analysis.\n",
+                    1,
+                )
+        else:
+            rubric = f"{data_sourcing_block}\n\n{rubric}"
+
+        rubric = re.sub(
+            r"(?ms)^Standalone document/source review before valuation:\n.*?(?=^Step 1:|\Z)",
+            document_review_block + "\n\n",
+            rubric,
+        ).strip()
+
+        if "Document review (complete before valuation):" not in rubric:
+            if "\n\nStep 1:" in rubric:
+                rubric = rubric.replace("\n\nStep 1:", f"\n\n{document_review_block}\n\nStep 1:", 1)
+            else:
+                rubric = f"{document_review_block}\n\n{rubric}"
         return rubric.strip()
 
     def render_stage1_query_prompt(

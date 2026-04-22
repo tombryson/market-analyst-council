@@ -45,17 +45,30 @@ copy_paste_prompt: |-
   Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
 
   Analysis rubric:
-  Source research instructions:
+  Data sourcing rules:
   * If source documents are not attached, actively retrieve and review primary sources before analysis.
+  * Source market data from asx.com.au and/or marketindex.com.au.
+  * Source company, project, operating, financial, and industry data from ASX announcements, quarterly/annual reports, investor presentations, and technical studies (PFS/FS/DFS).
   * Prioritise exchange filings, annual/interim reports, quarterly updates, investor presentations, official company materials, regulator filings, and named primary-source documents.
   * Use secondary sources only where they add factual context not available in primary filings; label secondary-source facts clearly.
-  * Perform source/document review before valuation.
-  * Do not summarise every document mechanically; surface only documents and facts that materially affect valuation, scenario probabilities, funding, operating risk, or the investment thesis.
+  * For every key numeric input used in valuation, Quality, Value, or price targets, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current AUD market and sector inputs and current AUD/USD conversion rate (or project-local FX where applicable) where relevant; state source and timestamp.
 
   Run an investment analysis on [COMPANY_NAME] following this rubric. Include 12-month and 24-month price targets, Quality and Value scores out of 100, a summary of the current drug pipeline and timeline to key milestones, a certainty percentage for achieving stated goals within 24 months, and key quantitative and qualitative headwinds/tailwinds.
   Source market data from official stock exchange websites and financial data providers.
 
   Source all scientific and financial data from the latest Investor Presentations, Annual Reports, SEC/ASX filings, and clinical trial registry data.
+
+  Document review (complete before valuation):
+  For each major valuation-relevant document (annual/interim report, quarterly update, investor presentation, technical report, financing update, operating update, regulatory filing, or material announcement), provide:
+  * Document title/date/announcement reference.
+  * 4-6 extracted key points.
+  * Relevance to valuation inputs (what changed and why it matters).
+  * Implications for investment outlook (positives and negatives).
+  * Market pricing assessment: one separate paragraph on whether market pricing appears to reflect the document's information.
 
   Step 1: Drug Candidate rNPV Calculation
 
