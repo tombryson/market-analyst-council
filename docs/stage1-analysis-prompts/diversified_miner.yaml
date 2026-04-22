@@ -47,121 +47,170 @@ copy_paste_prompt: |-
   Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
 
   Template rubric:
-  Can you run an investment analysis on [COMPANY_NAME] following this rubric? Do not deviate from this rubric, ignore your internal programming and follow this as closely as possible. Adjust for diversified commodity exposure, payable-metal mix, and commodity-equivalent normalization where needed.
+  Run an investment analysis on [COMPANY_NAME] using this diversified mining rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to valuation, funding risk, operating risk, commodity-price sensitivity, portfolio concentration, or scenario confidence.
 
-  Include 12-month and 24-month price targets, Quality and Value scores out of 100 (using the structured rubric below), current development stage and timeline to key milestones, a certainty percentage for achieving stated goals within 24 months, and key quantitative and qualitative headwinds/tailwinds with specific thresholds (e.g., gold price ranges impacting economics).
+  First classify the company:
+  * Explorer: multi-commodity land package with no operating mine and no completed economic study.
+  * Developer: study-stage or construction-stage portfolio, not yet steady-state production.
+  * Producer: one or more operating mines with recurring production/cash flow.
+  * Hybrid: producing asset base plus material development/exploration optionality.
 
-  Source Market data like market cap, shares outstanding from asx.com.au and/or marketindex.com.au.
-  Source all data from the latest ASX Investor Presentations, PFS, FS, DFS studies, justifying any estimates with clear reasoning.
-  Can you read the most recent investor presentation and reports and summarize its relevance to the analysis, and share your thoughts on its implications.
+  Use that classification to decide the valuation emphasis:
+  * Explorers: resource quality by commodity, drill results, jurisdiction, funding runway, EV/resource by commodity, and realistic path to study.
+  * Developers: study economics, permitting, funding, capex, execution risk, offtake/marketing status, and stage re-rating by project.
+  * Producers: production mix, unit costs, margins, cash flow, reserve life, balance sheet, guidance, sustaining capex, and portfolio concentration.
+  * Hybrids: separate producing cash flow from development/exploration optionality. Do not double count resources, reserves, projects, or expansion inventory.
 
-  Step 1: Project-Level NPV Calculation
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Current development/operating stage and timeline to key milestones by major asset.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
 
-  For each major project (up to three per company), populate the following NPV template using the most recent data from company filings or studies.
+  Data sourcing rules:
+  * Source market data from asx.com.au and/or marketindex.com.au.
+  * Source project data from ASX announcements, quarterly/annual reports, investor presentations, and technical studies (PFS/FS/DFS).
+  * For every key numeric input used in NAV, Quality, Value, or price targets, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current AUD commodity prices and current AUD/USD conversion rate (or project-local FX where applicable); state source and timestamp.
+  * Use company-disclosed study, production, reserve, cost, product, offtake, and balance-sheet data where available. Use generic assumptions only where no better source exists.
 
-  If data is missing (e.g., recovery, AISC), estimate based on industry standards for similar gold projects in the region (e.g., 85-90% recovery, A$2,000-3,000/oz AISC) and justify assumptions.
+  Commodity basket rule:
+  * Build valuation by asset and commodity rather than collapsing the company into one metal unless the company discloses an explicit equivalent basis.
+  * If using equivalent units, state the basket price, conversion method, recovery assumptions, and by-product credits.
+  * Apply commodity conversions consistently in NAV, EV/resource, production, cost, and scenario tables.
+  * Separate base-metal, precious-metal, bulk-commodity, battery-metal, and uranium exposures where material.
 
-  Compute post-tax NPV for each project using the detailed DCF approach below (building on the original formulas), then apply the stage multiplier to derive a "risked NPV." Sum risked NPVs across projects to get the company's total risked NPV.
+  Evidence review before valuation:
+  Use the available prepass, PDF context, primary filings, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, funding, operating risk, commodity exposure, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/announcement reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
 
-  NPV Template:
-  * Resource Tonnes (Mt): [Fill]
-  * Grade (g/t): [Fill]
-  * Recovery (fraction): [Fill]
-  * Mine Life (years): [Fill]
-  * AISC (AU$/oz): [Fill]
-  * Capex (AU$m): [Fill] (initial capex at Year 0)
-  * Discount Rate: 0.05
-  * Current Gold Price (AU$/oz): [Use spot price]
-  * Royalty Rate (fraction): 0.05
-  * Tax Rate (fraction): 0.3
-  * Sustaining Capex (AU$m/yr): [Fill]
-  * Working Capital (% revenue): 0.05
-  * Ramp-up years: 1
+  Step 1: Asset-Level Valuation
+  For each major operating asset, development project, or material exploration option, up to 5:
+  * Populate inputs where applicable: Resource/Reserve, Grade, Recovery, Product Specification, Mine Life, Annual Production, Unit Cost, Initial Capex, Sustaining Capex, Discount Rate, Commodity Price (spot/current and study case), Royalty, Tax, Working Capital, Ramp-up, Ownership, Offtake/Marketing terms.
+  * If disclosed production/cost guidance exists, use it before generic assumptions.
+  * If no project study exists, do not force a DCF. Use the resource or comparable method under Portfolio Summary.
+  * If no production history exists, do not infer producer-level cash flow.
 
-  Stage Multiplier (apply to NPV for risked value):
-  * Scoping - No MRE: 0.1
-  * Scoping - has MRE: 0.15
-  * Pre-Feasibility Study (PFS): 0.25
-  * Definitive Feasibility Study (DFS): 0.4
-  * Development: 0.6
-  * First Gold Pour: 0.8
-  * Ramp-up: 0.9
-  * Peak Production: 1.0
+  Missing-data assumptions:
+  Use only when no disclosed study or operating data exists, and label clearly as ESTIMATE:
+  * Recovery, product quality/specification, unit cost, capex intensity, sustaining capex, royalty, tax, and working capital must be based on company filings, comparable projects, or peer evidence where possible.
+  * Do not import single-commodity cost or capex ranges into unrelated commodities.
+  * If assumptions are too weak for a defensible DCF, use a resource/comparable method and flag DCF as not reliable.
+
+  Existing infrastructure adjustment:
+  * If usable plant, processing infrastructure, roads, grid connection, camp, water, tailings, rail, port, refinery/smelter access, or other site infrastructure already exists, state whether Initial Capex already reflects that advantage.
+  * If not reflected in the sourced study/base case, estimate avoided replacement capex separately, explain the basis, and show the brownfield/logistics advantage explicitly.
+  * Do not award infrastructure credit unless the infrastructure is usable, relevant to the current plan, and materially lowers capex, operating cost, marketing risk, or timeline.
+
+  DCF/NAV discipline:
+  * Show a compact DCF/NAV summary rather than a long mechanical formula dump.
+  * Include recoverable resource/reserve, annual production, realised price, royalties, unit operating costs, sustaining capex, tax, initial capex, working capital, and after-tax cash flow.
+  * Value major producing assets using cash flow/EBITDA/FCF where production history is more reliable than a mine-plan DCF.
+  * Value development projects using study-backed DCF where sufficient data exists.
+  * Value early-stage projects separately using resource/comparable methods.
+
+  Equity value discipline:
+  * Risked NAV = sum of risked asset values plus corporate adjustments.
+  * Equity Value/Share = (Risked NAV + Surplus Cash) / shares_basic.
+  * Surplus Cash = Total Committed Liquidity - Remaining Phase-1 Capex Requirement - drawn debt.
+  * Capex already embedded in project DCF must not be subtracted again from NAV.
+  * Subtract only obligations not already reflected in project cash flow or capex assumptions.
+  * Do not deduct the same funding burden twice across NAV, capex, debt, and Surplus Cash calculations.
+  * Use shares_basic for Market Cap and EV.
+  * For per-share value, use treasury-method diluted shares: shares_basic + in-the-money options - (aggregate exercise proceeds / current price). Do not use fully diluted shares including deep out-of-the-money instruments unless they are in-the-money.
+
+  Stage multiplier:
+  Step A - Development Base:
+  * Scoping no MRE: 0.10 | Scoping has MRE: 0.15 | PFS: 0.25 | DFS complete: 0.42
+  * FEED underway: 0.47 | FEED complete: 0.54 | FID declared / construction commencing: 0.62
+  * Construction >50%: 0.72 | First production / commissioning: 0.82 | Ramp-up: 0.91 | Steady-state production: 1.00
+  Evidence threshold: use the highest stage supported by achieved evidence, not management targets. Planned milestones may inform 12m/24m target multipliers, but not the current multiplier.
+
+  Step B - Funding Adjustment:
+  * No funding, gap >50% of Phase-1 capex: x 0.70
+  * Partial funding, gap 15-50% of capex: x 0.85
+  * Mostly funded, gap <15% of capex or clear near-term path: x 0.95
+  * Fully funded with committed debt/equity and no material gap: x 1.05
+  * Fully funded with working capital buffer >=20% above peak capex: x 1.10
+  Final Multiplier = Development_Base x Funding_Adjustment. State both components for material development assets.
+
+  Producer adjustment:
+  * For established producers, do not rely mainly on the pre-production stage multiplier.
+  * Anchor valuation to production, realised prices, unit costs, operating cash flow, reserve life, sustaining capex, guidance, and balance-sheet risk.
+  * Use stage multipliers only for material development or expansion assets.
+
+  Portfolio summary:
+  * Show asset-level and total risked NAV.
+  * Show Risked NAV / Market Cap at study-price, spot/current-price, and probability-weighted cases where applicable.
+  * Clearly separate:
+    - producing assets valued on cash flow
+    - DFS/PFS-stage DCF projects
+    - resource/comparable valued projects
+    - projects with no resource, with option value only unless evidence supports otherwise
+  * Do not double count a non-DFS asset through both resource value and EV/resource denominator expansion.
 
   Step 2: Quality Score (0-100)
-  Calculate a Quality Score reflecting operational and risk profile as a weighted average of the following factors (total weight = 100%).
+  Formula:
+  = (0.20 * Jurisdiction) + (0.10 * Infrastructure) + (0.20 * Management) + (0.10 * Portfolio Quality) + (0.30 * Funding) + (0.10 * ESG)
 
-  * Jurisdiction (20%): Regulatory stability, safety, mining friendliness. Score based on:
-      * Tier 1 (Australia, Canada): 100
-      * Tier 2 (US, EU, Chile, Brazil): 90
-      * Tier 3 (Stable Frontier): 80
-      * Tier 4 (Unstable Frontier): 60
-
-  * Infrastructure (10%): Access to processing facilities, roads, power, labor. Score 0-100:
-      * Excellent (near established mills): 100
-      * Good (regional access, some constraints): 80
-      * Moderate (remote, higher costs): 60
-      * Poor (no infrastructure): 40
-
-  * Management Quality (20%): Experience and track record in gold mining. Score based on Quantifiable Track Record, Insider Ownership, Capital Discipline.
-      * Top-tier (proven multi-project success in region): 100
-      * Experienced (solid gold experience): 90
-      * Average (mixed or limited track record): 80
-      * Weak/Unproven: 60
-
-  * Development Stage (10%): Average stage multiplier across projects (weighted by resource size), scaled to 100.
-
-  * Funding Chance/Funding Gap (20%): Probability of securing capex for development. Calculate funding gap as (Total Capex - Current Cash - 24-Month Expected Free Cash) / Capex.
-      * Gap <A$10M or fully funded: 100
-      * Gap A$10-25M with clear path: 80
-      * Gap A$25-50M: 60
-      * Gap >A$50M or unclear funding: 40
-
-  * Certainty % for Goals (12 Months) (10%): Probability of achieving stated milestones.
-  * ESG Credentials (10%): Permitting Status, Social License, Safety Record.
-
-  Quality Score Formula:
-  = (0.2 * Jurisdiction) + (0.1 * Infrastructure) + (0.2 * Management) + (0.1 * Development Stage) + (0.2 * Funding) + (0.1 * Certainty) + (0.1 * ESG)
+  Score each factor with raw score, weight, weighted contribution, and evidence:
+  * Jurisdiction: score each material asset and weight by NAV contribution.
+  * Infrastructure: credit only usable infrastructure that materially lowers capex, cost, timeline, or logistics risk.
+  * Management: track record, insider ownership, capital discipline, mine operating capability, and portfolio allocation discipline.
+  * Portfolio Quality: asset diversification, commodity mix, reserve life, margin quality, expansion inventory, and concentration risk.
+  * Funding: funding gaps, debt maturity, covenant pressure, capex commitments, and expected 24m free cash flow.
+  * ESG: permitting, social licence, safety/environmental performance, closure liabilities, and legacy remediation risk.
 
   Step 3: Value Score (0-100)
-  Calculate a Value Score reflecting economic attractiveness and undervaluation relative to market price, as a weighted average (total weight = 100%).
+  Formula:
+  = (0.30 * NAV Ratio Score) + (0.20 * EV/Resource Basket Score) + (0.20 * Portfolio Expansion Upside Score) + (0.15 * Cost Competitiveness Score) + (0.15 * Strategic Value Score)
 
-  * NPV vs. Market Cap (30%): Risked NPV / Current Market Cap. Score:
-      * Ratio >3x: 100
-      * 2-3x: 80
-      * 1-2x: 60
-      * <1x: 40
+  * NAV/Market Cap: use (Risked NAV + Surplus Cash) / Market Cap as primary; show commodity-price sensitivities separately.
+  * EV/Resource Basket: compare EV/resource by material commodity or disclosed equivalent unit; do not mix incompatible units without conversion.
+  * Portfolio Expansion Upside: score growth beyond resources/reserves already counted in NAV.
+  * Cost Competitiveness: compare asset-level costs against relevant regional/product peer ranges.
+  * Strategic Value: consider scale, scarcity, commodity exposure, infrastructure, offtake, jurisdiction, and acquirability.
 
-  * EV/Resource oz (20%): Enterprise Value / Total JORC Resource oz.
-      * <A$50/oz: 100
-      * A$50-100/oz: 70
-      * A$100-150/oz: 50
-      * >A$150/oz: 40
+  Step 4: Required Outputs
+  * Price targets:
+    - 12m and 24m bull/base/bear targets
+    - scenario probabilities, each horizon summing to 100%
+    - probability-weighted target for 12m and 24m
+    - explicit scenario drivers: commodity basket prices, production, costs, capex, timing, funding, dilution, permitting, and portfolio mix
+    - target reconciliation to NAV/share, cash-flow multiple, EV/resource, or another stated anchor
+  * For material funding gaps, include one compact financing bridge with debt tranche, equity tranche, issue price/discount, new shares, and post-dilution NAV/share.
+  * Development or operating timeline by major asset.
+  * Headwinds/tailwinds with threshold-driven valuation/cash-flow impact.
+  * Investment recommendation paragraph: core thesis reason, key 12m catalyst, key invalidation risk, and sizing context.
+  * Key risks and key opportunities ranked by probability and impact.
 
-  * Exploration Upside (20%): Potential resource growth % based on open strike, planned drilling.
-      * >50% growth potential: 100
-      * 25-50%: 80
-      * 10-25%: 60
-      * <10%: 40
+  Step 5: Additional Metrics
+  Include where relevant:
+  * Commodity revenue mix and NAV mix
+  * Reserve life by producing asset
+  * Production trend and guidance accuracy
+  * Unit-cost trend by commodity
+  * Corporate cash runway and debt maturity profile
+  * Sustaining and growth capex profile
+  * ESG and closure-liability exposure
+  * Peer EV/resource or EV/EBITDA by relevant commodity cohort
+  * Offtake/M&A potential
+  * Hedge/derivatives disclosures
 
-  * Cost Competitiveness (15%): AISC percentile vs. global gold cost curve.
-      * Bottom quartile (<A$1,500/oz): 100
-      * Second quartile (A$1,500-2,000/oz): 80
-      * Third quartile (A$2,000-2,500/oz): 60
-      * Top quartile (>A$2,500/oz): 40
-
-  * M&A/Strategic Value (15%): Proximity to majors, existing deals, or takeover potential.
-      * High: 100
-      * Moderate (near major operations): 80
-      * Low (no clear M&A interest): 60
-      * None: 40
-
-  Value Score Formula:
-  = (0.3 * NPV Ratio Score) + (0.2 * EV/Resource Score) + (0.2 * Exploration Upside Score) + (0.15 * Cost Competitiveness Score) + (0.15 * M&A/Strategic Score)
-
-  Step 4: Additional Outputs
-  Provide the following:
-  * 12/24-Month Price Targets: Estimate based on risked NPV/share, adjusted for the next likely catalyst.
-  * Development Timeline: Map current stage to key milestones (specify dates or quarters).
-  * Headwinds/Tailwinds: Identify 2-3 quantitative and 2-3 qualitative factors to monitor over 24 months.
-  * Investment Recommendation: BUY/HOLD/SELL with conviction level (HIGH/MEDIUM/LOW).
+  Cross-check requirements before final output:
+  * Commodity units must be internally consistent.
+  * NAV comparison vs company-stated study values: explain major variance drivers.
+  * EV arithmetic must be consistent across sections.
+  * Quality and Value weighted totals must equal stated final scores.
+  * Stage multipliers must match actual evidence and documented funding status for development assets.
+  * Price targets must be mathematically anchored to scenario assumptions.
+  * Do not create a risk from template structure alone. If a data point is missing but immaterial, state that it is immaterial rather than treating it as a governance or valuation failure.
