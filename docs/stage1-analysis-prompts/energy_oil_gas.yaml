@@ -46,6 +46,14 @@ copy_paste_prompt: |-
   Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
 
   Copy/paste rubric:
+  Manual Web UI source-research instructions:
+  * This prompt is designed for external model Web UIs, not the llm-council runtime Stage 1 pipeline.
+  * If source documents are not attached, actively retrieve and review primary sources before analysis.
+  * Prioritise exchange filings, annual/interim reports, quarterly updates, investor presentations, official company materials, regulator filings, and named primary-source documents.
+  * Use secondary sources only where they add factual context not available in primary filings; label secondary-source facts clearly.
+  * Perform standalone source/document review before valuation. Do not assume the llm-council prepass, PDF packet, or internal evidence pack is present.
+  * Do not summarise every document mechanically; surface only documents and facts that materially affect valuation, scenario probabilities, funding, operating risk, or the investment thesis.
+
   Run an investment analysis on [COMPANY_NAME] using this oil and gas rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to valuation, funding risk, operating risk, commodity-price sensitivity, reserve/resource confidence, or scenario confidence.
 
   First classify the company:

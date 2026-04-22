@@ -1875,9 +1875,7 @@ class TemplateLoader:
         Runtime Stage 1 does not call this method.
         """
         template = self.get_template(template_id) or {}
-        rubric = str(template.get("copy_paste_rubric") or template.get("rubric") or "").strip()
-        if not rubric:
-            rubric = get_template_prompt_fallback(template_id, template)
+        rubric = self._build_copy_paste_rubric(template_id, template)
         if not rubric:
             return ""
         rubric = self.apply_prompt_substitutions(
@@ -1887,6 +1885,55 @@ class TemplateLoader:
         )
         if max_chars > 0:
             rubric = rubric[:max_chars]
+        return rubric.strip()
+
+    def _build_copy_paste_rubric(self, template_id: str, template: Dict[str, Any]) -> str:
+        """
+        Return the manual Web UI rubric for a template.
+
+        `copy_paste_rubric` is the explicit override. Templates without one still
+        get a Web UI research preamble so manual prompts can stand alone outside
+        the llm-council prepass/PDF pipeline.
+        """
+        webui_preamble = (
+            "Manual Web UI source-research instructions:\n"
+            "* This prompt is designed for external model Web UIs, not the llm-council runtime Stage 1 pipeline.\n"
+            "* If source documents are not attached, actively retrieve and review primary sources before analysis.\n"
+            "* Prioritise exchange filings, annual/interim reports, quarterly updates, investor presentations, official company materials, regulator filings, and named primary-source documents.\n"
+            "* Use secondary sources only where they add factual context not available in primary filings; label secondary-source facts clearly.\n"
+            "* Perform standalone source/document review before valuation. Do not assume the llm-council prepass, PDF packet, or internal evidence pack is present.\n"
+            "* Do not summarise every document mechanically; surface only documents and facts that materially affect valuation, scenario probabilities, funding, operating risk, or the investment thesis.\n"
+        )
+
+        explicit = str(template.get("copy_paste_rubric") or "").strip()
+        if explicit:
+            if "Manual Web UI source-research instructions:" not in explicit:
+                explicit = f"{webui_preamble}\n{explicit}"
+            return explicit.strip()
+
+        rubric = str(template.get("rubric") or "").strip()
+        if not rubric:
+            rubric = get_template_prompt_fallback(template_id, template)
+        rubric = str(rubric or "").strip()
+        if not rubric:
+            return ""
+
+        replacements = {
+            "Evidence review before valuation:": "Standalone document/source review before valuation:",
+            "Use the available prepass, PDF context, primary filings, and retrieved evidence.": (
+                "Use attached documents, retrieved primary filings, official company materials, "
+                "and cited source evidence."
+            ),
+            "Use the available prepass, PDF context, primary filings, and retrieved evidence. Do not produce a generic document-by-document summary.": (
+                "Use attached documents, retrieved primary filings, official company materials, and cited source evidence. "
+                "Do not produce a generic document-by-document summary."
+            ),
+        }
+        for old, new in replacements.items():
+            rubric = rubric.replace(old, new)
+
+        if "Manual Web UI source-research instructions:" not in rubric:
+            rubric = f"{webui_preamble}\n{rubric}"
         return rubric.strip()
 
     def render_stage1_query_prompt(
@@ -2053,9 +2100,7 @@ class TemplateLoader:
         template = self.get_template(template_id) or {}
         rubric = ""
         if include_rubric:
-            rubric = str(template.get("copy_paste_rubric") or template.get("rubric") or "").strip()
-            if not rubric:
-                rubric = get_template_prompt_fallback(template_id, template)
+            rubric = self._build_copy_paste_rubric(template_id, template)
             rubric = self.apply_prompt_substitutions(
                 rubric,
                 company_name=company_name,
