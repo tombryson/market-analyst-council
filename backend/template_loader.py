@@ -1872,7 +1872,7 @@ class TemplateLoader:
         1) `copy_paste_rubric` (manual Web UI / external-model workflow)
         2) `rubric` / prompt fallback (for templates not yet split)
 
-        Runtime Stage 1 does not call this method.
+        Server-side analysis does not call this method.
         """
         template = self.get_template(template_id) or {}
         rubric = self._build_copy_paste_rubric(template_id, template)

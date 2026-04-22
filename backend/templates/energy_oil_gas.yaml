@@ -527,7 +527,7 @@ rubric: |
   * Hedging must be treated as evidence: unhedged-by-disclosure is a deliberate commodity exposure, not an unresolved data gap.
   * Do not create a risk from template structure alone. If a data point is missing but immaterial, state that it is immaterial rather than treating it as a governance or valuation failure.
 
-# Manual Web UI rubric/prompt. Runtime Stage 1 uses `rubric` above.
+# Copy/paste rubric/prompt. Server-side analysis uses `rubric` above.
 copy_paste_rubric: |
   Run an investment analysis on [Company Name] using this oil and gas rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to valuation, funding risk, operating risk, commodity-price sensitivity, reserve/resource confidence, or scenario confidence.
 
@@ -555,8 +555,8 @@ copy_paste_rubric: |
   * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
   * Key risks and key opportunities.
 
-  Data sourcing and retrieval rules for Web UI use:
-  * This prompt is designed for external Web UI models. If source documents are not attached, actively retrieve and review primary sources before analysis.
+  Data sourcing rules:
+  * If source documents are not attached, actively retrieve and review primary sources before analysis.
   * Source market data from [MARKET_DATA_SOURCES].
   * Source project, production, reserves/resources, financing, and hedging data from [PRIMARY_FILING_SOURCES].
   * For ASX companies, prioritise ASX announcements, quarterly activities/cashflow reports, annual reports, investor presentations lodged on ASX, reserve/resource reports, and company operating updates.
@@ -594,7 +594,7 @@ copy_paste_rubric: |
   * Do not penalise absence of a hedge book unless hedging is material to debt covenants, near-term liquidity, development funding, or downside survival.
 
   Standalone document/source review before valuation:
-  Because this is the manual Web UI lane, first retrieve or read the available source documents before valuation. Review the latest annual report, latest quarterly, latest investor presentation, reserve/resource report, production update, financing update, and any material drilling/acquisition/divestment announcement where available. Do not summarise every document mechanically; focus on documents that materially affect valuation, scenario probabilities, production, reserves/resources, funding, operating risk, hedge exposure, or the investment thesis.
+  Before valuation, first retrieve or read the available source documents. Review the latest annual report, latest quarterly, latest investor presentation, reserve/resource report, production update, financing update, and any material drilling/acquisition/divestment announcement where available. Do not summarise every document mechanically; focus on documents that materially affect valuation, scenario probabilities, production, reserves/resources, funding, operating risk, hedge exposure, or the investment thesis.
   For each valuation-relevant document, provide:
   * Document title/date/announcement reference.
   * 3-5 material facts.
