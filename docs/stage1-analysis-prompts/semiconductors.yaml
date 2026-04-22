@@ -6,13 +6,12 @@ placeholders:
   company_name: '[COMPANY_NAME]'
   ticker: '[EXCHANGE_CODE]:[TICKER]'
   exchange: ASX
-  instruction: Replace placeholders before pasting into any Stage 1 model Web UI.
-runtime_source:
+  instruction: Replace placeholders before pasting into an external model interface.
+generation_source:
   generated_by: scripts/export_stage1_analysis_prompts.py
   source_of_truth: backend/templates/*.yaml plus backend/template_loader.py
   copy_paste_prompt_renderer: TemplateLoader.get_copy_paste_research_brief(..., include_rubric=True)
   core_rubric_renderer_used_inside_prompt: TemplateLoader.render_copy_paste_rubric(...) / fallback rubric builder
-  runtime_stage1_injection_changed: false
 company_types:
 - semiconductors
 scoring_factors:
@@ -31,28 +30,25 @@ scoring_factors:
   - Strategic Value
 usage:
   copy_this_field: copy_paste_prompt
-  note: This is a generated manual-use artifact. It does not alter llm-council runtime Stage 1 injection.
+  note: Generated manual-use copy/paste prompt.
 copy_paste_prompt: |-
-  Manual Web UI analysis prompt:
+  Investment analysis prompt:
   - Template: semiconductors
   - Company name: [COMPANY_NAME].
   - Company type: semiconductors.
   - Exchange: ASX.
-  - Use this prompt when pasting into external model Web UIs.
-  - Perform standalone source/document research if documents are not already attached.
   - Keep outputs decision-grade, evidence-linked, and explicit about assumptions.
 
   - Run a dedicated sector lane (semiconductors): capture 2-4 recent sources on inventory cycle, end-market demand, pricing/ASP trends, capex intensity, and export-control or supply-chain risk; tie each point to scenario assumptions.
   Exchange assumptions:
   Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
 
-  Copy/paste rubric:
-  Manual Web UI source-research instructions:
-  * This prompt is designed for external model Web UIs, not the llm-council runtime Stage 1 pipeline.
+  Analysis rubric:
+  Source research instructions:
   * If source documents are not attached, actively retrieve and review primary sources before analysis.
   * Prioritise exchange filings, annual/interim reports, quarterly updates, investor presentations, official company materials, regulator filings, and named primary-source documents.
   * Use secondary sources only where they add factual context not available in primary filings; label secondary-source facts clearly.
-  * Perform standalone source/document review before valuation. Do not assume the llm-council prepass, PDF packet, or internal evidence pack is present.
+  * Perform source/document review before valuation.
   * Do not summarise every document mechanically; surface only documents and facts that materially affect valuation, scenario probabilities, funding, operating risk, or the investment thesis.
 
   Run an investment analysis on [COMPANY_NAME] following this rubric exactly. Keep the output investment-grade, explicit, and scenario-based. Use ASX-appropriate primary filings first and only use secondary sources where they add real value.

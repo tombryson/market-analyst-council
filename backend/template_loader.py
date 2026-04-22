@@ -1892,22 +1892,20 @@ class TemplateLoader:
         Return the manual Web UI rubric for a template.
 
         `copy_paste_rubric` is the explicit override. Templates without one still
-        get a Web UI research preamble so manual prompts can stand alone outside
-        the llm-council prepass/PDF pipeline.
+        get source-research instructions so copied prompts can stand alone.
         """
         webui_preamble = (
-            "Manual Web UI source-research instructions:\n"
-            "* This prompt is designed for external model Web UIs, not the llm-council runtime Stage 1 pipeline.\n"
+            "Source research instructions:\n"
             "* If source documents are not attached, actively retrieve and review primary sources before analysis.\n"
             "* Prioritise exchange filings, annual/interim reports, quarterly updates, investor presentations, official company materials, regulator filings, and named primary-source documents.\n"
             "* Use secondary sources only where they add factual context not available in primary filings; label secondary-source facts clearly.\n"
-            "* Perform standalone source/document review before valuation. Do not assume the llm-council prepass, PDF packet, or internal evidence pack is present.\n"
+            "* Perform source/document review before valuation.\n"
             "* Do not summarise every document mechanically; surface only documents and facts that materially affect valuation, scenario probabilities, funding, operating risk, or the investment thesis.\n"
         )
 
         explicit = str(template.get("copy_paste_rubric") or "").strip()
         if explicit:
-            if "Manual Web UI source-research instructions:" not in explicit:
+            if "Source research instructions:" not in explicit:
                 explicit = f"{webui_preamble}\n{explicit}"
             return explicit.strip()
 
@@ -1932,7 +1930,7 @@ class TemplateLoader:
         for old, new in replacements.items():
             rubric = rubric.replace(old, new)
 
-        if "Manual Web UI source-research instructions:" not in rubric:
+        if "Source research instructions:" not in rubric:
             rubric = f"{webui_preamble}\n{rubric}"
         return rubric.strip()
 
@@ -2095,7 +2093,7 @@ class TemplateLoader:
         Build the manual Web UI copy/paste prompt.
 
         This deliberately prefers `copy_paste_rubric` so external Web UI lanes can
-        ask for standalone document/source review without changing runtime Stage 1.
+        ask for standalone document/source review.
         """
         template = self.get_template(template_id) or {}
         rubric = ""
@@ -2139,22 +2137,20 @@ class TemplateLoader:
                 extra_lane_lines.append(f"- {lane_text}\n")
         extra_research_lanes = "".join(extra_lane_lines)
         return (
-            "Manual Web UI analysis prompt:\n"
+            "Investment analysis prompt:\n"
             f"- Template: {template_id}\n"
             f"- Company name: {company_name or 'unknown'}.\n"
             f"- {company_type_line}\n"
             f"- {exchange_line}\n"
-            "- Use this prompt when pasting into external model Web UIs.\n"
-            "- Perform standalone source/document research if documents are not already attached.\n"
             "- Keep outputs decision-grade, evidence-linked, and explicit about assumptions.\n\n"
             f"{extra_research_lanes}"
             "Exchange assumptions:\n"
             f"{exchange_assumptions}\n\n"
             + (
-                "Copy/paste rubric:\n"
+                "Analysis rubric:\n"
                 f"{rubric}"
                 if include_rubric and rubric
-                else "Copy/paste rubric:\n(omitted)"
+                else "Analysis rubric:\n(omitted)"
             )
         ).strip()
 

@@ -69,14 +69,13 @@ def _export_payload(template: Dict[str, Any], source_path: str) -> Dict[str, Any
             "company_name": COMPANY_PLACEHOLDER,
             "ticker": TICKER_PLACEHOLDER,
             "exchange": "ASX",
-            "instruction": "Replace placeholders before pasting into any Stage 1 model Web UI.",
+            "instruction": "Replace placeholders before pasting into an external model interface.",
         },
-        "runtime_source": {
+        "generation_source": {
             "generated_by": "scripts/export_stage1_analysis_prompts.py",
             "source_of_truth": "backend/templates/*.yaml plus backend/template_loader.py",
             "copy_paste_prompt_renderer": "TemplateLoader.get_copy_paste_research_brief(..., include_rubric=True)",
             "core_rubric_renderer_used_inside_prompt": "TemplateLoader.render_copy_paste_rubric(...) / fallback rubric builder",
-            "runtime_stage1_injection_changed": False,
         },
         "company_types": company_types,
         "scoring_factors": {
@@ -85,7 +84,7 @@ def _export_payload(template: Dict[str, Any], source_path: str) -> Dict[str, Any
         },
         "usage": {
             "copy_this_field": "copy_paste_prompt",
-            "note": "This is a generated manual-use artifact. It does not alter llm-council runtime Stage 1 injection.",
+            "note": "Generated manual-use copy/paste prompt.",
         },
         "copy_paste_prompt": LiteralString(copy_paste_prompt),
     }
@@ -121,11 +120,11 @@ def main() -> int:
         written.append(out_path)
 
     index_lines = [
-        "# Manual Web UI Analysis Prompt YAMLs",
+        "# Copy/Paste Analysis Prompt YAMLs",
         "",
         "Generated from the live `llm-council` template loader, not hand-written copies.",
         "",
-        "Use the `copy_paste_prompt` field for manual Web UI runs. If a template defines `copy_paste_rubric`, that Web UI-specific rubric is used. Runtime Stage 1 continues to use `rubric` / `stage1_focus_prompt` through `TemplateLoader.get_stage1_research_brief(...)`.",
+        "Use the `copy_paste_prompt` field for external model interfaces. If a template defines `copy_paste_rubric`, that copy/paste-specific rubric is used.",
         "",
         "Regenerate with:",
         "",
