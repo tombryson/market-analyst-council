@@ -15,8 +15,9 @@ class TemplatePromptFallbackTests(unittest.TestCase):
             exchange="asx",
         )
         self.assertIn("Life360 Inc", prompt)
-        self.assertIn("Quality Score out of 100", prompt)
-        self.assertIn("Bull / base / bear scenario framework", prompt)
+        self.assertIn("using this software and SaaS rubric", prompt)
+        self.assertIn("Step 1: Revenue Quality, Product, and GTM Workup", prompt)
+        self.assertIn("12-month and 24-month price targets with bull/base/bear scenarios", prompt)
 
     def test_bank_prompt_fallback_renders_full_prompt(self):
         prompt = self.loader.render_template_rubric(

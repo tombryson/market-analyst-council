@@ -44,34 +44,43 @@ copy_paste_prompt: |-
   Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
 
   Analysis rubric:
-  Run an investment analysis on [COMPANY_NAME] following this rubric exactly. Keep the output investment-grade, explicit, and scenario-based. Use ASX-appropriate primary filings first and only use secondary sources where they add real value.
+  Run an investment analysis on [COMPANY_NAME] using this software and SaaS rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to revenue quality, retention, unit economics, sales efficiency, cash burn, or scenario confidence.
 
-  Template focus:
-  * Template ID: software_saas
-  * Template Name: Software & SaaS
-  * Template Description: Comprehensive investment analysis for software and SaaS companies
-  * Analysis Type: software_saas
+  First classify the company:
+  * Enterprise SaaS: subscription software sold primarily to businesses with recurring ARR, multi-seat or usage-based economics, and retention-driven growth.
+  * SMB / vertical SaaS: software sold into a focused industry or smaller-customer segment where churn, CAC payback, and distribution efficiency matter heavily.
+  * Usage-based / infrastructure software: revenue driven by consumption, API volume, data usage, seats, or workflow activity rather than pure subscription seats.
+  * Marketplace-enabled software / payments-adjacent SaaS: software plus take-rate, payments, workflow, or embedded-finance revenue that should be separated in analysis.
+  * Services-heavy software company: product business still mixed with implementation, managed services, or low-margin professional services that can distort software quality.
+  * Hybrid software platform: meaningful mix of subscription, usage, services, marketplace, or hardware-linked revenue that should be separated in valuation.
 
-  Required outputs:
-  * 12-month and 24-month price targets.
-  * Bull / base / bear scenario framework with probabilities that sum to 100% for each horizon.
-  * Quality Score out of 100 with explicit sub-factor scoring.
-  * Value Score out of 100 with explicit sub-factor scoring.
-  * Development / operating timeline to the next key milestones.
-  * Thesis Map with explicit conditions for bull, base, and bear paths.
-  * Monitoring Watchlist with red flags and confirmatory signals.
-  * Verification Queue listing unresolved facts that still matter to the thesis.
-  * Investment Recommendation: BUY / HOLD / SELL with conviction and a short justification.
+  Use that classification to decide valuation emphasis:
+  * Enterprise SaaS: ARR quality, net retention, gross retention, land-and-expand motion, sales efficiency, gross margin, and FCF conversion.
+  * SMB / vertical SaaS: churn, CAC payback, go-to-market efficiency, pricing power, onboarding friction, and multi-product expansion.
+  * Usage-based software: workload durability, revenue volatility versus true consumption growth, gross margin, cloud hosting cost, and customer concentration.
+  * Marketplace/payments-adjacent models: separate true software revenue from payments/pass-through or lower-margin transactional revenue. Do not apply SaaS multiples blindly to blended revenue.
+  * Services-heavy software: separate recurring software gross margin from implementation/services mix. Do not let services revenue masquerade as high-quality ARR.
+  * Hybrid models: segment revenue quality explicitly. Do not let one attractive bucket hide weak retention, poor unit economics, or low-margin revenue elsewhere.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Product/go-to-market summary and timeline to key retention, growth, margin, product, and financing milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
 
   Data sourcing rules:
   * If source documents are not attached, actively retrieve and review primary sources before analysis.
-  * Use official exchange filings, official company investor materials, statutory reports, and primary operating disclosures first.
-  * Use market-data providers only for current price / market cap / share count / enterprise value inputs.
-  * For every key numeric input, state the value used, the source, the filing date, and whether it is estimated.
-  * If data is missing, estimate conservatively, say that it is estimated, and explain the basis in one line.
-
-  Sector research lanes:
-    * Run a dedicated sector lane (software): capture 2-4 recent sources on demand environment, enterprise IT budget trends, competitive pricing pressure, and valuation regime for growth software; tie each macro point to scenario assumptions.
+  * Source market data from asx.com.au and/or marketindex.com.au.
+  * Source operating, product, pricing, retention, sales, margin, and capital data from the company's primary exchange filings plus annual/interim reports, investor presentations, shareholder letters, product/pricing pages where relevant, and earnings/guidance materials.
+  * Prefer primary sources: exchange filings, statutory reports, company presentations, earnings calls/transcripts where necessary for factual management guidance, and company product disclosures. Use third-party competitive or demand sources only where they add factual context.
+  * For every key numeric input used in valuation, Quality, Value, price targets, retention, margin, sales efficiency, or cash-flow analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current AUD market data and current AUD/USD conversion rate (or project-local FX where applicable); state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
 
   Document review (complete before valuation):
   For each major valuation-relevant document (annual/interim report, quarterly update, investor presentation, technical report, financing update, operating update, regulatory filing, or material announcement), provide:
@@ -81,56 +90,174 @@ copy_paste_prompt: |-
   * Implications for investment outlook (positives and negatives).
   * Market pricing assessment: one separate paragraph on whether market pricing appears to reflect the document's information.
 
-  Step 1: Core operating and valuation workup
-  * Build the operating picture from current filings and primary disclosures.
-  * Identify the key revenue / margin / balance-sheet / capital-allocation drivers.
-  * Build a defendable valuation anchor appropriate to the sector.
-  * State the main assumptions that drive the 12-month and 24-month targets.
+  Step 1: Revenue Quality, Product, and GTM Workup
+  For each material product or revenue stream, capture where disclosed:
+  * Product name, customer type, geography, channel, pricing model, contract structure, and next milestone.
+  * Revenue model: subscription, usage-based, seat-based, transaction/take-rate, services, support, hardware-linked, or hybrid.
+  * Customer profile: SMB, mid-market, enterprise, public sector, developer, consumer-professional, or partner/OEM.
+  * Expansion levers: seat growth, upsell, cross-sell, price uplift, usage intensity, new modules, new geographies, or channel leverage.
+  * Competitive position, switching costs, workflow embedment, and integration depth.
 
-  Step 2: Quality Score (0-100)
-  Score the company explicitly across these quality factors and show the weighted contribution from each:
-    * Market & Demand Quality
-    * Product Moat
-    * Management
-    * Growth Quality
-    * Balance Sheet
-    * Governance
-  Quality score rules:
-  * Give a raw score for each factor.
-  * Explain what evidence supports the score.
-  * Penalize weak disclosure, funding risk, governance risk, or execution uncertainty.
-  * Do not hide missing evidence; call it out.
+  Revenue-quality and retention discipline:
+  * Establish the current revenue baseline from the latest half, quarter, or ARR run-rate.
+  * Distinguish ARR, annualized revenue, billings, bookings, backlog/RPO, and recognized revenue. Do not treat them as interchangeable.
+  * Separate net revenue retention from gross retention, logo retention, and expansion-led growth.
+  * If retention is not disclosed directly, infer conservatively from customer counts, cohort commentary, churn, upsell, and revenue mix, and label the inference.
+  * Do not treat short-term usage spikes or services growth as equivalent to durable subscription compounding.
 
-  Step 3: Value Score (0-100)
-  Score the company explicitly across these value factors and show the weighted contribution from each:
-    * Intrinsic Value vs Market Cap
-    * EV/Sales vs Growth
-    * Rule of 40 & Margin Path
-    * Retention Economics
-    * Strategic Value
-  Value score rules:
-  * Tie the score back to concrete valuation anchors, not vague sentiment.
-  * Compare valuation to quality, timing, and balance-sheet risk.
-  * State where the market is overpricing or underpricing the setup.
+  Product moat and demand-quality discipline:
+  * Identify whether the product is mission-critical, workflow-embedded, compliance-driven, or merely nice-to-have.
+  * Distinguish product-led growth from sales-led growth and state what that means for CAC and margin structure.
+  * Assess competitive pressure from incumbents, bundles, platform vendors, open-source substitutes, or customer insourcing.
+  * If pricing power exists, identify the evidence: successful price rises, low churn, module expansion, or strong win rates.
+  * Do not overstate moat just because management uses words like platform, ecosystem, or AI.
 
-  Step 4: Scenario framework
-  For bull, base, and bear cases, provide:
-  * 12M target and 24M target.
-  * Probability.
-  * Short scenario summary.
-  * Current positioning (e.g. base-leaning, mixed, bear-leaning).
-  * Explicit conditions that must hold for each path.
-  * Explicit failure conditions that would invalidate that path.
+  Sales-efficiency and GTM discipline:
+  * Identify sales mix: direct, channel, self-serve, product-led, enterprise sales, partner-led, or outbound-heavy.
+  * Assess new-customer acquisition efficiency, CAC payback where disclosed or inferable, S&M intensity, and whether growth is becoming more expensive.
+  * Distinguish healthy enterprise sales investment from structurally weak sales efficiency.
+  * For channel-heavy models, assess partner concentration and channel conflict risk.
+  * For international expansion, assess whether sales productivity abroad is proven or still investment-heavy.
 
-  Step 5: Monitoring and verification
-  Produce:
-  * Monitoring Watchlist:
-    * Red Flags
-    * Confirmatory Signals
-  * Verification Queue:
-    * unresolved facts that should be checked in later filings or primary-source follow-up
+  Margin, hosting, and cash-conversion discipline:
+  * Break out gross margin, contribution margin where available, hosting/infrastructure cost, services mix drag, R&D intensity, S&M leverage, and G&A leverage.
+  * Distinguish structural gross margin weakness from temporary investment or cloud optimization opportunity.
+  * Assess stock-based compensation, capitalized software, deferred revenue movements, and working-capital effects on cash flow.
+  * Distinguish headline free cash flow from durable owner earnings if cash flow is boosted by billing timing, underinvestment, or one-off working-capital benefits.
+  * State whether current cash runway or balance-sheet strength supports the path to the next major proof point.
 
-  Final instruction:
-  * This is not a generic company summary.
-  * Produce a decision-grade investment analysis aligned to the rubric above.
-  * Keep it specific, numeric where possible, and explicit about assumptions and unknowns.
+  Customer concentration and implementation-risk discipline:
+  * Identify concentration by customer, sector, reseller, cloud/platform dependency, or geography where disclosed.
+  * For larger-enterprise software, assess implementation complexity, time-to-value, professional-services dependence, and deployment risk.
+  * For SMB or self-serve models, assess onboarding friction, churn risk, and support burden.
+  * Do not assume backlog/RPO converts cleanly if delivery complexity or cancellation risk is meaningful.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation using software-appropriate anchors. Do not use generic tech optimism as a substitute for revenue quality or cash economics.
+
+  Core valuation anchors:
+  * EV/Sales: primary for high-growth software, but only justified by retention, gross margin, TAM quality, and credible operating leverage.
+  * EV/ARR or EV/Recurring Revenue: useful when disclosed recurring revenue quality is high and services/transactional revenue is separated.
+  * Rule of 40 and margin path: use as a quality cross-check, not a full valuation method by itself.
+  * EV/FCF or FCF yield: use where the company has already reached durable cash generation and disclosure quality is good.
+  * Sum-of-the-parts only if software, services, payments, marketplace, or hardware-linked segments truly deserve different multiples.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using EV/Sales, justify it with growth durability, retention, gross margin, cash burn, and margin trajectory.
+  * If recurring revenue is mixed with services or transactional revenue, separate the streams before assigning a multiple.
+  * If the company is still cash-burning, show what operational milestones justify today's multiple rather than assuming eventual software margins by default.
+  * If Rule of 40 is weak, the multiple should reflect that unless retention, moat, or latent margin structure clearly justify a premium.
+
+  Simple software bridge:
+  * Revenue driver = opening ARR/recurring revenue plus net new ARR from customer adds, expansion, pricing, and usage growth, less churn/contraction.
+  * Gross profit = revenue minus hosting/support/services delivery cost.
+  * Operating profit = gross profit minus S&M, R&D, G&A, and reinvestment intensity.
+  * Equity value anchor = justified EV/Sales, EV/ARR, or EV/FCF, cross-checked against retention, Rule of 40, and balance-sheet strength.
+
+  Stress and downside discipline:
+  * Show at least one downside case with slower ARR growth, weaker NRR, higher churn, lower pricing power, weaker sales efficiency, and/or delayed margin leverage.
+  * Show what happens to growth, gross margin, FCF trajectory, and valuation under that downside.
+  * If the model is usage-based, customer optimization may matter more than logo churn.
+  * If the model is enterprise-sales-led, elongating sales cycles and lower expansion may matter more than top-of-funnel volume.
+
+  Step 3: Quality Score (0-100)
+  Formula:
+  = (0.20 * Market & Demand Quality) + (0.20 * Product Moat) + (0.15 * Management) + (0.20 * Growth Quality) + (0.15 * Balance Sheet) + (0.10 * Governance)
+
+  Score each factor with raw score, weight, weighted contribution, and evidence:
+  * Market & Demand Quality:
+    - resilient end demand, mission-critical use case, strong TAM quality = 85-100
+    - good demand profile with some budget/cycle sensitivity = 65-85
+    - meaningful cyclicality or category uncertainty = 45-65
+    - weak demand durability or fad-like category risk = 20-45
+  * Product Moat:
+    - strong workflow embedment, switching costs, integrations, and pricing power = 85-100
+    - credible moat with some competitive pressure = 65-85
+    - limited differentiation or easy substitution = 45-65
+    - weak product edge or bundle/displacement risk = 20-45
+  * Management:
+    - disciplined capital allocation, clear product/GTM execution, credible guidance = 85-100
+    - mostly credible execution with manageable issues = 65-85
+    - uneven execution or promotional tone = 45-65
+    - repeated misses, weak prioritization, or poor capital discipline = 20-45
+  * Growth Quality:
+    - high-quality recurring growth with strong retention and efficient GTM = 85-100
+    - credible growth with some mix/efficiency questions = 65-85
+    - growth supported by low-quality revenue or weak retention = 45-65
+    - poor retention, expensive acquisition, or low-visibility growth = 20-45
+  * Balance Sheet:
+    - strong cash position, low refinancing risk, good runway = 85-100
+    - adequate balance sheet with manageable burn or leverage = 65-85
+    - elevated burn, leverage, or reliance on external capital = 45-65
+    - balance-sheet stress or major funding risk = 20-45
+  * Governance:
+    - transparent SaaS metrics, aligned incentives, strong oversight = 80-100
+    - acceptable governance with minor concerns = 60-80
+    - weak disclosure, incentive issues, or oversight concerns = 35-60
+
+  Step 4: Value Score (0-100)
+  Formula:
+  = (0.30 * Intrinsic Value vs Market Cap) + (0.25 * EV/Sales vs Growth) + (0.20 * Rule of 40 & Margin Path) + (0.15 * Retention Economics) + (0.10 * Strategic Value)
+
+  * Intrinsic Value vs Market Cap:
+    - compare current market value to the primary valuation anchor
+    - score higher when upside is supported by durable recurring economics, not just narrative
+  * EV/Sales vs Growth:
+    - compare trading multiple to growth durability, retention, gross margin, and cash-burn profile
+    - a high EV/Sales multiple is not justified if retention or gross margin is weak
+  * Rule of 40 & Margin Path:
+    - assess current Rule of 40 and the credibility of margin expansion
+    - do not give full credit for temporary FCF support from deferred revenue or working-capital timing
+  * Retention Economics:
+    - evaluate NRR, gross retention, cohort quality, payback, and expansion runway
+    - discount if growth relies on replacing churn rather than compounding cohorts
+  * Strategic Value:
+    - consider platform relevance, customer base quality, ecosystem fit, M&A relevance, and data/workflow ownership
+
+  Step 5: Scenario Framework and Price Targets
+  * Price targets:
+    - 12m and 24m bull/base/bear targets
+    - scenario probabilities, each horizon summing to 100%
+    - probability-weighted target for 12m and 24m
+    - explicit scenario drivers: ARR/revenue growth, NRR/gross retention, S&M efficiency, gross margin, Rule of 40, cash burn/FCF, and strategic product milestones
+    - target reconciliation to EV/Sales, EV/ARR, EV/FCF, or stated sum-of-the-parts anchor
+  * Timeline:
+    - current ARR/revenue and cash baseline
+    - next 24m milestones: product launches, major customer wins, pricing changes, retention/margin inflections, international expansion proof points, and financing/capital-return decisions
+    - status: on-track / at-risk / speculative
+    - impact on 24m probability-weighted target
+    - primary risk
+  * Headwinds/tailwinds:
+    - threshold-driven quantitative factors with directional growth, margin, and cash impact
+    - material qualitative factors with evidence and expected duration
+  * Investment recommendation paragraph:
+    - core thesis reason
+    - key 12m catalyst
+    - key invalidation risk
+    - sizing context: core compounder / high-growth / turnaround / speculative / avoid
+  * Key risks: ranked list with probability and impact.
+  * Key opportunities: ranked list with trigger and valuation impact.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * ARR / recurring revenue growth.
+  * NRR, gross retention, customer adds, and churn.
+  * Gross margin and services mix.
+  * Sales efficiency, CAC payback, and S&M intensity.
+  * Rule of 40 and FCF margin.
+  * RPO/backlog/deferred revenue where meaningful.
+  * Customer concentration and enterprise deal exposure.
+  * Cash runway, SBC intensity, and dilution risk.
+  * For usage-based models: usage growth, net expansion, and cloud cost leverage.
+  * For services-heavy models: recurring revenue mix versus implementation/services dependence.
+
+  Cross-check requirements before final output:
+  * Current ARR/revenue baseline must reconcile to the latest primary-source result.
+  * Retention commentary must distinguish NRR from gross retention and from generic revenue growth.
+  * Margin commentary must reconcile to gross margin, services mix, hosting cost, and operating-expense disclosures.
+  * Cash-flow commentary must distinguish durable FCF from billing-timing or working-capital support.
+  * Valuation anchor must be mathematically consistent with stated growth, margin, retention, and share-count assumptions.
+  * Quality and Value weighted totals must equal stated final scores.
+  * Price targets must be tied to explicit growth, retention, margin, cash, and multiple assumptions.
+  * Do not create a risk from template structure alone. If a missing data point is immaterial because equivalent disclosure already answers the economics, say so explicitly rather than marking the company down for template non-compliance.
