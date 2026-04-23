@@ -18,9 +18,9 @@ company_types:
 scoring_factors:
   quality:
   - Regulatory Environment
-  - Franchise Quality
+  - Operating Franchise
   - Management
-  - Asset/Credit Quality
+  - Risk Quality
   - Capital & Liquidity
   - Governance
   value:
@@ -45,34 +45,39 @@ copy_paste_prompt: |-
   Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
 
   Analysis rubric:
-  Run an investment analysis on [COMPANY_NAME] following this rubric exactly. Keep the output investment-grade, explicit, and scenario-based. Use ASX-appropriate primary filings first and only use secondary sources where they add real value.
+  Run an investment analysis on [COMPANY_NAME] using this diversified financials rubric. Use this template only when the business genuinely spans banking, lending, insurance, broking, or adjacent financial services in a way that makes a pure bank or pure insurance template incomplete. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to earnings power, asset/reserve risk, funding or solvency, capital adequacy, or scenario confidence.
 
-  Template focus:
-  * Template ID: financials_bank_insurance
-  * Template Name: Financials (Bank & Insurance)
-  * Template Description: Comprehensive investment analysis for banks, lenders, and insurance companies
-  * Analysis Type: financials
+  First classify the business mix:
+  * Bank-led financial: core earnings still primarily driven by deposit/lending economics, with insurance or adjacent financial-services contribution as secondary.
+  * Insurance-led financial: core earnings still primarily driven by underwriting/distribution economics, with banking or lending contribution as secondary.
+  * Diversified financial group: meaningful earnings from multiple financial segments such that no single bank-only or insurance-only lens is sufficient.
+  * Lender-insurer hybrid: lending/funding and underwriting/claims both matter to value and risk.
+  * Financial conglomerate / holding structure: portfolio of financial businesses with different capital structures, earnings quality, and regulatory constraints requiring segment separation.
 
-  Required outputs:
-  * 12-month and 24-month price targets.
-  * Bull / base / bear scenario framework with probabilities that sum to 100% for each horizon.
-  * Quality Score out of 100 with explicit sub-factor scoring.
-  * Value Score out of 100 with explicit sub-factor scoring.
-  * Development / operating timeline to the next key milestones.
-  * Thesis Map with explicit conditions for bull, base, and bear paths.
-  * Monitoring Watchlist with red flags and confirmatory signals.
-  * Verification Queue listing unresolved facts that still matter to the thesis.
-  * Investment Recommendation: BUY / HOLD / SELL with conviction and a short justification.
+  Routing rule:
+  * If the company is clearly bank-led, use bank logic for the core and treat insurance or fee businesses as add-ons.
+  * If the company is clearly insurance-led, use insurance logic for the core and treat banking/lending businesses as add-ons.
+  * If the company is genuinely mixed, separate the segments explicitly and do not let one segment's stronger multiple or temporary tailwind hide weakness in another.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Segment summary and timeline to key earnings, credit/reserve, capital, funding/solvency, and capital-return milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
 
   Data sourcing rules:
   * If source documents are not attached, actively retrieve and review primary sources before analysis.
-  * Use official exchange filings, official company investor materials, statutory reports, and primary operating disclosures first.
-  * Use market-data providers only for current price / market cap / share count / enterprise value inputs.
-  * For every key numeric input, state the value used, the source, the filing date, and whether it is estimated.
-  * If data is missing, estimate conservatively, say that it is estimated, and explain the basis in one line.
-
-  Sector research lanes:
-    * Run a dedicated sector lane (financials): capture 2-4 recent sources on rates curve, credit cycle, deposit/funding competition, and regulatory capital backdrop; tie each point to scenario assumptions.
+  * Source market data from asx.com.au and/or marketindex.com.au.
+  * Source segment earnings, balance-sheet, reserve, funding, solvency, capital, and regulatory data from the company's primary exchange filings plus annual/interim reports, investor presentations, prudential/solvency disclosures, funding documents, catastrophe/reserve updates where relevant, and segment reporting.
+  * Prefer primary sources: exchange filings, statutory reports, segment notes, capital/regulatory disclosures, and company documents. Use secondary sources only when they add factual context on the operating backdrop.
+  * For every key numeric input used in valuation, Quality, Value, price targets, capital, reserve, funding, or earnings-power analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current AUD market data and current AUD/USD conversion rate (or project-local FX where applicable); state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
 
   Document review (complete before valuation):
   For each major valuation-relevant document (annual/interim report, quarterly update, investor presentation, technical report, financing update, operating update, regulatory filing, or material announcement), provide:
@@ -82,56 +87,169 @@ copy_paste_prompt: |-
   * Implications for investment outlook (positives and negatives).
   * Market pricing assessment: one separate paragraph on whether market pricing appears to reflect the document's information.
 
-  Step 1: Core operating and valuation workup
-  * Build the operating picture from current filings and primary disclosures.
-  * Identify the key revenue / margin / balance-sheet / capital-allocation drivers.
-  * Build a defendable valuation anchor appropriate to the sector.
-  * State the main assumptions that drive the 12-month and 24-month targets.
+  Step 1: Segment Map and Earnings Attribution
+  Break the company into its real operating engines, for example:
+  * banking/lending
+  * insurance underwriting
+  * insurance broking/distribution
+  * wealth / asset management
+  * payments / platforms / adjacent fee businesses
+  * treasury / markets / investment portfolio
+  For each material segment, capture where disclosed:
+  * revenue and profit contribution
+  * capital allocated or capital intensity
+  * funding model or liability structure
+  * key risk exposures
+  * strategic role in the group
+  * whether the segment deserves its own valuation anchor
 
-  Step 2: Quality Score (0-100)
-  Score the company explicitly across these quality factors and show the weighted contribution from each:
-    * Regulatory Environment
-    * Franchise Quality
-    * Management
-    * Asset/Credit Quality
-    * Capital & Liquidity
-    * Governance
-  Quality score rules:
-  * Give a raw score for each factor.
-  * Explain what evidence supports the score.
-  * Penalize weak disclosure, funding risk, governance risk, or execution uncertainty.
-  * Do not hide missing evidence; call it out.
+  Banking and lending discipline:
+  Apply where relevant:
+  * establish earnings baseline, NIM/spread, funding mix, deposit beta, loan mix, arrears/NPLs, provisions, CET1/leverage, liquidity, and payout capacity
+  * distinguish sustainable earnings power from rate-cycle tailwinds or unusually benign losses
+  * test funding/refinancing risk for non-bank lenders and specialist books
 
-  Step 3: Value Score (0-100)
-  Score the company explicitly across these value factors and show the weighted contribution from each:
-    * Intrinsic Value vs Market Cap
-    * P/B vs ROE
-    * Earnings Power vs Price
-    * Capital Return Capacity
-    * Strategic Value
-  Value score rules:
-  * Tie the score back to concrete valuation anchors, not vague sentiment.
-  * Compare valuation to quality, timing, and balance-sheet risk.
-  * State where the market is overpricing or underpricing the setup.
+  Insurance and broking discipline:
+  Apply where relevant:
+  * establish underwriting or broking earnings baseline, premium growth, combined ratio or EBIT margin, reserve development, catastrophe exposure, reinsurance structure, solvency, and capital generation
+  * distinguish sustainable underwriting or fee earnings from reserve releases, benign catastrophe periods, or acquisition roll-up effects
+  * test reserve adequacy, catastrophe exposure, reinsurance cost, and payout resilience where relevant
 
-  Step 4: Scenario framework
-  For bull, base, and bear cases, provide:
-  * 12M target and 24M target.
-  * Probability.
-  * Short scenario summary.
-  * Current positioning (e.g. base-leaning, mixed, bear-leaning).
-  * Explicit conditions that must hold for each path.
-  * Explicit failure conditions that would invalidate that path.
+  Group-level capital and funding discipline:
+  * Identify whether capital is trapped, fungible, or structurally siloed across the group.
+  * Distinguish regulated entity capital from true holdco excess capital.
+  * Identify double leverage, holdco debt, hybrids, intra-group funding, minority interests, and dividend upstream constraints.
+  * Do not assume a strong segment can fully fund a weak segment if regulatory or structural barriers exist.
+  * Assess whether group capital return depends on benign credit, reserve releases, or capital ratios drifting too close to the floor.
 
-  Step 5: Monitoring and verification
-  Produce:
-  * Monitoring Watchlist:
-    * Red Flags
-    * Confirmatory Signals
-  * Verification Queue:
-    * unresolved facts that should be checked in later filings or primary-source follow-up
+  Operating-franchise and risk-quality discipline:
+  * Assess the strength of each operating franchise separately: deposit franchise, underwriting franchise, broker/distribution franchise, wealth/platform franchise, or lender origination capability.
+  * Assess risk quality separately: loan book quality, reserve adequacy, catastrophe exposure, funding fragility, duration/investment-portfolio risk, and operational/remediation risk.
+  * Do not collapse all risks into one generic bucket. State which segment drives the group's downside.
 
-  Final instruction:
-  * This is not a generic company summary.
-  * Produce a decision-grade investment analysis aligned to the rubric above.
-  * Keep it specific, numeric where possible, and explicit about assumptions and unknowns.
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation. If the group has distinct businesses with materially different economics, use a sum-of-the-parts. If one core segment dominates, use that segment's primary valuation anchor and value the rest as add-ons.
+
+  Core valuation anchors:
+  * Bank/lender segments: sustainable EPS, sustainable ROE/ROTCE, P/B/P/TBV, P/E, and capital return capacity.
+  * Insurance underwriting segments: sustainable underwriting earnings, sustainable ROE, P/B/P/TBV, and catastrophe/reserve-adjusted earnings power.
+  * Insurance brokers / fee businesses: sustainable EPS/EBIT, margin resilience, cash conversion, and justified earnings multiple.
+  * Wealth/platform segments: fee margin, net flow quality, cash conversion, and justified multiple if material.
+  * Conglomerate groups: sum-of-the-parts with segment-specific multiples or book-value anchors, less holdco costs/debt and structural discounts where justified.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using sum-of-the-parts, show segment values, holdco adjustments, and any conglomerate discount explicitly.
+  * If one segment contributes most earnings and value, do not overcomplicate the model; use the dominant segment as the core anchor and cross-check the rest.
+  * If the group mixes bank and insurance businesses, do not force one common multiple across all segments.
+  * Distinguish sustainable capital generation from temporary releases or one-off gains.
+
+  Simple group earnings-power bridge:
+  * Segment earnings = core operating profit for each segment after normalised losses/claims/reserving/funding effects.
+  * Group earnings = sum of segment earnings minus holdco costs, funding drag, minority leakage, and structural overhead.
+  * Equity value anchor = segment-based valuation sum or dominant-core valuation anchor, cross-checked against group book value, payout capacity, and peer positioning.
+
+  Stress and downside discipline:
+  * Show at least one downside case where the weak link in the group matters: higher credit losses, margin compression, reserve strengthening, catastrophe losses, weaker broking growth, funding pressure, or tighter capital rules.
+  * Show what happens to group ROE, capital buffers, payout capacity, and valuation under that downside.
+  * If the group has multiple regulated entities, stress the interaction, not just the standalone segments.
+
+  Step 3: Quality Score (0-100)
+  Formula:
+  = (0.20 * Regulatory Environment) + (0.20 * Operating Franchise) + (0.15 * Management) + (0.20 * Risk Quality) + (0.15 * Capital & Liquidity) + (0.10 * Governance)
+
+  Score each factor with raw score, weight, weighted contribution, and evidence:
+  * Regulatory Environment:
+    - strong prudential oversight, transparent disclosures, low remediation overhang = 85-100
+    - sound regime with manageable complexity = 70-85
+    - material regulatory/remediation complexity or weak disclosure = 45-70
+    - serious regulatory, capital, or remediation stress = 20-45
+  * Operating Franchise:
+    - strong customer franchise or distribution position across key segments = 85-100
+    - credible operating franchises with some concentration or cyclical pressure = 65-85
+    - narrow, uneven, or undifferentiated franchises = 45-65
+    - structurally weak or deteriorating franchises = 20-45
+  * Management:
+    - disciplined capital allocation, realistic guidance, credible segment execution = 85-100
+    - mostly credible execution with manageable issues = 65-85
+    - uneven execution or promotional tone = 45-65
+    - repeated misses, poor integration, or weak risk control = 20-45
+  * Risk Quality:
+    - strong loan/reserve quality, prudent risk selection, manageable group risk = 85-100
+    - acceptable risk profile with some concentration or cycle sensitivity = 65-85
+    - notable credit/reserve/funding/cat sensitivity = 45-65
+    - clear deterioration or hidden balance-sheet risk = 20-45
+  * Capital & Liquidity:
+    - strong regulated capital, ample liquidity, clear upstream capacity = 85-100
+    - adequate buffers with moderate sensitivity = 65-85
+    - limited headroom, trapped capital, or funding dependence = 45-65
+    - capital or liquidity stress likely to constrain outcomes = 20-45
+  * Governance:
+    - aligned incentives, strong oversight, transparent segment reporting = 80-100
+    - acceptable governance with minor concerns = 60-80
+    - opaque reporting, incentive issues, or oversight concerns = 35-60
+
+  Step 4: Value Score (0-100)
+  Formula:
+  = (0.30 * Intrinsic Value vs Market Cap) + (0.25 * P/B vs ROE) + (0.20 * Earnings Power vs Price) + (0.15 * Capital Return Capacity) + (0.10 * Strategic Value)
+
+  * Intrinsic Value vs Market Cap:
+    - compare current market value to the primary anchor or sum-of-the-parts value
+    - score higher when upside is supported by durable segment economics and credible group structure
+  * P/B vs ROE:
+    - compare trading multiple to sustainable group ROE and peer set
+    - a low P/B is not cheap if reserve, credit, or holdco complexity destroys value
+  * Earnings Power vs Price:
+    - compare normalised group EPS/earnings yield to current price and downside risk
+    - do not use peak segment margins or one-off releases without normalisation
+  * Capital Return Capacity:
+    - evaluate dividend sustainability, buyback room, and genuine capital fungibility
+    - discount if capital return depends on trapped capital or weak segment resilience
+  * Strategic Value:
+    - consider franchise scarcity, distribution networks, deposit base, underwriting capability, broking scale, and structure-improvement optionality
+
+  Step 5: Scenario Framework and Price Targets
+  * Price targets:
+    - 12m and 24m bull/base/bear targets
+    - scenario probabilities, each horizon summing to 100%
+    - probability-weighted target for 12m and 24m
+    - explicit scenario drivers: margin path, credit losses, reserve development, catastrophe outcomes, fee growth, funding cost, capital rules, and capital return
+    - target reconciliation to dominant-core anchor, segment-based valuation, book value, justified multiple, or stated sum-of-the-parts anchor
+  * Timeline:
+    - current earnings and capital baseline
+    - next 24m milestones: result dates, margin/claims inflections, reserve reviews, regulatory updates, funding rollovers, solvency/capital decisions, dividend/buyback decisions, and segment restructuring/integration milestones
+    - status: on-track / at-risk / speculative
+    - impact on 24m probability-weighted target
+    - primary risk
+  * Headwinds/tailwinds:
+    - threshold-driven quantitative factors with directional earnings and capital impact
+    - material qualitative factors with evidence and expected duration
+  * Investment recommendation paragraph:
+    - core thesis reason
+    - key 12m catalyst
+    - key invalidation risk
+    - sizing context: core / financials-diversified / cyclical / speculative / avoid
+  * Key risks: ranked list with probability and impact.
+  * Key opportunities: ranked list with trigger and valuation impact.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Segment earnings mix and capital intensity.
+  * Group ROE / ROTCE / ROA.
+  * CET1 / leverage / solvency buffers.
+  * NIM / spread, deposit growth, loan growth, arrears/NPLs, and provisioning.
+  * Combined ratio, reserve development, catastrophe load, and reinsurance cost.
+  * Broking/fee growth, margin, retention, and cash conversion.
+  * Holdco debt, hybrids, minority interests, and trapped-capital constraints.
+  * Dividend yield, buyback capacity, and capital-generation rate.
+  * Book value / tangible book value per share.
+
+  Cross-check requirements before final output:
+  * Current group earnings baseline must reconcile to the latest primary-source result.
+  * Segment commentary must reconcile to reported segment disclosures and management guidance.
+  * Credit, reserve, and catastrophe commentary must reconcile to actual disclosed risk indicators where relevant.
+  * Capital-return conclusions must reconcile to regulated capital, solvency, funding, and upstreaming constraints.
+  * Valuation anchor must be mathematically consistent with stated segment assumptions, group earnings/book value, and share count.
+  * Quality and Value weighted totals must equal stated final scores.
+  * Price targets must be tied to explicit segment, capital, and multiple assumptions.
+  * Do not create a risk from template structure alone. If a missing data point is immaterial because equivalent disclosure already answers the economics, say so explicitly rather than marking the company down for template non-compliance.
