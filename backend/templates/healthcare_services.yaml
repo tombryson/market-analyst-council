@@ -205,3 +205,217 @@ verification_schema:
         - guidance
         - development_timeline
         critical: true
+
+# The full rubric/prompt
+rubric: |
+  Run an investment analysis on [Company Name] using this healthcare-services rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to reimbursement/contract quality, utilization, labour intensity, compliance/accreditation risk, cash flow, or scenario confidence.
+
+  First classify the company:
+  * Healthcare provider / operator: hospitals, clinics, day surgeries, imaging centres, pathology/lab networks, dental, fertility, mental-health, aged-care, or other care-delivery sites.
+  * Diagnostics / service network: pathology, imaging, lab services, or diagnostic-service businesses where test volume, payor mix, and site economics matter more than device IP.
+  * Contracted care / reimbursement-led provider: revenue substantially driven by government reimbursement, insurer contracts, NDIS, aged-care funding, hospital funding, or payor schedules.
+  * Consumer-pay / elective healthcare service: demand partly cyclical and dependent on patient self-pay, discretionary procedures, or private-pay mix.
+  * Roll-up / multi-site services platform: value driven by acquisitions, integration, clinician retention, site productivity, and shared-services leverage.
+  * Hybrid services model: meaningful mix of clinical delivery, diagnostics, distribution, software/management services, or adjacent fee streams that should be separated in valuation.
+
+  Use that classification to decide valuation emphasis:
+  * Providers/operators: occupancy/utilization, procedure mix, payer mix, reimbursement, labour availability, clinician productivity, and site-level margin.
+  * Diagnostics/service networks: test/procedure volume, reimbursement rates, collection site density, throughput, logistics, fixed-cost leverage, and margin resilience.
+  * Contracted care/reimbursement-led providers: payor concentration, contract renewals, tariff changes, funding formulas, working-capital timing, and compliance risk.
+  * Consumer-pay/elective providers: conversion, pricing, utilization, demand cyclicality, and marketing/referral efficiency.
+  * Roll-ups/platforms: acquisition discipline, organic growth versus acquired growth, integration, clinician/site retention, leverage, and central-cost efficiency.
+  * Hybrid models: separate site-based clinical earnings from software, distribution, or other fee streams. Do not let higher-multiple ancillary revenue hide weak core site economics.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Service-line summary and timeline to key utilization, reimbursement, labour, acquisition/integration, and financing milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source operating, reimbursement, contract, utilization, labour, compliance, and financial data from the company's primary exchange filings plus annual/interim reports, investor presentations, contract/reimbursement updates, accreditation/compliance disclosures, and site/service-line reporting.
+  * Prefer primary sources: exchange filings, statutory reports, reimbursement or tariff notices, provider contract disclosures, accreditation/care-quality updates, occupancy/utilization metrics, and company operating disclosures.
+  * For every key numeric input used in valuation, Quality, Value, price targets, utilization, margin, reimbursement, labour, or cash-flow analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, reimbursement/contract updates, compliance disclosures, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, utilization, reimbursement, labour cost, compliance risk, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Service-Line, Utilization, and Site-Economics Workup
+  For each material service line or operating segment, capture where disclosed:
+  * Service type, customer/payor, geography, site footprint, channel/referral source, and next milestone.
+  * Revenue model: government reimbursement, private insurer contract, employer contract, clinician billings share, consumer-pay, subscription/management fee, or hybrid.
+  * Activity metrics: occupancy, bed days, admissions, procedures, scans, tests, consults, visits, billable episodes, active clinicians, sites, or other relevant throughput metrics.
+  * Site/network growth: greenfield openings, clinic rollout, acquisitions, closures, capacity additions, and productivity initiatives.
+  * Mix effects: inpatient/outpatient, public/private, insured/self-pay, acute/elective, routine/specialist, high/low complexity, or service-line contribution.
+
+  Demand and utilization discipline:
+  * Establish the current utilization baseline from the latest half, quarter, or run-rate.
+  * Distinguish structural demand from temporary catch-up, pandemic distortions, seasonal effects, or one-off contract wins.
+  * State whether demand is genuinely inelastic or whether pricing and volume are more cyclical than the business claims.
+  * For elective/self-pay services, explicitly assess consumer sensitivity and referral-channel dependence.
+  * For diagnostics or pathology/imaging, distinguish test/procedure volume growth from price/mix effects.
+
+  Reimbursement, contract, and payor discipline:
+  * Identify the reimbursement model: fee-for-service, bundled payment, capitation, contract/tariff, government funding, insurer agreement, or self-pay.
+  * State payor mix and concentration where disclosed.
+  * Capture tariff resets, reimbursement uplift/cuts, contract renewals, clawback/review risk, and billing/compliance complexity.
+  * Distinguish revenue growth driven by genuine volume/productivity from temporary reimbursement tailwinds.
+  * Do not assume contract economics are durable if renewal timing, government review, or insurer negotiations are major swing factors.
+
+  Labour, clinician, and operating-execution discipline:
+  * Identify labour intensity, wage inflation exposure, use of agency/contract staff, clinician recruitment/retention, productivity, and utilization of fixed assets.
+  * For clinician-led models, assess practitioner retention, referral stickiness, revenue split, and key-person concentration.
+  * Distinguish temporary margin compression from structural inability to pass through labour or procurement costs.
+  * For roll-up models, assess whether site-level economics improve post integration or remain masked by acquisition adjustments.
+
+  Compliance, accreditation, and quality discipline:
+  * Identify accreditation status, quality incidents, clinical governance, regulatory investigations, remediation programs, claim denials, coding/billing issues, and litigation exposure where disclosed.
+  * Distinguish immaterial compliance noise from issues that can impair licenses, reimbursements, occupancy, contracts, or reputation.
+  * If the model relies on government funding, insurer confidence, or hospital referrals, compliance quality is a valuation input, not just a governance side note.
+
+  Cash flow, balance sheet, and rollout discipline:
+  * Identify site-level versus corporate margin, central-cost leverage, lease burden, capex intensity, maintenance versus growth capex, working-capital timing, and cash conversion.
+  * Assess whether growth requires incremental sites, clinicians, equipment, acquisitions, or reimbursement approvals.
+  * Distinguish cash EBITDA from true free cash flow after leases, maintenance capex, and working capital.
+  * For acquisition-led names, assess leverage, earn-outs, integration cost, and whether reported growth is actually acquisition dependence.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation using the most appropriate service-business anchors. Do not force biotech/device logic onto a healthcare-services company.
+
+  Core valuation anchors:
+  * Provider/operator models: EV/EBITDA, EBIT, or free-cash-flow yield, anchored to utilization, payer mix, labour intensity, and cash conversion.
+  * Diagnostics/service networks: EV/EBITDA or EV/EBIT, cross-checked against test/procedure volume growth, reimbursement quality, and fixed-cost leverage.
+  * Contracted/reimbursement-led providers: multiple anchored to visibility/durability of contracts, margins, working capital, and regulatory risk.
+  * Roll-up/platform models: base multiple anchored to organic earnings quality, with acquisition/integration upside treated separately.
+  * Hybrid models: sum-of-the-parts only where different service lines genuinely deserve different multiples.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using EBITDA multiples, explain lease treatment, maintenance capex, and whether EBITDA overstates owner earnings.
+  * If using FCF yield, reconcile to actual maintenance needs and working-capital swings.
+  * If reimbursement, labour, or compliance risk is elevated, the multiple should reflect that explicitly.
+  * For roll-up models, do not award premium multiples to acquired growth unless integration quality and organic underlying performance justify it.
+
+  Simple operating bridge:
+  * Revenue driver = sites/clinicians/capacity x utilization/activity x reimbursement or price per episode/test/procedure/visit.
+  * Operating profit = revenue minus labour, consumables/procurement, occupancy/site cost, central overhead, and compliance/remediation burden.
+  * Free cash flow = operating profit after leases, maintenance capex, tax, interest where relevant, and working-capital needs.
+  * Equity value anchor = justified EV/EBITDA, EV/EBIT, or FCF yield, cross-checked against balance-sheet risk and peer positioning.
+
+  Stress and downside discipline:
+  * Show at least one downside case with weaker utilization, reimbursement pressure, labour inflation, clinician churn, compliance disruption, or integration underperformance.
+  * Show what happens to margin, cash conversion, leverage, and valuation under that downside.
+  * If the model is labour-constrained, staffing may matter more than demand.
+  * If the model is reimbursement-led, tariff/contract resets may matter more than raw volume.
+
+  Step 3: Quality Score (0-100)
+  Formula:
+  = (0.20 * Demand Inelasticity) + (0.20 * Reimbursement/Contract Quality) + (0.15 * Management) + (0.20 * Operating Execution) + (0.15 * Balance Sheet) + (0.10 * Governance)
+
+  Score each factor with raw score, weight, weighted contribution, and evidence:
+  * Demand Inelasticity:
+    - resilient demand, low discretionary exposure, strong referral stickiness = 85-100
+    - mostly resilient with some cycle sensitivity = 65-85
+    - meaningful discretionary or referral cyclicality = 45-65
+    - weak demand visibility or structurally exposed service mix = 20-45
+  * Reimbursement/Contract Quality:
+    - durable contracts/funding, good payor mix, manageable renewal risk = 85-100
+    - acceptable reimbursement quality with some policy or renewal exposure = 65-85
+    - meaningful tariff/contract/payor concentration risk = 45-65
+    - weak reimbursement visibility or severe concentration = 20-45
+  * Management:
+    - disciplined operators with credible rollout, clinician, and capital-allocation execution = 85-100
+    - mostly credible execution with manageable issues = 65-85
+    - uneven execution or promotional posture = 45-65
+    - repeated misses, weak integration, or poor operating control = 20-45
+  * Operating Execution:
+    - strong utilization, labour management, site productivity, and margin discipline = 85-100
+    - credible execution with some staffing/margin pressure = 65-85
+    - inconsistent productivity or weak cost pass-through = 45-65
+    - persistent execution slippage or structurally weak site economics = 20-45
+  * Balance Sheet:
+    - solid leverage, good cash conversion, low refinancing stress = 85-100
+    - manageable leverage with acceptable covenant/refinancing risk = 65-85
+    - elevated leverage, lease burden, or weak cash conversion = 45-65
+    - stressed balance sheet or material refinancing risk = 20-45
+  * Governance:
+    - transparent disclosure, strong clinical/compliance oversight, aligned incentives = 80-100
+    - acceptable governance with minor concerns = 60-80
+    - weak disclosures, incentive issues, or oversight concerns = 35-60
+
+  Step 4: Value Score (0-100)
+  Formula:
+  = (0.30 * Intrinsic Value vs Market Cap) + (0.25 * Earnings/FCF Yield) + (0.20 * Multiple vs Peers) + (0.15 * Utilization Upside) + (0.10 * Strategic Value)
+
+  * Intrinsic Value vs Market Cap:
+    - compare current market value to the primary valuation anchor
+    - score higher when upside is supported by real operating leverage and cash conversion
+  * Earnings/FCF Yield:
+    - compare normalized earnings or FCF yield to capital intensity, reimbursement risk, and balance-sheet risk
+    - a superficially cheap multiple is not attractive if leases, capex, or working capital consume the cash
+  * Multiple vs Peers:
+    - compare trading multiple to peers after adjusting for utilization, reimbursement durability, labour pressure, and organic growth quality
+  * Utilization Upside:
+    - evaluate whether the business has credible room to improve occupancy, throughput, clinician productivity, site maturity, or service mix
+  * Strategic Value:
+    - consider network density, referral base, geographic position, clinician relationships, and platform value for consolidation
+
+  Step 5: Scenario Framework and Price Targets
+  * Price targets:
+    - 12m and 24m bull/base/bear targets
+    - scenario probabilities, each horizon summing to 100%
+    - probability-weighted target for 12m and 24m
+    - explicit scenario drivers: utilization, reimbursement/contracts, labour cost, mix, integration, leverage, and cash conversion
+    - target reconciliation to EV/EBITDA, EV/EBIT, FCF yield, or stated sum-of-the-parts anchor
+  * Timeline:
+    - current utilization and cash baseline
+    - next 24m milestones: contract renewals, tariff resets, site openings/rollouts, clinician hiring, margin recovery steps, integration milestones, and refinancing decisions
+    - status: on-track / at-risk / speculative
+    - impact on 24m probability-weighted target
+    - primary risk
+  * Headwinds/tailwinds:
+    - threshold-driven quantitative factors with directional revenue, margin, and cash impact
+    - material qualitative factors with evidence and expected duration
+  * Investment recommendation paragraph:
+    - core thesis reason
+    - key 12m catalyst
+    - key invalidation risk
+    - sizing context: core compounder / recovery / roll-up / speculative / avoid
+  * Key risks: ranked list with probability and impact.
+  * Key opportunities: ranked list with trigger and valuation impact.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Occupancy / utilization / procedure or test volume.
+  * Payor mix / contract concentration / reimbursement resets.
+  * Revenue per site / clinician / episode / test / procedure.
+  * Labour cost intensity, clinician retention, and agency use.
+  * EBITDA margin, EBIT margin, lease-adjusted cash conversion.
+  * Site rollout / de novo / acquisition pipeline and maturity curve.
+  * Net debt / lease burden / covenant headroom.
+  * Compliance, accreditation, and claim-denial indicators.
+  * For diagnostics services: turnaround time, throughput, collection-site density, and reimbursement quality.
+  * For aged care or facility operators: occupancy, daily rate/funding mix, staffing ratios, and capex burden.
+
+  Cross-check requirements before final output:
+  * Current utilization and revenue baseline must reconcile to the latest primary-source result.
+  * Reimbursement/contract commentary must match disclosed payor mix, tariff notices, or contract updates.
+  * Labour commentary must reconcile to wage/staffing disclosure and margin trends.
+  * Compliance/accreditation commentary must distinguish immaterial noise from valuation-relevant risk.
+  * Valuation anchor must be mathematically consistent with stated utilization, margin, cash-flow, and share-count assumptions.
+  * Quality and Value weighted totals must equal stated final scores.
+  * Price targets must be tied to explicit utilization, reimbursement, labour, leverage, and multiple assumptions.
+  * Do not create a risk from template structure alone. If a missing data point is immaterial because equivalent disclosure already answers the economics, say so explicitly rather than marking the company down for template non-compliance.
