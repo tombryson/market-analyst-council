@@ -44,34 +44,43 @@ copy_paste_prompt: |-
   Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
 
   Analysis rubric:
-  Run an investment analysis on [COMPANY_NAME] following this rubric exactly. Keep the output investment-grade, explicit, and scenario-based. Use ASX-appropriate primary filings first and only use secondary sources where they add real value.
+  Run an investment analysis on [COMPANY_NAME] using this fixed-income and credit-vehicle rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to portfolio credit quality, duration/rate sensitivity, leverage, NAV integrity, liquidity, refinancing risk, or scenario confidence.
 
-  Template focus:
-  * Template ID: fixed_income
-  * Template Name: Fixed Income
-  * Template Description: Investment analysis for bond funds, credit vehicles, and listed fixed-income exposures
-  * Analysis Type: fixed_income
+  First classify the vehicle:
+  * Investment-grade bond fund / trust: portfolio dominated by sovereign, semi-government, investment-grade corporate, securitised, or high-quality floating-rate credit.
+  * High-yield / leveraged credit vehicle: portfolio driven by sub-investment-grade, structured credit, private credit, CLO debt/equity, mezzanine, or higher-spread loans.
+  * Floating-rate / private credit lender: income vehicle with predominantly floating-rate loans, direct lending, warehouse assets, or private credit exposures.
+  * Duration-sensitive bond vehicle: returns materially driven by government yields, curve movements, and duration management rather than credit spread alone.
+  * Hybrid income vehicle: mix of bonds/credit plus equities, hybrids, preferreds, property debt, or other assets that should be separated in risk analysis.
+  * Listed income fund / closed-end structure: NAV-based vehicle where discount/premium to NAV, distribution policy, buybacks, liquidity, and fee drag are material.
 
-  Required outputs:
-  * 12-month and 24-month price targets.
-  * Bull / base / bear scenario framework with probabilities that sum to 100% for each horizon.
-  * Quality Score out of 100 with explicit sub-factor scoring.
-  * Value Score out of 100 with explicit sub-factor scoring.
-  * Development / operating timeline to the next key milestones.
-  * Thesis Map with explicit conditions for bull, base, and bear paths.
-  * Monitoring Watchlist with red flags and confirmatory signals.
-  * Verification Queue listing unresolved facts that still matter to the thesis.
-  * Investment Recommendation: BUY / HOLD / SELL with conviction and a short justification.
+  Use that classification to decide valuation emphasis:
+  * Investment-grade funds: duration, spread carry, credit quality, liquidity, fee drag, and distribution sustainability.
+  * High-yield / leveraged credit: default cycle risk, spread compensation, recovery assumptions, refinancing wall, leverage, and mark-to-model risk.
+  * Floating-rate / private credit: base-rate pass-through, borrower leverage, covenant quality, non-accruals, loan-to-value, refinancing risk, and realised cash yield versus accounting yield.
+  * Duration-sensitive vehicles: rate sensitivity, curve shape, reinvestment yield, duration positioning, and whether current distribution reflects the new rate regime.
+  * Hybrid income vehicles: separate fixed-income earnings from equity/option/property-like risk. Do not let one bucket hide risk in another.
+  * Closed-end listed funds: test whether discount/premium to NAV is justified by fee structure, liquidity, governance, buybacks, and distribution quality.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Portfolio summary and timeline to key duration, spread, refinancing, distribution, and NAV catalysts.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
 
   Data sourcing rules:
   * If source documents are not attached, actively retrieve and review primary sources before analysis.
-  * Use official exchange filings, official company investor materials, statutory reports, and primary operating disclosures first.
-  * Use market-data providers only for current price / market cap / share count / enterprise value inputs.
-  * For every key numeric input, state the value used, the source, the filing date, and whether it is estimated.
-  * If data is missing, estimate conservatively, say that it is estimated, and explain the basis in one line.
-
-  Sector research lanes:
-    * Run a dedicated sector lane (fixed income): capture 2-4 recent sources on duration/rate sensitivity, credit spreads, portfolio quality, refinancing risk, and distribution sustainability; tie each point to scenario assumptions.
+  * Source market data from asx.com.au and/or marketindex.com.au.
+  * Source portfolio, NAV, duration, leverage, distribution, credit quality, and mandate data from the company's primary exchange filings plus annual/interim reports, monthly/quarterly portfolio updates, fund factsheets, mandate documents, distribution notices, debt/facility documents, and manager presentations.
+  * Prefer primary sources: exchange filings, statutory reports, portfolio holdings/risk reports, NAV statements, mandate/risk-limit disclosures, and manager documents. Use index/vendor data only where needed for reference yields, spreads, curves, or peer benchmarks.
+  * For every key numeric input used in valuation, Quality, Value, price targets, duration, spread, default, leverage, or distribution analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current AUD market data and current AUD/USD conversion rate (or project-local FX where applicable); state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
 
   Document review (complete before valuation):
   For each major valuation-relevant document (annual/interim report, quarterly update, investor presentation, technical report, financing update, operating update, regulatory filing, or material announcement), provide:
@@ -81,56 +90,179 @@ copy_paste_prompt: |-
   * Implications for investment outlook (positives and negatives).
   * Market pricing assessment: one separate paragraph on whether market pricing appears to reflect the document's information.
 
-  Step 1: Core operating and valuation workup
-  * Build the operating picture from current filings and primary disclosures.
-  * Identify the key revenue / margin / balance-sheet / capital-allocation drivers.
-  * Build a defendable valuation anchor appropriate to the sector.
-  * State the main assumptions that drive the 12-month and 24-month targets.
+  Step 1: Portfolio, NAV, and Income Workup
+  For the main portfolio buckets and earnings drivers, capture where disclosed:
+  * Portfolio mix by asset type: sovereign, semi-government, investment-grade corporate, high-yield, loans, private credit, RMBS/ABS/CLO, hybrids, cash, or other exposures.
+  * Sector, geography, issuer, and rating mix.
+  * Fixed versus floating-rate mix, average coupon/spread, weighted average life, duration, convexity, reset profile, and maturity ladder.
+  * Leverage structure: fund-level borrowings, repo, warehouses, margin facilities, notes, preferreds, or embedded leverage in structured products.
+  * Fee structure: management fee, performance fee, operating expense ratio, transaction cost drag, and hedging cost where relevant.
+  * Distribution policy: income-only, managed distribution, return-of-capital risk, smoothing policy, or manager discretion.
 
-  Step 2: Quality Score (0-100)
-  Score the company explicitly across these quality factors and show the weighted contribution from each:
-    * Portfolio Credit Quality
-    * Duration/Rate Risk
-    * Management
-    * Income Stability
-    * Liquidity
-    * Governance
-  Quality score rules:
-  * Give a raw score for each factor.
-  * Explain what evidence supports the score.
-  * Penalize weak disclosure, funding risk, governance risk, or execution uncertainty.
-  * Do not hide missing evidence; call it out.
+  Duration and rate-risk discipline:
+  * Establish the current duration baseline and state whether the portfolio is fixed-rate, floating-rate, hedged, laddered, barbelled, or actively trading duration.
+  * Distinguish income sensitivity from mark-to-market NAV sensitivity.
+  * Show whether rising/falling rates help the vehicle through higher reinvestment income, floating-rate reset benefit, spread compression, or hurt it through mark-to-market duration losses.
+  * For floating-rate vehicles, do not ignore borrower stress from higher base rates.
+  * For duration-heavy vehicles, do not focus only on running yield; state how much NAV can move for a meaningful rate shock if disclosed or infer conservatively.
 
-  Step 3: Value Score (0-100)
-  Score the company explicitly across these value factors and show the weighted contribution from each:
-    * Intrinsic Value vs Market Price
-    * Yield vs Risk
-    * Discount/Premium to NAV
-    * Distribution Sustainability
-    * Strategic Value
-  Value score rules:
-  * Tie the score back to concrete valuation anchors, not vague sentiment.
-  * Compare valuation to quality, timing, and balance-sheet risk.
-  * State where the market is overpricing or underpricing the setup.
+  Credit-quality and default discipline:
+  * Break out rating mix, internal risk grades, covenant quality, borrower leverage, non-accruals, impairments, watchlist names, restructures, and realised loss history where disclosed.
+  * Identify sector/issuer concentration, maturity wall, refinancing risk, sponsor quality, collateral coverage, and loan-to-value where relevant.
+  * Distinguish accounting yield from cash yield where non-accruals, PIK, capitalised interest, or unrealised marks matter.
+  * Do not assume current low defaults are sustainable if spreads are tight, borrower leverage is high, or refinancing conditions are deteriorating.
+  * For structured credit, identify tranche position, attachment/detachment, subordination, credit enhancement, and expected loss sensitivity where disclosed.
 
-  Step 4: Scenario framework
-  For bull, base, and bear cases, provide:
-  * 12M target and 24M target.
-  * Probability.
-  * Short scenario summary.
-  * Current positioning (e.g. base-leaning, mixed, bear-leaning).
-  * Explicit conditions that must hold for each path.
-  * Explicit failure conditions that would invalidate that path.
+  NAV and valuation-integrity discipline:
+  * Identify whether the vehicle reports daily, weekly, monthly, or periodic NAV and whether assets are mark-to-market, dealer-marked, model-valued, or manager-valued.
+  * Distinguish realised income from unrealised gains/losses and mark-to-model assumptions.
+  * For illiquid/private credit holdings, assess whether NAV could lag underlying deterioration.
+  * For listed funds, track discount/premium to NAV, buyback policy, redemption mechanism, and persistent discount drivers.
+  * Do not assume published NAV is fully reliable if valuation process, liquidity, or credit marks are opaque.
 
-  Step 5: Monitoring and verification
-  Produce:
-  * Monitoring Watchlist:
-    * Red Flags
-    * Confirmatory Signals
-  * Verification Queue:
-    * unresolved facts that should be checked in later filings or primary-source follow-up
+  Distribution and payout discipline:
+  * Establish the current income/distribution baseline and whether payouts are covered by net investment income, realised cash income, or depend on gains/return of capital.
+  * Separate gross portfolio yield from net yield after defaults, fees, hedging, leverage cost, and operating expenses.
+  * If the vehicle reports NII, distributable earnings, cash earnings, or similar, reconcile it to stated distributions.
+  * If distribution coverage is weak, state whether the likely outcome is a cut, temporary under-earning, or reliance on gains/capital.
+  * Do not treat a headline yield as attractive unless the payout is genuinely sustainable.
 
-  Final instruction:
-  * This is not a generic company summary.
-  * Produce a decision-grade investment analysis aligned to the rubric above.
-  * Keep it specific, numeric where possible, and explicit about assumptions and unknowns.
+  Liquidity, leverage, and refinancing discipline:
+  * Identify portfolio liquidity, redemption terms, listed trading liquidity, facility maturity profile, margining/refinancing risk, and covenant headroom where disclosed.
+  * For leveraged vehicles, test whether spread widening or defaults could pressure asset coverage, covenants, or forced selling.
+  * For private credit vehicles, assess warehouse maturity, lender concentration, and refinancing dependence.
+  * Treat liquidity mismatch between assets and liabilities as a real valuation risk where relevant.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation using the metrics most appropriate to the vehicle. Do not force an equity-style earnings multiple where NAV, distribution yield, and spread-adjusted risk are more important.
+
+  Core valuation anchors:
+  * NAV / price-to-NAV: primary for closed-end funds, listed trusts, and vehicles where asset marks are credible.
+  * Yield versus risk: compare net distribution yield or NII yield to portfolio duration, spread, leverage, default risk, and payout quality.
+  * Earnings power / NII: useful where recurring net investment income is stable and disclosures are good.
+  * Discount / premium to NAV: determine whether current trading discount or premium is justified by liquidity, governance, fee drag, mandate, buybacks, and payout sustainability.
+  * Book value / tangible equity where leverage facilities or lender-like structures make balance-sheet resilience central.
+  * Sum-of-the-parts only if the vehicle mixes distinct portfolios that genuinely deserve separate assumptions.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using NAV, state whether NAV is high-confidence mark-to-market, moderate-confidence mixed mark, or lower-confidence model-based/private asset NAV.
+  * If using yield, use net sustainable yield after defaults, fees, leverage cost, and likely payout policy. Do not rely on headline gross yield.
+  * If using price-to-NAV, explain why the discount/premium should narrow, stay wide, or move further.
+  * For leveraged/high-yield vehicles, stress-test valuation under wider spreads, higher defaults, and tighter financing.
+  * For duration-heavy vehicles, test valuation under at least one meaningful parallel-rate shift or curve move.
+
+  Simple income/NAV bridge:
+  * Gross asset income = portfolio coupon/spread income plus reset/reinvestment benefit where relevant.
+  * Net income = gross asset income minus defaults/impairments, leverage cost, fees, hedging cost, and operating expenses.
+  * Sustainable payout = net cash income adjusted for realistic loss and refinance assumptions.
+  * Equity value anchor = justified discount/premium to NAV and/or sustainable net yield relative to peer/risk set.
+
+  Stress and downside discipline:
+  * Show at least one downside case with spread widening, higher defaults/non-accruals, weaker recovery values, lower distribution coverage, and/or adverse rate moves.
+  * Show what happens to NAV, distribution coverage, leverage headroom, and valuation under that downside.
+  * For private credit, downgrade/refinancing risk may matter more than duration.
+  * For long-duration bond funds, rate shock and mark-to-market NAV may matter more than defaults.
+
+  Step 3: Quality Score (0-100)
+  Formula:
+  = (0.20 * Portfolio Credit Quality) + (0.20 * Duration/Rate Risk) + (0.15 * Management) + (0.20 * Income Stability) + (0.15 * Liquidity) + (0.10 * Governance)
+
+  Score each factor with raw score, weight, weighted contribution, and evidence:
+  * Portfolio Credit Quality:
+    - high-quality assets, good diversification, low default risk = 85-100
+    - sound portfolio with manageable concentration/default risk = 65-85
+    - notable leverage, weak ratings mix, or concentration risk = 45-65
+    - clear credit deterioration, weak marks, or heavy impairment risk = 20-45
+  * Duration/Rate Risk:
+    - well-managed duration/reset profile aligned to mandate = 85-100
+    - moderate rate sensitivity with good disclosure/hedging = 65-85
+    - meaningful rate risk or poor duration alignment = 45-65
+    - severe duration mismatch or opaque sensitivity = 20-45
+  * Management:
+    - disciplined portfolio construction, transparent reporting, strong cycle management = 85-100
+    - mostly credible execution with manageable issues = 65-85
+    - uneven execution or promotional posture = 45-65
+    - repeated misses, poor underwriting, or weak risk control = 20-45
+  * Income Stability:
+    - distributions well-covered by recurring cash income = 85-100
+    - mostly covered with some cycle sensitivity = 65-85
+    - coverage dependence on gains, leverage, or benign conditions = 45-65
+    - weak coverage or clear cut risk = 20-45
+  * Liquidity:
+    - liquid portfolio/funding structure with strong headroom = 85-100
+    - adequate liquidity with manageable refinancing risk = 65-85
+    - limited headroom or asset/liability mismatch = 45-65
+    - liquidity stress likely in a normal downturn = 20-45
+  * Governance:
+    - aligned structure, transparent NAV/distribution policy, sensible fees = 80-100
+    - acceptable governance with minor concerns = 60-80
+    - weak alignment, opaque fees, or poor disclosure = 35-60
+
+  Step 4: Value Score (0-100)
+  Formula:
+  = (0.30 * Intrinsic Value vs Market Price) + (0.25 * Yield vs Risk) + (0.20 * Discount/Premium to NAV) + (0.15 * Distribution Sustainability) + (0.10 * Strategic Value)
+
+  * Intrinsic Value vs Market Price:
+    - compare current price to the primary valuation anchor
+    - score higher when upside is supported by credible NAV, income, and balance-sheet resilience
+  * Yield vs Risk:
+    - compare net sustainable yield to duration, spread, default, and leverage risk
+    - a high yield is not attractive if it mainly compensates for likely NAV loss or payout cuts
+  * Discount/Premium to NAV:
+    - assess whether the current discount/premium is justified by liquidity, governance, fee drag, and asset quality
+    - persistent discounts can be deserved if NAV confidence or capital-allocation quality is weak
+  * Distribution Sustainability:
+    - evaluate payout coverage, cash conversion, and resilience through a normal credit/rate cycle
+    - discount if payout depends on realised gains, return of capital, or unusually benign conditions
+  * Strategic Value:
+    - consider mandate scarcity, access to hard-to-source credit exposure, scale, and potential for discount narrowing via buybacks, redemptions, or structure changes
+
+  Step 5: Scenario Framework and Price Targets
+  * Price targets:
+    - 12m and 24m bull/base/bear targets
+    - scenario probabilities, each horizon summing to 100%
+    - probability-weighted target for 12m and 24m
+    - explicit scenario drivers: rates, spreads, defaults/non-accruals, recoveries, leverage cost, distribution policy, and discount/premium to NAV
+    - target reconciliation to NAV, justified discount/premium, sustainable net yield, NII, or stated balance-sheet anchor
+  * Timeline:
+    - current NAV/income baseline
+    - next 24m milestones: portfolio updates, refinancing/facility maturities, duration resets, distribution decisions, credit events, buybacks, and mandate/structure changes where material
+    - status: on-track / at-risk / speculative
+    - impact on 24m probability-weighted target
+    - primary risk
+  * Headwinds/tailwinds:
+    - threshold-driven quantitative factors with directional NAV and income impact
+    - material qualitative factors with evidence and expected duration
+  * Investment recommendation paragraph:
+    - core thesis reason
+    - key 12m catalyst
+    - key invalidation risk
+    - sizing context: income / defensive / cyclical / speculative / avoid
+  * Key risks: ranked list with probability and impact.
+  * Key opportunities: ranked list with trigger and valuation impact.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Portfolio rating mix / internal risk-grade mix.
+  * Duration, weighted average life, floating-rate mix, and reset profile.
+  * Weighted average spread / coupon / portfolio yield.
+  * Default rate, non-accruals, impairments, and realised loss history.
+  * Leverage ratio, facility cost, maturity ladder, and covenant headroom.
+  * NAV per share and discount/premium to NAV.
+  * Net investment income / distribution coverage / payout ratio.
+  * Liquidity profile and trading volume.
+  * Fee ratio / management fee / performance fee.
+  * For private credit: LTV, covenant quality, sponsor quality, and refinancing wall.
+  * For structured credit: tranche position, attachment/detachment, enhancement, and expected-loss sensitivity.
+
+  Cross-check requirements before final output:
+  * Current NAV/income baseline must reconcile to the latest primary-source update.
+  * Yield/distribution commentary must reconcile to net income, fees, leverage cost, and payout disclosures.
+  * Duration commentary must reconcile to reported duration/reset profile and mandate.
+  * Credit-quality commentary must reconcile to ratings mix, defaults/non-accruals, impairments, and watchlist data.
+  * Discount/premium-to-NAV commentary must match reported NAV and current market price.
+  * Valuation anchor must be mathematically consistent with stated NAV, yield, spread, leverage, and share-count assumptions.
+  * Quality and Value weighted totals must equal stated final scores.
+  * Price targets must be tied to explicit rate, spread, default, income, and discount/premium assumptions.
+  * Do not create a risk from template structure alone. If a missing data point is immaterial because equivalent disclosure already answers the economics, say so explicitly rather than marking the company down for template non-compliance.
