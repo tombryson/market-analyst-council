@@ -212,3 +212,230 @@ verification_schema:
         - guidance
         - development_timeline
         critical: true
+
+# The full rubric/prompt
+rubric: |
+  Run an investment analysis on [Company Name] using this insurance rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to underwriting economics, reserve adequacy, catastrophe exposure, solvency/capital, investment income, or scenario confidence.
+
+  First classify the company:
+  * Personal-lines insurer: motor, home, CTP, travel, or household-focused underwriting with retail distribution and claims-frequency exposure.
+  * Commercial / specialty insurer: SME, corporate, specialty, liability, marine, workers compensation, or niche commercial books with larger-ticket risk and cycle exposure.
+  * Reinsurer / catastrophe-exposed writer: earnings materially driven by large-event volatility, retrocession, and global pricing cycles.
+  * Life / health insurer: mortality, morbidity, disability, lapse, longevity, or policyholder-behaviour exposure with embedded-value considerations.
+  * Insurance broker / distributor: fee and commission-led intermediary model with lower underwriting risk but exposure to premium-rate cycle, retention, and acquisition discipline.
+  * Hybrid insurer / broker / platform: meaningful mix of underwriting and distribution/adjacent fee earnings that should be separated in valuation.
+
+  Use that classification to decide valuation emphasis:
+  * Personal-lines insurers: rate adequacy, claims inflation, repair/labour costs, frequency/severity trends, reserve releases, expense ratio, and reinsurance cost.
+  * Commercial / specialty insurers: pricing cycle, risk selection, reserve conservatism, catastrophe/large-loss exposure, broker relationships, and capital intensity.
+  * Reinsurers / catastrophe names: peak peril exposure, aggregate cover, retrocession, modelled losses, attachment points, and book-value resilience through major events.
+  * Life / health insurers: new business strain, embedded value, lapse/morbidity/mortality assumptions, investment spread, capital generation, and regulatory solvency.
+  * Brokers / distributors: organic growth, retention, commission margin, acquisition discipline, cost control, and cash conversion. Do not apply underwriting metrics mechanically where the broker does not retain material risk.
+  * Hybrid models: separate underwriting profit from broker/fee earnings. Do not let higher-multiple fee businesses hide weak reserve quality or underpriced underwriting.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Underwriting / distribution summary and timeline to key pricing, claims, reserve, solvency, and capital-return milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source underwriting, premium, reserve, catastrophe, investment portfolio, capital, and regulatory data from the company's primary exchange filings plus annual/interim reports, investor presentations, solvency/regulatory disclosures, catastrophe updates, actuarial commentary, and reinsurance programme disclosures.
+  * Prefer primary sources: exchange filings, annual/interim reports, investor presentations, prudential/solvency disclosures, actuarial reserve commentary, catastrophe-event updates, and rating-agency materials only where they add concrete factual evidence.
+  * For every key numeric input used in valuation, Quality, Value, price targets, capital, reserve, catastrophe, or earnings-power analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, solvency/regulatory disclosures, catastrophe updates, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, underwriting margin, reserve adequacy, investment income, capital return, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Underwriting, Reserve, and Capital Workup
+  For the main operating segments and earnings drivers, capture where disclosed:
+  * Product mix: motor, home, CTP, workers compensation, commercial property, liability, specialty, life, health, broker/distribution, or reinsurance lines.
+  * Geography, customer, and channel mix: direct, broker, agency, affinity, bancassurance, aggregator, digital, or captive distribution.
+  * Revenue mix: gross written premium, net earned premium, fee/commission income, underwriting result, investment income, and other earnings.
+  * Retention and reinsurance structure: quota share, excess-of-loss, catastrophe treaty, aggregate cover, stop-loss, retrocession, attachment points, limits, and reinstatement terms where disclosed.
+  * Strategic priorities: pricing, remediation, portfolio exits, technology, acquisition integration, capital return, or broker roll-up strategy.
+
+  Underwriting margin discipline:
+  * Establish the current earnings baseline from the latest reported half, quarter, or run-rate. State whether earnings are statutory profit, operating profit, insurance profit, cash earnings, embedded value movement, or another management metric.
+  * Break the combined ratio or insurance margin into loss ratio, catastrophe impact, prior-year reserve development, expense ratio, and investment/discount-rate effects where disclosed.
+  * Distinguish underlying margin from temporary reserve releases, benign weather, low catastrophe incidence, or unusually strong investment markets.
+  * For brokers and distributors, replace combined-ratio logic with organic revenue growth, EBIT margin, retention, commission yield, acquisition economics, and cash conversion.
+  * If management gives premium growth, margin, claims-cost, or catastrophe guidance, reconcile it to the current baseline and show what must change for bull/base/bear scenarios.
+
+  Reserve adequacy and claims discipline:
+  * Break out prior-year reserve releases/strengthening, IBNR movements, claims frequency, claims severity, social inflation/legal inflation where relevant, and large-loss/catastrophe experience.
+  * Identify whether reserve adequacy is being supported by benign assumptions, discounting, or one-off releases rather than genuine underwriting quality.
+  * For long-tail books, focus on claims duration, inflation sensitivity, litigation trends, and adequacy of prudential margins.
+  * For short-tail books, focus on current pricing adequacy, repair/labour inflation, weather exposure, and reinsurance protection.
+  * Do not assume a low current combined ratio is sustainable if reserve releases, benign catastrophe experience, or underpriced reinsurance are doing the work.
+
+  Catastrophe and reinsurance discipline:
+  * Identify peak peril exposures, catastrophe budget/allowance, retained risk, reinsurance spend, programme structure, and how many events it would take to exhaust cover layers where disclosed.
+  * Distinguish attritional losses from catastrophe losses and from large one-off commercial claims.
+  * Assess whether reinsurance cost inflation, tighter terms, or weaker counterparties could compress future earnings or capital flexibility.
+  * For reinsurers, focus on retrocession dependence, aggregate covers, event clustering, reserve uncertainty, and book-value drawdown risk under large-event scenarios.
+
+  Investment income and asset-portfolio discipline:
+  * Identify the composition of the investment portfolio: cash, fixed income, duration profile, credit quality, equities, alternatives, or matching assets.
+  * Separate recurring investment spread or yield from mark-to-market volatility.
+  * For life and health insurers, assess liability matching, guaranteed rates, spread compression risk, and sensitivity to rates/credit.
+  * Do not capitalise unusually strong short-term investment markets as if they are durable underwriting earnings.
+
+  Capital, solvency, and cash-generation discipline:
+  * Identify solvency ratio, PCA/MCR/SCR or local equivalent, leverage, tangible equity/book value, rating buffers, and management operating ranges where disclosed.
+  * State whether capital is comfortably above target range, merely adequate, or at risk of constraining dividends, buybacks, growth, or acquisitions.
+  * Distinguish organic capital generation from capital released by reserve releases, discount-rate moves, reinsurance timing, or mark-to-market gains.
+  * Assess exposure to rating-agency thresholds, catastrophe capital strain, adverse reserve development, or regulatory intervention.
+  * For brokers, focus on cash conversion, working capital, acquisition leverage, earn-outs, and debt-funded roll-up risk.
+
+  Operating efficiency and franchise quality:
+  * Analyse expense ratio, cost-to-income where relevant, claims handling quality, technology/remediation spend, distribution strength, renewal retention, and customer churn.
+  * Assess brand, broker relationships, underwriting discipline, claims capability, pricing power, and scale benefits.
+  * Distinguish a genuinely strong insurer from one merely benefiting from a hard market or unusually light cat years.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation using the metrics most appropriate to the insurance model. Do not force underwriting metrics onto a broker-only model, and do not value a reserve-sensitive writer purely on near-term P/E.
+
+  Core valuation anchors:
+  * Sustainable underwriting earnings: normalised premium growth, net earned premium, loss ratio, catastrophe load, expense ratio, reserve development, investment income, tax, and share count.
+  * Sustainable ROE / ROTCE: use through-cycle returns rather than a single hard-market year or a reserve-release-assisted period.
+  * Price-to-book or price-to-tangible-book: anchor the multiple to sustainable ROE, reserve quality, catastrophe volatility, capital intensity, and growth.
+  * P/E or earnings yield: useful for brokers, fee-heavy hybrids, or relatively stable insurers, but only if earnings are normalised.
+  * Embedded value / appraisal value where relevant for life insurers.
+  * Sum-of-the-parts only where underwriting and broking/fee earnings genuinely deserve different multiples.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using P/B or P/TBV, connect the multiple explicitly to sustainable ROE, cost of equity, reserve quality, catastrophe volatility, and capital intensity.
+  * If using P/E, explain why current earnings are a fair proxy for sustainable earnings, or show the normalisation bridge.
+  * For brokers, emphasise organic growth, margin resilience, acquisition quality, and cash conversion.
+  * For catastrophe-exposed writers, stress-test book value and solvency under at least one severe-event year.
+  * For life insurers, separate spread income, experience variances, and capital generation from mark-to-market noise.
+
+  Simple underwriting-earnings bridge:
+  * Insurance revenue driver = net earned premium plus fee/commission income where relevant.
+  * Underwriting profit = premium minus losses, catastrophe load, expenses, and reserve strengthening.
+  * Pre-tax profit = underwriting profit plus sustainable investment income, less corporate costs and financing drag.
+  * Equity value anchor = sustainable EPS x justified P/E, or sustainable book value x justified P/B/P/TBV, cross-checked against ROE, dividend yield, and peer positioning.
+
+  Stress and downside discipline:
+  * Show at least one downside case with weaker pricing, higher claims inflation/severity, lower reserve releases or reserve strengthening, higher catastrophe losses, and/or weaker investment income.
+  * Show what happens to ROE, solvency/capital buffers, payout capacity, and valuation under that downside.
+  * If the business is broker-heavy, integration/cycle risk may matter more than catastrophe risk.
+  * If the business is short-tail and catastrophe exposed, event frequency/severity and reinsurance cost may dominate.
+
+  Step 3: Quality Score (0-100)
+  Formula:
+  = (0.20 * Regulatory Environment) + (0.20 * Underwriting Quality) + (0.15 * Management) + (0.20 * Reserve Adequacy) + (0.15 * Capital & Liquidity) + (0.10 * Governance)
+
+  Score each factor with raw score, weight, weighted contribution, and evidence:
+  * Regulatory Environment:
+    - strong prudential regime, conservative disclosure, low remediation overhang = 85-100
+    - generally sound regime with manageable complexity = 70-85
+    - material regulatory or disclosure uncertainty = 45-70
+    - serious solvency/remediation/regulatory stress = 20-45
+  * Underwriting Quality:
+    - disciplined pricing, strong claims control, sustainable margin = 85-100
+    - credible underwriting with some cycle sensitivity = 65-85
+    - inconsistent pricing/claims performance = 45-65
+    - structurally weak underwriting economics = 20-45
+  * Management:
+    - realistic reserving, disciplined capital allocation, strong execution = 85-100
+    - mostly credible execution with manageable issues = 65-85
+    - uneven execution or promotional tone = 45-65
+    - repeated misses, poor reserve calls, or acquisition mistakes = 20-45
+  * Reserve Adequacy:
+    - conservative reserves, limited adverse development risk = 85-100
+    - adequate reserves with manageable uncertainty = 65-85
+    - meaningful sensitivity to inflation/adverse development = 45-65
+    - clear reserve weakness or recurring strengthening risk = 20-45
+  * Capital & Liquidity:
+    - strong solvency buffers and clear capital-return capacity = 85-100
+    - adequate buffers with moderate catastrophe/funding sensitivity = 65-85
+    - limited headroom or leverage sensitivity = 45-65
+    - capital strain likely to constrain outcomes = 20-45
+  * Governance:
+    - conservative risk culture, transparent reserve/cat disclosures, aligned incentives = 80-100
+    - acceptable governance with minor concerns = 60-80
+    - weak disclosures, incentive issues, or oversight concerns = 35-60
+
+  Step 4: Value Score (0-100)
+  Formula:
+  = (0.30 * Intrinsic Value vs Market Cap) + (0.25 * P/B vs ROE) + (0.20 * Earnings Power vs Price) + (0.15 * Capital Return Capacity) + (0.10 * Strategic Value)
+
+  * Intrinsic Value vs Market Cap:
+    - compare current market value to the primary valuation anchor
+    - score higher when upside is supported by durable underwriting economics or fee earnings, not by one-off reserve releases or benign cats
+  * P/B vs ROE:
+    - compare trading multiple to sustainable ROE and peer set
+    - a low P/B is not cheap if reserves, catastrophe risk, or capital strain are weak
+  * Earnings Power vs Price:
+    - compare normalised EPS/earnings yield to current price and downside risk
+    - do not use peak hard-market margins or abnormal investment gains without normalisation
+  * Capital Return Capacity:
+    - evaluate dividend sustainability, buyback room, organic capital generation, and catastrophe resilience
+    - discount if capital return depends on reserve releases or solvency drifting too close to the floor
+  * Strategic Value:
+    - consider brand, broker network, customer franchise, acquisition appeal, data/claims capability, and fee-business optionality
+
+  Step 5: Scenario Framework and Price Targets
+  * Price targets:
+    - 12m and 24m bull/base/bear targets
+    - scenario probabilities, each horizon summing to 100%
+    - probability-weighted target for 12m and 24m
+    - explicit scenario drivers: premium-rate cycle, claims inflation, catastrophe losses, reserve development, investment income, solvency, and capital return
+    - target reconciliation to sustainable EPS, justified P/E, book value, justified P/B/P/TBV, embedded value where relevant, or stated sum-of-the-parts anchor
+  * Timeline:
+    - current earnings and capital baseline
+    - next 24m milestones: result dates, pricing renewals, catastrophe seasons, reserve review points, reinsurance renewals, solvency updates, dividend/buyback decisions, and acquisition integration milestones where material
+    - status: on-track / at-risk / speculative
+    - impact on 24m probability-weighted target
+    - primary risk
+  * Headwinds/tailwinds:
+    - threshold-driven quantitative factors with directional earnings and capital impact
+    - material qualitative factors with evidence and expected duration
+  * Investment recommendation paragraph:
+    - core thesis reason
+    - key 12m catalyst
+    - key invalidation risk
+    - sizing context: core / cyclical / income / speculative / avoid
+  * Key risks: ranked list with probability and impact.
+  * Key opportunities: ranked list with trigger and valuation impact.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Gross written premium / net earned premium growth.
+  * Combined ratio, loss ratio, expense ratio, and underlying margin.
+  * Catastrophe allowance versus actual cat losses.
+  * Prior-year reserve development / reserve release or strengthening.
+  * Solvency ratio / regulatory capital buffer / leverage.
+  * ROE / ROTCE.
+  * Investment yield, duration, and credit quality.
+  * Retention, renewal pricing, and customer/broker retention.
+  * Dividend yield, buyback capacity, and capital-generation rate.
+  * For brokers: organic growth, EBIT margin, acquisition pipeline, earn-outs, and cash conversion.
+  * For life insurers: embedded value, new business strain, lapse/morbidity/mortality sensitivities.
+
+  Cross-check requirements before final output:
+  * Current earnings baseline must reconcile to the latest primary-source result.
+  * Combined-ratio / margin commentary must reconcile to reported loss, expense, catastrophe, and reserve-development disclosures.
+  * Reserve-quality commentary must reconcile to prior-year development, IBNR/reserve commentary, and prudential margins where disclosed.
+  * Capital-return conclusions must reconcile to solvency buffers, leverage, and management/regulator/rating-agency thresholds.
+  * Premium-growth claims must match reported written/earned premium and rate-change disclosures.
+  * Valuation anchor must be mathematically consistent with stated EPS/book value/share count assumptions.
+  * Quality and Value weighted totals must equal stated final scores.
+  * Price targets must be tied to explicit pricing, loss, reserve, cat, capital, and multiple assumptions.
+  * Do not create a risk from template structure alone. If a missing data point is immaterial because equivalent disclosure already answers the economics, say so explicitly rather than marking the company down for template non-compliance.
