@@ -215,3 +215,227 @@ verification_schema:
         - guidance
         - development_timeline
         critical: true
+
+# The full rubric/prompt
+rubric: |
+  Run an investment analysis on [Company Name] using this bank and lender rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to earnings power, asset quality, funding risk, capital adequacy, regulatory risk, or scenario confidence.
+
+  First classify the company:
+  * Major diversified bank: broad retail, business, and institutional franchise with large deposit base and multiple earnings streams.
+  * Regional/community bank: narrower geography or customer segment, typically more concentrated funding and loan exposure.
+  * Specialist lender / non-bank lender: focused mortgage, asset finance, consumer, SME, or niche lending model with weaker or no deposit franchise.
+  * Commercial / business bank: earnings led by business banking, corporate lending, transaction services, or treasury markets activity.
+  * Digital challenger / growth bank: low physical footprint, customer acquisition still scaling, and profitability/capital trajectory still being proven.
+  * Hybrid bank / wealth platform: meaningful banking operations plus wealth, payments, broker, or adjacent fee businesses that should be separated in valuation.
+
+  Use that classification to decide valuation emphasis:
+  * Major diversified banks: deposit franchise durability, NIM stability, operating leverage, credit normalisation, capital return, and sustainable ROTCE/ROE.
+  * Regional/community banks: deposit competition, geographic concentration, loan book concentration, provisioning risk, and downside through the cycle.
+  * Specialist lenders / non-bank lenders: funding mix, securitisation/warehouse access, underwriting discipline, credit losses, and refinancing risk.
+  * Commercial / business banks: sector exposures, fee/treasury income cyclicality, larger-ticket credit risk, and capital intensity.
+  * Digital challengers: deposit gathering economics, CAC/retention, path to sustainable margins, operating leverage, and capital runway.
+  * Hybrid models: separate banking earnings from non-bank fee businesses. Do not let higher-multiple platform revenue hide weak core lending economics.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Franchise summary and timeline to key margin, credit, capital, regulatory, and capital-return milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source balance-sheet, earnings, capital, funding, asset-quality, and regulatory data from the company's primary exchange filings plus annual/interim reports, investor presentations, Basel/Pillar 3 disclosures, prudential capital disclosures, funding/securitisation materials, and regulator announcements.
+  * Prefer primary sources: exchange filings, annual/interim reports, investor presentations, Basel/Pillar 3 disclosures, regulatory updates, securitisation/funding documents, and prudential capital disclosures.
+  * For every key numeric input used in valuation, Quality, Value, price targets, capital, credit, or earnings-power analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, capital/regulatory disclosures, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, earnings power, asset quality, funding, capital return, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Franchise, Funding, and Balance-Sheet Workup
+  For the main operating segments, funding base, and loan book, capture where disclosed:
+  * Segment mix: retail banking, mortgages, business banking, institutional, treasury/markets, payments, wealth, or specialist lending.
+  * Revenue composition: net interest income, fee income, treasury/trading, other non-interest income.
+  * Loan book mix: mortgage, SME, corporate, commercial real estate, consumer, asset finance, credit cards, agriculture, government, or other concentrations.
+  * Deposit/funding mix: transaction deposits, savings, term deposits, wholesale funding, covered bonds, RMBS/securitisation, warehouse lines, central-bank facilities, subordinated debt, or hybrids.
+  * Geography and customer concentration where material.
+  * Latest stated strategic priorities, cost-out targets, branch/service model, and technology investment path.
+
+  Net interest margin and earnings-power discipline:
+  * Establish the current earnings baseline from the latest reported half, quarter, or run-rate. State whether earnings are reported profit, cash profit, statutory NPAT, operating earnings, or another management metric.
+  * Split NIM/margin performance into asset yield, deposit beta, funding cost, mix effects, hedging/treasury effects, and structural hedge contribution where disclosed.
+  * Distinguish temporary tailwinds from sustainable earnings power. Do not capitalise short-lived rate windfalls as though they are permanent.
+  * For non-bank lenders, separate gross yield from funding cost, net interest spread, credit losses, servicing costs, and residual economics after securitisation.
+  * If management gives NIM, margin, cost-to-income, or earnings guidance, reconcile it to the current baseline and show what must change for bull/base/bear scenarios.
+
+  Asset quality and provisioning discipline:
+  * Break out arrears, 30+/90+ delinquencies, non-performing loans, impaired assets, stage 1/2/3 exposures, write-offs, recoveries, restructures, hardship accounts, and watchlist exposures where disclosed.
+  * Identify sector, geography, borrower, or collateral concentrations that could move losses materially.
+  * Distinguish cyclical credit normalisation from true underwriting deterioration.
+  * Assess reserve adequacy: collective provisions, overlays, expected credit loss assumptions, coverage ratios, and whether management is releasing or rebuilding overlays.
+  * Do not assume current low losses are sustainable if the loan book, underwriting mix, funding mix, or macro backdrop suggests mean reversion risk.
+  * For commercial or specialist books, identify top-name concentration, covenant quality, LVR/LTV, fixed-versus-floating exposure, and refinancing wall where material.
+
+  Funding and liquidity discipline:
+  * Identify the core funding model and its vulnerabilities.
+  * State deposit mix, deposit growth, deposit beta, term mix, wholesale maturity ladder, securitisation dependence, warehouse headroom, and undrawn liquidity where disclosed.
+  * For banks, assess LCR/NSFR or local equivalents where disclosed, plus management/regulator minimums and buffers.
+  * For non-bank lenders, test whether warehouse lines, term funding, and securitisation markets remain open under base and bear cases.
+  * Treat deposit pricing pressure, wholesale spread widening, or rollover risk as valuation drivers when they can compress margin or cap growth materially.
+
+  Capital and regulatory discipline:
+  * Identify CET1, Tier 1, total capital, leverage ratio, risk-weighted assets, and management/regulator target ranges where disclosed.
+  * State whether capital is comfortably above operating range, merely adequate, or at risk of constraining growth, dividends, or buybacks.
+  * Separate organic capital generation from capital released by benign credit outcomes or RWA optimisation.
+  * Assess sensitivity to regulatory changes, mortgage risk weights, operational-risk models, countercyclical buffers, stress-test outcomes, or remediation costs.
+  * Do not give full credit for capital return if it relies on unusually benign losses, one-off releases, or capital ratios sitting close to the floor.
+
+  Operating efficiency and franchise quality:
+  * Analyse cost-to-income, jaws, technology spend, remediation/compliance drag, branch/service footprint, and operating leverage.
+  * Assess whether the franchise has pricing power, sticky deposits, distribution advantage, customer-switching friction, scale advantages, or cross-sell strength.
+  * Distinguish a genuinely strong franchise from a bank merely benefiting from rate tailwinds or aggressive competition withdrawals.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation using the metrics most appropriate to the bank type. Do not force a single method if the business mix requires multiple anchors.
+
+  Core valuation anchors:
+  * Sustainable earnings / EPS: normalised NIM or spread, fee income, operating expenses, credit cost, tax, and share count.
+  * Sustainable ROE / ROTCE: use through-cycle returns rather than the best recent quarter if cyclical conditions are unusually favourable.
+  * Price-to-book or price-to-tangible-book: anchor the multiple to sustainable ROE/ROTCE versus cost of equity, growth, capital intensity, and asset-quality risk.
+  * P/E or earnings yield: use when book value is less informative, such as for capital-light lenders or fee-heavy hybrids.
+  * Dividend yield and capital return capacity: use as a secondary anchor, not the only one.
+  * Sum-of-the-parts only if the company has meaningful banking plus non-bank operations that truly deserve different multiples.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using P/B or P/TBV, connect the multiple explicitly to sustainable ROE/ROTCE, cost of equity, growth, and downside capital risk.
+  * If using P/E, explain why current earnings are a fair proxy for sustainable earnings, or show the normalisation bridge.
+  * For specialist lenders, test valuation under higher funding spreads and more normalised credit losses.
+  * For digital challengers or low-profit banks, do not value deposit growth alone without a credible path to acceptable returns on capital.
+  * If management is buying back stock or running high payout ratios, test whether capital still supports growth and downside resilience.
+
+  Simple earnings-power bridge:
+  * Revenue driver = average interest-earning assets x sustainable margin, plus sustainable fee/non-interest income.
+  * Pre-provision profit = revenue minus sustainable operating cost base.
+  * Pre-tax profit = pre-provision profit minus through-cycle credit cost and funding/regulatory drag.
+  * Equity value anchor = sustainable EPS x justified P/E, or sustainable book value x justified P/B/P/TBV, cross-checked against dividend yield and peer positioning.
+
+  Stress and downside discipline:
+  * Show at least one downside case with lower loan growth, tighter margin, higher funding cost, and higher credit losses.
+  * Show what happens to ROE, CET1, payout capacity, and valuation under that downside.
+  * If the business is deposit-franchise rich but credit-light, margin compression may matter more than losses.
+  * If the business is funding-fragile or niche-credit heavy, funding spread and loss severity may dominate.
+
+  Step 3: Quality Score (0-100)
+  Formula:
+  = (0.20 * Regulatory Environment) + (0.20 * Franchise Quality) + (0.15 * Management) + (0.20 * Asset/Credit Quality) + (0.15 * Capital & Liquidity) + (0.10 * Governance)
+
+  Score each factor with raw score, weight, weighted contribution, and evidence:
+  * Regulatory Environment:
+    - strong prudential regime, conservative disclosure, low remediation overhang = 85-100
+    - generally sound regime with manageable compliance issues = 70-85
+    - material regulatory uncertainty, remediation, or weak disclosure = 45-70
+    - serious capital/remediation/regulatory stress = 20-45
+  * Franchise Quality:
+    - sticky low-cost funding, strong brand, diversified earnings, pricing power = 85-100
+    - credible franchise with some concentration or competitive pressure = 65-85
+    - narrow or undifferentiated franchise = 45-65
+    - structurally weak or shrinking franchise = 20-45
+  * Management:
+    - disciplined underwriting, clear capital allocation, realistic guidance = 85-100
+    - mostly credible execution with some misses = 65-85
+    - uneven execution or promotional tone = 45-65
+    - repeated misses or poor risk controls = 20-45
+  * Asset/Credit Quality:
+    - resilient book, low problem assets, prudent provisioning = 85-100
+    - manageable losses and sound underwriting = 65-85
+    - rising stress, concentrated book, or questionable reserve adequacy = 45-65
+    - clear underwriting deterioration or reserve insufficiency = 20-45
+  * Capital & Liquidity:
+    - strong CET1/liquidity buffers and clear capacity for growth/returns = 85-100
+    - adequate buffers with moderate sensitivity = 65-85
+    - limited headroom or funding dependence = 45-65
+    - capital or liquidity stress likely to constrain outcomes = 20-45
+  * Governance:
+    - conservative risk culture, transparent disclosures, aligned incentives = 80-100
+    - acceptable governance with minor concerns = 60-80
+    - weak disclosures, incentive issues, or board/risk oversight concerns = 35-60
+
+  Step 4: Value Score (0-100)
+  Formula:
+  = (0.30 * Intrinsic Value vs Market Cap) + (0.25 * P/B vs ROE) + (0.20 * Earnings Power vs Price) + (0.15 * Capital Return Capacity) + (0.10 * Strategic Value)
+
+  * Intrinsic Value vs Market Cap:
+    - compare current market value to the primary valuation anchor
+    - score higher when upside is clear and supported by durable earnings/capital, not just temporary tailwinds
+  * P/B vs ROE:
+    - compare trading multiple to sustainable ROE/ROTCE and peer set
+    - a low P/B is not cheap if returns or credit quality are structurally weak
+  * Earnings Power vs Price:
+    - compare normalised EPS/earnings yield to current price and downside risk
+    - do not use peak-cycle margin and peak-benign credit cost without normalisation
+  * Capital Return Capacity:
+    - evaluate dividend sustainability, buyback room, and organic capital generation
+    - discount if capital return depends on capital ratios drifting too close to the floor
+  * Strategic Value:
+    - consider scarcity, deposit franchise value, distribution footprint, takeover or platform value, and adjacent fee-business optionality
+
+  Step 5: Scenario Framework and Price Targets
+  * Price targets:
+    - 12m and 24m bull/base/bear targets
+    - scenario probabilities, each horizon summing to 100%
+    - probability-weighted target for 12m and 24m
+    - explicit scenario drivers: margin path, loan growth, funding cost, credit loss normalisation, cost-out delivery, capital ratios, regulation, and capital return
+    - target reconciliation to sustainable EPS, justified P/E, book value, justified P/B/P/TBV, or stated sum-of-the-parts anchor
+  * Timeline:
+    - current earnings and capital baseline
+    - next 24m milestones: results dates, NIM/margin inflection, cost-save delivery, arrears/provision trend, regulatory updates, funding rollovers, dividend/buyback decisions, and system/technology milestones where material
+    - status: on-track / at-risk / speculative
+    - impact on 24m probability-weighted target
+    - primary risk
+  * Headwinds/tailwinds:
+    - threshold-driven quantitative factors with directional earnings and capital impact
+    - material qualitative factors with evidence and expected duration
+  * Investment recommendation paragraph:
+    - core thesis reason
+    - key 12m catalyst
+    - key invalidation risk
+    - sizing context: core / cyclical / speculative / avoid
+  * Key risks: ranked list with probability and impact.
+  * Key opportunities: ranked list with trigger and valuation impact.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * NIM / spread trend and deposit beta.
+  * Loan growth and deposit growth.
+  * Cost-to-income / jaws.
+  * CET1, leverage, liquidity buffers, and payout ratio.
+  * ROE / ROTCE / ROA.
+  * Credit cost, arrears, NPL/impaired asset ratio, and coverage ratio.
+  * Funding mix and maturity ladder.
+  * Tangible book value / book value per share.
+  * Dividend yield, buyback capacity, and capital-generation rate.
+  * Segment profit mix and concentration.
+  * For specialist lenders: warehouse headroom, securitisation dependence, and refinancing schedule.
+
+  Cross-check requirements before final output:
+  * Current earnings baseline must reconcile to the latest primary-source result.
+  * Margin commentary must reconcile to reported NIM/spread and funding disclosures.
+  * Credit quality commentary must reconcile to arrears, NPL/impaired assets, and provisioning data.
+  * Capital-return conclusions must reconcile to CET1/leverage buffers and management/regulator ranges.
+  * Loan/deposit growth claims must match latest reported balances or management guidance.
+  * Valuation anchor must be mathematically consistent with stated EPS/book value/share count assumptions.
+  * Quality and Value weighted totals must equal stated final scores.
+  * Price targets must be tied to explicit margin, loss, capital, and multiple assumptions.
+  * Do not create a risk from template structure alone. If a missing data point is immaterial because equivalent disclosure already answers the economics, say so explicitly rather than marking the company down for template non-compliance.

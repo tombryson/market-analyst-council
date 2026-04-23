@@ -25,8 +25,9 @@ class TemplatePromptFallbackTests(unittest.TestCase):
             exchange="asx",
         )
         self.assertIn("Commonwealth Bank of Australia", prompt)
-        self.assertIn("Template ID: bank_financials", prompt)
-        self.assertIn("Investment Recommendation", prompt)
+        self.assertIn("using this bank and lender rubric", prompt)
+        self.assertIn("Step 1: Franchise, Funding, and Balance-Sheet Workup", prompt)
+        self.assertIn("Investment recommendation (BUY/HOLD/SELL)", prompt)
 
 
 if __name__ == "__main__":
