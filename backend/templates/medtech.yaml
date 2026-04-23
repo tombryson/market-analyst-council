@@ -251,3 +251,221 @@ verification_schema:
         - milestone
         - development_timeline
         critical: true
+
+# The full rubric/prompt
+rubric: |
+  Run an investment analysis on [Company Name] using this medtech rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to regulatory approval, reimbursement, commercial adoption, manufacturing/quality systems, cash runway, or scenario confidence.
+
+  First classify the company:
+  * Capital equipment medtech: revenue led by device/instrument placement with future service, consumables, or software pull-through.
+  * Consumables / recurring-revenue device model: revenue led by disposable products, cartridges, implants, sensors, reagents, or procedure-linked repeat use.
+  * Diagnostics / testing platform: value driven by installed base, assay/menu breadth, reimbursement, throughput, and recurring test volumes.
+  * Therapeutic device / implant company: value driven by clinical efficacy, regulatory pathway, surgeon adoption, reimbursement, and procedure growth.
+  * Medtech tools / enabling platform: value driven by workflow integration, technical differentiation, OEM/partner traction, and manufacturing scale-up.
+  * Hybrid medtech platform: meaningful mix of devices, consumables, software, services, or distribution economics that should be separated in valuation.
+
+  Use that classification to decide valuation emphasis:
+  * Capital equipment: placement growth, utilization, pull-through, gross margin, hospital budget cycles, service economics, and replacement cycle.
+  * Consumables / recurring revenue: installed base quality, repeat-order behaviour, pricing durability, reimbursement, and unit economics.
+  * Diagnostics: menu expansion, assay sensitivity/specificity, turnaround time, reimbursement coverage, lab adoption, and annuity-like test volumes.
+  * Therapeutic devices / implants: clinical evidence, procedure uptake, surgeon training, reimbursement/coding, channel access, and competitive differentiation.
+  * Tools / enabling platforms: partner/OEM reliance, technical moat, platform adoption, manufacturing quality, and customer concentration.
+  * Hybrid models: separate equipment revenue from recurring consumables/software/service revenue. Do not let hardware placements hide weak utilization or reimbursement.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Product/platform summary and timeline to key regulatory, reimbursement, launch, adoption, and financing milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source regulatory, clinical, technical, manufacturing, commercial, reimbursement, and financial data from the company's primary exchange filings plus annual/interim reports, investor presentations, FDA/CE/TGA or other regulator disclosures, clinical papers/abstracts where relevant, and reimbursement/coding materials.
+  * Prefer primary sources: exchange filings, statutory reports, regulatory databases/clearance notices, company product materials, clinician/investigator publications, reimbursement decisions, and company disclosures on installed base, volumes, and margin.
+  * For every key numeric input used in valuation, Quality, Value, price targets, adoption, margin, installed base, utilization, or runway analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, regulatory disclosures, reimbursement updates, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, adoption, regulatory risk, manufacturing quality, reimbursement, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Product, Regulatory, and Commercial Workup
+  For each material product/platform, up to 5, capture where disclosed:
+  * Product name, indication/use case, customer, geography, regulatory status, reimbursement status, channel, ownership/rights, and next milestone.
+  * Revenue model: capital sale, lease/rental, consumable pull-through, software subscription, service, OEM, distribution, licensing, or hybrid.
+  * Commercial status: pre-launch, limited launch, full launch, partnered distribution, pilot, discontinued, or mature product.
+  * Installed base / active sites / accounts / instruments / procedure volume / test volume where relevant.
+  * Key competitors, differentiation, and switching barriers.
+
+  Regulatory and quality-systems discipline:
+  * Identify the relevant pathway: 510(k), de novo, PMA, CE mark/MDR, TGA, PMDA, NMPA, CLIA/LDT, or other.
+  * State whether the product is cleared, approved, pending, being remediated, or requires further studies/inspections.
+  * Capture quality-system risk: manufacturing validation, design controls, GMP/QMS, warning letters, recalls, CAPA, inspection outcomes, and scale-up readiness where disclosed.
+  * Do not assume technical validation equals commercial or regulatory success.
+  * If the company has a history of delays, remediation, or quality issues, reflect that in scenario confidence and commercialization timing.
+
+  Clinical and technical evidence discipline:
+  * Distinguish engineering performance, analytical validation, and clinical utility.
+  * For diagnostics, state sensitivity, specificity, PPV/NPV where relevant, throughput, workflow advantage, and comparator relevance.
+  * For therapeutic devices, state endpoint quality, patient numbers, comparator/control, follow-up duration, adverse events, durability, and whether evidence is randomized or observational.
+  * For enabling tools, state measurable workflow, precision, cost, or outcome benefits and whether customers have verified them.
+  * Penalise weak evidence if adoption depends on strong clinical or health-economic proof.
+
+  Reimbursement and procedure/economic discipline:
+  * Identify whether reimbursement already exists, is pending, is temporary, or is customer-pay / self-pay / capital-budget dependent.
+  * State relevant codes, coverage decisions, ASP/payment level, lab reimbursement, hospital payment context, or procurement dynamics where disclosed.
+  * Distinguish regulatory clearance from reimbursement readiness.
+  * If adoption depends on physician behaviour, lab workflow, hospital capex approval, or procedure recovery, state that explicitly.
+  * Do not treat placements as equivalent to recurring revenue unless utilization and pull-through are evidenced.
+
+  Installed-base and adoption discipline:
+  * Separate placements, active accounts, revenue-producing accounts, utilization, and repeat-order behaviour.
+  * If the model depends on recurring consumables or test volume, state the implied revenue per installed unit/site and whether it is rising, flat, or weak.
+  * Distinguish channel-fill or distributor stocking from genuine end-user adoption.
+  * For early launches, focus on proof of repeat use, site activation speed, training friction, and sales-cycle length.
+
+  Manufacturing, margin, and cash discipline:
+  * Identify gross margin by product class where disclosed, manufacturing bottlenecks, yield/scrap issues, inventory build, service burden, and scale effects.
+  * Distinguish temporary low gross margin from structural lack of pricing power or poor manufacturing economics.
+  * Assess whether commercialization requires additional manufacturing capex, working capital, salesforce build-out, clinical evidence spending, or reimbursement support.
+  * State whether cash runway reaches the next meaningful value-inflection milestone.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation appropriate to the medtech model. Do not force biotech rNPV logic onto an already-commercial device company, and do not value pre-commercial medtech purely on near-term EV/Sales if sales are trivial.
+
+  Core valuation anchors:
+  * Commercial medtech: EV/Sales, gross margin trajectory, contribution margin, cash-burn normalization, and path to EBITDA/FCF.
+  * Installed-base / consumable models: installed base x utilization x recurring revenue per unit, plus gross margin and retention.
+  * Diagnostics: platform placements, test-menu breadth, revenue per instrument/site, reimbursement, and recurring assay/test revenue.
+  * Therapeutic or pre-commercial devices: launch-adjusted revenue ramp and probability-adjusted commercialization value where regulatory or adoption risk remains material.
+  * Hybrid models: separate hardware, recurring consumables, software/service, and partner revenue. Do not apply one blanket multiple to all of it.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using EV/Sales, justify it with growth durability, gross margin, recurring mix, reimbursement quality, and route to profitability.
+  * If the company is pre-commercial or early-launch, show the bridge from installed base/procedure/test volume assumptions to revenue rather than hiding inside a headline multiple.
+  * If regulatory or reimbursement risk is still substantial, probability-adjust the relevant revenue stream or launch timing.
+  * For capital equipment names, separate hardware revenue from recurring pull-through. Hardware placements without utilization should not receive premium recurring-revenue multiples.
+
+  Simple commercial bridge:
+  * Revenue driver = installed base or customer base x utilization/procedure/test volume x revenue per use/site/account, plus hardware/service revenue where relevant.
+  * Gross profit = revenue minus COGS/manufacturing/service burden.
+  * Operating profit = gross profit minus commercialization, R&D, clinical, reimbursement, and G&A costs.
+  * Equity value anchor = justified EV/Sales, EV/gross profit, or probability-adjusted commercialization value, cross-checked against cash runway and dilution risk.
+
+  Stress and downside discipline:
+  * Show at least one downside case with slower placements, lower utilization, reimbursement delays, manufacturing friction, weaker gross margin, or cash runway pressure.
+  * Show what happens to revenue trajectory, gross margin, runway, and valuation under that downside.
+  * If the model is recurring-revenue-heavy, utilization and repeat orders may matter more than new placements.
+  * If the model is hospital-capex driven, procurement cycles and budget pressure may matter more than technical performance.
+
+  Step 3: Quality Score (0-100)
+  Formula:
+  = (0.20 * Regulatory & Quality Systems) + (0.20 * Clinical/Technical Evidence) + (0.15 * Management) + (0.20 * Commercial Execution) + (0.15 * Cash Runway/Funding) + (0.10 * Governance)
+
+  Score each factor with raw score, weight, weighted contribution, and evidence:
+  * Regulatory & Quality Systems:
+    - clear approvals/clearances, strong QMS, low remediation risk = 85-100
+    - credible pathway with manageable quality/regulatory complexity = 65-85
+    - meaningful regulatory or quality-system uncertainty = 45-65
+    - serious remediation, recall, or approval risk = 20-45
+  * Clinical/Technical Evidence:
+    - strong clinically relevant evidence or validated technical moat = 85-100
+    - credible evidence with some adoption/reimbursement questions = 65-85
+    - limited evidence or narrow differentiation = 45-65
+    - weak, poorly validated, or non-differentiated evidence = 20-45
+  * Management:
+    - disciplined commercialization, manufacturing, and capital allocation = 85-100
+    - mostly credible execution with manageable issues = 65-85
+    - uneven execution or promotional tone = 45-65
+    - repeated misses, quality issues, or poor scaling discipline = 20-45
+  * Commercial Execution:
+    - strong adoption, repeat use, channel quality, and margin trajectory = 85-100
+    - credible early traction with some execution risk = 65-85
+    - slow adoption or unclear repeat economics = 45-65
+    - commercial model not yet proving out = 20-45
+  * Cash Runway/Funding:
+    - >24 months or funded through key milestone = 90-100
+    - 12-24 months = 70-90
+    - 6-12 months or likely raise before proof point = 45-70
+    - <6 months or major funding gap = 20-45
+  * Governance:
+    - transparent disclosures, aligned incentives, strong oversight = 80-100
+    - acceptable governance with minor concerns = 60-80
+    - weak disclosure, incentive issues, or oversight concerns = 35-60
+
+  Step 4: Value Score (0-100)
+  Formula:
+  = (0.30 * Intrinsic Value vs Market Cap) + (0.25 * EV/Sales vs Growth) + (0.20 * Gross Margin & Cash Conversion) + (0.15 * Adoption Curve Optionality) + (0.10 * Strategic Value)
+
+  * Intrinsic Value vs Market Cap:
+    - compare current market value to the primary valuation anchor
+    - score higher when upside is supported by real commercialization evidence, not just concept-stage promise
+  * EV/Sales vs Growth:
+    - compare trading multiple to growth durability, recurring mix, reimbursement quality, and margin potential
+    - a high growth multiple is not justified if revenue quality or adoption proof is weak
+  * Gross Margin & Cash Conversion:
+    - assess whether unit economics, manufacturing, service burden, and working capital support value creation
+    - discount if growth relies on cash-burning low-margin hardware with weak pull-through
+  * Adoption Curve Optionality:
+    - evaluate whether installed base, menu expansion, procedure growth, or recurring utilization can create upside beyond current consensus expectations
+  * Strategic Value:
+    - consider distribution value, OEM/partner interest, installed base scarcity, platform leverage, and M&A relevance
+
+  Step 5: Scenario Framework and Price Targets
+  * Price targets:
+    - 12m and 24m bull/base/bear targets
+    - scenario probabilities, each horizon summing to 100%
+    - probability-weighted target for 12m and 24m
+    - explicit scenario drivers: regulatory timing, reimbursement/coding, placements, utilization, gross margin, operating leverage, funding, and strategic partnerships
+    - target reconciliation to EV/Sales, EV/gross profit, installed-base economics, or probability-adjusted launch/commercialization value
+  * Timeline:
+    - current revenue/adoption and cash baseline
+    - next 24m milestones: clearances/approvals, reimbursement steps, launch expansions, site activations, menu additions, manufacturing scale-up, and financing decisions
+    - status: on-track / at-risk / speculative
+    - impact on 24m probability-weighted target
+    - primary risk
+  * Headwinds/tailwinds:
+    - threshold-driven quantitative factors with directional revenue, margin, and runway impact
+    - material qualitative factors with evidence and expected duration
+  * Investment recommendation paragraph:
+    - core thesis reason
+    - key 12m catalyst
+    - key invalidation risk
+    - sizing context: core growth / speculative growth / watch / avoid
+  * Key risks: ranked list with probability and impact.
+  * Key opportunities: ranked list with trigger and valuation impact.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Installed base / active sites / active accounts.
+  * Placement growth and utilization or test/procedure volume.
+  * Revenue per instrument/site/account and recurring mix.
+  * Gross margin, service burden, and cash conversion.
+  * Regulatory status and next approval/clearance milestone.
+  * Reimbursement/coding status and commercial coverage.
+  * Channel/distributor mix and concentration.
+  * Cash runway, burn rate, and likely dilution.
+  * For diagnostics: sensitivity/specificity, assay menu, throughput, and reimbursement.
+  * For therapeutic devices: procedure growth, clinician adoption, durability, and adverse-event profile.
+
+  Cross-check requirements before final output:
+  * Current revenue/adoption baseline must reconcile to the latest primary-source result.
+  * Regulatory commentary must reconcile to actual filed/cleared/approved status.
+  * Reimbursement commentary must distinguish coverage from clearance.
+  * Installed-base and recurring-revenue claims must reconcile to disclosed placements, active accounts, utilization, or repeat-order data.
+  * Margin commentary must reconcile to disclosed gross margin, service/manufacturing commentary, and inventory/working-capital signals.
+  * Valuation anchor must be mathematically consistent with stated revenue, margin, utilization, and share-count assumptions.
+  * Quality and Value weighted totals must equal stated final scores.
+  * Price targets must be tied to explicit adoption, reimbursement, margin, funding, and multiple assumptions.
+  * Do not create a risk from template structure alone. If a missing data point is immaterial because equivalent disclosure already answers the economics, say so explicitly rather than marking the company down for template non-compliance.
