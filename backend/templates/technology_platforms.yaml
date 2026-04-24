@@ -201,3 +201,221 @@ verification_schema:
         - guidance
         - development_timeline
         critical: true
+
+# The full rubric/prompt
+rubric: |
+  Run an investment analysis on [Company Name] using this technology-platforms rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to network effects, monetisation quality, unit economics, regulatory/platform risk, balance-sheet risk, or scenario confidence.
+
+  First classify the company:
+  * Marketplace platform: value driven by liquidity between buyers and sellers, take rate, conversion, repeat activity, and trust/safety.
+  * Payments / fintech platform: value driven by payment volume, take rate, margin on payment flows, merchant economics, fraud/losses, and regulatory/compliance quality.
+  * Advertising / audience platform: value driven by user engagement, ad load, pricing, advertiser demand, targeting capability, and privacy/regulatory risk.
+  * Consumer internet / engagement platform: value driven by user growth, retention, monetisation per user, network effects, and acquisition efficiency.
+  * Vertical platform / ecosystem business: value driven by software/workflow embedment plus ecosystem monetisation, partners, and platform expansion.
+  * Hybrid platform: meaningful mix of subscriptions, marketplace/take-rate, payments, ads, services, or hardware-linked revenue that must be separated in analysis.
+
+  Use that classification to decide valuation emphasis:
+  * Marketplaces: GMV or booking volume quality, take rate durability, liquidity density, repeat transactions, seller retention, and trust/friction.
+  * Payments/fintech: TPV/payment volume, net take rate, gross profit after network/funding/fraud costs, merchant concentration, and compliance/regulatory resilience.
+  * Ad platforms: MAU/DAU or engagement quality, ad yield, advertiser concentration, privacy changes, moderation costs, and demand cyclicality.
+  * Consumer platforms: cohort retention, frequency, monetisation per user, acquisition cost, virality, and network effects.
+  * Vertical ecosystems: attach rates across software/payments/services, partner dependence, platform control, and expansion economics.
+  * Hybrid models: separate high-quality recurring or gross-profit streams from lower-margin pass-through revenue. Do not apply one blanket multiple to blended revenue.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Platform/economics summary and timeline to key monetisation, engagement, margin, regulatory, and financing milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source operating, engagement, transaction, monetisation, unit-economics, and capital data from the company's primary exchange filings plus annual/interim reports, investor presentations, shareholder letters, pricing/product materials where relevant, and earnings/guidance materials.
+  * Prefer primary sources: exchange filings, statutory reports, company presentations, product/pricing disclosures, and company metrics disclosures. Use secondary sources only where they add factual context on market demand, competition, or regulation.
+  * For every key numeric input used in valuation, Quality, Value, price targets, user/merchant economics, take rate, margin, or cash-flow analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, product/pricing disclosures, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, network strength, monetisation quality, margin path, regulatory risk, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Platform, Network, and Monetisation Workup
+  For each material product, platform layer, or revenue stream, capture where disclosed:
+  * Product/platform name, customer type, geography, channel, monetisation model, contract structure where relevant, and next milestone.
+  * Revenue model: take-rate/transaction fee, payments spread, subscription, advertising, listing fee, services, hardware-linked, or hybrid.
+  * Core participants: consumers, merchants, creators, advertisers, sellers, developers, financial institutions, or partners.
+  * Growth levers: user growth, merchant growth, higher engagement, ad load, yield, take-rate expansion, attach rates, cross-sell, or international expansion.
+  * Competitive position, switching costs, network effects, liquidity, distribution advantage, and platform control points.
+
+  Network-effects and retention discipline:
+  * Establish the current activity baseline from the latest half, quarter, or run-rate.
+  * Distinguish user growth from engaged-user growth, active merchants from onboarded merchants, and gross volume growth from monetised volume growth.
+  * State whether network effects are real, weak, local, or claimed but unproven.
+  * If retention is not directly disclosed, infer conservatively from cohorts, repeat activity, merchant churn, creator retention, or engagement trends, and label the inference.
+  * Do not confuse short-term engagement spikes or marketing-driven growth with durable network strength.
+
+  Monetisation and unit-economics discipline:
+  * Separate gross transaction volume, gross bookings, TPV, GMV, or ad impressions from actual revenue and gross profit.
+  * Distinguish reported revenue from pass-through or low-margin volume where network fees, interchange, payment rails, incentives, or partner revenue shares matter.
+  * State take rate, net take rate, ARPU/ARPA, gross profit per user/merchant, and contribution margin where disclosed or inferable.
+  * Do not award premium valuation to volume growth if take rate, gross profit, or merchant/user quality is deteriorating.
+  * For ad platforms, distinguish engagement growth from ad-yield growth and pricing power.
+
+  Regulatory, trust, and platform-risk discipline:
+  * Identify licensing, AML/KYC, payments compliance, privacy regulation, antitrust, moderation/content risk, app-store/platform dependency, or partner/network-rule exposure where relevant.
+  * Distinguish manageable compliance cost from risks that can impair monetisation, take rate, onboarding, or business model viability.
+  * If the company depends heavily on one platform, ecosystem, bank partner, cloud vendor, or app distribution gatekeeper, state that explicitly.
+  * Do not ignore fraud, chargebacks, losses, moderation cost, or trust/safety burden where they are part of the economics.
+
+  Growth-quality and margin-path discipline:
+  * Break out revenue growth by user/merchant volume, price/take rate, mix, geography, or acquisitions where disclosed.
+  * Distinguish true operating leverage from temporary cost suppression or cyclically favorable ad/payment conditions.
+  * Assess gross margin, contribution margin, payment-network or hosting cost, customer support, trust/safety, and S&M leverage.
+  * Distinguish headline free cash flow from durable owner earnings if cash flow is boosted by working capital float, payables timing, reserves, or underinvestment.
+  * State whether current balance-sheet strength supports the next major proof point without forced dilution.
+
+  Concentration and ecosystem dependence discipline:
+  * Identify concentration by large merchants, advertisers, creators, vertical, geography, payment partner, or acquisition source where disclosed.
+  * For marketplace or ad-driven businesses, assess whether liquidity or demand is concentrated in a few categories.
+  * For fintech/payments, assess merchant concentration, funding dependence, and exposure to loss/fraud or regulatory reserve requirements.
+  * Do not assume ecosystem expansion converts cleanly if partner incentives or take-rate economics are weak.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation using platform-appropriate anchors. Do not apply pure SaaS logic to low-margin pass-through revenue, and do not let volume metrics replace real gross-profit economics.
+
+  Core valuation anchors:
+  * EV/Sales: useful when revenue quality is high, gross margins are attractive, and monetisation is durable.
+  * EV/Gross Profit: preferred when pass-through or payment-network costs make revenue a poor quality measure.
+  * EV/FCF or FCF yield: useful where gross-profit quality is high and cash generation is already durable.
+  * Unit-economics valuation bridge: useful where user/merchant economics, take rate, and engagement explain value better than a single headline multiple.
+  * Sum-of-the-parts only if subscriptions, marketplace, payments, ads, or hardware-linked segments genuinely deserve different multiples.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using EV/Sales, justify it with gross margin, network strength, monetisation durability, and margin path.
+  * If payment or marketplace pass-through is material, prefer EV/Gross Profit or clearly separate low-quality revenue before assigning a multiple.
+  * If the business is still cash-burning, show what operating milestones justify today's multiple rather than assuming eventual platform margins by default.
+  * If regulatory or platform dependency risk is high, the multiple should reflect that explicitly.
+
+  Simple platform bridge:
+  * Volume driver = active users/merchants/advertisers x activity/frequency x monetised volume or impressions.
+  * Revenue = volume x take rate / yield / monetisation rate, plus subscriptions or services where relevant.
+  * Gross profit = revenue minus payment rails/interchange, incentives, hosting, support, trust/safety, and other direct costs where relevant.
+  * Equity value anchor = justified EV/Sales, EV/Gross Profit, EV/FCF, or explicit unit-economics value bridge, cross-checked against network quality and balance-sheet strength.
+
+  Stress and downside discipline:
+  * Show at least one downside case with weaker engagement or merchant growth, lower take rate/ad yield, higher incentives, higher fraud/losses, margin delay, or regulatory/platform friction.
+  * Show what happens to revenue, gross profit, FCF trajectory, and valuation under that downside.
+  * For marketplaces, liquidity deterioration or seller/merchant churn may matter more than raw top-line.
+  * For ad-tech or consumer platforms, engagement quality and ad pricing may matter more than headline user growth.
+
+  Step 3: Quality Score (0-100)
+  Formula:
+  = (0.20 * Platform/Product Moat) + (0.20 * Retention & Network Effects) + (0.15 * Management) + (0.20 * Growth Quality) + (0.15 * Balance Sheet) + (0.10 * Governance)
+
+  Score each factor with raw score, weight, weighted contribution, and evidence:
+  * Platform/Product Moat:
+    - strong control point, workflow embedment, or defensible network position = 85-100
+    - credible moat with some competitive or platform pressure = 65-85
+    - limited differentiation or weak control point = 45-65
+    - weak moat or easy disintermediation risk = 20-45
+  * Retention & Network Effects:
+    - durable repeat usage/merchant retention with real network effects = 85-100
+    - good retention with some network benefit = 65-85
+    - retention mixed and network effects limited or local = 45-65
+    - weak retention or unproven network effects = 20-45
+  * Management:
+    - disciplined capital allocation, clear monetisation strategy, credible execution = 85-100
+    - mostly credible execution with manageable issues = 65-85
+    - uneven execution or promotional tone = 45-65
+    - repeated misses, weak prioritization, or poor discipline = 20-45
+  * Growth Quality:
+    - high-quality growth with strong monetisation, gross profit, and operating leverage = 85-100
+    - credible growth with some mix or unit-economics questions = 65-85
+    - low-quality growth or incentive-driven volume = 45-65
+    - weak growth visibility or structurally poor economics = 20-45
+  * Balance Sheet:
+    - strong cash position, low refinancing/funding risk, good runway = 85-100
+    - adequate balance sheet with manageable burn or leverage = 65-85
+    - elevated burn, leverage, or dependence on external capital = 45-65
+    - balance-sheet stress or meaningful funding risk = 20-45
+  * Governance:
+    - transparent platform metrics, aligned incentives, strong oversight = 80-100
+    - acceptable governance with minor concerns = 60-80
+    - weak disclosure, related-party/incentive issues, or oversight concerns = 35-60
+
+  Step 4: Value Score (0-100)
+  Formula:
+  = (0.30 * Intrinsic Value vs Market Cap) + (0.25 * EV/Sales vs Growth) + (0.20 * Margin Path) + (0.15 * Unit Economics) + (0.10 * Strategic Value)
+
+  * Intrinsic Value vs Market Cap:
+    - compare current market value to the primary valuation anchor
+    - score higher when upside is supported by real gross-profit economics, not just top-line narrative
+  * EV/Sales vs Growth:
+    - compare trading multiple to growth durability, monetisation quality, and gross margin profile
+    - a high EV/Sales multiple is not justified if growth is low-quality or pass-through-heavy
+  * Margin Path:
+    - assess the credibility of gross-margin and operating-margin expansion
+    - do not give full credit for temporary FCF support from float or working-capital timing
+  * Unit Economics:
+    - evaluate take rate, gross profit per user/merchant, CAC/payback where relevant, fraud/loss burden, and cohort quality
+    - discount if growth relies on incentives, subsidies, or deteriorating economics
+  * Strategic Value:
+    - consider ecosystem relevance, merchant/user base quality, geographic/network density, and M&A relevance
+
+  Step 5: Scenario Framework and Price Targets
+  * Price targets:
+    - 12m and 24m bull/base/bear targets
+    - scenario probabilities, each horizon summing to 100%
+    - probability-weighted target for 12m and 24m
+    - explicit scenario drivers: user/merchant growth, engagement, take rate, ad yield, gross margin, fraud/losses, regulatory/platform changes, and margin path
+    - target reconciliation to EV/Sales, EV/Gross Profit, EV/FCF, or stated sum-of-the-parts anchor
+  * Timeline:
+    - current monetisation and cash baseline
+    - next 24m milestones: product launches, monetisation changes, partner/regulatory decisions, engagement/merchant inflections, international expansion proof points, and financing/capital-return decisions
+    - status: on-track / at-risk / speculative
+    - impact on 24m probability-weighted target
+    - primary risk
+  * Headwinds/tailwinds:
+    - threshold-driven quantitative factors with directional revenue, gross-profit, and cash impact
+    - material qualitative factors with evidence and expected duration
+  * Investment recommendation paragraph:
+    - core thesis reason
+    - key 12m catalyst
+    - key invalidation risk
+    - sizing context: core platform / growth / cyclical / speculative / avoid
+  * Key risks: ranked list with probability and impact.
+  * Key opportunities: ranked list with trigger and valuation impact.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * MAU/DAU or active merchants/sellers/advertisers.
+  * GMV/TPV/booking volume and monetised volume.
+  * Take rate / net take rate / ad yield / ARPU.
+  * Gross margin / gross profit margin and direct-cost burden.
+  * User/merchant retention, cohort quality, and repeat activity.
+  * Fraud/loss rate, chargebacks, incentives, and trust/safety cost.
+  * Customer or merchant concentration.
+  * Cash runway, SBC intensity, and dilution risk.
+  * For ad platforms: engagement, ad load, pricing, and advertiser mix.
+  * For payments/fintech: payment mix, merchant concentration, losses, and compliance reserves.
+
+  Cross-check requirements before final output:
+  * Current revenue/volume baseline must reconcile to the latest primary-source result.
+  * Monetisation commentary must distinguish gross volume from actual revenue and gross profit.
+  * Network-effects commentary must be supported by repeat activity, retention, density, or switching evidence rather than management slogans.
+  * Margin commentary must reconcile to direct-cost burden, incentives, losses, trust/safety, and operating-expense disclosures.
+  * Valuation anchor must be mathematically consistent with stated growth, take rate, gross-profit, margin, and share-count assumptions.
+  * Quality and Value weighted totals must equal stated final scores.
+  * Price targets must be tied to explicit engagement, monetisation, margin, cash, and multiple assumptions.
+  * Do not create a risk from template structure alone. If a missing data point is immaterial because equivalent disclosure already answers the economics, say so explicitly rather than marking the company down for template non-compliance.
