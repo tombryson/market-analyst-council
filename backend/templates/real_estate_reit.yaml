@@ -215,3 +215,220 @@ verification_schema:
         - guidance
         - development_timeline
         critical: true
+
+# The full rubric/prompt
+rubric: |
+  Run an investment analysis on [Company Name] using this real-estate and REIT rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to asset quality, lease/occupancy quality, cap-rate valuation, debt/refinancing risk, distribution coverage, or scenario confidence.
+
+  First classify the vehicle:
+  * Office REIT / landlord: value driven by occupancy, leasing spreads, tenant quality, incentives, and asset obsolescence risk.
+  * Retail / shopping-centre REIT: value driven by occupancy, tenant sales productivity, rent reversion, anchors, remixing, and discretionary-demand exposure.
+  * Industrial / logistics REIT: value driven by rent growth, land scarcity, lease duration, development pipeline, and cap-rate sensitivity.
+  * Residential / accommodation / seniors / student / specialty housing REIT: value driven by occupancy, rate growth, turnover, regulation, and operating intensity.
+  * Diversified property platform / capital-light manager: value driven by management fees, third-party capital, development/asset-management earnings, and balance-sheet exposure.
+  * Hybrid property vehicle: meaningful mix of rent, development, funds management, operating assets, or non-core earnings that should be separated in valuation.
+
+  Use that classification to decide valuation emphasis:
+  * Office: vacancy, incentives, tenant rollover, asset quality, capex/repositioning needs, and work-from-office demand.
+  * Retail: specialty sales, occupancy cost, lease spreads, anchor quality, remixing/upgrades, and discretionary spending exposure.
+  * Industrial/logistics: market rent reversion, embedded uplift, development economics, land bank quality, and valuation sensitivity to cap rates.
+  * Residential/accommodation/specialty: occupancy, average daily rate/rent growth, regulation, labour intensity where relevant, and same-asset NOI quality.
+  * Capital-light managers: recurring fee base, AUM quality, balance-sheet-light earnings, development/promote cyclicality, and fee versus principal earnings mix.
+  * Hybrid vehicles: separate recurring property NOI from trading/development/funds-management or other non-core earnings. Do not let one-off gains hide weaker underlying NOI.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Portfolio summary and timeline to key leasing, occupancy, cap-rate, refinancing, development, and distribution milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source portfolio, leasing, occupancy, NOI, NAV, debt, development, and distribution data from the company's primary exchange filings plus annual/interim reports, investor presentations, property supplements, debt/refinancing announcements, and transaction disclosures.
+  * Prefer primary sources: exchange filings, statutory reports, property books, rent-roll/occupancy disclosures, valuation notes, debt maturity tables, and transaction announcements. Use secondary sources only where they add factual context on transaction cap rates, sector vacancy, or financing backdrop.
+  * For every key numeric input used in valuation, Quality, Value, price targets, NAV, FFO/AFFO, occupancy, or balance-sheet analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, property supplements, debt disclosures, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, leasing/occupancy, cap-rate assumptions, refinancing risk, distribution coverage, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Portfolio, Leasing, and NOI Workup
+  For each material portfolio, segment, or earnings stream, capture where disclosed:
+  * Asset type, geography, ownership share, tenant/customer type, lease structure, and next milestone.
+  * Revenue model: rent, service income, recoveries, parking, operating income, funds-management fees, development profit, or hybrid.
+  * Occupancy, WALE/lease term, lease expiry profile, top-tenant concentration, incentives, and same-property NOI or equivalent metric where relevant.
+  * Development/repositioning pipeline: committed capex, expected yield on cost, pre-leasing, delivery timing, and stabilization assumptions.
+  * Transaction activity: acquisitions, disposals, cap-rate evidence, and whether realized pricing validates or challenges book values.
+
+  Asset-quality and leasing discipline:
+  * Establish the current portfolio baseline from the latest half, quarter, or run-rate.
+  * Distinguish headline occupancy from occupied-and-paying, leased-versus-billed, and stabilized occupancy where relevant.
+  * Assess asset quality through location, tenant quality, building age/specification, relevance, and replacement risk.
+  * Identify embedded rent reversion, mark-to-market opportunity, incentives, downtime, and capital needs around lease expiry.
+  * Do not treat low vacancy alone as proof of asset quality if incentives, tenant risk, or capex needs are high.
+
+  NOI, FFO, and cash-earnings discipline:
+  * Break out same-property NOI growth versus acquired/disposed or development-driven growth.
+  * Distinguish property NOI from development profits, fair-value gains, transaction gains, or funds-management fees.
+  * For REITs, reconcile NOI to FFO and AFFO or the closest disclosed cash-earnings metric.
+  * Distinguish recurring cash earnings from valuation gains or working-capital noise.
+  * Do not treat temporary leasing spreads or one-off gains as permanent earnings power.
+
+  NAV and cap-rate discipline:
+  * Identify stated book values, independent valuations, cap rates/capitalization rates, and recent transaction evidence where disclosed.
+  * Distinguish external valuation support from management marks or stale book values.
+  * Assess whether cap rates embedded in book value are conservative, fair, or aggressive relative to current financing costs, asset quality, and transaction evidence.
+  * If a cap-rate or discount-rate move is central to the thesis, state the sensitivity explicitly.
+  * Do not use NAV as a mechanical truth if asset values or development carrying values appear optimistic.
+
+  Debt, funding, and distribution discipline:
+  * Identify net debt, LTV/gearing, interest coverage, fixed-versus-floating debt, weighted average debt maturity, covenant headroom, and near-term refinancing needs.
+  * Assess whether refinancing risk, higher rates, or covenant pressure can impair distributions, development, or asset sales.
+  * Reconcile distributions/dividends to AFFO or sustainable cash earnings, not just accounting profit.
+  * Distinguish recurring covered distribution from payout supported by asset sales, development gains, or balance-sheet stretch.
+  * If hedging is material, state the hedge profile and when refinancing at higher rates will hit earnings.
+
+  Development and capital-allocation discipline:
+  * Distinguish low-risk pre-leased development from speculative development exposure.
+  * Assess whether management is recycling capital intelligently or simply using disposals/equity issuance to patch weak underlying returns.
+  * For external management or complex structures, assess fee leakage, related-party risk, and alignment.
+  * For capital-light managers, separate recurring fee earnings from more cyclical transaction/promote earnings.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation using REIT-appropriate anchors. Do not force generic earnings multiples where NAV, FFO/AFFO, or cap-rate value is more relevant.
+
+  Core valuation anchors:
+  * NAV / discount-to-NAV: primary for asset-backed REITs where book values are credible and recent enough.
+  * FFO/AFFO yield: use to assess recurring earnings quality and payout coverage.
+  * EV/EBITDA or cash earnings multiples: useful for operating-property platforms or non-REIT vehicles, but only if lease and capex intensity are handled properly.
+  * Sum-of-the-parts: use when rental NOI, development, funds-management, and other earnings streams deserve different assumptions.
+  * Transaction cap-rate cross-check: use recent acquisitions/disposals or market comps to test book values and implied cap rates.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using NAV, state whether book values are high-confidence, moderate-confidence, or stale/aggressive.
+  * If using FFO/AFFO yield, reconcile to maintenance capex, leasing incentives, straight-lining, and recurring cash leakage.
+  * If a REIT trades at a discount to NAV, state whether the discount is deserved because of asset quality, leverage, governance, or development risk.
+  * If a premium is justified, explain why portfolio quality, growth, or capital-allocation quality warrants it.
+
+  Simple property bridge:
+  * Revenue driver = occupied area/units x rent or rate, plus recoveries and ancillary income where relevant.
+  * NOI = revenue minus property-level operating cost and vacancy/incentive drag.
+  * Cash earnings = NOI minus corporate overhead, interest, maintenance/leasing capex, and recurring leakage.
+  * Equity value anchor = justified discount/premium to NAV and/or FFO/AFFO yield, cross-checked against leverage and portfolio quality.
+
+  Stress and downside discipline:
+  * Show at least one downside case with higher vacancy, weaker leasing spreads, slower rent growth, wider cap rates, and higher refinancing costs.
+  * Show what happens to NAV, FFO/AFFO, LTV/gearing, distribution coverage, and valuation under that downside.
+  * For office or weak retail, vacancy and incentives may matter more than cap rates alone.
+  * For industrial or higher-growth sectors, cap-rate expansion and development economics may matter more than current occupancy.
+
+  Step 3: Quality Score (0-100)
+  Formula:
+  = (0.20 * Asset Quality) + (0.20 * Occupancy & Lease Quality) + (0.15 * Management) + (0.20 * Execution) + (0.15 * Balance Sheet) + (0.10 * Governance)
+
+  Score each factor with raw score, weight, weighted contribution, and evidence:
+  * Asset Quality:
+    - high-quality assets/locations with durable relevance and pricing power = 85-100
+    - good portfolio with manageable secondary-asset risk = 65-85
+    - mixed portfolio with asset-quality questions = 45-65
+    - weak or structurally challenged assets = 20-45
+  * Occupancy & Lease Quality:
+    - strong occupancy, healthy lease profile, quality tenants, manageable rollover = 85-100
+    - solid lease profile with some rollover or incentive pressure = 65-85
+    - meaningful vacancy, incentives, or tenant-risk issues = 45-65
+    - poor lease quality or heavy rollover risk = 20-45
+  * Management:
+    - disciplined capital allocation, prudent leasing/development, credible guidance = 85-100
+    - mostly credible execution with manageable issues = 65-85
+    - uneven execution or promotional tone = 45-65
+    - repeated value-destructive decisions or weak discipline = 20-45
+  * Execution:
+    - strong same-property NOI execution, disciplined developments, good leasing outcomes = 85-100
+    - credible execution with some sector/rollover pressure = 65-85
+    - inconsistent operating performance or integration/development issues = 45-65
+    - persistent underperformance or speculative execution = 20-45
+  * Balance Sheet:
+    - conservative leverage, good terming, strong covenant headroom = 85-100
+    - manageable leverage and refinancing profile = 65-85
+    - elevated leverage or refinancing sensitivity = 45-65
+    - stressed balance sheet or meaningful recapitalization risk = 20-45
+  * Governance:
+    - aligned management, transparent valuation/distribution disclosure, strong oversight = 80-100
+    - acceptable governance with minor concerns = 60-80
+    - weak alignment, external-manager leakage, or oversight concerns = 35-60
+
+  Step 4: Value Score (0-100)
+  Formula:
+  = (0.30 * NAV vs Market Cap) + (0.25 * FFO/AFFO Yield) + (0.20 * Multiple vs Peers) + (0.15 * Growth/Reinvestment Quality) + (0.10 * Strategic Value)
+
+  * NAV vs Market Cap:
+    - compare current market value to justified NAV, not just reported book value
+    - score higher when discount is supported by credible asset values and manageable leverage
+  * FFO/AFFO Yield:
+    - compare recurring cash-earnings yield to portfolio quality, leverage, and distribution coverage
+    - a high yield is not attractive if it reflects value traps, weak assets, or uncovered payouts
+  * Multiple vs Peers:
+    - compare trading multiple or discount/premium to peers after adjusting for asset quality, leverage, growth, and governance
+  * Growth/Reinvestment Quality:
+    - assess whether development, redevelopment, acquisitions, and capital recycling create value at acceptable risk
+    - discount if growth depends on aggressive cap rates, speculative projects, or repeated equity issuance
+  * Strategic Value:
+    - consider portfolio scarcity, consolidation appeal, land bank quality, management platform value, and takeover relevance
+
+  Step 5: Scenario Framework and Price Targets
+  * Price targets:
+    - 12m and 24m bull/base/bear targets
+    - scenario probabilities, each horizon summing to 100%
+    - probability-weighted target for 12m and 24m
+    - explicit scenario drivers: occupancy, leasing spreads, same-property NOI, cap rates, refinancing cost, development outcomes, and distribution policy
+    - target reconciliation to NAV, justified discount/premium, FFO/AFFO yield, or stated sum-of-the-parts anchor
+  * Timeline:
+    - current NOI/NAV and balance-sheet baseline
+    - next 24m milestones: lease expiries, refinancing, valuation updates, development completions, disposals/acquisitions, and distribution decisions
+    - status: on-track / at-risk / speculative
+    - impact on 24m probability-weighted target
+    - primary risk
+  * Headwinds/tailwinds:
+    - threshold-driven quantitative factors with directional NAV, NOI, and cash impact
+    - material qualitative factors with evidence and expected duration
+  * Investment recommendation paragraph:
+    - core thesis reason
+    - key 12m catalyst
+    - key invalidation risk
+    - sizing context: income / compounder / recovery / speculative / avoid
+  * Key risks: ranked list with probability and impact.
+  * Key opportunities: ranked list with trigger and valuation impact.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Occupancy and leased-versus-paying occupancy.
+  * WALE / lease expiry ladder / top-tenant concentration.
+  * Same-property NOI growth and leasing spreads.
+  * Portfolio cap rate, implied cap rate, and NAV per share.
+  * FFO, AFFO, payout ratio, and distribution coverage.
+  * Net debt / LTV / ICR / debt maturity ladder / hedge profile.
+  * Development pipeline, yield on cost, and pre-leasing.
+  * Maintenance capex / leasing capex / incentives.
+  * For capital-light managers: fee AUM, fee margin, and carry/promote dependence.
+
+  Cross-check requirements before final output:
+  * Current NOI/NAV baseline must reconcile to the latest primary-source result.
+  * Occupancy/leasing commentary must reconcile to actual disclosed occupancy, incentives, and rollover data.
+  * NAV commentary must distinguish reported book value from adjusted or stress-tested NAV.
+  * Distribution commentary must reconcile to AFFO or equivalent recurring cash earnings, not just statutory profit.
+  * Valuation anchor must be mathematically consistent with stated NOI, cap-rate, FFO/AFFO, leverage, and share-count assumptions.
+  * Quality and Value weighted totals must equal stated final scores.
+  * Price targets must be tied to explicit leasing, cap-rate, debt-cost, cash-earnings, and multiple assumptions.
+  * Do not create a risk from template structure alone. If a missing data point is immaterial because equivalent disclosure already answers the economics, say so explicitly rather than marking the company down for template non-compliance.
