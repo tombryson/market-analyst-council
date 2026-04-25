@@ -215,3 +215,220 @@ verification_schema:
         - guidance
         - development_timeline
         critical: true
+
+# The full rubric/prompt
+rubric: |
+  Run an investment analysis on [Company Name] using this consumer-retail rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to demand resilience, gross-margin quality, inventory health, store/channel economics, lease burden, or scenario confidence.
+
+  First classify the business:
+  * Branded discretionary retailer: sales driven by brand strength, full-price sell-through, traffic, basket size, and promotional discipline.
+  * Value / discount retailer: sales driven by value positioning, traffic resilience, sourcing discipline, and inventory turns more than premium brand power.
+  * Omnichannel retailer: economics depend on blended store + ecommerce productivity, fulfillment cost, digital acquisition, and channel mix.
+  * Specialty / category retailer: value driven by category expertise, assortment, repeat customer behaviour, and merchandising execution.
+  * Consumer brand with retail/distribution footprint: mix of owned brand economics plus retail, wholesale, franchise, or distributor channels that should be separated.
+  * Roll-up / multi-banner consumer platform: value driven by banner quality, acquisition integration, sourcing leverage, and store/network productivity.
+
+  Use that classification to decide valuation emphasis:
+  * Branded discretionary: comparable sales, full-price sell-through, markdown risk, gross margin, and customer/brand stickiness.
+  * Value/discount: traffic, basket, pricing gap versus competitors, sourcing resilience, shrink, and inventory turn.
+  * Omnichannel: channel mix, ecommerce contribution margin, fulfillment cost, returns, CAC/retention where relevant, and store productivity.
+  * Specialty/category: category leadership, repeat purchase, merchandising, inventory discipline, and square-foot productivity.
+  * Brand plus distribution: separate higher-margin brand economics from lower-margin wholesale/distribution or store operations.
+  * Multi-banner/roll-up: distinguish genuine operating leverage and sourcing benefit from acquired growth masking weak banner economics.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Brand/channel summary and timeline to key comp-sales, margin, inventory, rollout, and financing milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source operating, merchandising, inventory, channel, lease, and financial data from the company's primary exchange filings plus annual/interim reports, investor presentations, trading updates, and store/channel disclosures.
+  * Prefer primary sources: exchange filings, statutory reports, company presentations, same-store-sales disclosures, inventory commentary, rent/lease disclosures, and company channel metrics. Use secondary sources only where they add factual context on consumer demand, promotions, sourcing, or wage/rent backdrop.
+  * For every key numeric input used in valuation, Quality, Value, price targets, comp sales, gross margin, inventory, lease burden, or cash-flow analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, channel/store disclosures, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, comp sales, gross margin, inventory health, channel mix, balance-sheet risk, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Demand, Merchandising, and Store/Channel Economics Workup
+  For each material banner, channel, or earnings stream, capture where disclosed:
+  * Banner/brand/channel name, customer type, geography, store/network footprint, channel mix, and next milestone.
+  * Revenue model: own retail, ecommerce, wholesale, franchise, marketplace, concession, or hybrid.
+  * Demand metrics: traffic, basket size, average selling price, units per transaction, same-store/comparable sales, online conversion, repeat behaviour, or loyalty where relevant.
+  * Store/channel growth: store openings/closures, relocations, digital growth, wholesale partner growth, or franchise rollouts.
+  * Mix effects: full price versus markdown, private label versus branded, owned versus third-party, domestic versus international, and channel profitability.
+
+  Demand-resilience and pricing discipline:
+  * Establish the current sales baseline from the latest half, quarter, or run-rate.
+  * Distinguish traffic-driven growth from pricing-driven growth, mix-driven growth, and new-space growth.
+  * State whether demand is genuinely resilient or simply benefiting from short-term macro, weather, or promotional distortions.
+  * For discretionary categories, explicitly assess consumer sensitivity and promotion dependence.
+  * Do not award premium multiples to sales growth that comes mainly from price inflation or new-store rollout if underlying productivity is weak.
+
+  Brand, channel, and merchandising discipline:
+  * Assess brand strength, assortment relevance, loyalty, and switching risk.
+  * Distinguish a real brand moat from temporary trend/fashion success.
+  * For omnichannel models, separate channel growth from channel profitability and state whether digital cannibalizes or supports store economics.
+  * Assess whether wholesale/distribution partners strengthen the economics or dilute pricing and brand control.
+  * Do not assume channel expansion is attractive if fulfillment, returns, or acquisition cost destroy margin.
+
+  Gross-margin and inventory discipline:
+  * Break out gross-margin drivers: pricing, sourcing, freight, markdowns, shrink, mix, FX, and occupancy leverage where disclosed.
+  * Identify whether inventory is healthy, elevated, clearing, underbought, or mismatched to demand.
+  * Distinguish temporary margin uplift from structural pricing power or sourcing advantage.
+  * If inventory days, turns, or stock cover are not disclosed, infer conservatively from inventory growth versus sales growth and label it.
+  * Do not treat revenue growth as high quality if it is being bought via promotions or at the expense of future markdown risk.
+
+  Store economics, lease burden, and cash-conversion discipline:
+  * Identify store productivity, rent/lease burden, occupancy cost, wage intensity, new-store payback where disclosed, and maintenance versus growth capex.
+  * Distinguish EBITDA from real owner earnings if leases, store refresh capex, or working-capital swings are material.
+  * Assess whether the business can deleverage fixed-cost stores when traffic weakens.
+  * For digital-heavy names, assess fulfillment, return rates, and last-mile burden as part of store-equivalent economics.
+  * For franchise/asset-light models, distinguish true capital-light economics from hidden support or marketing obligations.
+
+  Balance-sheet and capital-allocation discipline:
+  * Identify cash, debt, lease liabilities, covenant headroom, inventory financing risk, and liquidity.
+  * Assess whether dividends, buybacks, rollout plans, or acquisitions are being funded responsibly.
+  * For acquisition-led or multi-banner groups, assess integration quality, sourcing synergies, and whether acquired growth is masking weak core banners.
+  * Distinguish healthy cash conversion from temporary working-capital release caused by supplier stretching or underbuying stock.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation using retail-appropriate anchors. Do not apply high-quality brand multiples to weak-margin promotional retail, and do not ignore lease-adjusted cash economics.
+
+  Core valuation anchors:
+  * EV/EBITDA or EV/EBIT: useful for established retailers if lease burden, capex, and cyclicality are handled properly.
+  * P/E on normalized earnings: useful where margins and store economics are relatively stable.
+  * FCF yield: useful where inventory, lease, and maintenance capex are properly incorporated.
+  * Sum-of-the-parts: use when brands, wholesale, franchise, retail, and ecommerce streams genuinely deserve different assumptions.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using EBITDA, explain lease treatment and whether store refresh/maintenance capex materially reduces owner earnings.
+  * If using P/E, explain why current earnings are a fair proxy for normalized earnings, or show the normalization bridge.
+  * If using FCF yield, reconcile to maintenance capex, store investment, lease cash obligations, and working-capital needs.
+  * If the company is promotional or cyclical, value on normalized rather than peak margins.
+  * If multiple channels have different economics, separate them rather than hiding behind a blended retail multiple.
+
+  Simple retail bridge:
+  * Revenue driver = traffic/transactions x basket/ASP x store/channel base, adjusted for comp growth and space growth.
+  * Operating profit = revenue minus merchandise cost, markdowns, rent, labour, fulfillment, and overhead.
+  * Free cash flow = operating profit after tax, leases, maintenance capex, working capital, and recurring leakage.
+  * Equity value anchor = justified EV/EBITDA, EV/EBIT, P/E, or FCF yield, cross-checked against brand strength, inventory quality, and balance-sheet risk.
+
+  Stress and downside discipline:
+  * Show at least one downside case with weaker traffic, higher promotions/markdowns, slower sell-through, inventory build, wage/rent pressure, and/or ecommerce fulfillment drag.
+  * Show what happens to margin, cash conversion, leverage, and valuation under that downside.
+  * For discretionary retail, promotions and traffic may matter more than store rollout.
+  * For value retail, sourcing/availability and gross-margin protection may matter more than top-line growth.
+
+  Step 3: Quality Score (0-100)
+  Formula:
+  = (0.20 * Demand Resilience) + (0.20 * Brand/Channel Strength) + (0.15 * Management) + (0.20 * Execution) + (0.15 * Balance Sheet) + (0.10 * Governance)
+
+  Score each factor with raw score, weight, weighted contribution, and evidence:
+  * Demand Resilience:
+    - strong repeat demand, low discretionary risk, resilient traffic = 85-100
+    - decent demand profile with some cycle sensitivity = 65-85
+    - meaningful discretionary or trend-driven risk = 45-65
+    - weak demand durability or severe category exposure = 20-45
+  * Brand/Channel Strength:
+    - strong brand, good channel control, healthy customer loyalty = 85-100
+    - credible channel/brand position with some pressure = 65-85
+    - limited differentiation or weak channel economics = 45-65
+    - weak brand/channel position or easy substitution = 20-45
+  * Management:
+    - disciplined merchandising, pricing, capital allocation, credible guidance = 85-100
+    - mostly credible execution with manageable issues = 65-85
+    - uneven execution or promotional posture = 45-65
+    - repeated misses, weak buying discipline, or poor capital allocation = 20-45
+  * Execution:
+    - strong comp sales, inventory control, margin execution, and store/channel productivity = 85-100
+    - credible execution with some pressure points = 65-85
+    - inconsistent execution or recurring markdown/inventory issues = 45-65
+    - persistent operational slippage or structurally weak economics = 20-45
+  * Balance Sheet:
+    - strong liquidity, manageable lease/debt burden, good cash conversion = 85-100
+    - adequate balance sheet with manageable sensitivity = 65-85
+    - elevated lease/debt burden or weaker cash conversion = 45-65
+    - stressed balance sheet or meaningful recapitalization risk = 20-45
+  * Governance:
+    - transparent disclosure, aligned incentives, strong oversight = 80-100
+    - acceptable governance with minor concerns = 60-80
+    - weak disclosure, related-party/incentive issues, or oversight concerns = 35-60
+
+  Step 4: Value Score (0-100)
+  Formula:
+  = (0.30 * Intrinsic Value vs Market Cap) + (0.25 * Earnings/FCF Yield) + (0.20 * Multiple vs Peers) + (0.15 * Growth/Reinvestment Quality) + (0.10 * Strategic Value)
+
+  * Intrinsic Value vs Market Cap:
+    - compare current market value to the primary valuation anchor
+    - score higher when upside is supported by clean retail economics, not temporary promotional spikes
+  * Earnings/FCF Yield:
+    - compare normalized earnings or FCF yield to category cyclicality, lease burden, and inventory risk
+    - discount if cash generation is flattered by underbuying, payables stretch, or low maintenance investment
+  * Multiple vs Peers:
+    - compare trading multiple to peers after adjusting for brand strength, channel quality, margin durability, and balance-sheet risk
+  * Growth/Reinvestment Quality:
+    - assess whether new stores, digital investment, category expansion, or acquisitions create value at acceptable returns
+    - discount if growth depends on weak store economics or capital-hungry expansion
+  * Strategic Value:
+    - consider brand relevance, channel network, sourcing capability, customer file, and consolidation/M&A appeal
+
+  Step 5: Scenario Framework and Price Targets
+  * Price targets:
+    - 12m and 24m bull/base/bear targets
+    - scenario probabilities, each horizon summing to 100%
+    - probability-weighted target for 12m and 24m
+    - explicit scenario drivers: comp sales, traffic, basket, gross margin, markdowns, inventory, lease burden, and capital allocation
+    - target reconciliation to EV/EBITDA, EV/EBIT, P/E, FCF yield, or stated sum-of-the-parts anchor
+  * Timeline:
+    - current sales/margin and cash baseline
+    - next 24m milestones: trading updates, inventory normalization, promotional resets, store openings/closures, margin recovery steps, refinancing decisions, and capital-return moves
+    - status: on-track / at-risk / speculative
+    - impact on 24m probability-weighted target
+    - primary risk
+  * Headwinds/tailwinds:
+    - threshold-driven quantitative factors with directional revenue, margin, and cash impact
+    - material qualitative factors with evidence and expected duration
+  * Investment recommendation paragraph:
+    - core thesis reason
+    - key 12m catalyst
+    - key invalidation risk
+    - sizing context: core consumer / cyclical / turnaround / speculative / avoid
+  * Key risks: ranked list with probability and impact.
+  * Key opportunities: ranked list with trigger and valuation impact.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Same-store/comparable sales growth.
+  * Traffic, basket size, ASP, and units per transaction.
+  * Gross margin and markdown/promotional intensity.
+  * Inventory growth, inventory turns, or stock cover.
+  * Ecommerce mix and digital contribution margin.
+  * Store count, productivity, and new-store payback where disclosed.
+  * Lease burden, rent/occupancy cost, and net debt.
+  * Working-capital intensity and cash conversion.
+  * Wholesale/franchise contribution where relevant.
+
+  Cross-check requirements before final output:
+  * Current sales baseline must reconcile to the latest primary-source result.
+  * Comp-sales commentary must distinguish same-store performance from space growth.
+  * Margin commentary must reconcile to pricing, promotions, inventory, sourcing, rent, and labour factors.
+  * Valuation anchor must distinguish current from normalized earnings where trading conditions are clearly non-normal.
+  * Valuation anchor must be mathematically consistent with stated sales, margin, lease, and share-count assumptions.
+  * Quality and Value weighted totals must equal stated final scores.
+  * Price targets must be tied to explicit traffic, basket, margin, inventory, cash, and multiple assumptions.
+  * Do not create a risk from template structure alone. If a missing data point is immaterial because equivalent disclosure already answers the economics, say so explicitly rather than marking the company down for template non-compliance.
