@@ -134,3 +134,193 @@ verification_schema:
       development_timeline:
         markers: ["development timeline", "timeline", "milestone", "guidance", "development_timeline"]
         critical: true
+
+rubric: |
+  Run an investment analysis on [Company Name] using this industrials-consumer-reit fallback rubric. Use this template only when the company genuinely mixes operating-business economics with meaningful real-estate or asset-backed value. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to segment economics, asset value, lease/property exposure, cash conversion, refinancing risk, or scenario confidence.
+
+  First classify the business mix:
+  * Property-backed operating platform: value driven by an operating business sitting on meaningful owned real estate, logistics/property assets, or redevelopment optionality.
+  * Consumer-with-property backbone: retailer, leisure, accommodation, or service business where store/site economics and property/lease structure are central to valuation.
+  * Industrial-with-real-estate component: industrial operator with plants, yards, terminals, warehouses, or logistics/property assets that materially affect NAV and earnings quality.
+  * Capital-light operating platform with asset-management or property earnings: mixed business with operating earnings plus property/funds/fee income that must be separated.
+  * Asset-recycling / sale-and-leaseback story: company using asset monetization, sale-and-leaseback, or redevelopment to reshape valuation and balance sheet.
+  * Hybrid real-economy conglomerate: meaningful mix of industrial, consumer, and property earnings streams that should be valued segment by segment rather than on one blended multiple.
+
+  Use that classification to decide valuation emphasis:
+  * Property-backed operating platform: separate operating earnings from underlying site/property value and redevelopment optionality.
+  * Consumer-with-property backbone: focus on store/site productivity, lease burden versus owned-asset support, occupancy costs, and channel economics.
+  * Industrial-with-real-estate component: focus on order book/utilization, maintenance capex, land/terminal/logistics asset value, and contract visibility.
+  * Capital-light plus property earnings: distinguish recurring fee/rent streams from more volatile operating or trading earnings.
+  * Asset-recycling story: test whether asset sales are genuinely value-accretive or just masking weak cash generation.
+  * Hybrid conglomerate: value each major segment on a sector-appropriate basis and show the reconciliation explicitly.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Segment summary and timeline to key operating, leasing, asset-sale, refinancing, redevelopment, and cash-flow milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source operating, property, lease, occupancy, NAV, debt, segment, and cash-flow data from the company's primary exchange filings plus annual/interim reports, investor presentations, property supplements if any, operating updates, and financing or asset-transaction announcements.
+  * Prefer primary sources: exchange filings, statutory reports, segment notes, lease and property disclosures, backlog/order-book tables where relevant, asset-sale announcements, valuation notes, and debt maturity tables. Use secondary sources only where they add factual context on property transactions, leasing backdrop, consumer demand, industrial cycle conditions, or financing environment.
+  * For every key numeric input used in valuation, Quality, Value, price targets, NAV, occupancy, lease burden, margins, working capital, leverage, or cash-flow analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, segment disclosures, property/lease disclosures, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, segment quality, property value, lease burden, refinancing risk, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Segment Map and Asset-Earnings Bridge
+  For each material segment, site/portfolio, or earnings stream, capture where disclosed:
+  * Segment/asset/business line name, geography, customer/tenant type, and next milestone.
+  * Revenue model: product/service revenue, rent, fee, throughput, same-store sales, occupancy-driven income, asset-management fees, development profit, or hybrid.
+  * Key operating drivers: volume, price, occupancy, same-site/store sales, rent spread, utilization, backlog, or service mix.
+  * Asset footprint: owned versus leased, site count, key locations, tenancy/customer concentration, and redevelopment or monetization options.
+  * Cost profile: fixed-cost burden, lease cost, maintenance capex, working-capital intensity, labour/content exposure, and financing sensitivity.
+
+  Segment-separation discipline:
+  * Establish the current earnings baseline from the latest half, quarter, or run-rate.
+  * Distinguish recurring operating earnings, recurring rent/fee earnings, one-off transaction gains, and fair-value movements. Do not treat them as equivalent.
+  * Distinguish owned-asset support from leased-site economics and show how each affects margin, cash conversion, and downside protection.
+  * For mixed groups, separate high-quality recurring earnings from cyclical/project or low-visibility earnings streams.
+  * Do not allow attractive asset value to hide weak underlying operating economics, or vice versa.
+
+  Operating-quality discipline:
+  * Assess demand resilience, order-book/backlog visibility where relevant, occupancy or same-site performance, pricing power, and customer/tenant quality.
+  * Distinguish real operating leverage from fragile earnings that only work under favorable occupancy, traffic, or utilization conditions.
+  * For industrial segments, assess plant/network quality, contract visibility, and maintenance burden.
+  * For consumer/property segments, assess store/site economics, occupancy cost, channel mix, and whether locations remain productive.
+  * Do not treat scale or footprint as a moat unless evidence shows margin resilience, location quality, switching costs, or replacement difficulty.
+
+  Asset-value and lease-burden discipline:
+  * Identify owned properties/assets, lease liabilities, rent burden, asset carrying values, cap rates or transaction evidence where relevant, and redevelopment/alternate-use potential.
+  * Distinguish genuine underlying asset support from stale book values, management marks, or highly conditional redevelopment narratives.
+  * Assess whether sale-and-leaseback or asset monetization improves economics or merely converts hidden value into future rent burden.
+  * If property is central to the thesis, state whether the relevant value is stabilized, realizable, encumbered, or speculative.
+  * Do not use asset value as a mechanical truth if monetization depends on aggressive assumptions or damages the operating business.
+
+  Margin, cash-conversion, and working-capital discipline:
+  * Break out gross-margin and EBIT/EBITDA drivers: price, volume, occupancy/utilization, mix, lease cost, labour, maintenance, and input-cost inflation where disclosed.
+  * Distinguish accounting profit from real owner earnings where lease expense, maintenance capex, redevelopment spend, or working capital matter.
+  * Assess whether free cash flow is supported by recurring operations or flattered by asset sales, working-capital release, or deferred maintenance.
+  * For property-heavy names, reconcile property NOI/rent economics to group cash earnings.
+  * Do not give full credit for earnings if cash conversion is persistently weak without a convincing structural reason.
+
+  Balance-sheet and refinancing discipline:
+  * Identify cash, debt, lease liabilities, covenant headroom, debt maturity profile, refinancing risk, and liquidity.
+  * Assess whether the company can fund its base plan, redevelopment pipeline, maintenance needs, and downside case without distressed equity or asset fire-sales.
+  * Distinguish resilient asset-backed financing from structures that look safe only because property is marked generously.
+  * If asset recycling is central, assess whether management is recycling intelligently or plugging weak underlying cash generation.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation using the right lens for each major earnings stream. Do not force one universal multiple across operating businesses, property value, and transaction/redevelopment optionality.
+
+  Core valuation anchors:
+  * Sum-of-the-parts: primary when operating earnings and asset/property value both matter materially.
+  * EV/EBITDA or EV/EBIT: useful for operating segments if lease burden, maintenance capex, and cyclicality are handled properly.
+  * NAV / asset-value cross-check: use when owned sites, properties, terminals, or asset-backed value are central to the case.
+  * FCF yield: useful where cash conversion is real after maintenance capex, lease costs, and redevelopment requirements.
+  * FFO/AFFO-style yield: use only where the property component behaves like a genuine recurring property cash-flow stream.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using SOTP, show the segment valuation explicitly and justify each segment multiple or NAV assumption.
+  * If using EBITDA, explain maintenance capex, lease burden, and whether EBITDA overstates owner earnings.
+  * If using NAV, state whether values are high-confidence, moderate-confidence, or speculative.
+  * If asset sales or redevelopment are part of the thesis, distinguish realizable near-term value from long-dated option value.
+  * Cross-check with peers only after adjusting for business mix, asset ownership, lease structure, cyclicality, and balance-sheet risk.
+
+  Step 3: Quality Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Quality factor weightings:
+  * Demand Resilience: 20%
+  * Asset/Operating Quality: 20%
+  * Management: 15%
+  * Execution: 15%
+  * Balance Sheet: 15%
+  * Governance: 15%
+
+  Quality scoring formula:
+  * Quality Score = sum(weighted factor scores), 0-100.
+
+  Quality scoring guidance:
+  * Demand Resilience: score operating demand visibility, occupancy/customer stability, and cyclicality of key earnings streams.
+  * Asset/Operating Quality: score site/asset quality, operating economics, maintenance burden, and competitive defensibility.
+  * Management: score capital allocation, disclosure quality, and realism around asset value versus operating performance.
+  * Execution: score delivery against operating, leasing, redevelopment, backlog-conversion, and monetization goals.
+  * Balance Sheet: score leverage, lease burden, liquidity, and refinancing resilience.
+  * Governance: score structure simplicity, related-party risk, disclosure transparency, and treatment of minority holders.
+
+  Quality grading bands:
+  * 85-100: high-quality mixed platform with resilient operations, credible asset support, disciplined capital allocation, and robust funding.
+  * 70-84: good business with clear strengths and manageable mix/structure risks.
+  * 50-69: mixed quality; some attractive assets or segments but meaningful concerns on structure, execution, or leverage.
+  * Below 50: weak economics, weak realizable asset support, or governance/balance-sheet issues that materially impair quality.
+
+  Step 4: Value Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Value factor weightings:
+  * Intrinsic Value vs Market Cap: 30%
+  * Earnings/FCF Yield: 20%
+  * Multiple vs Peers: 15%
+  * Growth/Reinvestment Quality: 15%
+  * Strategic Value: 20%
+
+  Value scoring formula:
+  * Value Score = sum(weighted factor scores), 0-100.
+
+  Value scoring guidance:
+  * Intrinsic Value vs Market Cap: compare your base-case SOTP or primary valuation to the current market cap and explain the gap.
+  * Earnings/FCF Yield: assess normalized owner-earnings and free-cash-flow yield after lease, capex, and working-capital realities.
+  * Multiple vs Peers: compare operating segments and asset values to relevant peers after adjusting for business mix and structure.
+  * Growth/Reinvestment Quality: score whether redevelopment, site rollout, capex, acquisitions, or asset recycling are likely to create value.
+  * Strategic Value: assess whether the operating footprint, real-estate positions, customer base, or breakup value would matter to a strategic acquirer or financial buyer.
+
+  Value grading bands:
+  * 85-100: materially undervalued relative to a realistic blend of operating value and asset support.
+  * 70-84: undervalued with clear upside and manageable execution/structure risks.
+  * 50-69: roughly fair value or upside offset by complexity, leverage, or realization risk.
+  * Below 50: expensive or weakly supported by either operations or asset value.
+
+  Step 5: Scenario Framework and Price Targets
+  Provide bull, base, and bear cases with:
+  * 12M target and 24M target.
+  * Probability for each scenario.
+  * Short description of what operationally changes.
+  * Current positioning (bull-leaning, base-leaning, mixed, bear-leaning).
+  * Explicit conditions that must hold.
+  * Explicit failure conditions.
+
+  Scenario design rules:
+  * Bull case should require evidence of stronger operating execution, leasing/occupancy improvement, asset monetization, redevelopment success, or refinancing relief that the market is underestimating.
+  * Base case should reflect the most likely path using conservative assumptions on operations, asset values, lease burden, and capital structure.
+  * Bear case should reflect realistic downside from operating deterioration, occupancy weakness, asset-value pressure, refinancing strain, or failed monetization/redevelopment.
+  * Do not let bull/base/bear differ only by exit multiple; operating, asset-value, and cash assumptions must change.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Same-site/store sales, occupancy, rent spread, utilization, backlog, and segment margins.
+  * NOI, FFO/AFFO where relevant, EBIT margin, EBITDA margin, and margin-bridge commentary.
+  * Lease liabilities, net debt / EBITDA, LTV/gearing, interest cover, and liquidity runway.
+  * Maintenance versus growth capex, redevelopment spend, asset-sale proceeds, and free-cash-flow conversion.
+  * Customer/tenant concentration, site count, owned versus leased mix, and major asset dependencies.
+
+  Cross-check requirements before final output:
+  * Ensure operating earnings, asset value, and one-off transaction gains are not conflated.
+  * Ensure valuation gives separate treatment to recurring operations, property/asset support, and option value.
+  * Ensure lease burden and refinancing risk are reflected in owner-earnings and downside scenarios.
+  * Ensure asset monetization assumptions do not quietly impair future operating economics.
+  * Ensure price targets are supported by operating and asset-value assumptions, not just a blended multiple overlay.
