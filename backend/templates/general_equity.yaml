@@ -128,3 +128,211 @@ verification_schema:
       development_timeline:
         markers: ["development timeline", "timeline", "milestone", "development_timeline"]
         critical: true
+
+# The full rubric/prompt
+rubric: |
+  Run an investment analysis on [Company Name] using this general-equity fallback rubric. Use this template only when the company does not cleanly belong to a more specific sector template. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to operating economics, capital intensity, funding risk, earnings quality, or scenario confidence.
+
+  First classify the business model:
+  * Asset-light recurring / contracted business: recurring revenue, contracted service, subscription, fee, or repeat relationship with moderate-to-high visibility.
+  * Asset-heavy / capital-intensive operator: economics driven by fixed assets, utilization, capex, maintenance burden, or throughput.
+  * Product-led cyclical business: economics driven by units, pricing, inventory, margin, and end-demand cycles.
+  * Distribution / intermediary / services model: economics driven by volume, mix, margin capture, network/reach, and working-capital efficiency.
+  * Roll-up / platform / holding structure: economics driven by capital allocation, acquisition integration, segment quality, and structure.
+  * Mixed / hybrid equity: meaningful mix of business models that should be separated in analysis rather than forced into one valuation lens.
+
+  Use that classification to decide valuation emphasis:
+  * Asset-light recurring/contracted: revenue quality, customer stickiness, margin scalability, and cash conversion.
+  * Asset-heavy/capital-intensive: utilization, maintenance capex, return on invested capital, balance-sheet strain, and cycle resilience.
+  * Product-led cyclical: inventory, pricing, margin volatility, demand visibility, and normalized earnings power.
+  * Distribution/intermediary/services: working capital, throughput, margin capture, operating leverage, and channel quality.
+  * Roll-up/platform/holding structure: acquisition quality, segment transparency, holdco costs/debt, and sum-of-the-parts logic.
+  * Mixed/hybrid: separate recurring high-quality earnings from lower-quality, cyclical, or capital-intensive streams. Do not let one attractive segment hide weak economics elsewhere.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Operating-model summary and timeline to key revenue, margin, capital, and financing milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source operating, segment, capital, balance-sheet, and valuation data from the company's primary exchange filings plus annual/interim reports, investor presentations, and material operating/financing announcements.
+  * Prefer primary sources: exchange filings, statutory reports, company presentations, segment notes, and company disclosures. Use secondary sources only where they add factual context on industry conditions, competitive structure, or funding backdrop.
+  * For every key numeric input used in valuation, Quality, Value, price targets, margin, cash-flow, or balance-sheet analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, operating quality, balance-sheet risk, capital allocation, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Operating Model and Earnings Quality Workup
+  For each material operating segment or earnings stream, capture where disclosed:
+  * Segment/product/service name, customer type, geography, revenue model, and next milestone.
+  * Revenue driver: units, price, volume, contracts, subscriptions, throughput, occupancy/utilization, or fee capture.
+  * Cost structure: variable cost, fixed-cost burden, gross margin, operating leverage, labour intensity, capital intensity, and working-capital profile.
+  * Growth levers: pricing, mix, new products/services, geographic expansion, M&A, utilization, efficiency, or channel expansion.
+  * Competitive position, customer concentration, and structural risks.
+
+  Revenue and demand-quality discipline:
+  * Establish the current revenue baseline from the latest half, quarter, or run-rate.
+  * Distinguish recurring, contracted, repeat, transactional, project, and one-off revenue. Do not treat them as equivalent.
+  * State whether demand is resilient, cyclical, discretionary, regulation-linked, or contract-dependent.
+  * Identify whether recent growth is organic, acquisition-driven, mix-driven, or price-driven.
+  * Do not award high-quality multiples to revenue streams that are low-visibility, volatile, or one-off in nature.
+
+  Margin and cash-conversion discipline:
+  * Break out gross margin, EBITDA/EBIT margin, free cash flow, capex intensity, and working-capital behavior where disclosed.
+  * Distinguish temporary margin support from durable margin structure.
+  * Distinguish accounting profit from real cash generation where capex, working capital, lease burden, or one-off items matter.
+  * If the company uses adjusted EBITDA or cash earnings, reconcile them to statutory profit and cash flow.
+  * Do not treat short-term working-capital release or asset sales as recurring cash earnings.
+
+  Balance-sheet and funding discipline:
+  * Identify cash, debt, lease liabilities where relevant, covenant headroom, debt maturity profile, refinancing risk, and liquidity.
+  * Assess whether the company can fund its base plan and downside case without distressed equity or balance-sheet stress.
+  * Distinguish strong balance-sheet optionality from capital structure that simply looks fine at peak earnings.
+  * For roll-up or holding structures, identify holdco debt, minority leakage, earn-outs, contingent liabilities, or trapped capital.
+
+  Capital-allocation and execution discipline:
+  * Identify whether management is allocating capital through reinvestment, acquisitions, buybacks, dividends, or debt reduction.
+  * Distinguish value-creating reinvestment from low-return growth for growth’s sake.
+  * For acquisition-led names, separate acquired growth from real organic progress.
+  * Assess whether execution risk sits in operations, pricing, integration, regulation, or funding.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation suited to the actual business model. Do not force one universal metric across businesses with different capital intensity and earnings quality.
+
+  Core valuation anchors:
+  * EV/EBITDA or EV/EBIT: useful for many operating businesses if capex intensity and cyclicality are handled properly.
+  * P/E on normalized earnings: useful where earnings quality is high and capex/working capital are not distorting value.
+  * FCF yield: useful where cash conversion is real and sustainable.
+  * Sum-of-the-parts: use when segments have materially different economics or when holding-company structure matters.
+  * Asset-based or NAV-style cross-checks: use where balance-sheet or asset value is central to the case.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using EBITDA, explain maintenance capex, lease burden, and whether EBITDA overstates owner earnings.
+  * If using P/E, explain why current earnings are a fair proxy for normalized earnings, or show the normalization bridge.
+  * If using FCF yield, reconcile to real maintenance capex and working-capital needs.
+  * If the business is cyclical, value on normalized rather than peak or trough earnings.
+  * If the group is structurally mixed, show the segment valuation explicitly rather than hiding behind a blended multiple.
+
+  Simple operating bridge:
+  * Revenue driver = price x volume/activity/contract base, adjusted for mix and market conditions.
+  * Operating profit = revenue minus variable cost, fixed-cost base, and required reinvestment intensity.
+  * Free cash flow = operating profit after tax, maintenance capex, working capital, interest where relevant, and recurring leakage.
+  * Equity value anchor = justified EV/EBITDA, EV/EBIT, P/E, FCF yield, or sum-of-the-parts, cross-checked against balance-sheet risk and sector peer set.
+
+  Stress and downside discipline:
+  * Show at least one downside case with weaker demand/volume, lower pricing, margin compression, slower execution, and/or tighter funding conditions.
+  * Show what happens to earnings, free cash flow, leverage, and valuation under that downside.
+  * Identify the real weak point in the model rather than using generic “macro risk” language.
+
+  Step 3: Quality Score (0-100)
+  Formula:
+  = (0.20 * Market Position) + (0.20 * Operating Quality) + (0.15 * Management) + (0.20 * Execution) + (0.15 * Balance Sheet) + (0.10 * Governance)
+
+  Score each factor with raw score, weight, weighted contribution, and evidence:
+  * Market Position:
+    - strong competitive position, pricing power, and customer relevance = 85-100
+    - credible position with manageable competition = 65-85
+    - mixed position with weak differentiation = 45-65
+    - weak position or structurally challenged relevance = 20-45
+  * Operating Quality:
+    - strong margin structure, cash conversion, and sensible capital intensity = 85-100
+    - decent economics with some variability = 65-85
+    - inconsistent profitability or weak capital efficiency = 45-65
+    - structurally weak economics = 20-45
+  * Management:
+    - disciplined capital allocation, credible guidance, strong operating discipline = 85-100
+    - mostly credible execution with manageable issues = 65-85
+    - uneven execution or promotional tone = 45-65
+    - repeated misses, weak allocation, or poor discipline = 20-45
+  * Execution:
+    - strong delivery against growth, cost, and capital objectives = 85-100
+    - credible execution with some slippage = 65-85
+    - inconsistent execution or integration issues = 45-65
+    - persistent operational underperformance = 20-45
+  * Balance Sheet:
+    - strong liquidity, manageable leverage, low refinancing stress = 85-100
+    - adequate balance sheet with manageable sensitivity = 65-85
+    - elevated leverage or funding dependence = 45-65
+    - stressed balance sheet or meaningful recapitalization risk = 20-45
+  * Governance:
+    - transparent disclosures, aligned incentives, strong oversight = 80-100
+    - acceptable governance with minor concerns = 60-80
+    - weak disclosure, incentive issues, or oversight concerns = 35-60
+
+  Step 4: Value Score (0-100)
+  Formula:
+  = (0.30 * Intrinsic Value vs Market Cap) + (0.25 * Cash-Flow Yield) + (0.20 * Relative Multiple) + (0.15 * Growth Quality) + (0.10 * Strategic Value)
+
+  * Intrinsic Value vs Market Cap:
+    - compare current market value to the primary valuation anchor
+    - score higher when upside is supported by real earnings/cash economics, not loose narrative
+  * Cash-Flow Yield:
+    - compare normalized cash-flow yield to risk, capital intensity, and leverage
+    - discount if reported cash generation is low quality or one-off
+  * Relative Multiple:
+    - compare trading multiple to relevant peers after adjusting for quality, cyclicality, capital intensity, and balance-sheet risk
+  * Growth Quality:
+    - evaluate whether growth is organic, repeatable, margin-supportive, and value-accretive
+    - discount if growth is mostly acquisition-dependent or low-return
+  * Strategic Value:
+    - consider consolidation appeal, scarcity, strategic assets, network position, or breakup value where relevant
+
+  Step 5: Scenario Framework and Price Targets
+  * Price targets:
+    - 12m and 24m bull/base/bear targets
+    - scenario probabilities, each horizon summing to 100%
+    - probability-weighted target for 12m and 24m
+    - explicit scenario drivers: revenue growth, pricing, margin, cash conversion, leverage, and capital allocation
+    - target reconciliation to EV/EBITDA, EV/EBIT, P/E, FCF yield, asset-based value, or stated sum-of-the-parts anchor
+  * Timeline:
+    - current earnings and cash baseline
+    - next 24m milestones: guidance updates, contract renewals, product/service launches, cost-out delivery, integration milestones, refinancing decisions, and capital-allocation moves
+    - status: on-track / at-risk / speculative
+    - impact on 24m probability-weighted target
+    - primary risk
+  * Headwinds/tailwinds:
+    - threshold-driven quantitative factors with directional earnings and cash impact
+    - material qualitative factors with evidence and expected duration
+  * Investment recommendation paragraph:
+    - core thesis reason
+    - key 12m catalyst
+    - key invalidation risk
+    - sizing context: core / cyclical / recovery / speculative / avoid
+  * Key risks: ranked list with probability and impact.
+  * Key opportunities: ranked list with trigger and valuation impact.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Revenue growth split: organic vs acquired vs price/mix.
+  * Gross margin / EBITDA margin / EBIT margin.
+  * FCF conversion and maintenance capex.
+  * Working-capital intensity and seasonality.
+  * Net debt / leverage / covenant headroom / maturity profile.
+  * Segment mix and concentration.
+  * Return on capital / reinvestment efficiency.
+  * Dividend / buyback / acquisition / deleveraging capacity.
+
+  Cross-check requirements before final output:
+  * Current earnings and cash baseline must reconcile to the latest primary-source result.
+  * Revenue-quality commentary must distinguish recurring/repeat from one-off or acquired revenue.
+  * Margin commentary must reconcile to cost structure, capex, working capital, and operating disclosures.
+  * Valuation anchor must distinguish current from normalized earnings where conditions are clearly non-normal.
+  * Valuation anchor must be mathematically consistent with stated growth, margin, cash-flow, and share-count assumptions.
+  * Quality and Value weighted totals must equal stated final scores.
+  * Price targets must be tied to explicit revenue, margin, cash, leverage, and multiple assumptions.
+  * Do not create a risk from template structure alone. If a missing data point is immaterial because equivalent disclosure already answers the economics, say so explicitly rather than marking the company down for template non-compliance.
