@@ -205,3 +205,194 @@ verification_schema:
         - guidance
         - development_timeline
         critical: true
+
+rubric: |
+  Run an investment analysis on [Company Name] using this gaming-interactive rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to franchise durability, release-slate quality, live-ops retention, platform economics, cash conversion, or scenario confidence.
+
+  First classify the business:
+  * Premium game publisher: value driven by release slate quality, franchise strength, launch execution, review/commercial hit rate, and catalog longevity.
+  * Live-service / free-to-play operator: value driven by retention, engagement, content cadence, monetisation per active user, and user-acquisition efficiency.
+  * Mobile-games portfolio operator: value driven by portfolio breadth, UA payback, live-ops discipline, platform fees, and hit-refresh cadence.
+  * Studio / developer-led content platform: value driven by creative execution, development pipeline, owned IP, partner dependence, and capital discipline.
+  * Interactive platform / ecosystem with gaming exposure: value driven by audience scale, engagement, monetisation mix, creator/platform economics, and community stickiness.
+  * Hybrid gaming group: separate premium launches, live-ops bookings, licensing, platform/marketplace revenue, and services/outsourcing rather than averaging them into one multiple.
+
+  Use that classification to decide valuation emphasis:
+  * Premium publisher: launch slate, franchise depth, content spending efficiency, platform mix, and catalog tail economics.
+  * Live-service/F2P: DAU/MAU quality, payer conversion, ARPDAU/ARPU, retention/cohorts, content cadence, and UA efficiency.
+  * Mobile portfolio: portfolio diversification, hit decay, UA discipline, ad monetisation mix, and platform dependence.
+  * Studio/developer-led: development milestones, partner/publisher terms, IP ownership, staffing/productivity, and financing runway.
+  * Interactive platform/ecosystem: engagement quality, creator economics, monetisation yield, moderation/platform policy risk, and network effects.
+  * Hybrid group: separate durable live-ops and recurring catalog economics from hit-driven new launches and lower-quality services revenue.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Franchise/product summary and timeline to key launches, content cadence, engagement, margin, and financing milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source bookings, revenue, DAU/MAU, ARPU/ARPDAU, engagement, platform-fee, margin, and balance-sheet data from the company's primary exchange filings plus annual/interim reports, investor presentations, launch/trading updates, and material studio or capital-allocation announcements.
+  * Prefer primary sources: exchange filings, statutory reports, company KPI disclosures, launch/slate updates, engagement metrics, platform/store disclosures where relevant, and debt/refinancing announcements. Use secondary sources only where they add factual context on platform policy, market demand, genre trends, user-acquisition conditions, or competitor launches.
+  * For every key numeric input used in valuation, Quality, Value, price targets, bookings, retention, engagement, margins, leverage, or cash-flow analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, launch/slate disclosures, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, franchise durability, release timing, engagement quality, monetisation, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Slate, Engagement, and Monetisation-Quality Workup
+  For each material franchise, title, studio, platform layer, or earnings stream, capture where disclosed:
+  * Franchise/title/business line name, geography, platform, customer type, and next milestone.
+  * Revenue model: upfront premium sale, downloadable content, live-service spend, in-app purchase, advertising, subscription/licensing, platform fee share, or hybrid.
+  * Demand drivers: release slate, content cadence, DAU/MAU, engagement hours, payer conversion, ARPU/ARPDAU, catalog sales, or partner/platform take-up.
+  * Distribution mix: console, PC, mobile, subscription platform, direct, app store, creator platform, or partner channel.
+  * Cost profile: UA/marketing, platform fees, revenue share, live-ops support, studio headcount, capitalized development, and working-capital profile.
+
+  Franchise/IP strength discipline:
+  * Assess whether the company owns durable franchises or relies on one-off hits, licensed content, or externally controlled IP.
+  * Distinguish genuine franchise depth from temporary success caused by novelty, one strong title, or cyclical genre popularity.
+  * Assess catalog tail, sequel cadence, cross-platform relevance, and merch/licensing optionality where relevant.
+  * For studio-led businesses, assess whether IP ownership and release control sit with the company or a partner/publisher.
+  * Do not award premium multiples to “IP value” without evidence of repeat monetisation and player retention.
+
+  Retention and live-ops discipline:
+  * Establish the current bookings/revenue baseline from the latest half, quarter, or run-rate.
+  * Distinguish new-title revenue from recurring live-ops/catalog revenue and from services/outsourcing revenue.
+  * Assess retention quality through DAU/MAU, payer metrics, cohort commentary, repeat spending, content cadence, and event/live-ops effectiveness.
+  * Distinguish genuine engagement durability from launch spike or paid-acquisition inflation.
+  * Do not treat short-term engagement spikes or successful launch weeks as durable retention proof.
+
+  Monetisation-quality discipline:
+  * Assess monetisation mix: premium box sales, DLC, battle pass/live-service spend, ads, subscriptions, or platform revenue.
+  * Distinguish healthy monetisation from player-hostile short-term extraction that can damage retention and lifetime value.
+  * Assess payer conversion, ARPU/ARPDAU, catalog pricing, discounting, and platform fee burden where disclosed.
+  * For mobile and F2P, assess UA efficiency and payback rather than just headline bookings growth.
+  * Do not award premium valuation to revenue growth that relies on unsustainably high UA, one-off launch hype, or weak player-value quality.
+
+  Release-slate and execution discipline:
+  * Break out the near-term slate by title/studio, release timing, development status, delay risk, and expected commercial importance where disclosed.
+  * Distinguish a diversified slate from a business economically dependent on one or two launches.
+  * Assess development productivity, capitalized content spend, studio turnover, outsourcing dependence, and delay history.
+  * For premium publishers, assess whether the current multiple quietly assumes unrealistically clean launch execution.
+  * Do not treat announced titles as value-accretive if timing, budget, or commercial viability remain highly uncertain.
+
+  Margin, cash-conversion, and balance-sheet discipline:
+  * Break out margin drivers: mix between launches and live ops, platform fees, royalty/revenue share, UA spend, headcount, hosting costs, and development capitalization where disclosed.
+  * Distinguish structurally attractive catalog/live-service margins from launch-period volatility.
+  * Assess free cash flow, capitalized development, working-capital timing, and whether reported earnings convert into real cash.
+  * Identify cash, debt, covenant headroom, refinancing risk, buybacks, M&A, and runway for the next major proof point.
+  * Do not give full credit for profits if cash generation depends heavily on capitalization, launch timing, or underinvestment in content.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation suited to the gaming business model. Do not apply generic software multiples to hit-driven or low-visibility bookings, and do not ignore platform fees or content reinvestment.
+
+  Core valuation anchors:
+  * EV/Bookings or EV/Revenue: useful if you clearly distinguish durable live-ops/catalog revenue from volatile launch revenue.
+  * EV/EBIT or EV/EBITDA: useful for mature, cash-generative publishers if platform fees, live-ops spend, and development capitalization are handled properly.
+  * FCF yield: useful where cash conversion is strong after content spend and maintenance investment.
+  * Sum-of-the-parts: use when premium launches, live-service/catalog, platform revenue, and services/licensing deserve different assumptions.
+  * Slate-optional value cross-check: use to test upside from major launches, but do not let speculative slate optimism dominate the base case.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using EV/Bookings, justify the choice with bookings quality, retention, catalog/live-ops mix, and cash conversion.
+  * If using EBITDA, explain platform fees, capitalization policy, live-service investment, and whether EBITDA overstates owner earnings.
+  * If using FCF yield, reconcile to real content-development needs and working-capital timing.
+  * Cross-check with peers only after adjusting for franchise quality, slate risk, monetisation mix, platform dependence, and balance-sheet strength.
+  * Do not give the same multiple to durable live-service franchises as to one-shot launch stories or outsourced-services revenue.
+
+  Step 3: Quality Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Quality factor weightings:
+  * Franchise/IP Strength: 20%
+  * Retention & Live Ops: 20%
+  * Management: 15%
+  * Monetisation Quality: 20%
+  * Balance Sheet: 15%
+  * Governance: 10%
+
+  Quality scoring formula:
+  * Quality Score = sum(weighted factor scores), 0-100.
+
+  Quality scoring guidance:
+  * Franchise/IP Strength: score durable owned IP, catalog tail, and dependence on repeatable franchises.
+  * Retention & Live Ops: score engagement quality, content cadence, cohort durability, and repeat-spend behavior.
+  * Management: score capital allocation, slate discipline, disclosure quality, and execution realism.
+  * Monetisation Quality: score pricing, platform economics, payer quality, UA efficiency, and player-value sustainability.
+  * Balance Sheet: score liquidity, leverage, runway, and ability to fund content without damaging equity economics.
+  * Governance: score transparency, capitalized-cost discipline, studio incentives, related-party risk, and treatment of minority holders.
+
+  Quality grading bands:
+  * 85-100: top-tier gaming business with durable IP, strong retention, disciplined monetisation, and robust funding.
+  * 70-84: good business with clear strengths and manageable slate/engagement risks.
+  * 50-69: mixed quality; some attractive franchises or live-ops economics but meaningful concerns on execution, slate dependence, or balance sheet.
+  * Below 50: weak content economics, fragile retention, or governance/balance-sheet issues that materially impair quality.
+
+  Step 4: Value Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Value factor weightings:
+  * Intrinsic Value vs Market Cap: 30%
+  * EV/Bookings vs Growth: 20%
+  * Cash Conversion: 20%
+  * Release Slate Optionality: 15%
+  * Strategic Value: 15%
+
+  Value scoring formula:
+  * Value Score = sum(weighted factor scores), 0-100.
+
+  Value scoring guidance:
+  * Intrinsic Value vs Market Cap: compare your base-case valuation to current market cap and explain the gap.
+  * EV/Bookings vs Growth: assess whether the market multiple matches the quality and durability of bookings growth.
+  * Cash Conversion: assess normalized free-cash-flow yield after real content-development and live-ops investment.
+  * Release Slate Optionality: score upside from credible upcoming launches without overcrediting speculative titles.
+  * Strategic Value: assess whether the IP, audience, studios, or platform/community assets would matter to a strategic buyer.
+
+  Value grading bands:
+  * 85-100: materially undervalued relative to durable franchise/bookings economics and realistic slate upside.
+  * 70-84: undervalued with clear upside and manageable release/engagement risks.
+  * 50-69: roughly fair value or upside offset by slate risk, platform dependence, or weak cash conversion.
+  * Below 50: expensive or weakly supported by normalized gaming economics.
+
+  Step 5: Scenario Framework and Price Targets
+  Provide bull, base, and bear cases with:
+  * 12M target and 24M target.
+  * Probability for each scenario.
+  * Short description of what operationally changes.
+  * Current positioning (bull-leaning, base-leaning, mixed, bear-leaning).
+  * Explicit conditions that must hold.
+  * Explicit failure conditions.
+
+  Scenario design rules:
+  * Bull case should require evidence of successful major launches, stronger retention/live-ops performance, better monetisation, or platform/community growth that the market is underestimating.
+  * Base case should reflect the most likely path using conservative assumptions on release timing, engagement, monetisation, platform fees, and cash conversion.
+  * Bear case should reflect realistic downside from launch misses, delays, retention fade, higher UA/platform costs, or financing strain.
+  * Do not let bull/base/bear differ only by exit multiple; slate, engagement, and cash assumptions must change.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Bookings, revenue, DAU/MAU, ARPU/ARPDAU, payer conversion, retention, and platform mix.
+  * Catalog/live-ops share versus new-release share, launch cadence, and content-spend intensity.
+  * Gross margin, EBITDA margin, EBIT margin, platform-fee burden, and free-cash-flow conversion.
+  * Net debt / EBITDA, liquidity runway, capitalized development, and buyback/M&A capacity.
+  * Platform dependence, studio concentration, IP mix, and major launch dependencies.
+
+  Cross-check requirements before final output:
+  * Ensure bookings, revenue, and live-ops/catalog quality are not conflated.
+  * Ensure valuation reflects real content-investment needs and platform-fee burden rather than just adjusted EBITDA optics.
+  * Ensure recurring live-ops/catalog economics are distinguished from hit-driven launch revenue.
+  * Ensure major title optionality does not overwhelm the base case unless execution evidence supports it.
+  * Ensure price targets are supported by slate, engagement, and cash assumptions, not just a multiple overlay.
