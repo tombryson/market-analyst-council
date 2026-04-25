@@ -230,3 +230,200 @@ verification_schema:
         - guidance
         - development_timeline
         critical: true
+
+rubric: |
+  Run an investment analysis on [Company Name] using this datacentres rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to power access, lease quality, capacity delivery, build economics, funding risk, or scenario confidence.
+
+  First classify the platform:
+  * Hyperscale development platform: value driven by landbank quality, power/grid access, pre-leasing, development yield, and funding capacity.
+  * Stabilized colocation / interconnection operator: value driven by recurring rent, customer stickiness, churn, cross-connect density, and incremental margin on occupied capacity.
+  * Wholesale / build-to-suit operator: value driven by anchor-customer quality, contract duration, rent escalators, delivery execution, and renewal/repricing risk.
+  * Digital infrastructure REIT / asset-backed owner: value driven by contracted cash flows, occupancy/utilization, cap-rate discipline, refinancing, and growth pipeline.
+  * Powered-land / entitlement platform: value driven by site control, permitting, utility position, and monetization path rather than current earnings.
+  * Hybrid datacentre platform: separate stabilized operating assets, development pipeline, powered landbank, services/interconnection, and non-core activities rather than averaging the whole business.
+
+  Use that classification to decide valuation emphasis:
+  * Hyperscale development: power secured, time to energization, pre-leasing, cost per MW, yield on cost, and access to capital.
+  * Stabilized colo/interconnection: MRR/recurring rent quality, churn, utilization, pricing, customer concentration, and operating leverage on incremental occupancy.
+  * Wholesale/build-to-suit: tenant credit, lease tenor, escalators, renewal timing, contracted MW, and delivery execution.
+  * Asset-backed REIT: NAV credibility, FFO/AFFO quality, debt structure, lease roll, and development optionality.
+  * Powered-land platform: probability of utility approval, entitlement timing, scarcity value, and takeout/partner economics.
+  * Hybrid: separate long-duration contracted earnings from more speculative development or land value.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Portfolio/pipeline summary and timeline to key power, commissioning, lease-up, utilization, refinancing, and development milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source capacity, power, lease, utilization, pipeline, capex, debt, and cash-flow data from the company's primary exchange filings plus annual/interim reports, investor presentations, debt/funding announcements, and material operating updates.
+  * Prefer primary sources: exchange filings, statutory reports, capacity tables, site-level development updates, financing disclosures, utility/power milestones, and company leasing commentary. Use secondary sources only where they add factual context on hyperscaler demand, regional supply, power constraints, lease-rate trends, or transaction/cap-rate evidence.
+  * For every key numeric input used in valuation, Quality, Value, price targets, MW delivery, utilization, rents, capex per MW, financing cost, NAV, FFO, or cash-flow analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, site/pipeline disclosures, debt disclosures, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, power access, lease-up, capex intensity, funding risk, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Capacity, Power, and Contracted-Earnings Workup
+  For each material site, campus, region, or earnings stream, capture where disclosed:
+  * Site/campus name, geography, site type, customer type, and next milestone.
+  * Capacity profile: delivered MW, leased MW, reserved MW, under-construction MW, powered shell, and future land/power option where relevant.
+  * Revenue model: colocation, wholesale, build-to-suit, powered shell, land monetization, interconnection/services, or hybrid.
+  * Contract profile: anchor tenant, customer concentration, lease tenor, escalators, renewal profile, and credit quality where disclosed.
+  * Development profile: utility status, substation/transmission dependencies, permitting, commissioning date, capex per MW, and expected stabilization timeline.
+
+  Power-access and site-quality discipline:
+  * Establish the current delivered-capacity baseline from the latest half, quarter, or run-rate.
+  * Distinguish secured power from requested power, theoretical landbank potential, and non-binding utility discussions.
+  * Assess site quality through grid access, time to energization, network importance, land control, permitting complexity, and scarcity.
+  * Distinguish a real power moat from speculative site marketing.
+  * Do not give full credit for undeveloped landbank or headline pipeline if the power path is uncertain.
+
+  Lease quality and customer-mix discipline:
+  * Assess whether earnings are supported by long-duration contracted rent, recurring colo revenue, or more speculative lease-up assumptions.
+  * Distinguish pre-leased MW, reserved-but-not-billed MW, and uncontracted speculative capacity.
+  * Identify customer concentration, hyperscaler dependence, tenant credit quality, and renewal/repricing risk.
+  * For interconnection-heavy or retail colo models, assess churn, switching costs, density, and whether stickiness is genuine.
+  * Do not treat headline bookings or reservation announcements as equivalent to contracted cash earnings unless terms are clear.
+
+  Delivery execution and build-economics discipline:
+  * Break out development phases, commissioning dates, contractor dependencies, major equipment dependencies, and capex per MW.
+  * Assess whether yield on cost remains attractive after power equipment, civil works, financing, and delay risk.
+  * Distinguish capacity announced, capacity under active construction, and capacity that is actually energised and billable.
+  * Identify whether delivery timelines are slipping, holding, or accelerating and whether the company has a credible execution record.
+  * Do not treat incremental MW as value-accretive if returns are falling or delivery is perpetually deferred.
+
+  Utilization, margin, and cash-earnings discipline:
+  * Assess occupancy/utilization, ramp profile, rent per kW or equivalent pricing, operating margin, and incremental margin on additional leased capacity.
+  * Distinguish mature cash-yielding sites from ramping sites still carrying subscale cost.
+  * For REIT-like structures, reconcile site-level earnings to EBITDA, FFO/AFFO, or the closest disclosed recurring cash metric.
+  * Distinguish recurring cash earnings from development gains, fair-value uplifts, or capitalized interest smoothing.
+  * Do not treat EBITDA growth as high quality if it is flattered by capitalization, revaluation, or under-maintenance assumptions.
+
+  Funding, leverage, and refinancing discipline:
+  * Identify cash, debt, project finance, covenant headroom, debt maturity profile, fixed-versus-floating exposure, and undrawn liquidity.
+  * Assess whether the current funding base can support the announced build pipeline without punitive equity dilution or balance-sheet stress.
+  * Distinguish self-funded development, customer-funded build, asset recycling, JV funding, and speculative balance-sheet expansion.
+  * Assess refinancing risk relative to asset stabilization, lease maturity, and rate environment.
+  * Do not assume the full pipeline is financeable unless sources and uses are credible.
+
+  Capital-allocation and structure discipline:
+  * Assess whether management is prioritizing high-return, power-secure sites or simply maximizing headline pipeline size.
+  * For JVs, external managers, or complex structures, assess fee leakage, minority leakage, and who actually captures the economics.
+  * For land-heavy or early-stage vehicles, separate land option value from operating datacentre value.
+  * Distinguish strategic capital partnering from funding dependency that erodes equity economics.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation using datacentre-appropriate anchors. Do not force generic tech or generic REIT multiples where delivered MW, contracted cash flow, development yield, and NAV matter more.
+
+  Core valuation anchors:
+  * NAV / asset value: primary for asset-backed owners and REIT-like platforms where site values, stabilized NOI, and cap rates are reasonably observable.
+  * EV / delivered MW or EV / stabilized MW: useful if you clearly separate energized, leased, reserved, and speculative capacity.
+  * FFO/AFFO or recurring cash-earnings yield: useful where stabilized recurring earnings exist.
+  * Sum-of-the-parts: use when operating assets, development pipeline, powered landbank, interconnection/services, and JV stakes deserve different assumptions.
+  * Development-yield cross-check: compare cost per MW, lease rate, target stabilized yield, and market transaction benchmarks.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using EV/MW, specify whether the denominator is delivered, leased, stabilized, reserved, or pipeline MW and justify the choice.
+  * If using NAV, separate stabilized assets from development and speculative landbank.
+  * If using recurring cash-earnings multiples, reconcile carefully for capitalization policies, maintenance capex, and timing of lease-up.
+  * Cross-check with peers only after adjusting for power security, customer concentration, geography, stage of development, leverage, and cost of capital.
+  * Do not give the same value per MW to speculative future capacity as to energized, leased, cash-yielding capacity.
+
+  Step 3: Quality Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Quality factor weightings:
+  * Power Access & Site Quality: 25%
+  * Lease Quality & Customer Mix: 20%
+  * Management: 15%
+  * Delivery Execution: 15%
+  * Balance Sheet/Funding: 15%
+  * Governance: 10%
+
+  Quality scoring formula:
+  * Quality Score = sum(weighted factor scores), 0-100.
+
+  Quality scoring guidance:
+  * Power Access & Site Quality: score secured power, time to energization, location quality, land control, and scarcity.
+  * Lease Quality & Customer Mix: score contract duration, credit quality, churn, concentration, and pricing durability.
+  * Management: score capital allocation, disclosure quality, and realism of pipeline guidance.
+  * Delivery Execution: score track record of energizing and leasing assets on time and on budget.
+  * Balance Sheet/Funding: score liquidity, leverage, refinancing profile, and ability to finance the next stages without damaging equity returns.
+  * Governance: score alignment, structure simplicity, related-party risk, and transparency.
+
+  Quality grading bands:
+  * 85-100: top-tier digital infrastructure platform with secured power, strong contracts, disciplined growth, and credible funding.
+  * 70-84: good platform with clear strengths and manageable execution/funding risks.
+  * 50-69: mixed quality; some attractive assets but meaningful uncertainty on delivery, funding, or concentration.
+  * Below 50: weak site quality, speculative pipeline, fragile funding, or governance issues that materially impair quality.
+
+  Step 4: Value Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Value factor weightings:
+  * NAV vs Market Cap: 30%
+  * EV/Delivered MW: 20%
+  * FFO/FCF Yield: 20%
+  * Lease-up Optionality: 15%
+  * Strategic Value: 15%
+
+  Value scoring formula:
+  * Value Score = sum(weighted factor scores), 0-100.
+
+  Value scoring guidance:
+  * NAV vs Market Cap: compare your base-case asset value to current market cap and explain the gap.
+  * EV/Delivered MW: assess whether the market is paying a fair value for actually energized and value-relevant capacity.
+  * FFO/FCF Yield: assess normalized recurring cash yield after maintenance, lease-up, and funding needs.
+  * Lease-up Optionality: score the value of moving reserved/available capacity into revenue-producing occupancy without overcrediting speculative demand.
+  * Strategic Value: assess whether the sites, power rights, or customer position would matter to a strategic buyer or capital partner.
+
+  Value grading bands:
+  * 85-100: materially undervalued relative to stabilized asset value and realistic development upside.
+  * 70-84: undervalued with credible upside and manageable execution/funding risk.
+  * 50-69: roughly fair value or upside offset by stage, funding, or concentration risks.
+  * Below 50: expensive or poorly supported by asset quality, earnings quality, or financeability.
+
+  Step 5: Scenario Framework and Price Targets
+  Provide bull, base, and bear cases with:
+  * 12M target and 24M target.
+  * Probability for each scenario.
+  * Short description of what operationally changes.
+  * Current positioning (bull-leaning, base-leaning, mixed, bear-leaning).
+  * Explicit conditions that must hold.
+  * Explicit failure conditions.
+
+  Scenario design rules:
+  * Bull case should require evidence of power secured, successful delivery, strong lease-up, or funding improvements that the market is underestimating.
+  * Base case should reflect the most likely path using conservative assumptions on energization, pre-leasing, capex, financing, and stabilization.
+  * Bear case should reflect realistic downside from power delays, construction slippage, customer concentration, rent pressure, refinancing strain, or overbuilt regional supply.
+  * Do not let bull/base/bear differ only by exit multiple; operating and financing assumptions must change.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Delivered MW, leased MW, reserved MW, under-construction MW, and future powered-land option.
+  * Utilization/occupancy, rent per kW, lease tenor, escalators, churn, and customer concentration.
+  * Capex per MW, target stabilized yield, time to energization, and commissioning milestones.
+  * EBITDA, FFO/AFFO, cash conversion, net debt / EBITDA, interest cover, and liquidity runway.
+  * Regional supply pipeline, hyperscaler demand context, power constraint exposure, and key JV/partner economics.
+
+  Cross-check requirements before final output:
+  * Ensure leased, reserved, delivered, and pipeline MW are not conflated.
+  * Ensure valuation gives different treatment to stabilized assets, in-flight development, and speculative landbank.
+  * Ensure funding conclusions are consistent with the build schedule and sources/uses of capital.
+  * Ensure recurring cash-earnings claims reconcile against capitalization policy, lease-up timing, and maintenance needs.
+  * Ensure price targets are supported by operating and financing assumptions, not just a multiple overlay.
