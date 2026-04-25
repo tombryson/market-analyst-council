@@ -215,3 +215,194 @@ verification_schema:
         - guidance
         - development_timeline
         critical: true
+
+rubric: |
+  Run an investment analysis on [Company Name] using this industrials rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to order-book quality, margin structure, utilization, working-capital intensity, capital requirements, or scenario confidence.
+
+  First classify the business:
+  * Engineered products / industrial manufacturer: value driven by product differentiation, pricing, plant utilization, margin resilience, and aftermarket/service attachment.
+  * Industrial distributor / intermediary: value driven by throughput, gross-margin capture, customer relationships, working-capital turns, and network density.
+  * Engineering / project / contractor model: value driven by order intake, backlog quality, project execution, claims/change-order risk, and cash conversion.
+  * Asset-heavy processing / logistics / infrastructure operator: value driven by utilization, throughput, maintenance capex, contract structure, and cycle sensitivity.
+  * Contract manufacturing / outsourced industrial services: value driven by customer concentration, capacity utilization, input-cost pass-through, and margin discipline.
+  * Hybrid industrial platform: separate product, service, project, distribution, and asset-heavy earnings streams rather than forcing them into one blended multiple.
+
+  Use that classification to decide valuation emphasis:
+  * Engineered products: pricing power, end-market mix, aftermarket/service, plant efficiency, and replacement/competitive moat.
+  * Distributor/intermediary: revenue quality, gross-margin stability, inventory turns, customer retention, and working-capital discipline.
+  * Project/contractor: order-book quality, fixed-price exposure, execution risk, margin recognition, and cash conversion.
+  * Asset-heavy operator: throughput/utilization, maintenance burden, contract visibility, operating leverage, and balance-sheet resilience.
+  * Contract manufacturing/services: customer concentration, renewal/retention, utilization, labour/content risk, and return on incremental capital.
+  * Hybrid: separate higher-quality recurring/service earnings from cyclical project or lower-quality pass-through revenue.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Operating summary and timeline to key order-book, backlog conversion, utilization, margin, capex, and financing milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source revenue, backlog, margin, plant/service, capex, working-capital, and balance-sheet data from the company's primary exchange filings plus annual/interim reports, investor presentations, operating updates, and financing announcements.
+  * Prefer primary sources: exchange filings, statutory reports, order-book/backlog tables, plant and utilization commentary, contract announcements, segment notes, and debt/refinancing disclosures. Use secondary sources only where they add factual context on end-market demand, industry pricing, cost inflation, procurement trends, or financing backdrop.
+  * For every key numeric input used in valuation, Quality, Value, price targets, backlog, margins, utilization, working capital, leverage, or cash-flow analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, operating disclosures, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, order-book quality, margins, capacity utilization, funding risk, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Order Book, Plant, and Earnings-Quality Workup
+  For each material segment, plant, contract stream, or earnings stream, capture where disclosed:
+  * Segment/business line name, end market, geography, customer type, and next milestone.
+  * Revenue model: engineered product sales, recurring service/aftermarket, distribution margin, long-cycle project, throughput/processing, contract manufacturing, or hybrid.
+  * Demand drivers: order intake, backlog, throughput, utilization, customer activity, replacement demand, capex cycle, and pricing/mix.
+  * Cost structure: variable cost, fixed-cost burden, labour intensity, maintenance capex, inventory needs, and working-capital profile.
+  * Growth levers: price, mix, new contracts, backlog conversion, service penetration, utilization uplift, bolt-on M&A, or cost-out.
+
+  Demand visibility and order-book discipline:
+  * Establish the current revenue baseline from the latest half, quarter, or run-rate.
+  * Distinguish recurring/service revenue, project revenue, pass-through revenue, and one-off revenue. Do not treat them as equivalent.
+  * For project or engineered businesses, assess order intake, book-to-bill, backlog age, cancellation risk, margin quality, and customer diversification.
+  * For more cyclical manufacturers, distinguish genuine end-demand strength from temporary inventory replenishment or distributor restocking.
+  * Do not award high-quality multiples to headline backlog or revenue if cash conversion, cancellation risk, or margin visibility is poor.
+
+  Asset/operating quality discipline:
+  * Assess plant/network quality, asset age, maintenance burden, automation, service quality, and operating bottlenecks.
+  * Distinguish genuine operating leverage from fragile margins that only work at peak utilization.
+  * Assess whether the company owns differentiated assets, engineering IP, distribution reach, or service capability that supports above-cycle returns.
+  * For asset-heavy operators, distinguish contracted utilization from spot/cycle-exposed throughput.
+  * Do not treat scale as a moat unless evidence shows margin resilience, switching costs, or asset scarcity.
+
+  Margin and pricing discipline:
+  * Break out gross-margin and EBIT/EBITDA drivers: price, volume, mix, utilization, input costs, labour, freight, procurement, and cost-out programs where disclosed.
+  * Distinguish temporary cost relief from structural improvement in mix, pricing, or asset efficiency.
+  * Assess whether pricing pass-through is contractual, lagged, partial, or effectively unavailable.
+  * For project businesses, assess whether margin recognition is conservative and cash-backed or vulnerable to later reversals.
+  * Do not treat adjusted earnings as high quality unless they reconcile back to statutory profit and cash flow cleanly.
+
+  Working-capital and cash-conversion discipline:
+  * Assess inventory intensity, debtor/payable behavior, contract assets/liabilities where relevant, progress payments, retention balances, and seasonal swings.
+  * Distinguish genuine free cash flow from short-term working-capital release, milestone timing, or stretched payables.
+  * For distributors and manufacturers, assess stock turns, obsolescence risk, and whether inventory is growing ahead of real demand.
+  * For project/contractor names, assess whether earnings are converting into cash or being trapped in receivables, claims, and WIP.
+  * Do not give full credit for profits if cash conversion is persistently weak without a convincing operational reason.
+
+  Balance-sheet and capital-allocation discipline:
+  * Identify cash, debt, lease liabilities where relevant, covenant headroom, debt maturity profile, refinancing risk, and liquidity.
+  * Assess whether capex, M&A, dividends, buybacks, and restructuring are being funded responsibly.
+  * Distinguish maintenance capex from growth capex and identify whether reported free cash flow is after real maintenance needs.
+  * For acquisitive industrial groups, separate acquisition-led growth from true organic improvement and assess integration quality.
+  * Distinguish resilient balance sheets from those that only look safe at current cycle conditions.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation suited to the industrial business model. Do not pay premium multiples for low-quality pass-through revenue, peak-cycle earnings, or order books that are not converting into cash.
+
+  Core valuation anchors:
+  * EV/EBITDA or EV/EBIT: useful for many industrial operating businesses if capex intensity and cyclicality are handled properly.
+  * P/E on normalized earnings: useful where earnings quality is strong, maintenance capex is manageable, and cycle position is not extreme.
+  * FCF yield: useful where working-capital behavior and maintenance capex are honest and repeatable.
+  * Sum-of-the-parts: use when product, service, project, infrastructure, and distribution earnings deserve different assumptions.
+  * Asset-based cross-checks: use where owned infrastructure, equipment base, or land/asset value is central to the case.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using EBITDA, explain maintenance capex, working-capital intensity, and whether EBITDA overstates owner earnings.
+  * If using P/E, explain why current earnings are a fair proxy for normalized earnings, or show the normalization bridge.
+  * If using FCF yield, reconcile to real maintenance capex, contract cash conversion, and working-capital needs.
+  * If the company is cyclical, value on normalized mid-cycle earnings rather than peak or trough conditions.
+  * Cross-check with peers only after adjusting for end-market exposure, service mix, balance-sheet risk, and cash-conversion quality.
+
+  Step 3: Quality Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Quality factor weightings:
+  * Demand Resilience: 20%
+  * Asset/Operating Quality: 20%
+  * Management: 15%
+  * Execution: 20%
+  * Balance Sheet: 15%
+  * Governance: 10%
+
+  Quality scoring formula:
+  * Quality Score = sum(weighted factor scores), 0-100.
+
+  Quality scoring guidance:
+  * Demand Resilience: score end-market stability, order-book quality, recurring/service mix, and customer diversity.
+  * Asset/Operating Quality: score plant/network quality, margin resilience, utilization economics, and competitive differentiation.
+  * Management: score capital allocation, disclosure quality, and cycle awareness.
+  * Execution: score delivery against margin, backlog conversion, project execution, and operational targets.
+  * Balance Sheet: score leverage, liquidity, covenant headroom, and ability to withstand cyclical weakness.
+  * Governance: score alignment, transparency, related-party risk, and treatment of minority holders.
+
+  Quality grading bands:
+  * 85-100: top-tier industrial business with resilient demand, strong operating assets, disciplined execution, and robust funding.
+  * 70-84: good business with clear strengths and manageable cyclical/execution risks.
+  * 50-69: mixed quality; some attractive assets but clear concerns on cycle, execution, or balance sheet.
+  * Below 50: weak economics, weak conversion, or governance/balance-sheet issues that materially impair quality.
+
+  Step 4: Value Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Value factor weightings:
+  * Intrinsic Value vs Market Cap: 30%
+  * Earnings/FCF Yield: 20%
+  * Multiple vs Peers: 20%
+  * Growth/Reinvestment Quality: 15%
+  * Strategic Value: 15%
+
+  Value scoring formula:
+  * Value Score = sum(weighted factor scores), 0-100.
+
+  Value scoring guidance:
+  * Intrinsic Value vs Market Cap: compare your base-case valuation to the current market cap and explain the gap.
+  * Earnings/FCF Yield: assess normalized earnings and free-cash-flow yield after maintenance capex and working-capital needs.
+  * Multiple vs Peers: compare the trading multiple with peers after adjusting for cycle position, asset quality, and cash conversion.
+  * Growth/Reinvestment Quality: score whether reinvestment, service expansion, capex, or M&A are likely to earn attractive returns.
+  * Strategic Value: assess whether the assets, installed base, engineering capability, distribution footprint, or contracts would matter to a strategic buyer.
+
+  Value grading bands:
+  * 85-100: materially undervalued relative to normalized earnings and asset/service quality.
+  * 70-84: undervalued with clear upside and manageable risks.
+  * 50-69: roughly fair value or upside offset by cycle, execution, or conversion concerns.
+  * Below 50: expensive or weakly supported by fundamentals.
+
+  Step 5: Scenario Framework and Price Targets
+  Provide bull, base, and bear cases with:
+  * 12M target and 24M target.
+  * Probability for each scenario.
+  * Short description of what operationally changes.
+  * Current positioning (bull-leaning, base-leaning, mixed, bear-leaning).
+  * Explicit conditions that must hold.
+  * Explicit failure conditions.
+
+  Scenario design rules:
+  * Bull case should require evidence of stronger order intake, better backlog conversion, utilization/margin upside, or capital-allocation improvements that the market is underestimating.
+  * Base case should reflect the most likely path using conservative assumptions on demand, margin, utilization, capex, and cash conversion.
+  * Bear case should reflect realistic downside from order slowdown, cost inflation, project execution issues, utilization drops, or refinancing strain.
+  * Do not let bull/base/bear differ only by exit multiple; operating and cash assumptions must change.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Order intake, backlog, book-to-bill, utilization, throughput, and service/aftermarket mix.
+  * Gross margin, EBIT margin, EBITDA margin, and margin bridge commentary.
+  * Inventory turns, contract assets/liabilities, working-capital intensity, and free-cash-flow conversion.
+  * Maintenance versus growth capex, net debt / EBITDA, interest cover, and liquidity runway.
+  * Customer concentration, end-market exposure, geographic mix, and major contract or project dependencies.
+
+  Cross-check requirements before final output:
+  * Ensure order-book, backlog, and revenue-conversion claims are consistent with cash flow and execution evidence.
+  * Ensure margin conclusions reconcile against price, volume, mix, utilization, and input-cost dynamics.
+  * Ensure valuation reflects maintenance capex and working-capital reality rather than just EBITDA optics.
+  * Ensure cyclicality is reflected in the normalized valuation anchor.
+  * Ensure price targets are supported by operating and cash assumptions, not just a multiple overlay.
