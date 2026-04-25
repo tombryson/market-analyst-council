@@ -44,34 +44,43 @@ copy_paste_prompt: |-
   Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
 
   Analysis rubric:
-  Run an investment analysis on [COMPANY_NAME] following this rubric exactly. Keep the output investment-grade, explicit, and scenario-based. Use ASX-appropriate primary filings first and only use secondary sources where they add real value.
+  Run an investment analysis on [COMPANY_NAME] using this gambling rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to regulatory position, product economics, customer-value quality, channel/venue mix, cash conversion, or scenario confidence.
 
-  Template focus:
-  * Template ID: gambling
-  * Template Name: Gambling
-  * Template Description: Investment analysis for wagering, lotteries, gaming machines, casinos, and gambling technology businesses
-  * Analysis Type: gambling
+  First classify the business:
+  * Wagering / sportsbook operator: value driven by turnover growth, net win/hold, customer acquisition efficiency, product mix, and regulatory/tax burden.
+  * Lottery / keno operator: value driven by licence durability, jackpot cycle resilience, retail/digital mix, and highly cash-generative recurring economics.
+  * Casino / integrated gaming operator: value driven by gaming spend, non-gaming mix, VIP versus mass exposure, licence/regulatory standing, and fixed-cost leverage.
+  * Gaming machines / venue-based gaming operator: value driven by installed base, venue economics, machine yield, participation/replacement cycle, and regulator treatment.
+  * Gambling technology / platform / B2B supplier: value driven by recurring content/platform revenue, operator diversification, regulatory footprint, and contractual stickiness.
+  * Hybrid gambling platform: separate wagering, lotteries, venue/casino, machine, media/affiliate, and B2B technology earnings streams rather than blending them into one average multiple.
 
-  Required outputs:
-  * 12-month and 24-month price targets.
-  * Bull / base / bear scenario framework with probabilities that sum to 100% for each horizon.
-  * Quality Score out of 100 with explicit sub-factor scoring.
-  * Value Score out of 100 with explicit sub-factor scoring.
-  * Development / operating timeline to the next key milestones.
-  * Thesis Map with explicit conditions for bull, base, and bear paths.
-  * Monitoring Watchlist with red flags and confirmatory signals.
-  * Verification Queue listing unresolved facts that still matter to the thesis.
-  * Investment Recommendation: BUY / HOLD / SELL with conviction and a short justification.
+  Use that classification to decide valuation emphasis:
+  * Wagering: turnover, net win margin, active player value, acquisition payback, product differentiation, and tax/regulatory burden.
+  * Lottery/keno: licence tenure, jackpot-driven volatility versus baseline recurring demand, digital penetration, and cash conversion.
+  * Casino: gaming mix, visitation, spend per visit, licence quality, fixed-cost leverage, and balance-sheet sensitivity.
+  * Gaming machines/venue: installed base, unit economics, venue concentration, replacement cycle, machine yield, and participation mix.
+  * B2B gambling tech/platform: recurring contracted revenue, operator concentration, take rate, content performance, and regulatory market access.
+  * Hybrid: separate higher-quality recurring/licence/platform revenue from more promotional or cyclical wagering/venue revenue.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Product/channel summary and timeline to key licence, product-launch, market-share, tax/regulatory, and financing milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
 
   Data sourcing rules:
   * If source documents are not attached, actively retrieve and review primary sources before analysis.
-  * Use official exchange filings, official company investor materials, statutory reports, and primary operating disclosures first.
-  * Use market-data providers only for current price / market cap / share count / enterprise value inputs.
-  * For every key numeric input, state the value used, the source, the filing date, and whether it is estimated.
-  * If data is missing, estimate conservatively, say that it is estimated, and explain the basis in one line.
-
-  Sector research lanes:
-    * Run a dedicated sector lane (gambling): capture 2-4 recent sources on regulatory/tax changes, wagering turnover trends, hold margins, venue or digital mix, and consumer resilience; tie each point to scenario assumptions.
+  * Source market data from asx.com.au and/or marketindex.com.au.
+  * Source turnover, gross gaming revenue, net win, hold, active-player, installed-base, venue, licence, margin, and balance-sheet data from the company's primary exchange filings plus annual/interim reports, investor presentations, trading updates, and regulatory/licence announcements.
+  * Prefer primary sources: exchange filings, statutory reports, operator KPIs, market-share disclosures, licence updates, tax/regulatory disclosures, venue/machine stats, and debt/refinancing announcements. Use secondary sources only where they add factual context on regulation, tax changes, consumer trends, hold/market-share dynamics, or competitive positioning.
+  * For every key numeric input used in valuation, Quality, Value, price targets, turnover, hold, GGR, take rate, installed base, margins, leverage, or cash-flow analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current AUD market data and current AUD/USD conversion rate (or project-local FX where applicable); state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
 
   Document review (complete before valuation):
   For each major valuation-relevant document (annual/interim report, quarterly update, investor presentation, technical report, financing update, operating update, regulatory filing, or material announcement), provide:
@@ -81,56 +90,146 @@ copy_paste_prompt: |-
   * Implications for investment outlook (positives and negatives).
   * Market pricing assessment: one separate paragraph on whether market pricing appears to reflect the document's information.
 
-  Step 1: Core operating and valuation workup
-  * Build the operating picture from current filings and primary disclosures.
-  * Identify the key revenue / margin / balance-sheet / capital-allocation drivers.
-  * Build a defendable valuation anchor appropriate to the sector.
-  * State the main assumptions that drive the 12-month and 24-month targets.
+  Step 1: Product Mix, Player Economics, and Cash-Quality Workup
+  For each material product, brand, geography, channel, or earnings stream, capture where disclosed:
+  * Brand/product/business line name, geography, customer type, and next milestone.
+  * Revenue model: sportsbook margin, lottery ticket sales/commission, gaming-machine yield, casino table/slot revenue, B2B take rate, platform fee, or hybrid.
+  * Core demand drivers: turnover, active players, spend, visitation, installed base, machine yield, jackpot cycle, market share, or operator uptake.
+  * Channel mix: retail, digital, venue, casino floor, media/affiliate, or B2B operator/distributor.
+  * Cost profile: promotional intensity, revenue share, tax burden, venue/hosting costs, labour/fixed-cost base, and working-capital profile.
 
-  Step 2: Quality Score (0-100)
-  Score the company explicitly across these quality factors and show the weighted contribution from each:
-    * Regulatory Position
-    * Product/Distribution Quality
-    * Management
-    * Revenue Resilience
-    * Balance Sheet
-    * Governance
-  Quality score rules:
-  * Give a raw score for each factor.
-  * Explain what evidence supports the score.
-  * Penalize weak disclosure, funding risk, governance risk, or execution uncertainty.
-  * Do not hide missing evidence; call it out.
+  Regulatory-position discipline:
+  * Assess licence durability, jurisdiction mix, point-of-consumption or equivalent tax burden, compliance posture, and exposure to adverse rule changes.
+  * Distinguish businesses benefiting from durable regulated incumbency from those simply exposed to regulation.
+  * Assess whether growth relies on regulatory expansion, tax relief, or approvals that remain uncertain.
+  * For multi-jurisdiction operators, separate attractive regulated markets from structurally hostile or marginal ones.
+  * Do not treat licence ownership or market access as a moat unless the economics are still attractive after tax and compliance burden.
 
-  Step 3: Value Score (0-100)
-  Score the company explicitly across these value factors and show the weighted contribution from each:
-    * Intrinsic Value vs Market Cap
-    * Earnings/FCF Yield
-    * Multiple vs Peers
-    * Recurring Revenue Quality
-    * Strategic Value
-  Value score rules:
-  * Tie the score back to concrete valuation anchors, not vague sentiment.
-  * Compare valuation to quality, timing, and balance-sheet risk.
-  * State where the market is overpricing or underpricing the setup.
+  Product/distribution-quality discipline:
+  * Assess whether product economics are driven by true customer value, convenient distribution, and retention or by unsustainably high promotion and bonus intensity.
+  * Distinguish genuine product moat from short-term share bought with marketing spend.
+  * For lotteries/keno, assess licence strength, jackpot sensitivity, and digital migration quality.
+  * For machine/venue and casino models, assess site quality, customer concentration, utilization/yield, and venue dependence.
+  * For B2B suppliers, assess operator concentration, contract stickiness, and whether content/platform take rates are durable.
 
-  Step 4: Scenario framework
-  For bull, base, and bear cases, provide:
+  Revenue-resilience and unit-economics discipline:
+  * Establish the current revenue baseline from the latest half, quarter, or run-rate.
+  * Distinguish turnover growth from hold-driven growth, jackpot-driven volatility from recurring demand, and promotional share gains from sustainable customer economics.
+  * Assess player-value quality: acquisition cost, retention, wallet share, repeat behavior, and payback where disclosed.
+  * Distinguish recurring cash-generative streams from inherently volatile event/jackpot/VIP-driven streams.
+  * Do not award premium multiples to revenue growth that comes mainly from temporary hold spikes, abnormal jackpot cycles, or unsustainably high promo spending.
+
+  Margin, cash-conversion, and working-capital discipline:
+  * Break out margin drivers: hold/take rate, tax changes, marketing/promotions, venue mix, product mix, platform fees, and fixed-cost leverage where disclosed.
+  * Distinguish structurally attractive margins from temporarily favorable hold or low-promotional periods.
+  * Assess free cash flow, capex where relevant, licence payments, content/platform investment, and working-capital behavior.
+  * For casinos/venues, distinguish EBITDA from true owner earnings if maintenance capex, refurbishments, or licence obligations are material.
+  * Do not give full credit for profits if cash conversion is weak without a convincing structural reason.
+
+  Balance-sheet and capital-allocation discipline:
+  * Identify cash, debt, covenant headroom, debt maturity profile, lease liabilities where relevant, refinancing risk, and liquidity.
+  * Assess whether dividends, buybacks, acquisitions, licences, and product investment are being funded responsibly.
+  * Distinguish healthy cash-generative balance sheets from those flattered by favorable hold, jackpot cycles, or working-capital timing.
+  * For acquisitive/platform groups, separate acquisition-led growth from true share gains or product strength.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation suited to the gambling business model. Do not pay premium multiples for promotional share gains, favorable short-term hold, or revenue streams facing material regulatory or tax deterioration.
+
+  Core valuation anchors:
+  * EV/EBITDA or EV/EBIT: useful for many gambling operators if tax, promotional intensity, and capex/licence burdens are handled properly.
+  * P/E on normalized earnings: useful where earnings are relatively stable and hold/jackpot effects are normalized.
+  * FCF yield: useful where cash conversion is strong after licence payments, capex, and customer-acquisition requirements.
+  * Sum-of-the-parts: use when lotteries, wagering, venue/casino, machines, media, and B2B platform/content earnings deserve different assumptions.
+  * Installed-base or recurring-revenue cross-check: use only where the business genuinely has durable B2B or machine/platform economics.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using EBITDA, explain regulatory taxes, promotional intensity, maintenance capex/licence burden, and whether EBITDA overstates owner earnings.
+  * If using P/E, explain why current earnings are a fair proxy for normalized economics, or show the normalization bridge.
+  * If using FCF yield, reconcile to real content/platform investment, licence obligations, and maintenance needs.
+  * Cross-check with peers only after adjusting for jurisdiction mix, tax burden, promotion intensity, product quality, and balance-sheet risk.
+  * Do not give the same multiple to regulated recurring lottery/B2B revenue as to promotional wagering or volatile venue-driven revenue.
+
+  Step 3: Quality Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Quality factor weightings:
+  * Regulatory Position: 20%
+  * Product/Distribution Quality: 20%
+  * Management: 15%
+  * Revenue Resilience: 20%
+  * Balance Sheet: 15%
+  * Governance: 10%
+
+  Quality scoring formula:
+  * Quality Score = sum(weighted factor scores), 0-100.
+
+  Quality scoring guidance:
+  * Regulatory Position: score licence durability, jurisdiction quality, tax burden, and compliance standing.
+  * Product/Distribution Quality: score product attractiveness, channel strength, installed base/platform stickiness, and market-share quality.
+  * Management: score capital allocation, disclosure quality, and realism about promo, hold, and regulatory risks.
+  * Revenue Resilience: score recurring demand, player-value quality, hold/jackpot volatility, and revenue diversification.
+  * Balance Sheet: score leverage, liquidity, covenant headroom, and ability to absorb tax/regulatory shocks.
+  * Governance: score disclosure, responsible-gambling/compliance culture, related-party risk, and treatment of minority holders.
+
+  Quality grading bands:
+  * 85-100: top-tier regulated gambling platform with strong products, resilient cash generation, and credible governance.
+  * 70-84: good business with clear strengths and manageable regulatory/product risks.
+  * 50-69: mixed quality; some attractive products or positions but meaningful concerns on regulation, promo intensity, or balance sheet.
+  * Below 50: weak economics, fragile regulatory footing, or governance/balance-sheet issues that materially impair quality.
+
+  Step 4: Value Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Value factor weightings:
+  * Intrinsic Value vs Market Cap: 30%
+  * Earnings/FCF Yield: 20%
+  * Multiple vs Peers: 20%
+  * Recurring Revenue Quality: 15%
+  * Strategic Value: 15%
+
+  Value scoring formula:
+  * Value Score = sum(weighted factor scores), 0-100.
+
+  Value scoring guidance:
+  * Intrinsic Value vs Market Cap: compare your base-case valuation to the current market cap and explain the gap.
+  * Earnings/FCF Yield: assess normalized earnings and free-cash-flow yield after tax, promotion, licence, and investment realities.
+  * Multiple vs Peers: compare the trading multiple with peers after adjusting for jurisdiction mix, product quality, and balance-sheet risk.
+  * Recurring Revenue Quality: score how much of the revenue base is genuinely durable, contracted, licence-protected, installed-base, or repeatable.
+  * Strategic Value: assess whether the brands, licences, installed base, technology, customer relationships, or market access would matter to a strategic buyer.
+
+  Value grading bands:
+  * 85-100: materially undervalued relative to normalized regulated cash earnings and recurring revenue quality.
+  * 70-84: undervalued with clear upside and manageable regulatory/product risks.
+  * 50-69: roughly fair value or upside offset by volatility, regulation, or leverage.
+  * Below 50: expensive or weakly supported by normalized economics.
+
+  Step 5: Scenario Framework and Price Targets
+  Provide bull, base, and bear cases with:
   * 12M target and 24M target.
-  * Probability.
-  * Short scenario summary.
-  * Current positioning (e.g. base-leaning, mixed, bear-leaning).
-  * Explicit conditions that must hold for each path.
-  * Explicit failure conditions that would invalidate that path.
+  * Probability for each scenario.
+  * Short description of what operationally changes.
+  * Current positioning (bull-leaning, base-leaning, mixed, bear-leaning).
+  * Explicit conditions that must hold.
+  * Explicit failure conditions.
 
-  Step 5: Monitoring and verification
-  Produce:
-  * Monitoring Watchlist:
-    * Red Flags
-    * Confirmatory Signals
-  * Verification Queue:
-    * unresolved facts that should be checked in later filings or primary-source follow-up
+  Scenario design rules:
+  * Bull case should require evidence of sustainable market-share gains, product/channel improvements, licence wins, tax relief, or margin inflection that the market is underestimating.
+  * Base case should reflect the most likely path using conservative assumptions on turnover, hold, product mix, regulation, and cash conversion.
+  * Bear case should reflect realistic downside from tax/regulatory tightening, hold normalization, consumer weakness, compliance issues, or leverage/refinancing strain.
+  * Do not let bull/base/bear differ only by exit multiple; operating and regulatory assumptions must change.
 
-  Final instruction:
-  * This is not a generic company summary.
-  * Produce a decision-grade investment analysis aligned to the rubric above.
-  * Keep it specific, numeric where possible, and explicit about assumptions and unknowns.
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Turnover, gross gaming revenue, net win, hold/take rate, market share, and digital/venue mix.
+  * Active players, retention, acquisition cost/payback, same-venue/store metrics, or installed-base/machine yield.
+  * EBITDA margin, EBIT margin, margin-bridge commentary, and free-cash-flow conversion.
+  * Net debt / EBITDA, interest cover, liquidity runway, licence commitments, and tax sensitivity.
+  * Jurisdiction mix, licence terms, operator/venue concentration, and product/market dependencies.
+
+  Cross-check requirements before final output:
+  * Ensure turnover, hold, and revenue conclusions are not conflated.
+  * Ensure valuation reflects normalized hold/jackpot and regulatory-tax realities rather than favorable short-term conditions.
+  * Ensure recurring/licence-protected revenue is distinguished from promotional or volatile revenue.
+  * Ensure balance-sheet and regulatory downside are reflected in scenario probabilities.
+  * Ensure price targets are supported by operating and regulatory assumptions, not just a multiple overlay.
