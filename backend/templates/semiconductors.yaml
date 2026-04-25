@@ -202,3 +202,220 @@ verification_schema:
         - guidance
         - development_timeline
         critical: true
+
+# The full rubric/prompt
+rubric: |
+  Run an investment analysis on [Company Name] using this semiconductors rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to technology position, cycle timing, inventory normalization, gross-margin durability, capex intensity, customer concentration, or scenario confidence.
+
+  First classify the company:
+  * Fabless semiconductor designer: value driven by design wins, ASPs, gross margin, outsourced manufacturing access, and end-market exposure.
+  * Integrated device manufacturer (IDM): value driven by internal manufacturing scale, utilization, product mix, capex intensity, and cycle management.
+  * Foundry / manufacturing services: value driven by node leadership, utilization, wafer pricing, customer mix, and capacity discipline.
+  * Memory / commodity semiconductor: value driven by supply discipline, bit growth, pricing/ASP recovery, inventory, and cycle timing.
+  * Semiconductor equipment / materials supplier: value driven by WFE or fab-utilization cycle, installed base, service mix, technology transitions, and order visibility.
+  * Analog / mixed-signal / specialty / power / sensor supplier: value driven by design-in stickiness, long product cycles, industrial/auto exposure, and margin resilience.
+
+  Use that classification to decide valuation emphasis:
+  * Fabless: design-win quality, customer concentration, wafer supply access, gross margin, and inventory digestion at customers/distributors.
+  * IDMs: internal fab utilization, product mix, depreciation burden, capex discipline, and execution across product plus manufacturing.
+  * Foundries: leading-edge versus mature-node mix, capacity utilization, pricing, customer commitments, and geopolitical/export-control risk.
+  * Memory/commodity: normalized cycle earnings, supply discipline, inventory turns, and pricing recovery timing. Do not annualize peak-cycle margins.
+  * Equipment/materials: order cycle, installed-base service revenue, node transition drivers, customer capex concentration, and book-to-bill quality.
+  * Analog/specialty: end-market durability, long-tail lifecycle, sticky sockets, pricing power, and lower but still real inventory cycle exposure.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Product/end-market summary and timeline to key inventory, utilization, product, capacity, and financing milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source operating, technology, utilization, inventory, margin, capex, and financial data from the company's primary exchange filings plus annual/interim reports, investor presentations, product roadmaps where publicly disclosed, and earnings/guidance materials.
+  * Prefer primary sources: exchange filings, statutory reports, company presentations, product/roadmap disclosures, and company metrics disclosures. Use secondary sources only where they add factual context on semiconductor demand, pricing, WFE cycle, or export-control backdrop.
+  * For every key numeric input used in valuation, Quality, Value, price targets, inventory, utilization, margin, capex, or earnings-power analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, product/technology disclosures, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, cycle timing, technology position, utilization, gross margin, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Product, Cycle, and Manufacturing Workup
+  For each material product line, end market, or segment, capture where disclosed:
+  * Product family, end market, customer type, geography, manufacturing model, node/process relevance, and next milestone.
+  * Revenue model: chip sales, wafers, equipment/tools, service/spares, licensing/IP, or hybrid.
+  * End-market exposure: data center, AI, PC, smartphone/consumer, industrial, auto, networking, telecom, memory, or other.
+  * Growth levers: design wins, socket content gains, node transition, capacity adds, utilization recovery, pricing improvement, service attach, or inventory normalization.
+  * Competitive position, switching cost, qualification cycle, and technology relevance.
+
+  Technology/IP and roadmap discipline:
+  * Identify whether the company competes on process leadership, architecture, analog/performance know-how, software/toolchain support, IP/library position, or manufacturing execution.
+  * Distinguish durable technology edge from short-lived feature claims or marketing around AI/HPC.
+  * Assess roadmap credibility: tape-outs, launches, qualification, yield ramp, node migration, packaging/interconnect, or reliability milestones where disclosed.
+  * For equipment/materials, assess whether the product is critical to a node transition or whether it is exposed to deferrable capex.
+  * Do not overstate moat if the company lacks a defendable design, node, qualification, or ecosystem advantage.
+
+  Inventory, utilization, and cycle discipline:
+  * Establish the current cycle baseline from the latest half, quarter, or run-rate.
+  * Distinguish company inventory from channel/customer inventory and from end-demand recovery.
+  * State utilization or capacity-loading where disclosed or inferable, especially for IDMs, foundries, and memory names.
+  * Identify whether revenue changes reflect true end demand, customer digestion, double-ordering unwind, pricing pressure, or supply constraint normalization.
+  * Do not annualize trough or peak margins without discussing where the company sits in the semiconductor cycle.
+
+  Pricing, gross-margin, and mix discipline:
+  * Break out revenue and gross-margin drivers: ASP, wafer pricing, memory pricing, product mix, utilization, yield, service mix, and fixed-cost absorption.
+  * Distinguish structural margin from temporary uplift due to tight supply, subsidy, or unusually favorable mix.
+  * For fabless companies, assess foundry cost exposure and whether leading-edge access compresses margin.
+  * For IDMs/foundries, assess depreciation burden, underutilization charges, and capex intensity.
+  * For equipment names, distinguish high-margin spares/service from lower-visibility systems revenue.
+
+  Customer concentration and end-market quality discipline:
+  * Identify major-customer exposure, program concentration, hyperscaler concentration, handset/PC cyclicality, automotive qualification stickiness, or industrial diversification where disclosed.
+  * Distinguish high-quality secular demand from cyclical recovery narratives.
+  * For export-control-sensitive businesses, state how much of demand, supply, or margin could be affected.
+  * Do not assume AI or auto exposure is automatically high-quality if pricing, qualification, or competitive durability is weak.
+
+  Capex, balance sheet, and cash-conversion discipline:
+  * Identify capex intensity, depreciation, foundry commitments, wafer purchase obligations, subsidies/grants, debt, and liquidity.
+  * Distinguish genuine free cash flow from temporary working-capital or capex timing benefits.
+  * For asset-heavy names, assess whether the balance sheet can carry through a downcycle without forced equity or distressed capex cuts.
+  * For fabless names, assess whether customer prepayments, inventory builds, or foundry commitments create hidden cycle risk.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation using semiconductor-appropriate anchors. Do not apply software multiples to cyclical hardware earnings, and do not value trough margins as permanent.
+
+  Core valuation anchors:
+  * Cycle-normal earnings / EPS: primary for cyclical semiconductor names where current earnings are materially above or below normalized.
+  * EV/EBITDA or EV/EBIT: useful for asset-heavy IDMs, foundries, or equipment names when normalized for cycle position.
+  * P/E on normalized earnings: useful where earnings power through the cycle is reasonably estimable.
+  * EV/Sales: acceptable for higher-growth fabless names only when gross margin, design-win quality, and operating leverage support it.
+  * Sum-of-the-parts only if product groups, service revenue, or asset-light versus asset-heavy segments deserve different assumptions.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using normalized earnings, explain what is being normalized: utilization, inventory correction, pricing, mix, and fixed-cost absorption.
+  * If using EV/Sales, justify it with gross margin, design-win durability, and balance-sheet quality.
+  * Do not assign peak multiples to peak-cycle margins, or trough multiples to trough-cycle earnings, without explaining the cycle position.
+  * If capex intensity or export-control risk is elevated, the multiple should reflect that explicitly.
+
+  Simple cycle-normal bridge:
+  * Revenue driver = units/wafer volume/equipment shipments x ASP or pricing, adjusted for end-demand and inventory normalization.
+  * Gross profit = revenue minus manufacturing/foundry/material cost, underutilization, and mix effects.
+  * Operating profit = gross profit minus R&D, S&M, and G&A, adjusted for sustainable spending through the cycle.
+  * Equity value anchor = justified normalized P/E, EV/EBIT, EV/EBITDA, or EV/Sales, cross-checked against balance-sheet and capex intensity.
+
+  Stress and downside discipline:
+  * Show at least one downside case with slower inventory normalization, weaker utilization, lower ASP/pricing, customer delays, or export-control disruption.
+  * Show what happens to gross margin, normalized earnings, FCF trajectory, and valuation under that downside.
+  * For memory/commodity names, pricing and supply discipline may dominate all other factors.
+  * For fabless or specialty names, customer concentration and design-loss risk may matter more than broad cycle swings.
+
+  Step 3: Quality Score (0-100)
+  Formula:
+  = (0.20 * Technology/IP Position) + (0.20 * End-Market Quality) + (0.15 * Management) + (0.20 * Cycle Execution) + (0.15 * Balance Sheet) + (0.10 * Governance)
+
+  Score each factor with raw score, weight, weighted contribution, and evidence:
+  * Technology/IP Position:
+    - strong node, architecture, process, qualification, or IP edge = 85-100
+    - credible technical position with some competitive pressure = 65-85
+    - limited differentiation or lagging roadmap = 45-65
+    - weak technology position or commoditization risk = 20-45
+  * End-Market Quality:
+    - durable secular demand with diversified exposure = 85-100
+    - good market exposure with some cyclicality = 65-85
+    - meaningful dependence on volatile or concentrated markets = 45-65
+    - weak or structurally challenged end-market mix = 20-45
+  * Management:
+    - disciplined cycle management, capital allocation, and execution = 85-100
+    - mostly credible execution with manageable issues = 65-85
+    - uneven execution or promotional posture = 45-65
+    - repeated misses, poor capex timing, or weak discipline = 20-45
+  * Cycle Execution:
+    - strong inventory control, margin resilience, and utilization management = 85-100
+    - credible cycle execution with some volatility = 65-85
+    - inconsistent margin/inventory handling = 45-65
+    - poor cycle control or repeated inventory/pricing mistakes = 20-45
+  * Balance Sheet:
+    - strong liquidity, manageable capex, low refinancing stress = 85-100
+    - adequate balance sheet with manageable cycle sensitivity = 65-85
+    - elevated leverage, capex burden, or working-capital risk = 45-65
+    - stressed balance sheet or material downcycle funding risk = 20-45
+  * Governance:
+    - transparent disclosures, aligned incentives, strong oversight = 80-100
+    - acceptable governance with minor concerns = 60-80
+    - weak disclosure, capital-allocation issues, or oversight concerns = 35-60
+
+  Step 4: Value Score (0-100)
+  Formula:
+  = (0.30 * Intrinsic Value vs Market Cap) + (0.25 * Cycle-Normal Earnings Power) + (0.20 * Multiple vs Peers) + (0.15 * Margin Resilience) + (0.10 * Strategic Value)
+
+  * Intrinsic Value vs Market Cap:
+    - compare current market value to the primary valuation anchor
+    - score higher when upside is supported by normalized economics, not peak-cycle optics
+  * Cycle-Normal Earnings Power:
+    - assess normalized earnings versus current price with explicit cycle adjustment
+    - discount if current earnings rely on temporary tight supply, subsidy, or unusually low costs
+  * Multiple vs Peers:
+    - compare trading multiple to peers after adjusting for technology position, cycle point, asset intensity, and end-market quality
+  * Margin Resilience:
+    - evaluate how gross margin holds under lower utilization, pricing pressure, or mix change
+    - discount if margins depend heavily on unusually high utilization or fragile pricing
+  * Strategic Value:
+    - consider technology scarcity, customer relevance, acquisition value, and strategic ecosystem fit
+
+  Step 5: Scenario Framework and Price Targets
+  * Price targets:
+    - 12m and 24m bull/base/bear targets
+    - scenario probabilities, each horizon summing to 100%
+    - probability-weighted target for 12m and 24m
+    - explicit scenario drivers: inventory normalization, utilization, pricing/ASP, design wins, node/product execution, capex, and regulatory/export-control shifts
+    - target reconciliation to normalized earnings, EV/EBIT, EV/EBITDA, EV/Sales, or stated sum-of-the-parts anchor
+  * Timeline:
+    - current cycle and cash baseline
+    - next 24m milestones: product launches, tape-outs, customer ramps, inventory normalization, utilization recovery, capacity adds, and refinancing/capex decisions
+    - status: on-track / at-risk / speculative
+    - impact on 24m probability-weighted target
+    - primary risk
+  * Headwinds/tailwinds:
+    - threshold-driven quantitative factors with directional revenue, gross-margin, and cash impact
+    - material qualitative factors with evidence and expected duration
+  * Investment recommendation paragraph:
+    - core thesis reason
+    - key 12m catalyst
+    - key invalidation risk
+    - sizing context: core tech / cyclical recovery / secular compounder / speculative / avoid
+  * Key risks: ranked list with probability and impact.
+  * Key opportunities: ranked list with trigger and valuation impact.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Inventory days / channel inventory / customer inventory commentary.
+  * Utilization / loading / wafer starts or shipment indicators.
+  * Gross margin and underutilization or fixed-cost absorption effects.
+  * Customer concentration and top-program exposure.
+  * Capex intensity, depreciation, and subsidy dependence.
+  * End-market mix by data center, AI, auto, industrial, consumer, smartphone, or PC.
+  * Design wins / socket wins / qualification status.
+  * Cash runway, leverage, and downcycle flexibility.
+  * For foundries: node mix, pricing, and committed capacity.
+  * For equipment names: service mix, backlog/order quality, and WFE sensitivity.
+
+  Cross-check requirements before final output:
+  * Current revenue/cycle baseline must reconcile to the latest primary-source result.
+  * Inventory commentary must distinguish company inventory from channel/customer digestion.
+  * Margin commentary must reconcile to utilization, pricing/mix, and fixed-cost absorption.
+  * Valuation anchor must distinguish current from normalized earnings where cycle conditions are non-normal.
+  * Valuation anchor must be mathematically consistent with stated revenue, margin, capex, and share-count assumptions.
+  * Quality and Value weighted totals must equal stated final scores.
+  * Price targets must be tied to explicit cycle, pricing, margin, capex, and multiple assumptions.
+  * Do not create a risk from template structure alone. If a missing data point is immaterial because equivalent disclosure already answers the economics, say so explicitly rather than marking the company down for template non-compliance.
