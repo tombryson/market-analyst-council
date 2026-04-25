@@ -202,3 +202,194 @@ verification_schema:
         - guidance
         - development_timeline
         critical: true
+
+rubric: |
+  Run an investment analysis on [Company Name] using this defence rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to backlog quality, contract economics, programme execution, sovereign/customer dependence, export risk, or scenario confidence.
+
+  First classify the business:
+  * Prime contractor / programme integrator: value driven by contract visibility, programme execution, customer intimacy, and margin on large sovereign programmes.
+  * Mission systems / subsystem supplier: value driven by position on critical platforms, switching costs, qualification moat, and long-tail sustainment revenue.
+  * Sustainment / MRO / services business: value driven by recurring support work, installed-base exposure, labour execution, and contract renewal quality.
+  * Sovereign capability / niche defence technology provider: value driven by strategic relevance, exportability, IP differentiation, and procurement priority.
+  * Defence manufacturing / equipment producer: value driven by production ramp, order-book conversion, supply-chain execution, and margin discipline.
+  * Hybrid defence platform: separate development, programme, production, sustainment, and non-defence earnings streams rather than blending them into one average margin.
+
+  Use that classification to decide valuation emphasis:
+  * Prime contractor: contract structure, milestone delivery, claims/change-order risk, margin profile, and recompete risk.
+  * Mission systems/subsystems: platform exposure, content per platform, qualification moat, programme longevity, and aftermarket/service tail.
+  * Sustainment/services: recurring revenue, utilization, labour availability, contract tenure, and cash conversion.
+  * Sovereign capability/niche tech: relevance to defence priorities, export approvals, technology moat, and path from prototype to scaled revenue.
+  * Manufacturing/equipment: backlog quality, production ramp, fixed-cost absorption, cost pass-through, and schedule adherence.
+  * Hybrid: separate higher-quality sustainment and installed-base economics from lower-visibility tender or development economics.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Contract/programme summary and timeline to key contract awards, production milestones, backlog conversion, margin, and financing milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source contract, backlog, programme, margin, cash-flow, and balance-sheet data from the company's primary exchange filings plus annual/interim reports, investor presentations, contract award announcements, operating updates, and financing disclosures.
+  * Prefer primary sources: exchange filings, statutory reports, contract announcements, customer/government award notices where available, backlog/order-book tables, programme delivery commentary, and debt/refinancing disclosures. Use secondary sources only where they add factual context on defence budgets, procurement priorities, export restrictions, or competitor/platform dynamics.
+  * For every key numeric input used in valuation, Quality, Value, price targets, backlog, margin, programme profitability, leverage, or cash-flow analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, contract/programme disclosures, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, backlog quality, programme execution, sovereign demand, export risk, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Backlog, Programme, and Earnings-Quality Workup
+  For each material programme, platform, customer, or earnings stream, capture where disclosed:
+  * Programme/platform/business line name, end customer, geography, and next milestone.
+  * Revenue model: prime contract, subsystem content, sustainment/service, production lot, development/prototype, export programme, or hybrid.
+  * Demand driver: awarded backlog, tender pipeline, platform fleet/installed base, defence budget priority, allied export demand, or recompete cycle.
+  * Contract profile: fixed-price, cost-plus, milestone-based, long-term support, framework agreement, sole-source, or competitive tender.
+  * Cost and execution profile: labour intensity, engineering content, supply-chain dependence, milestone cadence, and working-capital profile.
+
+  Contract visibility and backlog discipline:
+  * Establish the current revenue baseline from the latest half, quarter, or run-rate.
+  * Distinguish awarded funded backlog, options, preferred-bidder status, tender pipeline, and mere opportunity pipeline. Do not treat them as equivalent.
+  * Assess backlog age, cancellation/rephasing risk, concentration by programme/customer, and whether the backlog is margin-bearing or low-quality pass-through.
+  * Distinguish genuinely recurring sustainment or installed-base revenue from one-off programme wins.
+  * Do not award premium multiples to headline backlog if funding, scope, timing, or margin remains uncertain.
+
+  Mission-critical positioning discipline:
+  * Assess whether the company occupies a hard-to-displace role on important platforms, sovereign priorities, or regulated supply chains.
+  * Distinguish true mission-critical content from opportunistic defence exposure that could be substituted or deprioritized.
+  * Assess platform longevity, installed-base tail, qualification barriers, certification moats, and integration depth.
+  * For niche technology players, assess whether the technology is actually being procured at scale or remains demonstration-stage.
+  * Do not treat “sovereign capability” language as a moat unless there is evidence of procurement preference, budget support, or contract traction.
+
+  Programme execution and margin discipline:
+  * Break out revenue and margin drivers: backlog conversion, milestone delivery, mix, labour productivity, procurement, change orders, and cost inflation where disclosed.
+  * Distinguish temporary margin strength from structurally attractive contract economics.
+  * Assess whether pricing/pass-through is contractual, lagged, partial, or effectively capped.
+  * For fixed-price programmes, assess overrun risk, schedule slippage, and margin fragility.
+  * Do not treat adjusted programme profits as high quality unless they reconcile back to statutory profit and cash flow cleanly.
+
+  Working-capital and cash-conversion discipline:
+  * Assess receivables, contract assets/liabilities, milestone timing, inventory/WIP, advance payments, retention balances, and seasonal billing swings.
+  * Distinguish genuine free cash flow from milestone timing, deferred supplier payments, or temporary contract advances.
+  * For development or production ramps, assess whether working capital is building faster than backlog converts into cash.
+  * For services and sustainment, assess labour-capacity risk and utilization rather than just reported margins.
+  * Do not give full credit for earnings if cash conversion is persistently weak without a convincing contract-structure reason.
+
+  Balance-sheet, export, and capital-allocation discipline:
+  * Identify cash, debt, covenant headroom, debt maturity profile, refinancing risk, and liquidity.
+  * Assess whether the company can fund its base plan, bid pipeline, and working-capital needs without punitive equity dilution or balance-sheet stress.
+  * Assess export-license dependence, sanction/regulatory exposure, customer concentration, and geopolitical sensitivity.
+  * Distinguish value-creating acquisitions or capability build-outs from empire building.
+  * For acquisitive defence groups, separate acquisition-led growth from true platform wins and installed-base expansion.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation suited to the defence business model. Do not pay premium multiples for low-quality opportunity pipeline, politically fragile export hopes, or peak margins on fixed-price programmes.
+
+  Core valuation anchors:
+  * EV/EBITDA or EV/EBIT: useful for established defence suppliers and service businesses if contract quality and cash conversion are handled properly.
+  * P/E on normalized earnings: useful where earnings are backed by durable backlog, installed-base support, and manageable execution risk.
+  * FCF yield: useful where contract cash conversion and working-capital behavior are honest and repeatable.
+  * Sum-of-the-parts: use when sustainment, production, development, and non-defence earnings deserve different assumptions.
+  * Backlog-supported earnings cross-check: use awarded backlog and expected conversion quality to test earnings visibility rather than as a standalone valuation metric.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using EBITDA, explain working-capital intensity, bid costs, development capitalization if any, and whether EBITDA overstates owner earnings.
+  * If using P/E, explain why current earnings are a fair proxy for normalized programme economics, or show the normalization bridge.
+  * If using FCF yield, reconcile to real working-capital needs, milestone timing, and maintenance/reinvestment needs.
+  * Cross-check with peers only after adjusting for contract quality, sovereign exposure, execution risk, export dependence, and balance-sheet strength.
+  * Do not give the same multiple to tender-heavy opportunity-driven businesses as to installed-base sustainment franchises.
+
+  Step 3: Quality Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Quality factor weightings:
+  * Contract Visibility: 25%
+  * Mission-Critical Positioning: 20%
+  * Management: 15%
+  * Programme Execution: 15%
+  * Balance Sheet: 15%
+  * Governance: 10%
+
+  Quality scoring formula:
+  * Quality Score = sum(weighted factor scores), 0-100.
+
+  Quality scoring guidance:
+  * Contract Visibility: score funded backlog quality, recurring/sustainment mix, customer diversification, and timing confidence.
+  * Mission-Critical Positioning: score platform relevance, qualification moat, sovereign importance, and switching-cost depth.
+  * Management: score capital allocation, disclosure quality, bidding discipline, and realism of guidance.
+  * Programme Execution: score delivery record, margin discipline, and schedule performance.
+  * Balance Sheet: score liquidity, leverage, covenant headroom, and ability to carry working-capital swings or bid pipeline needs.
+  * Governance: score transparency, incentive alignment, related-party risk, and contract/compliance discipline.
+
+  Quality grading bands:
+  * 85-100: top-tier defence platform with high-quality backlog, critical positioning, disciplined execution, and robust funding.
+  * 70-84: good business with clear strengths and manageable execution/customer risks.
+  * 50-69: mixed quality; attractive programmes or niches but meaningful concerns on concentration, execution, or balance sheet.
+  * Below 50: weak backlog quality, fragile positioning, or governance/balance-sheet issues that materially impair quality.
+
+  Step 4: Value Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Value factor weightings:
+  * Intrinsic Value vs Market Cap: 30%
+  * Earnings/FCF Yield: 20%
+  * Backlog Quality: 20%
+  * Margin Durability: 15%
+  * Strategic Value: 15%
+
+  Value scoring formula:
+  * Value Score = sum(weighted factor scores), 0-100.
+
+  Value scoring guidance:
+  * Intrinsic Value vs Market Cap: compare your base-case valuation to the current market cap and explain the gap.
+  * Earnings/FCF Yield: assess normalized earnings and free-cash-flow yield after working-capital and execution realities.
+  * Backlog Quality: score whether the current backlog genuinely supports durable earnings rather than just reported headline years of cover.
+  * Margin Durability: score whether current margins are defendable through contract mix, execution, and cost environment.
+  * Strategic Value: assess whether the capabilities, clearances, platform position, installed base, or sovereign relevance would matter to a strategic buyer or prime.
+
+  Value grading bands:
+  * 85-100: materially undervalued relative to durable contract-backed earnings and strategic value.
+  * 70-84: undervalued with clear upside and manageable execution/customer risks.
+  * 50-69: roughly fair value or upside offset by programme, export, or concentration concerns.
+  * Below 50: expensive or weakly supported by backlog quality and fundamental economics.
+
+  Step 5: Scenario Framework and Price Targets
+  Provide bull, base, and bear cases with:
+  * 12M target and 24M target.
+  * Probability for each scenario.
+  * Short description of what operationally changes.
+  * Current positioning (bull-leaning, base-leaning, mixed, bear-leaning).
+  * Explicit conditions that must hold.
+  * Explicit failure conditions.
+
+  Scenario design rules:
+  * Bull case should require evidence of major contract wins, stronger backlog conversion, margin inflection, export approvals, or sovereign-budget upside that the market is underestimating.
+  * Base case should reflect the most likely path using conservative assumptions on award timing, backlog conversion, programme execution, and cash conversion.
+  * Bear case should reflect realistic downside from procurement slippage, programme overruns, fixed-price contract pain, export restrictions, or working-capital/funding strain.
+  * Do not let bull/base/bear differ only by exit multiple; contract and cash assumptions must change.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Awarded backlog, options, tender pipeline, book-to-bill, and backlog conversion cadence.
+  * Gross margin, EBIT margin, EBITDA margin, and programme-margin bridge commentary.
+  * Contract assets/liabilities, milestone payments, working-capital intensity, and free-cash-flow conversion.
+  * Net debt / EBITDA, interest cover, liquidity runway, and bid/tender funding needs.
+  * Customer concentration, sovereign/export exposure, platform mix, and installed-base sustainment tail.
+
+  Cross-check requirements before final output:
+  * Ensure awarded backlog, tender pipeline, and opportunity pipeline are not conflated.
+  * Ensure margin conclusions reconcile against contract mix, fixed-price exposure, and execution risk.
+  * Ensure valuation reflects working-capital and milestone-cash realities rather than just EBITDA optics.
+  * Ensure sovereign/export dependence is reflected in scenario probabilities.
+  * Ensure price targets are supported by contract and cash assumptions, not just a multiple overlay.
