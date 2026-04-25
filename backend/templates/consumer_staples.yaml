@@ -207,3 +207,199 @@ verification_schema:
         - guidance
         - development_timeline
         critical: true
+
+rubric: |
+  Run an investment analysis on [Company Name] using this consumer-staples rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to demand resilience, pricing power, category structure, input-cost pass-through, working-capital quality, or scenario confidence.
+
+  First classify the business:
+  * Branded staples franchise: value driven by repeat purchase, pricing power, brand equity, distribution breadth, and category resilience.
+  * Value / private-label staples supplier: value driven by price positioning, retailer relationships, sourcing discipline, manufacturing efficiency, and share gains in weak consumer environments.
+  * Beverage / snacking / packaged-food portfolio: value driven by portfolio mix, channel execution, innovation cadence, and margin resilience across categories.
+  * Household / personal care staples business: value driven by recurring demand, brand/distribution strength, innovation, trade-spend efficiency, and margin durability.
+  * Distribution-led staples platform: value driven by route-to-market control, customer density, working-capital discipline, and operating leverage more than premium brand power.
+  * Hybrid staples model: separate brand, manufacturing, distribution, licensing, and route-to-market economics rather than blending them into one average margin.
+
+  Use that classification to decide valuation emphasis:
+  * Branded staples: pricing power, repeat demand, gross-margin durability, advertising efficiency, and shelf-space resilience.
+  * Value/private-label: retailer concentration, cost position, manufacturing utilization, and resilience under private-label competition.
+  * Beverage/snacking/packaged food: mix, innovation, distribution execution, input-cost pass-through, and category share.
+  * Household/personal care: category stability, promotional intensity, channel mix, brand support efficiency, and margin recovery potential.
+  * Distribution-led: route density, service levels, cash conversion, inventory discipline, and exposure to customer concentration.
+  * Hybrid: separate high-return brand economics from lower-return distribution/manufacturing operations and value each accordingly.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Demand, category, pricing, and distribution summary plus timeline to key margin, volume, inventory, cash-flow, and capital-allocation milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks and key opportunities.
+
+  Data sourcing rules:
+  * Source market data from [MARKET_DATA_SOURCES].
+  * Source operating, category, pricing, mix, inventory, channel, and financial data from the company's primary exchange filings plus annual/interim reports, investor presentations, trading updates, and material announcements.
+  * Prefer primary sources: exchange filings, statutory reports, company presentations, category commentary, pricing disclosures, inventory and working-capital commentary, margin bridges, customer/channel disclosures, and management guidance. Use secondary sources only where they add factual context on category trends, retailer pressure, commodity/input costs, or competitive positioning.
+  * For every key numeric input used in valuation, Quality, Value, price targets, volume, pricing, gross margin, working capital, inventory, leverage, or cash-flow analysis, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current [DEFAULT_CURRENCY] market data and [FX_CONVERSION_GUIDANCE]; state source and timestamp.
+  * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
+
+  Evidence review before valuation:
+  Use the available source context, primary filings, category disclosures, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, pricing power, category resilience, margin structure, channel strength, balance-sheet risk, or the investment thesis.
+  For each valuation-relevant document, provide:
+  * Document title/date/reference.
+  * 3-5 material facts.
+  * Which valuation/scenario input changed, if any.
+  * One sentence on whether market pricing appears to reflect the information.
+
+  Step 1: Demand, Category, and Channel Economics Workup
+  For each material brand, category, geography, or earnings stream, capture where disclosed:
+  * Brand/category/business line name, end customer, geography, key channel exposure, and next milestone.
+  * Revenue model: branded manufacturing, private label, wholesale, distributor-led, licensing, direct-to-consumer, foodservice, or hybrid.
+  * Demand metrics: volumes, volumes versus pricing, market share, repeat purchase, category growth, customer churn/retention where relevant, and channel mix.
+  * Channel position: grocery, mass, club, convenience, pharmacy, route-to-market, foodservice, ecommerce, export, or distributor relationships.
+  * Mix effects: premium versus value, branded versus private label, domestic versus export, owned manufacturing versus outsourced, and high-margin versus low-margin channels.
+
+  Demand-resilience and category discipline:
+  * Establish the current sales baseline from the latest half, quarter, or run-rate.
+  * Distinguish price-led growth from volume-led growth, mix-led growth, and acquisition-led growth.
+  * State whether category demand is genuinely resilient or being flattered by pantry refill, temporary inflation, channel stocking, or one-off promotional activity.
+  * Distinguish a structurally defensive staple category from one merely marketed as defensive.
+  * Do not award premium valuation to reported growth if volumes are weak and all the lift comes from price while share is slipping.
+
+  Pricing power and mix discipline:
+  * Assess whether the company can pass through commodity, freight, packaging, labour, or FX inflation without permanently damaging volume or shelf position.
+  * Distinguish real pricing power from temporary inflation-led repricing that customers or retailers may later resist.
+  * Assess premiumization, innovation, and mix improvement separately from basic list-price increases.
+  * For private-label suppliers, assess whether low-price positioning is a moat or simply a low-margin necessity.
+  * Do not assume pricing sticks unless the evidence shows stable volumes, stable share, and acceptable retailer/customer relationships.
+
+  Channel, distribution, and shelf-space discipline:
+  * Assess distribution breadth, route-to-market quality, customer concentration, retailer bargaining power, and service execution.
+  * Distinguish broad, resilient shelf-space access from dependence on a few customers, a few SKUs, or a few banners.
+  * For distributor-led or route-based models, assess density, logistics efficiency, fill rates, and working-capital demands.
+  * For export-led businesses, assess whether channel expansion is durable or opportunistic.
+  * Do not treat customer concentration as benign without evidence on bargaining power, contract stability, and margin protection.
+
+  Gross-margin and input-cost discipline:
+  * Break out gross-margin drivers: pricing, volume mix, commodity inputs, manufacturing utilization, freight, packaging, FX, trade spend, promotional activity, and operating leverage where disclosed.
+  * Distinguish temporary gross-margin recovery from a structural improvement in product mix, scale, or sourcing.
+  * Identify whether input-cost inflation is easing, stabilising, or re-accelerating and how exposed the business is to commodities, agriculture, resin, energy, freight, or labour.
+  * If margin disclosure is thin, infer conservatively from segment commentary, inventory movements, and cost bridges and label the inference.
+  * Do not treat revenue growth as high quality if promotions, discounting, or channel stuffing are doing the heavy lifting.
+
+  Inventory, working-capital, and cash-conversion discipline:
+  * Assess inventory health, stock turns, days inventory, obsolescence risk, receivables/payables discipline, and seasonal working-capital swings.
+  * Distinguish genuine cash conversion from temporary working-capital release, supplier stretching, or inventory underinvestment.
+  * Assess whether inventory is healthy, elevated, understocked, or mismatched to demand.
+  * For staples names with high promotional or seasonal exposure, assess whether the business is quietly borrowing from the future via trade loading or inventory pull-forward.
+  * Do not give full credit for earnings if cash conversion is persistently weak without a credible working-capital reason.
+
+  Balance-sheet and capital-allocation discipline:
+  * Identify cash, debt, covenant headroom, lease liabilities where relevant, maturities, and liquidity.
+  * Assess whether capex, marketing spend, M&A, dividends, and buybacks are being funded responsibly.
+  * For portfolio companies, assess acquisition quality, disposal discipline, and whether management is reshaping the mix intelligently or just smoothing reported growth.
+  * Distinguish healthy reinvestment in brands, innovation, and distribution from spend that merely defends a weakening franchise.
+
+  Step 2: Valuation Workup
+  Build a compact but defendable valuation using staples-appropriate anchors. Do not pay premium consumer-staples multiples to weak brands, structurally low-margin private-label suppliers, or businesses where price-led growth hides weak volume and poor cash conversion.
+
+  Core valuation anchors:
+  * EV/EBIT or EV/EBITDA: useful for established staples businesses if margin quality, capex, and working-capital demands are handled properly.
+  * P/E on normalized earnings: useful where category demand, pricing, and capital intensity are relatively stable.
+  * FCF yield: useful where working-capital intensity, maintenance capex, and tax/cash conversion are captured honestly.
+  * Sum-of-the-parts: use when brands, manufacturing, distribution, licensing, or geography segments genuinely deserve different assumptions.
+
+  Valuation discipline:
+  * State which anchor is primary and why.
+  * If using EBITDA, explain why it is a valid proxy for owner earnings or what adjustments are required for working capital, maintenance capex, and cash restructuring costs.
+  * If using P/E, explain why current earnings are a fair proxy for normalized earnings, or show the normalization bridge.
+  * If using FCF yield, show how working capital normalises through the cycle rather than simply annualising a favourable period.
+  * Cross-check with peer multiples only after adjusting for category quality, pricing power, margin durability, balance-sheet risk, and channel position.
+  * If the business is acquisition-driven, separate acquired earnings quality from organic earnings quality.
+
+  Step 3: Quality Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Quality factor weightings:
+  * Demand Resilience: 20%
+  * Pricing Power: 20%
+  * Brand/Distribution Strength: 20%
+  * Management: 15%
+  * Balance Sheet: 15%
+  * Governance: 10%
+
+  Quality scoring formula:
+  * Quality Score = sum(weighted factor scores), 0-100.
+
+  Quality scoring guidance:
+  * Demand Resilience: score the stability of category demand, repeat purchase behaviour, volume resilience, and exposure to discretionary weakness.
+  * Pricing Power: score pass-through ability, share retention after pricing, and mix/innovation strength.
+  * Brand/Distribution Strength: score brand equity, shelf-space position, customer/channel diversification, route-to-market quality, and retailer bargaining balance.
+  * Management: score capital allocation, margin execution, disclosure quality, and operational consistency.
+  * Balance Sheet: score leverage, liquidity, covenant headroom, and resilience through input-cost or demand shocks.
+  * Governance: score incentives, disclosure, related-party risk, and treatment of minority holders.
+
+  Quality grading bands:
+  * 85-100: top-tier staples franchise with clear pricing power, resilient demand, strong channels, and disciplined capital allocation.
+  * 70-84: good business with solid category position and manageable weaknesses.
+  * 50-69: mixed quality; some defensiveness but clear operating, channel, or balance-sheet issues.
+  * Below 50: weak franchise, weak resilience, poor economics, or governance/balance-sheet concerns that materially impair quality.
+
+  Step 4: Value Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Value factor weightings:
+  * Intrinsic Value vs Market Cap: 30%
+  * Earnings/FCF Yield: 20%
+  * Multiple vs Peers: 20%
+  * Margin Durability: 15%
+  * Strategic Value: 15%
+
+  Value scoring formula:
+  * Value Score = sum(weighted factor scores), 0-100.
+
+  Value scoring guidance:
+  * Intrinsic Value vs Market Cap: compare your base-case valuation to the current market cap and explain the gap.
+  * Earnings/FCF Yield: assess normalized earnings and free-cash-flow yield after working-capital and reinvestment needs.
+  * Multiple vs Peers: compare the trading multiple with peers after adjusting for category quality, balance-sheet risk, and margin durability.
+  * Margin Durability: score whether the current margin base is defendable, improving, or vulnerable to retailer/customer pushback and input costs.
+  * Strategic Value: assess whether the asset would matter to a logical strategic buyer because of brands, categories, channels, manufacturing scale, or route-to-market.
+
+  Value grading bands:
+  * 85-100: materially undervalued relative to normalized cash earnings and franchise quality.
+  * 70-84: undervalued with clear upside and manageable risks.
+  * 50-69: roughly fair value or upside offset by execution/quality concerns.
+  * Below 50: expensive or weakly supported by fundamentals.
+
+  Step 5: Scenario Framework and Price Targets
+  Provide bull, base, and bear cases with:
+  * 12M target and 24M target.
+  * Probability for each scenario.
+  * Short description of what operationally changes.
+  * Current positioning (bull-leaning, base-leaning, mixed, bear-leaning).
+  * Explicit conditions that must hold.
+  * Explicit failure conditions.
+
+  Scenario design rules:
+  * Bull case should require evidence of sustained volume resilience, pricing hold, channel strength, and/or margin expansion that the market is underestimating.
+  * Base case should reflect the most likely steady-state path using conservative assumptions on volume, pricing, input costs, and cash conversion.
+  * Bear case should reflect realistic downside from retailer pressure, private-label share loss, cost inflation, margin compression, channel disruption, or balance-sheet stress.
+  * Do not let bull/base/bear differ only by exit multiple; operating assumptions must change.
+
+  Step 6: Additional Metrics
+  Include where relevant:
+  * Volume growth, price/mix growth, category share, and channel mix.
+  * Gross margin, EBIT margin, EBITDA margin, and margin bridge commentary.
+  * Inventory turns, working-capital intensity, cash conversion, and maintenance capex.
+  * Net debt / EBITDA, interest cover, dividend payout, and buyback/acquisition capacity.
+  * Customer concentration, export exposure, commodity/input-cost sensitivities, and major contract or shelf-space dependencies.
+
+  Cross-check requirements before final output:
+  * Ensure volume, pricing, and mix statements do not contradict each other.
+  * Ensure reported margin improvement is reconciled against pricing, input costs, mix, and promotional intensity.
+  * Ensure cash-flow conclusions are consistent with working-capital movements and capex.
+  * Ensure the valuation anchor matches the actual business model and capital intensity.
+  * Ensure price targets are supported by the scenario assumptions, not just a multiple overlay.
