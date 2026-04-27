@@ -303,49 +303,6 @@ rubric: |
   * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
   * Key risks and key opportunities.
 
-  Data sourcing rules:
-  * Source market data from [MARKET_DATA_SOURCES].
-  * Source project, production, reserves/resources, financing, and hedging data from [PRIMARY_FILING_SOURCES].
-  * For every key numeric input used in NAV, Quality, Value, production, or price targets, provide:
-    1) value used
-    2) source URL + document date
-    3) ESTIMATE tag with one-line justification if inferred.
-  * Use current [DEFAULT_CURRENCY] Brent, WTI, Henry Hub, LNG/JKM, local gas, and relevant basin differential data where applicable; state source and timestamp.
-  * Use company-disclosed production, reserves/resources, realised price, LOE/opex, capex, hedging, debt, and balance-sheet data where available. Use generic assumptions only where no better source exists.
-
-  Production baseline discipline:
-  * Establish the current production baseline before creating scenarios.
-  * Use the latest disclosed quarter, month, or annualised run-rate, and state whether production is gross, net, working-interest, royalty-interest, WI, NRI, boe/d, bbl/d, Mcf/d, MMscf/d, or another basis.
-  * Do not treat an already-achieved production level as a future bull-case milestone.
-  * Reconcile any conflict between old presentations, recent quarterlies, and current guidance. Prefer newest dated primary-source operating disclosure.
-  * If the company discloses a current run-rate and a future target, value the incremental change from the current baseline, not the full future target as though starting from zero.
-
-  Commodity and unit rules:
-  * Keep oil, gas, NGL, condensate, and LNG units explicit. Convert to boe only when the conversion basis is stated or standard 6:1 energy equivalence is appropriate.
-  * Do not let boe conversion hide product mix, realised pricing, gas basis risk, NGL discounts, or oil/gas weighting.
-  * Distinguish reserves and resources:
-    - PDP/PDNP/PUD if disclosed
-    - 1P / 2P / 3P reserves
-    - 1C / 2C / 3C contingent resources
-    - prospective resources and risked/unrisked prospective resources
-  * Prefer PRMS/SPE-PRMS qualified reserve/resource reports or company filings with named competent/reserve evaluator support.
-  * Do not value prospective resources like reserves. Apply geological chance of success and commercial chance of development separately.
-
-  Hedging and price exposure:
-  * Identify whether the company is hedged, partially hedged, or deliberately unhedged.
-  * If the company affirmatively discloses that it is unhedged, treat that as a deliberate exposure choice, not as a disclosure gap.
-  * For hedged volumes, state commodity, volume, tenor, strike/swap/collar terms, and mark-to-market impact where disclosed.
-  * For unhedged exposure, quantify sensitivity to Brent/WTI/Henry Hub/LNG/local price moves where possible.
-  * Do not penalise absence of a hedge book unless hedging is material to debt covenants, near-term liquidity, development funding, or downside survival.
-
-  Evidence review before valuation:
-  Use the available prepass, PDF context, primary filings, and retrieved evidence. Do not produce a generic document-by-document summary. Only surface documents that materially affect valuation, scenario probabilities, production, reserves/resources, funding, operating risk, hedge exposure, or the investment thesis.
-  For each valuation-relevant document, provide:
-  * Document title/date/announcement reference.
-  * 3-5 material facts.
-  * Which valuation/scenario input changed, if any.
-  * One sentence on whether market pricing appears to reflect the information.
-
   Step 1: Asset-Level Operating and Valuation Workup
   For each major producing asset, development project, appraisal asset, or exploration option, up to 5:
   * Populate inputs where applicable: ownership/WI/NRI, production, decline, reserves/resources, realised price, price differential, royalty, production taxes, LOE/opex, transport/gathering/processing, G&A, sustaining capex, development capex, abandonment/ARO, working capital, fiscal terms, and development timeline.
