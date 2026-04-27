@@ -48,7 +48,28 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
                 "source_type": "exchange_filing",
                 "source_url": "https://announcements.asx.com.au/asxpdf/example.pdf",
             },
-            "baseline_run": {"run_id": "run-1"},
+            "baseline_run": {
+                "run_id": "run-1",
+                "lab_payload": {
+                    "structured_data": {
+                        "extended_analysis": {
+                            "current_thesis_state": {"leaning": "bull", "status": "on-track"}
+                        },
+                        "thesis_map": {
+                            "bull": {
+                                "target_12m": "A$0.48",
+                                "target_24m": "A$0.85",
+                                "probability_24m_pct": 25,
+                                "summary": "Bull case summary.",
+                                "required_conditions": [
+                                    {"condition_id": "bull_dfs", "condition": "DFS confirms capex"}
+                                ],
+                                "failure_conditions": [],
+                            }
+                        },
+                    }
+                },
+            },
             "comparison_report": {
                 "ticker": "ASX:WWI",
                 "baseline_run_id": "run-1",
@@ -73,6 +94,15 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
                         "observed_value": 4846,
                         "comparator": ">",
                         "threshold_value": 4200,
+                    },
+                    {
+                        "condition_id": "bull_dfs",
+                        "scenario": "bull",
+                        "group": "required",
+                        "label": "DFS confirms capex",
+                        "status": "not_matched",
+                        "matched_via": "",
+                        "reason": "No filing text matched this condition.",
                     }
                 ],
             },
@@ -98,6 +128,8 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
         self.assertEqual(row["invalidated_sections"], [])
         self.assertEqual(row["affected_domains"], [])
         self.assertNotIn("full rerun", " ".join(row["follow_up_steps"]).lower())
+        self.assertEqual(row["announcement_condition_checks"][0]["status"], "not_matched")
+        self.assertEqual(row["thesis_snapshot"]["scenarios"]["bull"]["summary"], "Bull case summary.")
 
 
 if __name__ == "__main__":

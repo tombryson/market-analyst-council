@@ -221,7 +221,23 @@ class ScenarioRouterObservability:
                 evaluations,
                 matched_via="market_facts",
                 statuses={"matched", "contradicted", "unclear"},
+                limit=12,
             ),
+            "announcement_condition_checks": _condition_details(
+                evaluations,
+                groups={"required", "failure"},
+                statuses={"matched", "not_matched", "contradicted", "unclear"},
+                exclude_market=True,
+                limit=40,
+            ),
+            "watchlist_condition_checks": _condition_details(
+                evaluations,
+                groups={"red_flag", "confirmatory"},
+                statuses={"matched", "not_matched", "contradicted", "unclear"},
+                exclude_market=True,
+                limit=30,
+            ),
+            "thesis_snapshot": _thesis_snapshot(baseline_run),
             "key_findings": _finding_details(report.get("key_findings")),
             "conflicts_with_run": _finding_details(report.get("conflicts_with_run")),
             "action_reason": str(display_projection.get("action_reason") or action.get("reason") or "").strip(),
@@ -276,6 +292,7 @@ def _condition_details(
     matched_via: str = "",
     statuses: set[str] | None = None,
     exclude_market: bool = False,
+    limit: int = 10,
 ) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     for item in evaluations:
@@ -313,8 +330,131 @@ def _condition_details(
                 "threshold_value": item.get("threshold_value"),
             }
         )
-        if len(rows) >= 10:
+        if len(rows) >= max(1, int(limit or 10)):
             break
+    return rows
+
+
+def _thesis_snapshot(baseline_run: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(baseline_run, dict):
+        return {}
+    lab_payload = baseline_run.get("lab_payload") if isinstance(baseline_run.get("lab_payload"), dict) else {}
+    structured = lab_payload.get("structured_data") if isinstance(lab_payload.get("structured_data"), dict) else {}
+    thesis_map = structured.get("thesis_map") if isinstance(structured.get("thesis_map"), dict) else {}
+    watchlist = structured.get("monitoring_watchlist") if isinstance(structured.get("monitoring_watchlist"), dict) else {}
+    extended = structured.get("extended_analysis") if isinstance(structured.get("extended_analysis"), dict) else {}
+    current_state = extended.get("current_thesis_state") if isinstance(extended.get("current_thesis_state"), dict) else {}
+    verification = structured.get("verification_queue") if isinstance(structured.get("verification_queue"), list) else []
+
+    scenarios: Dict[str, Any] = {}
+    for name in ("bull", "base", "bear"):
+        block = thesis_map.get(name) if isinstance(thesis_map.get(name), dict) else {}
+        scenarios[name] = {
+            "target_12m": block.get("target_12m"),
+            "target_24m": block.get("target_24m"),
+            "probability_pct": block.get("probability_24m_pct", block.get("probability_pct")),
+            "summary": str(block.get("summary") or "").strip(),
+            "current_positioning": str(block.get("current_positioning") or "").strip(),
+            "why_current_positioning": str(block.get("why_current_positioning") or "").strip(),
+            "condition_logic": block.get("condition_logic") if isinstance(block.get("condition_logic"), dict) else {},
+            "required_conditions": _snapshot_conditions(block.get("required_conditions")),
+            "failure_conditions": _snapshot_conditions(block.get("failure_conditions")),
+        }
+
+    return {
+        "current_thesis_state": {
+            "leaning": str(current_state.get("leaning") or "").strip(),
+            "status": str(current_state.get("status") or "").strip(),
+            "basis": str(current_state.get("basis") or "").strip(),
+        },
+        "scenarios": scenarios,
+        "monitoring_watchlist": {
+            "red_flags": _snapshot_watch_items(watchlist.get("red_flags")),
+            "confirmatory_signals": _snapshot_watch_items(watchlist.get("confirmatory_signals")),
+        },
+        "verification_queue": _snapshot_verification_items(verification),
+    }
+
+
+def _snapshot_conditions(value: Any) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    if not isinstance(value, list):
+        return rows
+    for item in value:
+        if isinstance(item, str):
+            text = item.strip()
+            if not text:
+                continue
+            rows.append({"condition_id": "", "condition": text, "status": "", "target_period": "", "severity": ""})
+            continue
+        if not isinstance(item, dict):
+            continue
+        condition = str(item.get("condition") or item.get("title") or item.get("condition_id") or "").strip()
+        if not condition:
+            continue
+        rows.append(
+            {
+                "condition_id": str(item.get("condition_id") or item.get("watch_id") or "").strip(),
+                "condition": condition,
+                "status": str(item.get("status") or "").strip(),
+                "target_period": str(item.get("target_period") or item.get("trigger_window") or "").strip(),
+                "severity": str(item.get("severity") or "").strip(),
+                "source_to_monitor": str(item.get("source_to_monitor") or "").strip(),
+            }
+        )
+    return rows
+
+
+def _snapshot_watch_items(value: Any) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    if not isinstance(value, list):
+        return rows
+    for item in value:
+        if isinstance(item, str):
+            text = item.strip()
+            if text:
+                rows.append({"watch_id": "", "condition": text, "source_to_monitor": "", "severity": ""})
+            continue
+        if not isinstance(item, dict):
+            continue
+        condition = str(item.get("condition") or item.get("title") or item.get("watch_id") or "").strip()
+        if not condition:
+            continue
+        rows.append(
+            {
+                "watch_id": str(item.get("watch_id") or "").strip(),
+                "condition": condition,
+                "source_to_monitor": str(item.get("source_to_monitor") or "").strip(),
+                "trigger_window": str(item.get("trigger_window") or "").strip(),
+                "severity": str(item.get("severity") or "").strip(),
+            }
+        )
+    return rows
+
+
+def _snapshot_verification_items(value: Any) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    if not isinstance(value, list):
+        return rows
+    for item in value[:12]:
+        if isinstance(item, str):
+            field = item.strip()
+            if field:
+                rows.append({"field": field, "priority": "", "reason": "", "required_source": ""})
+            continue
+        if not isinstance(item, dict):
+            continue
+        field = str(item.get("field") or item.get("field_path") or "").strip()
+        if not field:
+            continue
+        rows.append(
+            {
+                "field": field,
+                "priority": str(item.get("priority") or "").strip(),
+                "reason": str(item.get("reason") or "").strip(),
+                "required_source": str(item.get("required_source") or "").strip(),
+            }
+        )
     return rows
 
 

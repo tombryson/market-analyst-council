@@ -2696,11 +2696,17 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
 
     market_only_watch_projection = None
     should_project_market_only_watch = None
+    router_condition_details = None
+    router_thesis_snapshot = None
     try:
         from .scenario_router.artifact_replay import replay_comparison_from_artifact
         from .scenario_router.display_contract import (
             market_only_watch_projection,
             should_project_market_only_watch,
+        )
+        from .scenario_router.observability import (
+            _condition_details as router_condition_details,
+            _thesis_snapshot as router_thesis_snapshot,
         )
 
         comparison, action = replay_comparison_from_artifact(router_state)
@@ -2868,6 +2874,29 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         "triggered_watchlist": triggered_watchlist,
         "triggered_watchlist_details": triggered_watchlist_details,
         "market_context_conditions": market_context_conditions,
+        "announcement_condition_checks": (
+            router_condition_details(
+                condition_evaluations,
+                groups={"required", "failure"},
+                statuses={"matched", "not_matched", "contradicted", "unclear"},
+                exclude_market=True,
+                limit=40,
+            )
+            if router_condition_details
+            else matched_condition_details
+        ),
+        "watchlist_condition_checks": (
+            router_condition_details(
+                condition_evaluations,
+                groups={"red_flag", "confirmatory"},
+                statuses={"matched", "not_matched", "contradicted", "unclear"},
+                exclude_market=True,
+                limit=30,
+            )
+            if router_condition_details
+            else triggered_watchlist_details
+        ),
+        "thesis_snapshot": router_thesis_snapshot(router_state.get("baseline_run")) if router_thesis_snapshot else {},
         "key_findings": key_findings,
         "conflicts_with_run": conflicts_with_run,
         "affected_domains": (

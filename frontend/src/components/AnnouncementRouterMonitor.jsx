@@ -169,7 +169,7 @@ function explainRouterDecision(router) {
     : Object.keys(router.market_facts_used || {}).length;
 
   if (!matchedCount && !watchCount && marketCount) {
-    return 'The filing did not directly match the thesis map. Market facts were checked as backdrop only.';
+    return 'No announcement-based thesis condition matched. The saved lab path below is the pre-existing lab view, not a fresh recommendation from this filing.';
   }
   if (!matchedCount && !watchCount && action === 'ignore') {
     return 'The filing was resolved to a primary source and did not change the saved thesis path.';
@@ -181,6 +181,66 @@ function explainRouterDecision(router) {
     return `The filing hit ${matchedCount + watchCount} monitored condition(s), but did not move the thesis path.`;
   }
   return routerReason(router);
+}
+
+function routerOutcomeLabel(router) {
+  if (!hasRouterDecision(router)) return 'Not assessed';
+  const transition = String(router.path_transition || '').trim();
+  const matched = Number(router.matched_conditions_count || 0);
+  const watched = Number(router.triggered_watchlist_count || 0);
+  const action = String(router.action || '').trim().toLowerCase();
+  if (transition) return labelScenarioTransition(transition);
+  if (matched || watched) return `${matched + watched} thesis condition${matched + watched === 1 ? '' : 's'} hit`;
+  if (action === 'ignore') return 'No thesis impact';
+  if (action === 'watch') return 'Watch only';
+  return labelScenarioAction(action);
+}
+
+function pathExplanation(router) {
+  const path = String(router?.baseline_path || router?.current_path || '').trim();
+  if (!path) return '';
+  return `${labelScenarioPath(path)} is the saved path from the latest lab run. It only changes here when the announcement hits mapped bull/base/bear conditions.`;
+}
+
+function conditionTone(status, group = '') {
+  const normalized = String(status || '').trim().toLowerCase();
+  const normalizedGroup = String(group || '').trim().toLowerCase();
+  if (normalized === 'matched' && ['failure', 'red_flag'].includes(normalizedGroup)) return 'bear';
+  if (normalized === 'matched') return 'bull';
+  if (normalized === 'contradicted') return 'bear';
+  if (normalized === 'unclear') return 'base';
+  return 'muted';
+}
+
+function conditionStatusLabel(status) {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (normalized === 'not_matched') return 'Not hit';
+  if (normalized === 'matched') return 'Hit';
+  if (normalized === 'contradicted') return 'Contradicted';
+  if (normalized === 'unclear') return 'Unclear';
+  return normalized ? titleizeKey(normalized) : 'Monitor';
+}
+
+function scenarioTargetText(block) {
+  const parts = [];
+  if (block?.target_12m != null && block.target_12m !== '') parts.push(`12M ${block.target_12m}`);
+  if (block?.target_24m != null && block.target_24m !== '') parts.push(`24M ${block.target_24m}`);
+  if (block?.probability_pct != null && block.probability_pct !== '') parts.push(`Prob ${block.probability_pct}%`);
+  return parts.join(' | ');
+}
+
+function conditionStateLabel(item, fallback) {
+  const status = String(item?.status || '').trim();
+  const severity = String(item?.severity || '').trim();
+  return status || severity || fallback;
+}
+
+function conditionMetaText(item) {
+  const parts = [
+    item?.target_period && `by ${item.target_period}`,
+    item?.source_to_monitor,
+  ];
+  return parts.filter(Boolean).join(' | ');
 }
 
 function metricLabel(value, fallback = 'n/a') {
@@ -211,6 +271,127 @@ function DetailList({ title, items, conflict = false, market = false }) {
         ))}
       </div>
     </>
+  );
+}
+
+function ConditionChecks({ title, items }) {
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) return null;
+  return (
+    <>
+      <h4>{title}</h4>
+      <div className="announcement-router-condition-checks">
+        {rows.map((item, idx) => (
+          <div key={`${title}-${idx}`} className="announcement-router-condition-check">
+            <span className={`announcement-router-status tone-${conditionTone(item?.status, item?.group)}`}>
+              {conditionStatusLabel(item?.status)}
+            </span>
+            <div>
+              <strong>{routerItemLabel(item)}</strong>
+              {routerItemMeta(item) && <em>{routerItemMeta(item)}</em>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function ThesisSnapshot({ snapshot, router }) {
+  const scenarios = snapshot?.scenarios && typeof snapshot.scenarios === 'object' ? snapshot.scenarios : {};
+  const watchlist = snapshot?.monitoring_watchlist && typeof snapshot.monitoring_watchlist === 'object'
+    ? snapshot.monitoring_watchlist
+    : {};
+  const verification = Array.isArray(snapshot?.verification_queue) ? snapshot.verification_queue : [];
+  const redFlags = Array.isArray(watchlist.red_flags) ? watchlist.red_flags : [];
+  const confirmatorySignals = Array.isArray(watchlist.confirmatory_signals) ? watchlist.confirmatory_signals : [];
+  if (!Object.keys(scenarios).length && !redFlags.length && !confirmatorySignals.length && !verification.length) return null;
+
+  return (
+    <details className="announcement-router-thesis-snapshot" open>
+      <summary>Thesis Map Used For This Decision</summary>
+      <div className="announcement-router-path-explainer">
+        {pathExplanation(router)}
+      </div>
+      <div className="announcement-router-scenario-grid">
+        {['bull', 'base', 'bear'].map((name) => {
+          const block = scenarios[name] || {};
+          const required = Array.isArray(block.required_conditions) ? block.required_conditions : [];
+          const failures = Array.isArray(block.failure_conditions) ? block.failure_conditions : [];
+          return (
+            <article key={name} className={`announcement-router-scenario-card tone-${scenarioTone(name)}`}>
+              <header>
+                <strong>{name.toUpperCase()}</strong>
+                <span>{scenarioTargetText(block)}</span>
+              </header>
+              {block.summary && <p>{block.summary}</p>}
+              {(block.current_positioning || block.why_current_positioning) && (
+                <p className="announcement-router-scenario-sub">
+                  {block.current_positioning}{block.current_positioning && block.why_current_positioning ? ' | ' : ''}{block.why_current_positioning}
+                </p>
+              )}
+              {!!required.length && <h5>Required</h5>}
+              {required.map((item, idx) => (
+                <div key={`req-${name}-${idx}`} className="announcement-router-thesis-condition">
+                  <span>{conditionStateLabel(item, 'monitor')}</span>
+                  <strong>{item.condition}</strong>
+                  {conditionMetaText(item) && <em>{conditionMetaText(item)}</em>}
+                </div>
+              ))}
+              {!!failures.length && <h5>Failure</h5>}
+              {failures.map((item, idx) => (
+                <div key={`fail-${name}-${idx}`} className="announcement-router-thesis-condition is-risk">
+                  <span>{conditionStateLabel(item, 'at-risk')}</span>
+                  <strong>{item.condition}</strong>
+                  {conditionMetaText(item) && <em>{conditionMetaText(item)}</em>}
+                </div>
+              ))}
+            </article>
+          );
+        })}
+      </div>
+
+      {!!(redFlags.length || confirmatorySignals.length) && (
+        <>
+          <h4>Monitoring Watchlist</h4>
+          <div className="announcement-router-watchlist-grid">
+            {redFlags.map((item, idx) => (
+              <div key={`red-${idx}`} className="announcement-router-thesis-condition is-risk">
+                <span>{conditionStateLabel(item, 'red flag')}</span>
+                <strong>{item.condition}</strong>
+                {conditionMetaText(item) && <em>{conditionMetaText(item)}</em>}
+              </div>
+            ))}
+            {confirmatorySignals.map((item, idx) => (
+              <div key={`confirm-${idx}`} className="announcement-router-thesis-condition">
+                <span>{conditionStateLabel(item, 'confirm')}</span>
+                <strong>{item.condition}</strong>
+                {conditionMetaText(item) && <em>{conditionMetaText(item)}</em>}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {!!verification.length && (
+        <>
+          <h4>Verification Queue</h4>
+          <div className="announcement-router-condition-checks">
+            {verification.map((item, idx) => (
+              <div key={`verify-${idx}`} className="announcement-router-condition-check">
+                <span className={`announcement-router-status tone-${String(item.priority || '').toLowerCase() === 'high' ? 'bear' : 'base'}`}>
+                  {String(item.priority || 'check').toUpperCase()}
+                </span>
+                <div>
+                  <strong>{item.field}</strong>
+                  {(item.reason || item.required_source) && <em>{[item.reason, item.required_source && `Need: ${item.required_source}`].filter(Boolean).join(' | ')}</em>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </details>
   );
 }
 
@@ -248,7 +429,10 @@ function DecisionPanel({ router, emptyTitle = 'No announcement decision attached
   const findings = Array.isArray(router?.key_findings) ? router.key_findings : [];
   const conflicts = Array.isArray(router?.conflicts_with_run) ? router.conflicts_with_run : [];
   const marketConditions = Array.isArray(router?.market_context_conditions) ? router.market_context_conditions : [];
+  const announcementChecks = Array.isArray(router?.announcement_condition_checks) ? router.announcement_condition_checks : [];
+  const watchlistChecks = Array.isArray(router?.watchlist_condition_checks) ? router.watchlist_condition_checks : [];
   const followUps = Array.isArray(router?.follow_up_steps) ? router.follow_up_steps : [];
+  const directHits = matchedConditions.length + watchHits.length;
 
   if (!decisionAvailable) {
     return (
@@ -263,12 +447,16 @@ function DecisionPanel({ router, emptyTitle = 'No announcement decision attached
     <article className="scenario-router-column announcement-router-decision-panel">
       <h4>Selected Filing Decision</h4>
       <DetailRow label="Announcement" value={routerTitle(router)} />
-      <DetailRow label="Source" value={router?.source_type ? titleizeKey(router.source_type) : 'Unknown'} />
-      <DetailRow label="Current thesis path" value={labelScenarioPath(router?.current_path)} tone={scenarioTone(router?.current_path)} />
-      <DetailRow label="Scenario movement" value={labelScenarioTransition(router?.path_transition)} />
+      <DetailRow label="Official source" value={router?.source_type ? titleizeKey(router.source_type) : 'Unknown'} />
+      <DetailRow label="Router outcome" value={routerOutcomeLabel(router)} tone={directHits ? scenarioTone(router?.current_path) : ''} />
+      <DetailRow label="Saved lab path" value={labelScenarioPath(router?.baseline_path || router?.current_path)} tone={scenarioTone(router?.baseline_path || router?.current_path)} />
       <DetailRow label="Recommended action" value={labelScenarioAction(router?.action)} />
       <DetailRow label="Materiality" value={router?.impact_level ? titleizeKey(router.impact_level) : 'Not assessed'} />
       <DetailRow label="Last evaluated" value={router?.saved_at_utc ? fmtRelativeSince(router.saved_at_utc) : 'n/a'} />
+      <div className={`announcement-router-impact-callout ${directHits ? 'has-hit' : 'no-hit'}`}>
+        <strong>{directHits ? `${directHits} announcement thesis hit${directHits === 1 ? '' : 's'}` : 'No announcement-thesis hit'}</strong>
+        <span>{directHits ? 'The filing matched mapped lab conditions below.' : 'The filing did not match the bull/base/bear conditions. Market facts are shown separately as backdrop.'}</span>
+      </div>
       {explainRouterDecision(router) && <div className="scenario-router-detail-note">{explainRouterDecision(router)}</div>}
       {routerReason(router) && <div className="scenario-router-detail-note"><strong>Decision reason:</strong> {routerReason(router)}</div>}
       {router?.source_url && (
@@ -280,6 +468,8 @@ function DecisionPanel({ router, emptyTitle = 'No announcement decision attached
       <DetailList title="Watchlist Hits" items={watchHits} />
       <DetailList title="Conflicts With Saved Run" items={conflicts} conflict />
       <DetailList title="Supporting Findings" items={findings} />
+      <ConditionChecks title="Announcement Conditions Checked" items={announcementChecks} />
+      <ConditionChecks title="Watchlist Conditions Checked" items={watchlistChecks} />
       <DetailList title="Market Conditions Checked" items={marketConditions} market />
       {!!Object.keys(router?.market_facts_used || {}).length && (
         <>
@@ -305,6 +495,11 @@ function DecisionPanel({ router, emptyTitle = 'No announcement decision attached
           </div>
         </>
       )}
+      <ThesisSnapshot snapshot={router?.thesis_snapshot} router={router} />
+      <details className="announcement-router-trace-details">
+        <summary>Processing trace</summary>
+        <PipelineTrace router={router} />
+      </details>
     </article>
   );
 }
@@ -327,6 +522,22 @@ export default function AnnouncementRouterMonitor({
     () => String(tickerFilter || selectedTicker || '').trim().toUpperCase(),
     [tickerFilter, selectedTicker]
   );
+
+  useEffect(() => {
+    if (embedded || typeof document === 'undefined') return undefined;
+    const root = document.getElementById('root');
+    const previousRootOverflow = root?.style.overflow ?? '';
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    if (root) root.style.overflow = 'auto';
+    document.body.style.overflow = 'auto';
+    document.documentElement.style.overflow = 'auto';
+    return () => {
+      if (root) root.style.overflow = previousRootOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [embedded]);
 
   useEffect(() => {
     if (embedded) return undefined;
@@ -352,9 +563,7 @@ export default function AnnouncementRouterMonitor({
   const recentEvents = Array.isArray(overview?.recent_events) ? overview.recent_events : [];
   const selectedEvent = recentEvents.find((row) => row?.event_id === selectedEventId) || recentEvents[0] || {};
   const selectedRouter = embedded ? (runRouter || {}) : selectedEvent;
-  const actionCounts = topCountEntries(overview?.action_counts, 4);
   const statusCounts = topCountEntries(overview?.status_counts, 4);
-  const transitionCounts = topCountEntries(overview?.path_transition_counts, 4);
 
   const openFullMonitor = useCallback(() => {
     if (onOpenFullMonitor) {
@@ -386,12 +595,6 @@ export default function AnnouncementRouterMonitor({
             emptyTitle="No router decision for this run"
             emptyCopy={`No announcement-routing artifact is attached to ${selectedRunId || 'this selected run'}. This panel is intentionally blank rather than showing unrelated global events.`}
           />
-          {hasRouterDecision(selectedRouter) && (
-            <article className="scenario-router-column">
-              <h4>Processing Trace</h4>
-              <PipelineTrace router={selectedRouter} />
-            </article>
-          )}
         </div>
       </section>
     );
@@ -459,29 +662,13 @@ export default function AnnouncementRouterMonitor({
           <div className="scenario-router-columns announcement-router-monitor-columns">
             <DecisionPanel router={selectedRouter} emptyTitle="No routed announcements yet" />
 
-            <article className="scenario-router-column">
-              <h4>How This Decision Was Produced</h4>
-              <PipelineTrace router={selectedRouter} />
-              <h4>Action Distribution</h4>
-              <div className="scenario-router-chip-list">
-                {actionCounts.map(([key, value]) => (
-                  <span key={`action-${key}`} className="scenario-router-chip">{labelScenarioAction(key)} | {value}</span>
-                ))}
-                {!actionCounts.length && <span className="watch-empty">No actions yet.</span>}
+            <article className="scenario-router-column announcement-router-list-column">
+              <div className="announcement-router-list-head">
+                <h4>Routed Announcements</h4>
+                <span>{Math.min(recentEvents.length, 10)} of {recentEvents.length} shown</span>
               </div>
-              <h4>Scenario Movement</h4>
-              <div className="scenario-router-chip-list">
-                {transitionCounts.map(([key, value]) => (
-                  <span key={`transition-${key}`} className="scenario-router-chip">{labelScenarioTransition(key)} | {value}</span>
-                ))}
-                {!transitionCounts.length && <span className="watch-empty">No scenario movements yet.</span>}
-              </div>
-            </article>
-
-            <article className="scenario-router-column scenario-router-column-wide">
-              <h4>Recent Routed Announcements</h4>
               <div className="scenario-router-event-list">
-                {recentEvents.slice(0, 12).map((row) => (
+                {recentEvents.slice(0, 10).map((row) => (
                   <button
                     type="button"
                     className={`scenario-router-event ${selectedEvent?.event_id === row.event_id ? 'is-selected' : ''}`}
@@ -491,12 +678,11 @@ export default function AnnouncementRouterMonitor({
                     <div className="scenario-router-event-top">
                       <strong>{row.ticker || 'n/a'}</strong>
                       <span>{row.status || 'ok'}</span>
-                      <span>{labelScenarioAction(row.action)}</span>
-                      <span className={`tone-${scenarioTone(row.current_path)}`}>{labelScenarioPath(row.current_path)}</span>
+                      <span>{routerOutcomeLabel(row)}</span>
                     </div>
                     <div className="scenario-router-event-title">{row.title || 'Untitled announcement'}</div>
                     <div className="scenario-router-event-meta">
-                      {labelScenarioTransition(row.path_transition)} | {row.source_type || 'unknown source'} | {fmtMs(row.processing_duration_ms)} | {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
+                      Saved path: {labelScenarioPath(row.baseline_path || row.current_path)} | {row.source_type || 'unknown source'} | {fmtMs(row.processing_duration_ms)} | {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
                     </div>
                     {row.action_reason && <div className="scenario-router-event-reason">{row.action_reason}</div>}
                     {row.error_reason && <div className="scenario-router-detail-note">{row.error_reason}</div>}
