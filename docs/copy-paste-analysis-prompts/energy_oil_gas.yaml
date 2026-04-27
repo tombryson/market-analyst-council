@@ -5,7 +5,7 @@ source_yaml: backend/templates/energy_oil_gas.yaml
 placeholders:
   company_name: '[COMPANY_NAME]'
   ticker: '[EXCHANGE_CODE]:[TICKER]'
-  exchange: ASX
+  exchange: '[EXCHANGE_CODE]'
   instruction: Replace placeholders before pasting into an external model interface.
 generation_source:
   generated_by: scripts/export_copy_paste_analysis_prompts.py
@@ -35,12 +35,12 @@ copy_paste_prompt: |-
   - Template: energy_oil_gas
   - Company name: [COMPANY_NAME].
   - Company type: energy_oil_gas.
-  - Exchange: ASX.
+  - Exchange: [EXCHANGE_CODE].
   - Keep outputs decision-grade, evidence-linked, and explicit about assumptions.
 
   - Run a dedicated sector-macro lane (energy): capture 2-4 recent sources on oil/gas market drivers (Brent/WTI/Henry Hub trend, OPEC+ policy, geopolitical supply risks such as Middle East/Hormuz, inventories/demand) and tie each macro point to scenario assumptions.
   Exchange assumptions:
-  Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
+  Exchange profile: listing venue not preselected. Infer filing sources from the company's exchange, domicile, regulator, and primary documents; do not assume one exchange-specific filing format by default.
 
   Analysis rubric:
   Run an investment analysis on [COMPANY_NAME] using this oil and gas rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to valuation, funding risk, operating risk, commodity-price sensitivity, reserve/resource confidence, or scenario confidence.
@@ -71,15 +71,15 @@ copy_paste_prompt: |-
 
   Data sourcing rules:
   * If source documents are not attached, actively retrieve and review primary sources before analysis.
-  * Source market data from asx.com.au and/or marketindex.com.au.
-  * Source project, production, reserves/resources, financing, and hedging data from ASX announcements, quarterly/annual reports, investor presentations, and technical studies (PFS/FS/DFS).
-  * For ASX companies, prioritise ASX announcements, quarterly activities/cashflow reports, annual reports, investor presentations lodged on ASX, reserve/resource reports, and company operating updates.
+  * Source market data from official exchange sources, regulator filings, and reliable market-data providers for the listing venue.
+  * Source project, production, reserves/resources, financing, and hedging data from primary regulator filings, official exchange announcements, and company investor materials.
+  * Prioritise official exchange announcements, periodic reports, annual reports, investor presentations lodged with the exchange or regulator, reserve/resource reports, and company operating updates.
   * For US oil/gas operations, also check state regulator well records where relevant, SEC/OTC filings if applicable, reserve reports, and official basin/operator disclosures.
   * For every key numeric input used in NAV, Quality, Value, production, or price targets, provide:
     1) value used
     2) source URL + document date
     3) ESTIMATE tag with one-line justification if inferred.
-  * Use current AUD Brent, WTI, Henry Hub, LNG/JKM, local gas, and relevant basin differential data where applicable; state source and timestamp.
+  * Use current listing currency Brent, WTI, Henry Hub, LNG/JKM, local gas, and relevant basin differential data where applicable; state source and timestamp.
   * Use company-disclosed production, reserves/resources, realised price, LOE/opex, capex, hedging, debt, and balance-sheet data where available. Use generic assumptions only where no better source exists.
 
   Production baseline discipline:

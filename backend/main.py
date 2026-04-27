@@ -2694,8 +2694,14 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
     if not isinstance(router_state, dict) or not router_state:
         return {}
 
+    market_only_watch_projection = None
+    should_project_market_only_watch = None
     try:
         from .scenario_router.artifact_replay import replay_comparison_from_artifact
+        from .scenario_router.display_contract import (
+            market_only_watch_projection,
+            should_project_market_only_watch,
+        )
 
         comparison, action = replay_comparison_from_artifact(router_state)
     except Exception:
@@ -2820,28 +2826,40 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
     raw_current_path = str(comparison.get("current_path") or "").strip()
     raw_baseline_path = str(comparison.get("baseline_path") or "").strip()
     raw_impact = str(comparison.get("impact_level") or "").strip()
-    has_direct_announcement_hit = bool(matched_conditions or triggered_watchlist)
-    suppress_stale_market_only_reroute = (
-        not has_direct_announcement_hit
-        and raw_action in {"full_rerun", "rerun_stage1", "run_delta_only"}
+    suppress_stale_market_only_reroute = False
+    if should_project_market_only_watch:
+        suppress_stale_market_only_reroute = should_project_market_only_watch(
+            matched_conditions_count=len(matched_conditions),
+            triggered_watchlist_count=len(triggered_watchlist),
+            market_conditions_count=len(market_context_conditions),
+            raw_action=raw_action,
+        )
+    display_projection = (
+        market_only_watch_projection(
+            baseline_path=raw_baseline_path,
+            current_path=raw_current_path,
+            raw_impact=raw_impact,
+        )
+        if suppress_stale_market_only_reroute and market_only_watch_projection
+        else {}
     )
-    display_current_path = (
-        raw_baseline_path or raw_current_path
-        if suppress_stale_market_only_reroute
-        else raw_current_path
-    )
-    display_action = "watch" if suppress_stale_market_only_reroute else raw_action
-    display_impact = "low" if suppress_stale_market_only_reroute and raw_impact != "critical" else raw_impact
+    display_current_path = str(display_projection.get("current_path") or raw_current_path).strip()
+    display_action = str(display_projection.get("action") or raw_action).strip()
+    display_impact = str(display_projection.get("impact_level") or raw_impact).strip()
     return {
         "current_path": display_current_path,
         "baseline_path": raw_baseline_path,
-        "path_transition": "" if suppress_stale_market_only_reroute else str(comparison.get("path_transition") or "").strip(),
+        "path_transition": str(
+            display_projection.get("path_transition")
+            if display_projection
+            else comparison.get("path_transition") or ""
+        ).strip(),
         "path_confidence": comparison.get("path_confidence"),
-        "run_validity": str(comparison.get("run_validity") or "").strip(),
+        "run_validity": str(display_projection.get("run_validity") or comparison.get("run_validity") or "").strip(),
         "impact_level": display_impact,
         "action": display_action,
         "action_confidence": action.get("confidence"),
-        "reason": str(action.get("reason") or "").strip(),
+        "reason": str(display_projection.get("reason") or action.get("reason") or "").strip(),
         "announcement_title": str(
             comparison.get("announcement_title") or facts.get("title") or event.get("subject") or ""
         ).strip(),
@@ -2853,12 +2871,14 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         "key_findings": key_findings,
         "conflicts_with_run": conflicts_with_run,
         "affected_domains": (
-            comparison.get("affected_domains")
+            display_projection.get("affected_domains")
+            if display_projection
+            else comparison.get("affected_domains")
             if isinstance(comparison.get("affected_domains"), list)
             else []
         ),
-        "thesis_effect": str(comparison.get("thesis_effect") or "").strip(),
-        "run_validity": str(comparison.get("run_validity") or "").strip(),
+        "thesis_effect": str(display_projection.get("thesis_effect") or comparison.get("thesis_effect") or "").strip(),
+        "run_validity": str(display_projection.get("run_validity") or comparison.get("run_validity") or "").strip(),
         "source_type": str(packet.get("source_type") or "").strip(),
         "source_url": str(packet.get("source_url") or "").strip(),
         "market_facts_used": (
@@ -2868,14 +2888,21 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         ),
         "invalidated_sections": [
             str(item or "").strip()
-            for item in (action.get("invalidated_sections") or [])
+            for item in (
+                (display_projection.get("invalidated_sections") if display_projection else action.get("invalidated_sections"))
+                or []
+            )
             if str(item or "").strip()
         ][:8],
         "follow_up_steps": [
             str(item or "").strip()
-            for item in (action.get("follow_up_steps") or [])
+            for item in (
+                (display_projection.get("follow_up_steps") if display_projection else action.get("follow_up_steps"))
+                or []
+            )
             if str(item or "").strip()
         ][:5],
+        "display_adjustment": str(display_projection.get("display_adjustment") or "").strip(),
         "received_at_utc": str(event.get("received_at_utc") or "").strip(),
         "saved_at_utc": str(router_state.get("saved_at_utc") or "").strip(),
     }
@@ -3185,6 +3212,7 @@ async def get_gantt_run_report_packet(run_id: str):
     return _build_integration_packet(run_id=str(run_payload.get("id") or run_id), run_payload=run_payload)
 
 
+@app.get("/api/announcement-router/overview")
 @app.get("/api/scenario-router/overview")
 async def get_scenario_router_overview(limit: int = 100, ticker: str = ""):
     from .scenario_router.observability import ScenarioRouterObservability
@@ -3193,6 +3221,7 @@ async def get_scenario_router_overview(limit: int = 100, ticker: str = ""):
     return observer.build_overview(recent_limit=max(1, min(int(limit or 100), 500)), ticker=str(ticker or "").strip())
 
 
+@app.get("/api/announcement-router/events")
 @app.get("/api/scenario-router/events")
 async def list_scenario_router_events(limit: int = 50, ticker: str = ""):
     from .scenario_router.observability import ScenarioRouterObservability
@@ -3203,6 +3232,7 @@ async def list_scenario_router_events(limit: int = 50, ticker: str = ""):
     }
 
 
+@app.get("/api/announcement-router/evaluations")
 @app.get("/api/scenario-router/evaluations")
 async def get_scenario_router_evaluations():
     from .scenario_router.observability import ScenarioRouterObservability
@@ -3225,6 +3255,7 @@ async def get_latest_delta_check(run_id: str):
     return latest
 
 
+@app.post("/api/announcement-router/process-announcement")
 @app.post("/api/scenario-router/process-announcement")
 @app.post("/api/freshness/process-announcement")
 async def process_scenario_router_announcement(

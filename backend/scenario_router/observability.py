@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 
 from .action_judge import ActionJudge
 from .artifact_replay import replay_comparison_from_artifact
+from .display_contract import market_only_watch_projection, should_project_market_only_watch
 from .lab_scribe import SCENARIO_ROUTER_EVENTS_DIR
 from .models import AnnouncementFacts, BaselineRunPacket, EvidenceRef
 from .thesis_comparator import ThesisComparator
@@ -182,12 +183,17 @@ class ScenarioRouterObservability:
         raw_action = str(action.get("action") or "").strip()
         raw_current_path = str(report.get("current_path") or "").strip()
         raw_baseline_path = str(report.get("baseline_path") or "").strip()
-        suppress_stale_market_only_reroute = (
-            matched_conditions == 0
-            and triggered_watchlist == 0
-            and market_conditions > 0
-            and raw_action in {"full_rerun", "rerun_stage1", "run_delta_only"}
+        suppress_stale_market_only_reroute = should_project_market_only_watch(
+            matched_conditions_count=matched_conditions,
+            triggered_watchlist_count=triggered_watchlist,
+            market_conditions_count=market_conditions,
+            raw_action=raw_action,
         )
+        display_projection = market_only_watch_projection(
+            baseline_path=raw_baseline_path,
+            current_path=raw_current_path,
+            raw_impact=str(report.get("impact_level") or "").strip(),
+        ) if suppress_stale_market_only_reroute else {}
 
         return {
             "status": str(payload.get("status") or "ok").strip() or "ok",
@@ -197,11 +203,11 @@ class ScenarioRouterObservability:
             "company_name": str(packet.get("company_name") or "").strip(),
             "saved_at_utc": str(payload.get("saved_at_utc") or "").strip(),
             "received_at_utc": str(event.get("received_at_utc") or "").strip(),
-            "action": "watch" if suppress_stale_market_only_reroute else raw_action,
-            "impact_level": "low" if suppress_stale_market_only_reroute else str(report.get("impact_level") or "").strip(),
-            "current_path": (raw_baseline_path or raw_current_path) if suppress_stale_market_only_reroute else raw_current_path,
+            "action": str(display_projection.get("action") or raw_action).strip(),
+            "impact_level": str(display_projection.get("impact_level") or report.get("impact_level") or "").strip(),
+            "current_path": str(display_projection.get("current_path") or raw_current_path).strip(),
             "baseline_path": raw_baseline_path,
-            "path_transition": "" if suppress_stale_market_only_reroute else str(report.get("path_transition") or "").strip(),
+            "path_transition": str(display_projection.get("path_transition") if display_projection else report.get("path_transition") or "").strip(),
             "source_type": str(packet.get("source_type") or "").strip(),
             "source_url": str(packet.get("source_url") or "").strip(),
             "run_id": str(baseline_run.get("run_id") or "").strip(),
@@ -218,21 +224,34 @@ class ScenarioRouterObservability:
             ),
             "key_findings": _finding_details(report.get("key_findings")),
             "conflicts_with_run": _finding_details(report.get("conflicts_with_run")),
-            "action_reason": str(action.get("reason") or "").strip(),
+            "action_reason": str(display_projection.get("action_reason") or action.get("reason") or "").strip(),
             "action_confidence": action.get("confidence"),
-            "follow_up_steps": [str(item or "").strip() for item in (action.get("follow_up_steps") or []) if str(item or "").strip()][:5],
-            "invalidated_sections": [
+            "follow_up_steps": (
+                [str(item or "").strip() for item in (display_projection.get("follow_up_steps") or []) if str(item or "").strip()]
+                if display_projection
+                else [str(item or "").strip() for item in (action.get("follow_up_steps") or []) if str(item or "").strip()]
+            )[:5],
+            "invalidated_sections": (
+                [str(item or "").strip() for item in (display_projection.get("invalidated_sections") or []) if str(item or "").strip()]
+                if display_projection
+                else [
                 str(item or "").strip()
                 for item in (action.get("invalidated_sections") or [])
                 if str(item or "").strip()
-            ][:8],
-            "affected_domains": [
+                ]
+            )[:8],
+            "affected_domains": (
+                [str(item or "").strip() for item in (display_projection.get("affected_domains") or []) if str(item or "").strip()]
+                if display_projection
+                else [
                 str(item or "").strip()
                 for item in (report.get("affected_domains") or [])
                 if str(item or "").strip()
-            ][:8],
-            "thesis_effect": str(report.get("thesis_effect") or "").strip(),
-            "run_validity": str(report.get("run_validity") or "").strip(),
+                ]
+            )[:8],
+            "thesis_effect": str(display_projection.get("thesis_effect") or report.get("thesis_effect") or "").strip(),
+            "run_validity": str(display_projection.get("run_validity") or report.get("run_validity") or "").strip(),
+            "display_adjustment": str(display_projection.get("display_adjustment") or "").strip(),
             "market_facts_used": report.get("market_facts_used") if isinstance(report.get("market_facts_used"), dict) else {},
             "error_reason": str(((payload.get("error") or {}) if isinstance(payload.get("error"), dict) else {}).get("reason") or "").strip(),
             "processing_trace": trace,

@@ -516,7 +516,7 @@ copy_paste_rubric: |
   * If source documents are not attached, actively retrieve and review primary sources before analysis.
   * Source market data from [MARKET_DATA_SOURCES].
   * Source project, production, reserves/resources, financing, and hedging data from [PRIMARY_FILING_SOURCES].
-  * For ASX companies, prioritise ASX announcements, quarterly activities/cashflow reports, annual reports, investor presentations lodged on ASX, reserve/resource reports, and company operating updates.
+  * Prioritise official exchange announcements, periodic reports, annual reports, investor presentations lodged with the exchange or regulator, reserve/resource reports, and company operating updates.
   * For US oil/gas operations, also check state regulator well records where relevant, SEC/OTC filings if applicable, reserve reports, and official basin/operator disclosures.
   * For every key numeric input used in NAV, Quality, Value, production, or price targets, provide:
     1) value used

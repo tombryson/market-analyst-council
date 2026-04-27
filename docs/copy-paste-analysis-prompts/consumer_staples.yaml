@@ -5,7 +5,7 @@ source_yaml: backend/templates/consumer_staples.yaml
 placeholders:
   company_name: '[COMPANY_NAME]'
   ticker: '[EXCHANGE_CODE]:[TICKER]'
-  exchange: ASX
+  exchange: '[EXCHANGE_CODE]'
   instruction: Replace placeholders before pasting into an external model interface.
 generation_source:
   generated_by: scripts/export_copy_paste_analysis_prompts.py
@@ -36,12 +36,12 @@ copy_paste_prompt: |-
   - Template: consumer_staples
   - Company name: [COMPANY_NAME].
   - Company type: consumer_staples.
-  - Exchange: ASX.
+  - Exchange: [EXCHANGE_CODE].
   - Keep outputs decision-grade, evidence-linked, and explicit about assumptions.
 
   - Run a dedicated sector lane (consumer staples): capture 2-4 recent sources on volume resilience, pricing pass-through, input-cost inflation, retailer/private-label pressure, and channel inventory; tie each point to scenario assumptions.
   Exchange assumptions:
-  Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
+  Exchange profile: listing venue not preselected. Infer filing sources from the company's exchange, domicile, regulator, and primary documents; do not assume one exchange-specific filing format by default.
 
   Analysis rubric:
   Run an investment analysis on [COMPANY_NAME] using this consumer-staples rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to demand resilience, pricing power, category structure, input-cost pass-through, working-capital quality, or scenario confidence.
@@ -72,14 +72,14 @@ copy_paste_prompt: |-
 
   Data sourcing rules:
   * If source documents are not attached, actively retrieve and review primary sources before analysis.
-  * Source market data from asx.com.au and/or marketindex.com.au.
+  * Source market data from official exchange sources, regulator filings, and reliable market-data providers for the listing venue.
   * Source operating, category, pricing, mix, inventory, channel, and financial data from the company's primary exchange filings plus annual/interim reports, investor presentations, trading updates, and material announcements.
   * Prefer primary sources: exchange filings, statutory reports, company presentations, category commentary, pricing disclosures, inventory and working-capital commentary, margin bridges, customer/channel disclosures, and management guidance. Use secondary sources only where they add factual context on category trends, retailer pressure, commodity/input costs, or competitive positioning.
   * For every key numeric input used in valuation, Quality, Value, price targets, volume, pricing, gross margin, working capital, inventory, leverage, or cash-flow analysis, provide:
     1) value used
     2) source URL + document date
     3) ESTIMATE tag with one-line justification if inferred.
-  * Use current AUD market data and current AUD/USD conversion rate (or project-local FX where applicable); state source and timestamp.
+  * Use current listing currency market data and relevant base-currency FX conversion where project economics are reported in a different currency; state source and timestamp.
   * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
 
   Document review (complete before valuation):

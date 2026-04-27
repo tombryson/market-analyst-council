@@ -104,7 +104,7 @@ class InboxSentinel:
     @staticmethod
     def _coerce_company_hint(*, explicit: Any, body_text: str) -> str:
         text = str(explicit or "").strip()
-        if text:
+        if text and not InboxSentinel._is_boilerplate_company_hint(text):
             return text
 
         lines = [str(line or "").strip() for line in str(body_text or "").splitlines()]
@@ -116,12 +116,32 @@ class InboxSentinel:
             if "released an announcement" in lowered:
                 prefix = re.split(r"released an announcement", line, flags=re.IGNORECASE)[0]
                 candidate = prefix.rstrip(". ").strip()
-                if candidate:
+                if candidate and not InboxSentinel._is_boilerplate_company_hint(candidate):
                     return candidate
                 break
+        for line in lines:
+            if re.match(r"^[A-Z0-9]{2,8}:\s+", line):
+                continue
+            if InboxSentinel._is_boilerplate_company_hint(line):
+                continue
             if re.search(r"\b(limited|resources|mining|metals|energy|holdings|corp|corporation|pharmaceuticals|biotech)\b", line, flags=re.IGNORECASE):
                 return line.rstrip(".")
         return ""
+
+    @staticmethod
+    def _is_boilerplate_company_hint(value: str) -> bool:
+        text = str(value or "").strip().lower()
+        if not text:
+            return True
+        boilerplate_tokens = (
+            "hotcopper",
+            "report card pty",
+            "welcome from",
+            "kind regards",
+            "you are receiving this email",
+            "manage your stock email alerts",
+        )
+        return any(token in text for token in boilerplate_tokens)
 
     @staticmethod
     def _coerce_urls(value: Any) -> List[str]:

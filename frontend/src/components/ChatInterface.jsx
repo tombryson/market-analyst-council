@@ -41,8 +41,8 @@ export default function ChatInterface({
   const [enableSearch, setEnableSearch] = useState(true);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [supplementaryFile, setSupplementaryFile] = useState(null);
-  const [fileInputKey, setFileInputKey] = useState(Date.now());
-  const [supplementaryInputKey, setSupplementaryInputKey] = useState(Date.now() + 1);
+  const [fileInputKey, setFileInputKey] = useState(() => Date.now());
+  const [supplementaryInputKey, setSupplementaryInputKey] = useState(() => Date.now() + 1);
   const [availableTemplates, setAvailableTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [availableExchanges, setAvailableExchanges] = useState([]);

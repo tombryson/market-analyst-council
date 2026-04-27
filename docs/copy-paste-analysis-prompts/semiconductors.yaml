@@ -5,7 +5,7 @@ source_yaml: backend/templates/semiconductors.yaml
 placeholders:
   company_name: '[COMPANY_NAME]'
   ticker: '[EXCHANGE_CODE]:[TICKER]'
-  exchange: ASX
+  exchange: '[EXCHANGE_CODE]'
   instruction: Replace placeholders before pasting into an external model interface.
 generation_source:
   generated_by: scripts/export_copy_paste_analysis_prompts.py
@@ -36,12 +36,12 @@ copy_paste_prompt: |-
   - Template: semiconductors
   - Company name: [COMPANY_NAME].
   - Company type: semiconductors.
-  - Exchange: ASX.
+  - Exchange: [EXCHANGE_CODE].
   - Keep outputs decision-grade, evidence-linked, and explicit about assumptions.
 
   - Run a dedicated sector lane (semiconductors): capture 2-4 recent sources on inventory cycle, end-market demand, pricing/ASP trends, capex intensity, and export-control or supply-chain risk; tie each point to scenario assumptions.
   Exchange assumptions:
-  Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
+  Exchange profile: listing venue not preselected. Infer filing sources from the company's exchange, domicile, regulator, and primary documents; do not assume one exchange-specific filing format by default.
 
   Analysis rubric:
   Run an investment analysis on [COMPANY_NAME] using this semiconductors rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to technology position, cycle timing, inventory normalization, gross-margin durability, capex intensity, customer concentration, or scenario confidence.
@@ -72,14 +72,14 @@ copy_paste_prompt: |-
 
   Data sourcing rules:
   * If source documents are not attached, actively retrieve and review primary sources before analysis.
-  * Source market data from asx.com.au and/or marketindex.com.au.
+  * Source market data from official exchange sources, regulator filings, and reliable market-data providers for the listing venue.
   * Source operating, technology, utilization, inventory, margin, capex, and financial data from the company's primary exchange filings plus annual/interim reports, investor presentations, product roadmaps where publicly disclosed, and earnings/guidance materials.
   * Prefer primary sources: exchange filings, statutory reports, company presentations, product/roadmap disclosures, and company metrics disclosures. Use secondary sources only where they add factual context on semiconductor demand, pricing, WFE cycle, or export-control backdrop.
   * For every key numeric input used in valuation, Quality, Value, price targets, inventory, utilization, margin, capex, or earnings-power analysis, provide:
     1) value used
     2) source URL + document date
     3) ESTIMATE tag with one-line justification if inferred.
-  * Use current AUD market data and current AUD/USD conversion rate (or project-local FX where applicable); state source and timestamp.
+  * Use current listing currency market data and relevant base-currency FX conversion where project economics are reported in a different currency; state source and timestamp.
   * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
 
   Document review (complete before valuation):

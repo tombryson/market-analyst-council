@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { mapStage3ToGanttModel } from '../utils/stage3GanttMapper';
 import { api } from '../api';
+import AnnouncementRouterMonitor from './AnnouncementRouterMonitor';
 import ScenarioTimelineUnit from './ScenarioTimelineUnit';
 import './GanttIntelligenceLab.css';
 
@@ -53,107 +54,12 @@ function fmtMoney(value, currency = 'AUD') {
   return `${symbol}${n.toFixed(2)}`;
 }
 
-function fmtMoneyM(value, currency = 'AUD') {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return 'n/a';
-  return `${fmtMoney(n, currency)}m`;
-}
-
 function titleizeKey(key) {
   return String(key || '')
     .replace(/_/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function labelScenarioPath(value) {
-  const path = String(value || '').trim().toLowerCase();
-  if (path === 'bull') return 'Bull case';
-  if (path === 'base') return 'Base case';
-  if (path === 'bear') return 'Bear case';
-  if (path === 'mixed') return 'Mixed / unclear';
-  return 'Not assessed';
-}
-
-function labelScenarioAction(value) {
-  const action = String(value || '').trim().toLowerCase();
-  const labels = {
-    ignore: 'No action',
-    watch: 'Watch only',
-    annotate_run: 'Attach note to run',
-    run_delta_only: 'Run delta check',
-    rerun_stage1: 'Refresh evidence only',
-    full_rerun: 'Full rerun recommended',
-    urgent_human_review: 'Urgent human review',
-  };
-  return labels[action] || (action ? titleizeKey(action) : 'Not assessed');
-}
-
-function labelScenarioTransition(value) {
-  const transition = String(value || '').trim().toLowerCase();
-  if (!transition || !transition.includes('->')) return 'No scenario change';
-  const [from, to] = transition.split('->').map((part) => labelScenarioPath(part));
-  return `${from} to ${to}`;
-}
-
-function explainScenarioSignal(router) {
-  if (!router || typeof router !== 'object') return '';
-  const action = String(router.action || '').trim().toLowerCase();
-  const transition = String(router.path_transition || '').trim();
-  const matchedCount = Array.isArray(router.matched_conditions) ? router.matched_conditions.length : 0;
-  const watchCount = Array.isArray(router.triggered_watchlist) ? router.triggered_watchlist.length : 0;
-  const marketCount = Array.isArray(router.market_context_conditions)
-    ? router.market_context_conditions.length
-    : Object.keys(router.market_facts_used || {}).length;
-
-  if (!matchedCount && !watchCount && marketCount) {
-    return 'The announcement did not directly hit a thesis-map condition. Market context was checked separately and should be read as backdrop, not announcement evidence.';
-  }
-  if (!matchedCount && !watchCount && action === 'ignore') {
-    return 'The announcement was found, read from the primary source, and did not change the saved thesis path.';
-  }
-  if (transition) {
-    return `The announcement evidence maps to ${labelScenarioTransition(transition)}. ${labelScenarioAction(action)}.`;
-  }
-  if (matchedCount || watchCount) {
-    return `The announcement hit ${matchedCount + watchCount} monitored condition(s), but did not move the thesis path. ${labelScenarioAction(action)}.`;
-  }
-  return router.reason || '';
-}
-
-function routerDetailItems(router, detailKey, fallbackKey) {
-  const details = router?.[detailKey];
-  if (Array.isArray(details) && details.length) return details;
-  const fallback = router?.[fallbackKey];
-  return Array.isArray(fallback) ? fallback : [];
-}
-
-function routerItemLabel(item) {
-  if (item && typeof item === 'object') return String(item.label || item.summary || item.condition_id || '').trim();
-  return String(item || '').trim();
-}
-
-function routerItemMeta(item) {
-  if (!item || typeof item !== 'object') return '';
-  const parts = [];
-  if (item.scenario) parts.push(labelScenarioPath(item.scenario));
-  if (item.group) parts.push(titleizeKey(item.group));
-  if (item.status) parts.push(titleizeKey(item.status));
-  if (item.reason) parts.push(String(item.reason));
-  return parts.filter(Boolean).join(' · ');
-}
-
-function formatRouterMarketCondition(item) {
-  if (!item || typeof item !== 'object') return '';
-  const observed = typeof item.observed_value === 'number'
-    ? fmtNum(item.observed_value, item.observed_value >= 100 ? 0 : 2)
-    : String(item.observed_value ?? 'n/a');
-  const threshold = typeof item.threshold_value === 'number'
-    ? fmtNum(item.threshold_value, item.threshold_value >= 100 ? 0 : 2)
-    : String(item.threshold_value ?? 'n/a');
-  const field = item.field || item.market_field || 'market fact';
-  return `${titleizeKey(field)} observed ${observed}; condition ${item.comparator || '?'} ${threshold} was ${item.status || 'checked'}.`;
 }
 
 function parseIsoDateOrNull(value) {
@@ -192,13 +98,6 @@ function fmtRunTimestamp(value) {
   } catch {
     return dt.toISOString().replace('T', ' ').slice(0, 16);
   }
-}
-
-function fmtMs(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return 'n/a';
-  if (n < 1000) return `${Math.round(n)}ms`;
-  return `${(n / 1000).toFixed(2)}s`;
 }
 
 function shortRunId(runId) {
@@ -768,11 +667,61 @@ function weightedTargetForHorizon(targets = {}, probs = {}) {
   return toNumberOrNull(targets?.base);
 }
 
+const PRICE_REBASE_STORAGE_KEY = 'llm-council:gantt-price-rebase:v1';
+
+function loadStoredPriceRebases() {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(PRICE_REBASE_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function normalizePriceRebase(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const type = String(raw.type || '').trim();
+  if (!['share_consolidation', 'share_split'].includes(type)) return null;
+  const oldUnits = Number(raw.old_units);
+  const newUnits = Number(raw.new_units);
+  if (!Number.isFinite(oldUnits) || oldUnits <= 0 || !Number.isFinite(newUnits) || newUnits <= 0) return null;
+  const priceFactor = oldUnits / newUnits;
+  if (!Number.isFinite(priceFactor) || priceFactor <= 0) return null;
+  return {
+    type,
+    old_units: oldUnits,
+    new_units: newUnits,
+    price_factor: priceFactor,
+    created_at: raw.created_at || new Date().toISOString(),
+  };
+}
+
+function rebasePrice(value, factor) {
+  const n = toNumberOrNull(value);
+  if (n == null) return null;
+  return n * factor;
+}
+
+function rebaseTargets(targets = {}, factor = 1) {
+  return {
+    bear: rebasePrice(targets?.bear, factor),
+    base: rebasePrice(targets?.base, factor),
+    bull: rebasePrice(targets?.bull, factor),
+  };
+}
+
+function formatRebaseRatio(rebase) {
+  if (!rebase) return '';
+  return `${fmtNum(rebase.old_units, 0)}:${fmtNum(rebase.new_units, 0)}`;
+}
+
 function toNumberOrNull(value) {
   if (value == null) return null;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value === 'string') {
-    const cleaned = value.replace(/[^0-9.\-]/g, '').trim();
+    const cleaned = value.replace(/[^0-9.-]/g, '').trim();
     if (!cleaned) return null;
     const n = Number(cleaned);
     return Number.isFinite(n) ? n : null;
@@ -902,13 +851,6 @@ function dedupeRuns(runs) {
       const tb = Date.parse(String(b.updated_at || b.analysis_date || '')) || 0;
       return tb - ta;
     });
-}
-
-function topCountEntries(counts, limit = 4) {
-  return Object.entries(counts || {})
-    .filter(([, value]) => Number(value) > 0)
-    .sort((a, b) => Number(b[1]) - Number(a[1]))
-    .slice(0, limit);
 }
 
 function normalizeVerificationQueue(stage3) {
@@ -1041,13 +983,14 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
   const [remoteError, setRemoteError] = useState('');
   const [deletingRunId, setDeletingRunId] = useState('');
   const [runsReloadToken, setRunsReloadToken] = useState(0);
-  const [scenarioOverview, setScenarioOverview] = useState(null);
-  const [scenarioEvaluations, setScenarioEvaluations] = useState(null);
-  const [scenarioLoading, setScenarioLoading] = useState(false);
-  const [scenarioError, setScenarioError] = useState('');
-  const [scenarioReloadToken, setScenarioReloadToken] = useState(0);
-  const [scenarioTickerFilter, setScenarioTickerFilter] = useState('');
-  const [selectedScenarioEventId, setSelectedScenarioEventId] = useState('');
+  const [priceRebaseByRunId, setPriceRebaseByRunId] = useState(loadStoredPriceRebases);
+  const [priceAdjustOpen, setPriceAdjustOpen] = useState(false);
+  const [priceAdjustError, setPriceAdjustError] = useState('');
+  const [priceAdjustForm, setPriceAdjustForm] = useState({
+    type: 'share_consolidation',
+    oldUnits: '10',
+    newUnits: '1',
+  });
   const preferredRunIdFromUrl = useMemo(() => {
     try {
       const params = new URLSearchParams(locationSearch || '');
@@ -1079,10 +1022,6 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
     }
     return out;
   }, [preferredTickerFromUrl]);
-  const effectiveScenarioTicker = useMemo(
-    () => String(scenarioTickerFilter || preferredTickerFromUrl || '').trim().toUpperCase(),
-    [scenarioTickerFilter, preferredTickerFromUrl]
-  );
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const sync = () => setLocationSearch(window.location.search || '');
@@ -1114,6 +1053,15 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(PRICE_REBASE_STORAGE_KEY, JSON.stringify(priceRebaseByRunId || {}));
+    } catch {
+      // Local display preference only; ignore storage failures.
+    }
+  }, [priceRebaseByRunId]);
+
+  useEffect(() => {
     let cancelled = false;
     const loadRuns = async () => {
       try {
@@ -1140,12 +1088,6 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
         }
       } catch (err) {
         if (cancelled) return;
-        try {
-          const loadedDirect = await loadPreferredRunDirectly();
-          if (loadedDirect) return;
-        } catch (_) {
-          // fall through to user-visible error below
-        }
         setRemoteError(err?.message || 'Failed to load run list');
       } finally {
         if (!cancelled) {
@@ -1158,32 +1100,6 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
       cancelled = true;
     };
   }, [preferredTickerAliases, runsReloadToken]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadScenarioMonitor = async () => {
-      try {
-        setScenarioLoading(true);
-        setScenarioError('');
-        const [overview, evaluations] = await Promise.all([
-          api.getScenarioRouterOverview(120, effectiveScenarioTicker),
-          api.getScenarioRouterEvaluations(),
-        ]);
-        if (cancelled) return;
-        setScenarioOverview(overview || null);
-        setScenarioEvaluations(evaluations || null);
-      } catch (err) {
-        if (cancelled) return;
-        setScenarioError(err?.message || 'Failed to load scenario router monitor');
-      } finally {
-        if (!cancelled) setScenarioLoading(false);
-      }
-    };
-    loadScenarioMonitor();
-    return () => {
-      cancelled = true;
-    };
-  }, [effectiveScenarioTicker, scenarioReloadToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1323,10 +1239,12 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
   const selectedMeta = remoteRuns.find((run) => `run:${run?.id}` === datasetId) || null;
   const selectedPayload = selected?.data || null;
   const selectedRunId = selected?.remoteRunId || '';
+  const activePriceRebase = normalizePriceRebase(priceRebaseByRunId[selectedRunId]);
+  const priceRebaseFactor = activePriceRebase?.price_factor || 1;
   const visibleDatasetId = pendingDatasetId || datasetId || '';
   const selectionPending = Boolean(pendingDatasetId && pendingDatasetId !== datasetId);
   const deltaCheck = selectedPayload?.delta_check || (selectedRunId ? deltaByRunId[selectedRunId] : null) || null;
-  const stage3 = selectedPayload?.structured_data || selectedPayload || {};
+  const stage3 = useMemo(() => selectedPayload?.structured_data || selectedPayload || {}, [selectedPayload]);
   const freshness = useMemo(() => {
     const raw = selectedPayload?.freshness;
     if (raw && typeof raw === 'object') {
@@ -1360,33 +1278,14 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
   const bannerThesis = selectionPending
     ? 'Loading selected analysis run…'
     : (stage3?.investment_recommendation?.summary || mapped.thesis || 'No thesis summary provided.');
-  const recentScenarioEvents = Array.isArray(scenarioOverview?.recent_events) ? scenarioOverview.recent_events : [];
-  const selectedScenarioEvent = recentScenarioEvents.find((row) => row?.event_id === selectedScenarioEventId) || recentScenarioEvents[0] || {};
   const selectedRunRouter = selectedPayload?.scenario_router || {};
   const selectedRunRouterHasDecision = Boolean(
     selectedRunRouter
     && typeof selectedRunRouter === 'object'
     && (selectedRunRouter.action || selectedRunRouter.current_path || selectedRunRouter.announcement_title)
   );
-  const selectedRouter = selectedScenarioEventId
-    ? selectedScenarioEvent
-    : (selectedRunRouterHasDecision ? selectedRunRouter : selectedScenarioEvent);
-  const selectedRouterExplanation = explainScenarioSignal(selectedRouter);
-  const selectedRouterConditionHits = routerDetailItems(selectedRouter, 'matched_condition_details', 'matched_conditions');
-  const selectedRouterWatchHits = routerDetailItems(selectedRouter, 'triggered_watchlist_details', 'triggered_watchlist');
-  const selectedRouterFindings = Array.isArray(selectedRouter?.key_findings) ? selectedRouter.key_findings : [];
-  const selectedRouterConflicts = Array.isArray(selectedRouter?.conflicts_with_run) ? selectedRouter.conflicts_with_run : [];
-  const selectedRouterMarketConditions = Array.isArray(selectedRouter?.market_context_conditions) ? selectedRouter.market_context_conditions : [];
-  const selectedRouterTitle = selectedRouter?.announcement_title || selectedRouter?.title || '';
-  const selectedRouterReason = selectedRouter?.reason || selectedRouter?.action_reason || '';
-  const overviewActionCounts = topCountEntries(scenarioOverview?.action_counts, 4);
-  const overviewStatusCounts = topCountEntries(scenarioOverview?.status_counts, 4);
-  const overviewTransitionCounts = topCountEntries(scenarioOverview?.path_transition_counts, 4);
-  const goToTimelineLab = useCallback(() => {
-    navigateTo('/gantt-lab');
-  }, []);
   const goToScenarioRouter = useCallback(() => {
-    navigateTo('/scenario-router');
+    navigateTo('/announcement-router');
   }, []);
 
   const currency =
@@ -1406,12 +1305,25 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
     () => inferCurrentPrice(stage3, selectedPayload),
     [stage3, selectedPayload]
   );
+  const displayCurrentSpotPrice = rebasePrice(currentSpotPrice, priceRebaseFactor);
+  const displayTargets12 = rebaseTargets({
+    bear: targets12.bear,
+    base: toNumberOrNull(targets12.base) ?? toNumberOrNull(stage3?.price_targets?.target_12m),
+    bull: targets12.bull,
+  }, priceRebaseFactor);
+  const displayTargets24 = rebaseTargets({
+    bear: toNumberOrNull(targets24.bear) ?? toNumberOrNull(targets12.bear),
+    base: toNumberOrNull(targets24.base) ?? toNumberOrNull(stage3?.price_targets?.target_24m),
+    bull: toNumberOrNull(targets24.bull) ?? toNumberOrNull(targets12.bull),
+  }, priceRebaseFactor);
+  const displayWeighted12 = rebasePrice(weighted12, priceRebaseFactor);
+  const displayWeighted24 = rebasePrice(weighted24, priceRebaseFactor);
 
   const timeline = useMemo(
     () => normalizeTimelineRows(stage3?.development_timeline),
     [stage3?.development_timeline]
   );
-  const thesisMap = stage3?.thesis_map || {};
+  const thesisMap = useMemo(() => stage3?.thesis_map || {}, [stage3?.thesis_map]);
   const watch = useMemo(() => normalizeWatchlist(stage3, thesisMap), [stage3, thesisMap]);
   const verification = useMemo(() => normalizeVerificationQueue(stage3), [stage3]);
   const dissents = (stage3?.extended_analysis?.dissenting_views || []).slice(0, 6);
@@ -1425,19 +1337,19 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
   const claimLedger = stage3?.council_metadata?.claim_ledger_counts || {};
 
   const chartPayload = {
-    current: currentSpotPrice,
+    current: displayCurrentSpotPrice,
     targets12: {
-      bear: Number(targets12.bear) || 0,
-      base: Number(targets12.base) || Number(stage3?.price_targets?.target_12m) || 0,
-      bull: Number(targets12.bull) || 0,
+      bear: displayTargets12.bear || 0,
+      base: displayTargets12.base || 0,
+      bull: displayTargets12.bull || 0,
     },
     targets24: {
-      bear: Number(targets24.bear) || Number(targets12.bear) || 0,
-      base: Number(targets24.base) || Number(stage3?.price_targets?.target_24m) || 0,
-      bull: Number(targets24.bull) || Number(targets12.bull) || 0,
+      bear: displayTargets24.bear || 0,
+      base: displayTargets24.base || 0,
+      bull: displayTargets24.bull || 0,
     },
-    weighted12: weighted12 ?? 0,
-    weighted24: weighted24 ?? 0,
+    weighted12: displayWeighted12 ?? 0,
+    weighted24: displayWeighted24 ?? 0,
   };
 
   const freshnessStatus = String(freshness?.status || '').toLowerCase();
@@ -1515,6 +1427,47 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
   const topVerification = verification.slice(0, 5);
   const retryLoadRuns = () => {
     setRunsReloadToken((prev) => prev + 1);
+  };
+  const openPriceAdjust = () => {
+    const existing = activePriceRebase;
+    setPriceAdjustError('');
+    setPriceAdjustForm({
+      type: existing?.type || 'share_consolidation',
+      oldUnits: existing ? String(existing.old_units) : '10',
+      newUnits: existing ? String(existing.new_units) : '1',
+    });
+    setPriceAdjustOpen(true);
+  };
+  const applyPriceAdjust = () => {
+    if (!selectedRunId) return;
+    const oldUnits = Number(priceAdjustForm.oldUnits);
+    const newUnits = Number(priceAdjustForm.newUnits);
+    const type = String(priceAdjustForm.type || '').trim();
+    const normalized = normalizePriceRebase({
+      type,
+      old_units: oldUnits,
+      new_units: newUnits,
+      created_at: new Date().toISOString(),
+    });
+    if (!normalized) {
+      setPriceAdjustError('Enter a valid positive ratio.');
+      return;
+    }
+    setPriceRebaseByRunId((prev) => ({
+      ...(prev || {}),
+      [selectedRunId]: normalized,
+    }));
+    setPriceAdjustOpen(false);
+  };
+  const clearPriceAdjust = () => {
+    if (!selectedRunId) return;
+    setPriceRebaseByRunId((prev) => {
+      const next = { ...(prev || {}) };
+      delete next[selectedRunId];
+      return next;
+    });
+    setPriceAdjustOpen(false);
+    setPriceAdjustError('');
   };
   const deleteSelectedRun = async () => {
     const targetRunId = String(selectedRunId || '').trim();
@@ -1660,213 +1613,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
       )}
 
       {monitorOnly && (
-      <section className="lab-panel scenario-router-monitor-panel">
-        <div className="scenario-router-monitor-head">
-          <div>
-            <h3>Scenario Router Monitor</h3>
-            <p className="scenario-router-monitor-copy">
-              Primary-source announcement routing, signal quality, and recent decision flow.
-            </p>
-          </div>
-          <div className="scenario-router-monitor-actions">
-            <input
-              type="text"
-              className="scenario-router-filter-input"
-              placeholder="Filter by ticker, e.g. ASX:TOR"
-              value={scenarioTickerFilter}
-              onChange={(e) => setScenarioTickerFilter(String(e.target.value || '').toUpperCase())}
-            />
-            <button
-              type="button"
-              className="gantt-lab-inline-retry"
-              onClick={() => setScenarioReloadToken((prev) => prev + 1)}
-              disabled={scenarioLoading}
-            >
-              {scenarioLoading ? 'Refreshing…' : 'Refresh Monitor'}
-            </button>
-            <button
-              type="button"
-              className="gantt-lab-inline-retry"
-              onClick={monitorOnly ? goToTimelineLab : goToScenarioRouter}
-            >
-              {monitorOnly ? 'Open Timeline Lab' : 'Open Full Monitor'}
-            </button>
-          </div>
-        </div>
-
-        <div className="scenario-router-monitor-grid">
-          <div className="scenario-router-card">
-            <label>Total Events</label>
-            <strong>{scenarioOverview?.total_events ?? 'n/a'}</strong>
-            <span>{scenarioOverview?.unique_tickers ?? 'n/a'} tickers tracked</span>
-          </div>
-          <div className="scenario-router-card">
-            <label>Primary Source Rate</label>
-            <strong>{fmtPct(scenarioOverview?.official_source_rate_pct)}</strong>
-            <span>official ASX filing used</span>
-          </div>
-          <div className="scenario-router-card">
-            <label>Average Processing</label>
-            <strong>{fmtMs(scenarioOverview?.average_processing_ms)}</strong>
-            <span>end-to-end router latency</span>
-          </div>
-          <div className="scenario-router-card">
-            <label>Event Status</label>
-            <strong>{overviewStatusCounts[0]?.[0] || 'n/a'}</strong>
-            <span>{overviewStatusCounts[0]?.[1] || 0} latest-status count</span>
-          </div>
-          <div className="scenario-router-card">
-            <label>Router QA</label>
-            <strong>{fmtPct(scenarioEvaluations?.pass_rate_pct)}</strong>
-            <span>{scenarioEvaluations?.passed_cases ?? 0}/{scenarioEvaluations?.total_cases ?? 0} regression checks</span>
-          </div>
-        </div>
-
-        <div className="scenario-router-columns">
-          <article className="scenario-router-column">
-            <h4>Announcement Decision</h4>
-            <div className="scenario-router-detail-row"><span>Current thesis path</span><strong className={`tone-${scenarioTone(selectedRouter?.current_path)}`}>{labelScenarioPath(selectedRouter?.current_path)}</strong></div>
-            <div className="scenario-router-detail-row"><span>Scenario movement</span><strong>{labelScenarioTransition(selectedRouter?.path_transition)}</strong></div>
-            <div className="scenario-router-detail-row"><span>Recommended action</span><strong>{labelScenarioAction(selectedRouter?.action)}</strong></div>
-            <div className="scenario-router-detail-row"><span>Materiality</span><strong>{selectedRouter?.impact_level ? titleizeKey(selectedRouter.impact_level) : 'Not assessed'}</strong></div>
-            <div className="scenario-router-detail-row"><span>Announcement</span><strong>{selectedRouterTitle || 'n/a'}</strong></div>
-            <div className="scenario-router-detail-row"><span>Last Evaluated</span><strong>{selectedRouter?.saved_at_utc ? fmtRelativeSince(selectedRouter.saved_at_utc) : 'n/a'}</strong></div>
-            {selectedRouterExplanation && <div className="scenario-router-detail-note">{selectedRouterExplanation}</div>}
-            {selectedRouterReason && <div className="scenario-router-detail-note"><strong>Why:</strong> {selectedRouterReason}</div>}
-            {!!selectedRouterConditionHits.length && (
-              <>
-                <h4>Matched Thesis Conditions</h4>
-                <div className="scenario-router-detail-list">
-                  {selectedRouterConditionHits.map((item, idx) => (
-                    <div key={`matched-${idx}`} className="scenario-router-detail-item">
-                      <strong>{routerItemLabel(item)}</strong>
-                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            {!!selectedRouterConflicts.length && (
-              <>
-                <h4>Conflicts With Saved Run</h4>
-                <div className="scenario-router-detail-list">
-                  {selectedRouterConflicts.map((item, idx) => (
-                    <div key={`conflict-${idx}`} className="scenario-router-detail-item is-conflict">
-                      <strong>{routerItemLabel(item)}</strong>
-                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            {!!selectedRouterFindings.length && (
-              <>
-                <h4>Supporting Findings</h4>
-                <div className="scenario-router-detail-list">
-                  {selectedRouterFindings.map((item, idx) => (
-                    <div key={`finding-${idx}`} className="scenario-router-detail-item">
-                      <strong>{routerItemLabel(item)}</strong>
-                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            {!!selectedRouterWatchHits.length && (
-              <>
-                <h4>Watchlist Hits</h4>
-                <div className="scenario-router-detail-list">
-                  {selectedRouterWatchHits.map((item, idx) => (
-                    <div key={`watch-${idx}`} className="scenario-router-detail-item">
-                      <strong>{routerItemLabel(item)}</strong>
-                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            {!!selectedRouterMarketConditions.length && (
-              <>
-                <h4>Market Conditions Checked</h4>
-                <div className="scenario-router-detail-list">
-                  {selectedRouterMarketConditions.map((item, idx) => (
-                    <div key={`market-condition-${idx}`} className="scenario-router-detail-item">
-                      <strong>{routerItemLabel(item)}</strong>
-                      <span>{formatRouterMarketCondition(item)}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            {!!Object.keys(selectedRouter?.market_facts_used || {}).length && (
-              <>
-                <h4>Market Facts Used</h4>
-                <div className="scenario-router-chip-list">
-                  {Object.entries(selectedRouter.market_facts_used || {}).map(([key, value]) => (
-                    <span key={`market-${key}`} className="scenario-router-chip">
-                      {titleizeKey(key)} · {typeof value === 'number' ? fmtNum(value, value >= 100 ? 0 : 2) : String(value)}
-                    </span>
-                  ))}
-                </div>
-              </>
-            )}
-          </article>
-
-          <article className="scenario-router-column">
-            <h4>Status Distribution</h4>
-            <div className="scenario-router-chip-list">
-              {overviewStatusCounts.map(([key, value]) => (
-                <span key={`status-${key}`} className="scenario-router-chip">{key} · {value}</span>
-              ))}
-              {!overviewStatusCounts.length && <span className="watch-empty">No events yet.</span>}
-            </div>
-            <h4>Action Distribution</h4>
-            <div className="scenario-router-chip-list">
-              {overviewActionCounts.map(([key, value]) => (
-                <span key={`action-${key}`} className="scenario-router-chip">{key} · {value}</span>
-              ))}
-              {!overviewActionCounts.length && <span className="watch-empty">No events yet.</span>}
-            </div>
-            <h4>Transition Distribution</h4>
-            <div className="scenario-router-chip-list">
-              {overviewTransitionCounts.map(([key, value]) => (
-                <span key={`transition-${key}`} className="scenario-router-chip">{key} · {value}</span>
-              ))}
-              {!overviewTransitionCounts.length && <span className="watch-empty">No routed transitions yet.</span>}
-            </div>
-          </article>
-
-          <article className="scenario-router-column scenario-router-column-wide">
-            <h4>Recent Routed Announcements</h4>
-            <div className="scenario-router-event-list">
-              {recentScenarioEvents.slice(0, 8).map((row) => (
-                <button
-                  type="button"
-                  className={`scenario-router-event ${selectedScenarioEvent?.event_id === row.event_id ? 'is-selected' : ''}`}
-                  key={row.event_id || `${row.ticker}-${row.saved_at_utc}`}
-                  onClick={() => setSelectedScenarioEventId(row.event_id || '')}
-                >
-                  <div className="scenario-router-event-top">
-                    <strong>{row.ticker || 'n/a'}</strong>
-                    <span>{row.status || 'ok'}</span>
-                    <span>{labelScenarioAction(row.action)}</span>
-                    <span className={`tone-${scenarioTone(row.current_path)}`}>{labelScenarioPath(row.current_path)}</span>
-                  </div>
-                  <div className="scenario-router-event-title">{row.title || 'Untitled announcement'}</div>
-                  <div className="scenario-router-event-meta">
-                    {labelScenarioTransition(row.path_transition)} · {row.source_type || 'unknown source'} · {fmtMs(row.processing_duration_ms)} · {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
-                  </div>
-                  {row.action_reason && <div className="scenario-router-event-reason">{row.action_reason}</div>}
-                  {row.error_reason && <div className="scenario-router-detail-note">{row.error_reason}</div>}
-                </button>
-              ))}
-              {!recentScenarioEvents.length && <div className="watch-empty">No scenario-router events yet.</div>}
-            </div>
-          </article>
-        </div>
-
-        {scenarioError && <div className="run-meta-note run-meta-note-error">Scenario router monitor error: {scenarioError}</div>}
-      </section>
+      <AnnouncementRouterMonitor />
       )}
 
       {!monitorOnly && (
@@ -1897,22 +1644,27 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
             </div>
             <div className="snapshot-meta-row">
               <span>Current Price</span>
-              <strong>{fmtMoney(currentSpotPrice, currency)}</strong>
+              <strong>{fmtMoney(displayCurrentSpotPrice, currency)}</strong>
             </div>
+            {activePriceRebase && (
+              <div className="snapshot-adjust-note">
+                Adjusted {formatRebaseRatio(activePriceRebase)}
+              </div>
+            )}
             <h4>Price Scenarios</h4>
             <div className="snapshot-horizon">
               <div className="snapshot-horizon-title">12M</div>
-              <div className="snapshot-scenario-row"><span>Bear</span><span>{fmtMoney(toNumberOrNull(targets12.bear), currency)}</span><span>{fmtPct(normalizeProb(p12.bear))}</span></div>
-              <div className="snapshot-scenario-row"><span>Base</span><span>{fmtMoney(toNumberOrNull(targets12.base), currency)}</span><span>{fmtPct(normalizeProb(p12.base))}</span></div>
-              <div className="snapshot-scenario-row"><span>Bull</span><span>{fmtMoney(toNumberOrNull(targets12.bull), currency)}</span><span>{fmtPct(normalizeProb(p12.bull))}</span></div>
-              <div className="snapshot-scenario-row snapshot-scenario-row-em"><span>Prob-weighted</span><strong>{fmtMoney(weighted12, currency)}</strong><span /></div>
+              <div className="snapshot-scenario-row"><span>Bear</span><span>{fmtMoney(displayTargets12.bear, currency)}</span><span>{fmtPct(normalizeProb(p12.bear))}</span></div>
+              <div className="snapshot-scenario-row"><span>Base</span><span>{fmtMoney(displayTargets12.base, currency)}</span><span>{fmtPct(normalizeProb(p12.base))}</span></div>
+              <div className="snapshot-scenario-row"><span>Bull</span><span>{fmtMoney(displayTargets12.bull, currency)}</span><span>{fmtPct(normalizeProb(p12.bull))}</span></div>
+              <div className="snapshot-scenario-row snapshot-scenario-row-em"><span>Prob-weighted</span><strong>{fmtMoney(displayWeighted12, currency)}</strong><span /></div>
             </div>
             <div className="snapshot-horizon">
               <div className="snapshot-horizon-title">24M</div>
-              <div className="snapshot-scenario-row"><span>Bear</span><span>{fmtMoney(toNumberOrNull(targets24.bear), currency)}</span><span>{fmtPct(normalizeProb(p24.bear))}</span></div>
-              <div className="snapshot-scenario-row"><span>Base</span><span>{fmtMoney(toNumberOrNull(targets24.base), currency)}</span><span>{fmtPct(normalizeProb(p24.base))}</span></div>
-              <div className="snapshot-scenario-row"><span>Bull</span><span>{fmtMoney(toNumberOrNull(targets24.bull), currency)}</span><span>{fmtPct(normalizeProb(p24.bull))}</span></div>
-              <div className="snapshot-scenario-row snapshot-scenario-row-em"><span>Prob-weighted</span><strong>{fmtMoney(weighted24, currency)}</strong><span /></div>
+              <div className="snapshot-scenario-row"><span>Bear</span><span>{fmtMoney(displayTargets24.bear, currency)}</span><span>{fmtPct(normalizeProb(p24.bear))}</span></div>
+              <div className="snapshot-scenario-row"><span>Base</span><span>{fmtMoney(displayTargets24.base, currency)}</span><span>{fmtPct(normalizeProb(p24.base))}</span></div>
+              <div className="snapshot-scenario-row"><span>Bull</span><span>{fmtMoney(displayTargets24.bull, currency)}</span><span>{fmtPct(normalizeProb(p24.bull))}</span></div>
+              <div className="snapshot-scenario-row snapshot-scenario-row-em"><span>Prob-weighted</span><strong>{fmtMoney(displayWeighted24, currency)}</strong><span /></div>
             </div>
           </article>
 
@@ -1933,208 +1685,13 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
       )}
 
       {!monitorOnly && (
-      <section className="lab-panel scenario-router-monitor-panel">
-        <div className="scenario-router-monitor-head">
-          <div>
-            <h3>Scenario Router Monitor</h3>
-            <p className="scenario-router-monitor-copy">
-              Primary-source announcement routing, signal quality, and recent decision flow.
-            </p>
-          </div>
-          <div className="scenario-router-monitor-actions">
-            <input
-              type="text"
-              className="scenario-router-filter-input"
-              placeholder="Filter by ticker, e.g. ASX:TOR"
-              value={scenarioTickerFilter}
-              onChange={(e) => setScenarioTickerFilter(String(e.target.value || '').toUpperCase())}
-            />
-            <button
-              type="button"
-              className="gantt-lab-inline-retry"
-              onClick={() => setScenarioReloadToken((prev) => prev + 1)}
-              disabled={scenarioLoading}
-            >
-              {scenarioLoading ? 'Refreshing…' : 'Refresh Monitor'}
-            </button>
-            <button
-              type="button"
-              className="gantt-lab-inline-retry"
-              onClick={goToScenarioRouter}
-            >
-              Open Full Monitor
-            </button>
-          </div>
-        </div>
-
-        <div className="scenario-router-monitor-grid">
-          <div className="scenario-router-card">
-            <label>Total Events</label>
-            <strong>{scenarioOverview?.total_events ?? 'n/a'}</strong>
-            <span>{scenarioOverview?.unique_tickers ?? 'n/a'} tickers tracked</span>
-          </div>
-          <div className="scenario-router-card">
-            <label>Primary Source Rate</label>
-            <strong>{fmtPct(scenarioOverview?.official_source_rate_pct)}</strong>
-            <span>official ASX filing used</span>
-          </div>
-          <div className="scenario-router-card">
-            <label>Average Processing</label>
-            <strong>{fmtMs(scenarioOverview?.average_processing_ms)}</strong>
-            <span>end-to-end router latency</span>
-          </div>
-          <div className="scenario-router-card">
-            <label>Event Status</label>
-            <strong>{overviewStatusCounts[0]?.[0] || 'n/a'}</strong>
-            <span>{overviewStatusCounts[0]?.[1] || 0} latest-status count</span>
-          </div>
-        </div>
-
-        <div className="scenario-router-columns">
-          <article className="scenario-router-column">
-            <h4>Announcement Decision</h4>
-            <div className="scenario-router-detail-row"><span>Current thesis path</span><strong className={`tone-${scenarioTone(selectedRouter?.current_path)}`}>{labelScenarioPath(selectedRouter?.current_path)}</strong></div>
-            <div className="scenario-router-detail-row"><span>Scenario movement</span><strong>{labelScenarioTransition(selectedRouter?.path_transition)}</strong></div>
-            <div className="scenario-router-detail-row"><span>Recommended action</span><strong>{labelScenarioAction(selectedRouter?.action)}</strong></div>
-            <div className="scenario-router-detail-row"><span>Materiality</span><strong>{selectedRouter?.impact_level ? titleizeKey(selectedRouter.impact_level) : 'Not assessed'}</strong></div>
-            <div className="scenario-router-detail-row"><span>Announcement</span><strong>{selectedRouterTitle || 'n/a'}</strong></div>
-            <div className="scenario-router-detail-row"><span>Last Evaluated</span><strong>{selectedRouter?.saved_at_utc ? fmtRelativeSince(selectedRouter.saved_at_utc) : 'n/a'}</strong></div>
-            {selectedRouterExplanation && <div className="scenario-router-detail-note">{selectedRouterExplanation}</div>}
-            {selectedRouterReason && <div className="scenario-router-detail-note"><strong>Why:</strong> {selectedRouterReason}</div>}
-            {!!selectedRouterConditionHits.length && (
-              <>
-                <h4>Matched Thesis Conditions</h4>
-                <div className="scenario-router-detail-list">
-                  {selectedRouterConditionHits.map((item, idx) => (
-                    <div key={`matched-lab-${idx}`} className="scenario-router-detail-item">
-                      <strong>{routerItemLabel(item)}</strong>
-                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            {!!selectedRouterConflicts.length && (
-              <>
-                <h4>Conflicts With Saved Run</h4>
-                <div className="scenario-router-detail-list">
-                  {selectedRouterConflicts.map((item, idx) => (
-                    <div key={`conflict-lab-${idx}`} className="scenario-router-detail-item is-conflict">
-                      <strong>{routerItemLabel(item)}</strong>
-                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            {!!selectedRouterFindings.length && (
-              <>
-                <h4>Supporting Findings</h4>
-                <div className="scenario-router-detail-list">
-                  {selectedRouterFindings.map((item, idx) => (
-                    <div key={`finding-lab-${idx}`} className="scenario-router-detail-item">
-                      <strong>{routerItemLabel(item)}</strong>
-                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            {!!selectedRouterWatchHits.length && (
-              <>
-                <h4>Watchlist Hits</h4>
-                <div className="scenario-router-detail-list">
-                  {selectedRouterWatchHits.map((item, idx) => (
-                    <div key={`watch-lab-${idx}`} className="scenario-router-detail-item">
-                      <strong>{routerItemLabel(item)}</strong>
-                      {routerItemMeta(item) && <span>{routerItemMeta(item)}</span>}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            {!!selectedRouterMarketConditions.length && (
-              <>
-                <h4>Market Conditions Checked</h4>
-                <div className="scenario-router-detail-list">
-                  {selectedRouterMarketConditions.map((item, idx) => (
-                    <div key={`market-condition-lab-${idx}`} className="scenario-router-detail-item">
-                      <strong>{routerItemLabel(item)}</strong>
-                      <span>{formatRouterMarketCondition(item)}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            {!!Object.keys(selectedRouter?.market_facts_used || {}).length && (
-              <>
-                <h4>Market Facts Used</h4>
-                <div className="scenario-router-chip-list">
-                  {Object.entries(selectedRouter.market_facts_used || {}).map(([key, value]) => (
-                    <span key={`market-lab-${key}`} className="scenario-router-chip">
-                      {titleizeKey(key)} · {typeof value === 'number' ? fmtNum(value, value >= 100 ? 0 : 2) : String(value)}
-                    </span>
-                  ))}
-                </div>
-              </>
-            )}
-          </article>
-
-          <article className="scenario-router-column">
-            <h4>Status Distribution</h4>
-            <div className="scenario-router-chip-list">
-              {overviewStatusCounts.map(([key, value]) => (
-                <span key={`status-lab-${key}`} className="scenario-router-chip">{key} · {value}</span>
-              ))}
-              {!overviewStatusCounts.length && <span className="watch-empty">No events yet.</span>}
-            </div>
-            <h4>Action Distribution</h4>
-            <div className="scenario-router-chip-list">
-              {overviewActionCounts.map(([key, value]) => (
-                <span key={`action-lab-${key}`} className="scenario-router-chip">{key} · {value}</span>
-              ))}
-              {!overviewActionCounts.length && <span className="watch-empty">No events yet.</span>}
-            </div>
-            <h4>Transition Distribution</h4>
-            <div className="scenario-router-chip-list">
-              {overviewTransitionCounts.map(([key, value]) => (
-                <span key={`transition-lab-${key}`} className="scenario-router-chip">{key} · {value}</span>
-              ))}
-              {!overviewTransitionCounts.length && <span className="watch-empty">No routed transitions yet.</span>}
-            </div>
-          </article>
-
-          <article className="scenario-router-column scenario-router-column-wide">
-            <h4>Recent Routed Announcements</h4>
-            <div className="scenario-router-event-list">
-              {recentScenarioEvents.slice(0, 8).map((row) => (
-                <button
-                  type="button"
-                  className={`scenario-router-event ${selectedScenarioEvent?.event_id === row.event_id ? 'is-selected' : ''}`}
-                  key={row.event_id || `${row.ticker}-${row.saved_at_utc}`}
-                  onClick={() => setSelectedScenarioEventId(row.event_id || '')}
-                >
-                  <div className="scenario-router-event-top">
-                    <strong>{row.ticker || 'n/a'}</strong>
-                    <span>{row.status || 'ok'}</span>
-                    <span>{labelScenarioAction(row.action)}</span>
-                    <span className={`tone-${scenarioTone(row.current_path)}`}>{labelScenarioPath(row.current_path)}</span>
-                  </div>
-                  <div className="scenario-router-event-title">{row.title || 'Untitled announcement'}</div>
-                  <div className="scenario-router-event-meta">
-                    {labelScenarioTransition(row.path_transition)} · {row.source_type || 'unknown source'} · {fmtMs(row.processing_duration_ms)} · {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
-                  </div>
-                  {row.action_reason && <div className="scenario-router-event-reason">{row.action_reason}</div>}
-                  {row.error_reason && <div className="scenario-router-detail-note">{row.error_reason}</div>}
-                </button>
-              ))}
-              {!recentScenarioEvents.length && <div className="watch-empty">No scenario-router events yet.</div>}
-            </div>
-          </article>
-        </div>
-
-        {scenarioError && <div className="run-meta-note run-meta-note-error">Scenario router monitor error: {scenarioError}</div>}
-      </section>
+      <AnnouncementRouterMonitor
+        embedded
+        runRouter={selectedRunRouterHasDecision ? selectedRunRouter : null}
+        selectedRunId={selectedRunId}
+        selectedTicker={bannerTicker}
+        onOpenFullMonitor={goToScenarioRouter}
+      />
       )}
 
       {!monitorOnly && (
@@ -2200,8 +1757,10 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
               const block = rawBlock && typeof rawBlock === 'object' && !Array.isArray(rawBlock) ? rawBlock : {};
               const conditions = Array.isArray(block.required_conditions) ? block.required_conditions : [];
               const failures = Array.isArray(block.failure_conditions) ? block.failure_conditions : [];
-              const target12 = toNumberOrNull(block.target_12m) ?? toNumberOrNull(targets12?.[name]);
-              const target24 = toNumberOrNull(block.target_24m) ?? toNumberOrNull(targets24?.[name]);
+              const rawTarget12 = toNumberOrNull(block.target_12m) ?? toNumberOrNull(targets12?.[name]);
+              const rawTarget24 = toNumberOrNull(block.target_24m) ?? toNumberOrNull(targets24?.[name]);
+              const target12 = rebasePrice(rawTarget12, priceRebaseFactor);
+              const target24 = rebasePrice(rawTarget24, priceRebaseFactor);
               const prob = toNumberOrNull(block.probability_24m_pct ?? block.probability_pct);
               const logicRequired = String(block?.condition_logic?.required_conditions || '').trim();
               const logicFailure = String(block?.condition_logic?.failure_conditions || '').trim();
@@ -2415,6 +1974,20 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
           </button>
           <button
             type="button"
+            className="gantt-lab-adjust"
+            onClick={openPriceAdjust}
+            disabled={!selectedRunId}
+            title={selectedRunId ? 'Adjust displayed per-share prices' : 'No run selected'}
+          >
+            Adjust
+          </button>
+          {activePriceRebase && (
+            <span className="price-adjust-pill">
+              {formatRebaseRatio(activePriceRebase)}
+            </span>
+          )}
+          <button
+            type="button"
             className={`gantt-lab-toggle ${timelineOrientation === 'horizontal' ? 'is-horizontal' : 'is-vertical'}`}
             onClick={() => setTimelineOrientation((prev) => (prev === 'vertical' ? 'horizontal' : 'vertical'))}
             aria-label={`Switch to ${timelineOrientation === 'vertical' ? 'horizontal' : 'vertical'} chart/catalyst layout`}
@@ -2435,6 +2008,83 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
           ? <p className="memo-empty">Loading selected run…</p>
           : renderMarkdownBlocks(analystMemoMarkdown)}
       </aside>
+      )}
+      {priceAdjustOpen && !monitorOnly && (
+        <div
+          className="price-adjust-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setPriceAdjustOpen(false);
+          }}
+        >
+          <div className="price-adjust-modal" role="dialog" aria-modal="true" aria-label="Adjust price">
+            <div className="price-adjust-head">
+              <h3>Adjust Price</h3>
+              <button
+                type="button"
+                className="price-adjust-close"
+                onClick={() => setPriceAdjustOpen(false)}
+                aria-label="Close adjust price dialog"
+              >
+                x
+              </button>
+            </div>
+            <div className="price-adjust-type-row">
+              <button
+                type="button"
+                className={`price-adjust-type ${priceAdjustForm.type === 'share_consolidation' ? 'is-active' : ''}`}
+                onClick={() => {
+                  setPriceAdjustError('');
+                  setPriceAdjustForm({ type: 'share_consolidation', oldUnits: '10', newUnits: '1' });
+                }}
+              >
+                Consolidation
+              </button>
+              <button
+                type="button"
+                className={`price-adjust-type ${priceAdjustForm.type === 'share_split' ? 'is-active' : ''}`}
+                onClick={() => {
+                  setPriceAdjustError('');
+                  setPriceAdjustForm({ type: 'share_split', oldUnits: '1', newUnits: '10' });
+                }}
+              >
+                Split
+              </button>
+            </div>
+            <label className="price-adjust-label" htmlFor="price-adjust-old">Ratio</label>
+            <div className="price-adjust-ratio-row">
+              <input
+                id="price-adjust-old"
+                className="price-adjust-ratio-input"
+                inputMode="decimal"
+                value={priceAdjustForm.oldUnits}
+                onChange={(event) => setPriceAdjustForm((prev) => ({ ...prev, oldUnits: event.target.value }))}
+              />
+              <span>:</span>
+              <input
+                className="price-adjust-ratio-input"
+                inputMode="decimal"
+                value={priceAdjustForm.newUnits}
+                onChange={(event) => setPriceAdjustForm((prev) => ({ ...prev, newUnits: event.target.value }))}
+              />
+            </div>
+            <div className="price-adjust-example">10:1 means 10 old shares became 1 new share.</div>
+            {priceAdjustError && <div className="price-adjust-error">{priceAdjustError}</div>}
+            <div className="price-adjust-actions">
+              {activePriceRebase && (
+                <button type="button" className="price-adjust-secondary" onClick={clearPriceAdjust}>
+                  Clear
+                </button>
+              )}
+              <button type="button" className="price-adjust-secondary" onClick={() => setPriceAdjustOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" className="price-adjust-primary" onClick={applyPriceAdjust}>
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       </div>
     </div>

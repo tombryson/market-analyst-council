@@ -5,7 +5,7 @@ source_yaml: backend/templates/diversified_miner.yaml
 placeholders:
   company_name: '[COMPANY_NAME]'
   ticker: '[EXCHANGE_CODE]:[TICKER]'
-  exchange: ASX
+  exchange: '[EXCHANGE_CODE]'
   instruction: Replace placeholders before pasting into an external model interface.
 generation_source:
   generated_by: scripts/export_copy_paste_analysis_prompts.py
@@ -36,12 +36,12 @@ copy_paste_prompt: |-
   - Template: diversified_miner
   - Company name: [COMPANY_NAME].
   - Company type: diversified_miner.
-  - Exchange: ASX.
+  - Exchange: [EXCHANGE_CODE].
   - Keep outputs decision-grade, evidence-linked, and explicit about assumptions.
 
   - Run a dedicated sector-macro lane (diversified mining): capture 2-4 recent sources on multi-commodity cycle drivers (commodity basket pricing, China demand, inventory trends, supply disruptions, FX) and tie each point to scenario assumptions.
   Exchange assumptions:
-  Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
+  Exchange profile: listing venue not preselected. Infer filing sources from the company's exchange, domicile, regulator, and primary documents; do not assume one exchange-specific filing format by default.
 
   Analysis rubric:
   Run an investment analysis on [COMPANY_NAME] using this diversified mining rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to valuation, funding risk, operating risk, commodity-price sensitivity, portfolio concentration, or scenario confidence.
@@ -68,13 +68,13 @@ copy_paste_prompt: |-
 
   Data sourcing rules:
   * If source documents are not attached, actively retrieve and review primary sources before analysis.
-  * Source market data from asx.com.au and/or marketindex.com.au.
-  * Source project data from ASX announcements, quarterly/annual reports, investor presentations, and technical studies (PFS/FS/DFS).
+  * Source market data from official exchange sources, regulator filings, and reliable market-data providers for the listing venue.
+  * Source project data from primary regulator filings, official exchange announcements, and company investor materials.
   * For every key numeric input used in NAV, Quality, Value, or price targets, provide:
     1) value used
     2) source URL + document date
     3) ESTIMATE tag with one-line justification if inferred.
-  * Use current AUD commodity prices and current AUD/USD conversion rate (or project-local FX where applicable); state source and timestamp.
+  * Use current listing currency commodity prices and relevant base-currency FX conversion where project economics are reported in a different currency; state source and timestamp.
   * Use company-disclosed study, production, reserve, cost, product, offtake, and balance-sheet data where available. Use generic assumptions only where no better source exists.
 
   Commodity basket rule:

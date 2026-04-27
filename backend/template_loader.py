@@ -1044,8 +1044,9 @@ PREALLOCATED_EXCHANGES: List[Dict[str, Any]] = [
         "ticker_suffixes": [],
         "detection_keywords": [],
         "assumption_template": (
-            "Exchange profile: unknown. Infer filing sources from company domicile and exchange references "
-            "in primary documents; do not assume ASX-specific formats by default."
+            "Exchange profile: listing venue not preselected. Infer filing sources from the company's "
+            "exchange, domicile, regulator, and primary documents; do not assume one exchange-specific "
+            "filing format by default."
         ),
         "retrieval_params": {
             "allowed_domain_suffixes": [],
@@ -2087,11 +2088,7 @@ class TemplateLoader:
             if company_type
             else "Company type: unspecified."
         )
-        exchange_line = (
-            f"Exchange: {exchange}."
-            if exchange
-            else "Exchange: unknown."
-        )
+        exchange_line = f"Exchange: {exchange or '[EXCHANGE_CODE]'}."
         exchange_assumptions = self.get_exchange_assumptions(exchange)
         behavior = self.get_template_behavior(template_id)
         extra_lane_lines: List[str] = []
@@ -2163,11 +2160,7 @@ class TemplateLoader:
             if company_type
             else "Company type: unspecified."
         )
-        exchange_line = (
-            f"Exchange: {exchange}."
-            if exchange
-            else "Exchange: unknown."
-        )
+        exchange_line = f"Exchange: {exchange or '[EXCHANGE_CODE]'}."
         exchange_assumptions = self.get_exchange_assumptions(exchange)
         behavior = self.get_template_behavior(template_id)
         extra_lane_lines: List[str] = []

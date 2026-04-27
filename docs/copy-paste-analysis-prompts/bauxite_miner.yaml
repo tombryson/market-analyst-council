@@ -5,7 +5,7 @@ source_yaml: backend/templates/resources_bauxite_monometallic.yaml
 placeholders:
   company_name: '[COMPANY_NAME]'
   ticker: '[EXCHANGE_CODE]:[TICKER]'
-  exchange: ASX
+  exchange: '[EXCHANGE_CODE]'
   instruction: Replace placeholders before pasting into an external model interface.
 generation_source:
   generated_by: scripts/export_copy_paste_analysis_prompts.py
@@ -37,12 +37,12 @@ copy_paste_prompt: |-
   - Template: bauxite_miner
   - Company name: [COMPANY_NAME].
   - Company type: bauxite_miner.
-  - Exchange: ASX.
+  - Exchange: [EXCHANGE_CODE].
   - Keep outputs decision-grade, evidence-linked, and explicit about assumptions.
 
   - Run a dedicated sector-macro lane (bauxite/alumina): capture 2-4 recent sources on alumina/aluminium pricing, refinery utilization, freight/energy costs, Chinese demand, and supply disruptions; tie each point to scenario assumptions.
   Exchange assumptions:
-  Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
+  Exchange profile: listing venue not preselected. Infer filing sources from the company's exchange, domicile, regulator, and primary documents; do not assume one exchange-specific filing format by default.
 
   Analysis rubric:
   Run an investment analysis on [COMPANY_NAME] using this bauxite and alumina mining rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to valuation, funding risk, operating risk, commodity-price sensitivity, or scenario confidence.
@@ -69,13 +69,13 @@ copy_paste_prompt: |-
 
   Data sourcing rules:
   * If source documents are not attached, actively retrieve and review primary sources before analysis.
-  * Source market data from asx.com.au and/or marketindex.com.au.
-  * Source project data from ASX announcements, quarterly/annual reports, investor presentations, and technical studies (PFS/FS/DFS).
+  * Source market data from official exchange sources, regulator filings, and reliable market-data providers for the listing venue.
+  * Source project data from primary regulator filings, official exchange announcements, and company investor materials.
   * For every key numeric input used in NPV, Quality, Value, or price targets, provide:
     1) value used
     2) source URL + document date
     3) ESTIMATE tag with one-line justification if inferred.
-  * Use current AUD bauxite, alumina, aluminium, freight, and FX references relevant to the company product and current AUD/USD conversion rate (or project-local FX where applicable); state source and timestamp.
+  * Use current listing currency bauxite, alumina, aluminium, freight, and FX references relevant to the company product and relevant base-currency FX conversion where project economics are reported in a different currency; state source and timestamp.
   * Use company-disclosed study, production, reserve, cost, product, offtake, and balance-sheet data where available. Use generic assumptions only where no better source exists.
 
   Commodity adjustment rule:
@@ -202,10 +202,10 @@ copy_paste_prompt: |-
   * Funding:
     - Funding Gap = (Phase-1 capex - cash - expected 24m FCF) / capex
     - If infrastructure lowers Phase-1 capex, reflect that lower capex and state the adjustment.
-    - <10M AUD or fully funded = 100
-    - 10-25M AUD with clear path = 80
-    - 25-50M AUD = 60
-    - >50M AUD or unclear path = 40
+    - <10M listing currency or fully funded = 100
+    - 10-25M listing currency with clear path = 80
+    - 25-50M listing currency = 60
+    - >50M listing currency or unclear path = 40
     - If debt is binding but drawdown conditions remain, cap practical score at 85-90.
   * ESG:
     - Permitting: fully approved 100 | key permits received 80 | applications submitted 60 | limited progress 40

@@ -14,7 +14,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function readJsonSafe(response) {
   try {
     return await response.json();
-  } catch (_) {
+  } catch {
     return {};
   }
 }
@@ -254,14 +254,14 @@ export const api = {
     return body;
   },
 
-  async getScenarioRouterOverview(limit = 100, ticker = '') {
+  async getAnnouncementRouterOverview(limit = 100, ticker = '') {
     const qs = new URLSearchParams();
     qs.set('limit', String(limit));
     if (String(ticker || '').trim()) {
       qs.set('ticker', String(ticker || '').trim());
     }
     const { response, body } = await fetchJsonWithRetry(
-      `${API_BASE}/api/scenario-router/overview?${qs.toString()}`,
+      `${API_BASE}/api/announcement-router/overview?${qs.toString()}`,
       { method: 'GET' },
       { retries: 2, timeoutMs: 30000 }
     );
@@ -272,14 +272,18 @@ export const api = {
     return body;
   },
 
-  async listScenarioRouterEvents(limit = 50, ticker = '') {
+  async getScenarioRouterOverview(limit = 100, ticker = '') {
+    return this.getAnnouncementRouterOverview(limit, ticker);
+  },
+
+  async listAnnouncementRouterEvents(limit = 50, ticker = '') {
     const qs = new URLSearchParams();
     qs.set('limit', String(limit));
     if (String(ticker || '').trim()) {
       qs.set('ticker', String(ticker || '').trim());
     }
     const { response, body } = await fetchJsonWithRetry(
-      `${API_BASE}/api/scenario-router/events?${qs.toString()}`,
+      `${API_BASE}/api/announcement-router/events?${qs.toString()}`,
       { method: 'GET' },
       { retries: 2, timeoutMs: 30000 }
     );
@@ -290,9 +294,13 @@ export const api = {
     return body;
   },
 
-  async getScenarioRouterEvaluations() {
+  async listScenarioRouterEvents(limit = 50, ticker = '') {
+    return this.listAnnouncementRouterEvents(limit, ticker);
+  },
+
+  async getAnnouncementRouterEvaluations() {
     const { response, body } = await fetchJsonWithRetry(
-      `${API_BASE}/api/scenario-router/evaluations`,
+      `${API_BASE}/api/announcement-router/evaluations`,
       { method: 'GET' },
       { retries: 2, timeoutMs: 30000 }
     );
@@ -301,6 +309,10 @@ export const api = {
       throw new Error(detail ? `Failed to load scenario router evaluations: ${detail}` : 'Failed to load scenario router evaluations');
     }
     return body;
+  },
+
+  async getScenarioRouterEvaluations() {
+    return this.getAnnouncementRouterEvaluations();
   },
 
   /**

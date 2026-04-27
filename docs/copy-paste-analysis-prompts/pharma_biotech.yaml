@@ -5,7 +5,7 @@ source_yaml: backend/templates/pharma_biotech.yaml
 placeholders:
   company_name: '[COMPANY_NAME]'
   ticker: '[EXCHANGE_CODE]:[TICKER]'
-  exchange: ASX
+  exchange: '[EXCHANGE_CODE]'
   instruction: Replace placeholders before pasting into an external model interface.
 generation_source:
   generated_by: scripts/export_copy_paste_analysis_prompts.py
@@ -37,12 +37,12 @@ copy_paste_prompt: |-
   - Template: pharma_biotech
   - Company name: [COMPANY_NAME].
   - Company type: pharma_biotech.
-  - Exchange: ASX.
+  - Exchange: [EXCHANGE_CODE].
   - Keep outputs decision-grade, evidence-linked, and explicit about assumptions.
 
   - Run a dedicated sector lane (pharma/biotech): capture 2-4 recent sources on regulatory/pipeline backdrop (peer readout calendar, FDA/EMA policy signals, payer/reimbursement pressure, sector financing window) and tie each point to scenario assumptions.
   Exchange assumptions:
-  Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
+  Exchange profile: listing venue not preselected. Infer filing sources from the company's exchange, domicile, regulator, and primary documents; do not assume one exchange-specific filing format by default.
 
   Analysis rubric:
   Run an investment analysis on [COMPANY_NAME] using this pharmaceutical and biotech rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to valuation, clinical risk, regulatory risk, funding risk, commercial risk, or scenario confidence.
@@ -73,14 +73,14 @@ copy_paste_prompt: |-
 
   Data sourcing rules:
   * If source documents are not attached, actively retrieve and review primary sources before analysis.
-  * Source market data from asx.com.au and/or marketindex.com.au.
-  * Source pipeline, financial, regulatory, clinical, partnership, and IP data from ASX announcements, quarterly/annual reports, investor presentations, and technical studies (PFS/FS/DFS).
+  * Source market data from official exchange sources, regulator filings, and reliable market-data providers for the listing venue.
+  * Source pipeline, financial, regulatory, clinical, partnership, and IP data from primary regulator filings, official exchange announcements, and company investor materials.
   * Prefer primary sources: exchange filings, annual/interim reports, investor presentations, trial protocols, clinical trial registries, regulatory announcements, FDA/EMA/TGA documents, peer-reviewed publications, conference abstracts, patent/exclusivity databases, and company releases.
   * For every key numeric input used in rNPV, Quality, Value, cash runway, or price targets, provide:
     1) value used
     2) source URL + document date
     3) ESTIMATE tag with one-line justification if inferred.
-  * Use current AUD market data and current AUD/USD conversion rate (or project-local FX where applicable); state source and timestamp.
+  * Use current listing currency market data and relevant base-currency FX conversion where project economics are reported in a different currency; state source and timestamp.
   * Do not use broker price targets or analyst probability assumptions as primary evidence. They may be cited only as secondary sentiment/context.
 
   Document review (complete before valuation):

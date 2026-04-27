@@ -5,7 +5,7 @@ source_yaml: backend/templates/gaming_interactive.yaml
 placeholders:
   company_name: '[COMPANY_NAME]'
   ticker: '[EXCHANGE_CODE]:[TICKER]'
-  exchange: ASX
+  exchange: '[EXCHANGE_CODE]'
   instruction: Replace placeholders before pasting into an external model interface.
 generation_source:
   generated_by: scripts/export_copy_paste_analysis_prompts.py
@@ -36,12 +36,12 @@ copy_paste_prompt: |-
   - Template: gaming_interactive
   - Company name: [COMPANY_NAME].
   - Company type: gaming_interactive.
-  - Exchange: ASX.
+  - Exchange: [EXCHANGE_CODE].
   - Keep outputs decision-grade, evidence-linked, and explicit about assumptions.
 
   - Run a dedicated sector lane (interactive gaming): capture 2-4 recent sources on release slate quality, engagement/retention trends, platform economics, user-acquisition costs, and monetisation durability; tie each point to scenario assumptions.
   Exchange assumptions:
-  Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
+  Exchange profile: listing venue not preselected. Infer filing sources from the company's exchange, domicile, regulator, and primary documents; do not assume one exchange-specific filing format by default.
 
   Analysis rubric:
   Run an investment analysis on [COMPANY_NAME] using this gaming-interactive rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to franchise durability, release-slate quality, live-ops retention, platform economics, cash conversion, or scenario confidence.
@@ -72,14 +72,14 @@ copy_paste_prompt: |-
 
   Data sourcing rules:
   * If source documents are not attached, actively retrieve and review primary sources before analysis.
-  * Source market data from asx.com.au and/or marketindex.com.au.
+  * Source market data from official exchange sources, regulator filings, and reliable market-data providers for the listing venue.
   * Source bookings, revenue, DAU/MAU, ARPU/ARPDAU, engagement, platform-fee, margin, and balance-sheet data from the company's primary exchange filings plus annual/interim reports, investor presentations, launch/trading updates, and material studio or capital-allocation announcements.
   * Prefer primary sources: exchange filings, statutory reports, company KPI disclosures, launch/slate updates, engagement metrics, platform/store disclosures where relevant, and debt/refinancing announcements. Use secondary sources only where they add factual context on platform policy, market demand, genre trends, user-acquisition conditions, or competitor launches.
   * For every key numeric input used in valuation, Quality, Value, price targets, bookings, retention, engagement, margins, leverage, or cash-flow analysis, provide:
     1) value used
     2) source URL + document date
     3) ESTIMATE tag with one-line justification if inferred.
-  * Use current AUD market data and current AUD/USD conversion rate (or project-local FX where applicable); state source and timestamp.
+  * Use current listing currency market data and relevant base-currency FX conversion where project economics are reported in a different currency; state source and timestamp.
   * Do not use broker target prices or consensus estimates as primary evidence. They may be cited only as secondary context.
 
   Document review (complete before valuation):

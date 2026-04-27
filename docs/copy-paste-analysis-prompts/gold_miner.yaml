@@ -5,7 +5,7 @@ source_yaml: backend/templates/resources_gold_monometallic.yaml
 placeholders:
   company_name: '[COMPANY_NAME]'
   ticker: '[EXCHANGE_CODE]:[TICKER]'
-  exchange: ASX
+  exchange: '[EXCHANGE_CODE]'
   instruction: Replace placeholders before pasting into an external model interface.
 generation_source:
   generated_by: scripts/export_copy_paste_analysis_prompts.py
@@ -37,12 +37,12 @@ copy_paste_prompt: |-
   - Template: gold_miner
   - Company name: [COMPANY_NAME].
   - Company type: gold_miner.
-  - Exchange: ASX.
+  - Exchange: [EXCHANGE_CODE].
   - Keep outputs decision-grade, evidence-linked, and explicit about assumptions.
 
   - Run a dedicated sector-macro lane (gold): capture 2-4 recent sources on gold market drivers (real yields, USD trend, central-bank demand, geopolitical risk) and tie each macro point to scenario assumptions.
   Exchange assumptions:
-  Exchange profile: ASX (Australia). Prefer ASX announcements, quarterly/annual reports, Appendix 4D/4E/5B/5C, and investor presentations. Market data in AUD by default unless the company reports otherwise.
+  Exchange profile: listing venue not preselected. Infer filing sources from the company's exchange, domicile, regulator, and primary documents; do not assume one exchange-specific filing format by default.
 
   Analysis rubric:
   Run an investment analysis on [COMPANY_NAME] using this gold mining rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to valuation, funding risk, operating risk, or scenario confidence.
@@ -69,13 +69,13 @@ copy_paste_prompt: |-
 
   Data sourcing rules:
   * If source documents are not attached, actively retrieve and review primary sources before analysis.
-  * Source market data from asx.com.au and/or marketindex.com.au.
-  * Source project data from ASX announcements, quarterly/annual reports, investor presentations, and technical studies (PFS/FS/DFS).
+  * Source market data from official exchange sources, regulator filings, and reliable market-data providers for the listing venue.
+  * Source project data from primary regulator filings, official exchange announcements, and company investor materials.
   * For every key numeric input used in NPV, Quality, Value, or price targets, provide:
     1) value used
     2) source URL + document date
     3) ESTIMATE tag with one-line justification if inferred.
-  * Use current AUD spot gold and current AUD/USD conversion rate (or project-local FX where applicable); state source and timestamp.
+  * Use current listing currency spot gold and relevant base-currency FX conversion where project economics are reported in a different currency; state source and timestamp.
   * Use company-disclosed study, production, reserve, cost, and balance-sheet data where available. Use generic assumptions only where no better source exists.
 
   Polymetallic adjustment rule:
@@ -101,8 +101,8 @@ copy_paste_prompt: |-
   Missing-data assumptions:
   Use only when no disclosed study or operating data exists, and label clearly as ESTIMATE:
   * Recovery: 85-90% underground hard rock; 80-85% heap leach.
-  * AISC: 2,000-2,800 AUD/oz for West Africa open pit or 1,500-2,200 AUD/oz for Australian underground, unless better regional evidence exists.
-  * Initial capex: 2,500-4,000 AUD per annual oz for open pit or 4,000-7,000 AUD per annual oz for underground, unless better regional evidence exists.
+  * AISC: 2,000-2,800 listing currency/oz for West Africa open pit or 1,500-2,200 listing currency/oz for Australian underground, unless better regional evidence exists.
+  * Initial capex: 2,500-4,000 listing currency per annual oz for open pit or 4,000-7,000 listing currency per annual oz for underground, unless better regional evidence exists.
   * Sustaining capex: 5-10% of initial capex annually.
 
   Existing infrastructure adjustment:
@@ -206,10 +206,10 @@ copy_paste_prompt: |-
   * Funding:
     - Funding Gap = (Phase-1 capex - cash - expected 24m FCF) / capex
     - If infrastructure lowers Phase-1 capex, reflect that lower capex and state the adjustment.
-    - <10M AUD or fully funded = 100
-    - 10-25M AUD with clear path = 80
-    - 25-50M AUD = 60
-    - >50M AUD or unclear path = 40
+    - <10M listing currency or fully funded = 100
+    - 10-25M listing currency with clear path = 80
+    - 25-50M listing currency = 60
+    - >50M listing currency or unclear path = 40
     - If debt is binding but drawdown conditions remain, cap practical score at 85-90.
   * ESG:
     - Permitting: fully approved 100 | key permits received 80 | applications submitted 60 | limited progress 40
@@ -229,14 +229,14 @@ copy_paste_prompt: |-
     - EV = Market Cap + Debt - Cash.
     - Use currently disclosed attributable code-compliant AuEq inventory only.
     - Do not substitute mine-plan output, recovered ounces, exploration targets, or non-code-compliant inventory.
-    - <50 AUD/oz = 100 | 50-100 = 70 | 100-150 = 50 | >150 = 40
+    - <50 listing currency/oz = 100 | 50-100 = 70 | 100-150 = 50 | >150 = 40
   * Exploration Upside:
     - Score growth beyond the current code-compliant resource base, not ounces already counted.
     - >50% potential = 100 | 25-50% = 80 | 10-25% = 60 | <10% = 40
   * Cost Competitiveness:
     - Use disclosed or defensible net AISC.
     - Do not infer low-cost status from strong project FCF alone.
-    - <1,500 AUD/oz = 100 | 1,500-2,000 = 80 | 2,000-2,500 = 60 | >2,500 = 40
+    - <1,500 listing currency/oz = 100 | 1,500-2,000 = 80 | 2,000-2,500 = 60 | >2,500 = 40
   * M&A/Strategic:
     - Consider proximity to majors, formal agreements, infrastructure fit, jurisdiction, and acquirability.
     - High = 100 | Moderate = 80 | Low = 60 | None = 40

@@ -19,7 +19,7 @@ OUT_DIR = REPO_ROOT / "docs" / "copy-paste-analysis-prompts"
 TEMPLATES_DIR = REPO_ROOT / "backend" / "templates"
 COMPANY_PLACEHOLDER = "[COMPANY_NAME]"
 TICKER_PLACEHOLDER = "[EXCHANGE_CODE]:[TICKER]"
-DEFAULT_EXCHANGE = "asx"
+EXCHANGE_PLACEHOLDER = "[EXCHANGE_CODE]"
 
 
 class LiteralString(str):
@@ -55,7 +55,7 @@ def _export_payload(template: Dict[str, Any], source_path: str) -> Dict[str, Any
     copy_paste_prompt = loader.get_copy_paste_research_brief(
         template_id,
         company_type=company_types[0] if company_types else template_id,
-        exchange=DEFAULT_EXCHANGE.upper(),
+        exchange=None,
         company_name=COMPANY_PLACEHOLDER,
         include_rubric=True,
     )
@@ -68,7 +68,7 @@ def _export_payload(template: Dict[str, Any], source_path: str) -> Dict[str, Any
         "placeholders": {
             "company_name": COMPANY_PLACEHOLDER,
             "ticker": TICKER_PLACEHOLDER,
-            "exchange": "ASX",
+            "exchange": EXCHANGE_PLACEHOLDER,
             "instruction": "Replace placeholders before pasting into an external model interface.",
         },
         "generation_source": {

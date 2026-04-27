@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import './Sidebar.css';
 
 export default function Sidebar({
@@ -36,7 +35,7 @@ export default function Sidebar({
           onClick={onOpenScenarioRouter}
           type="button"
         >
-          Open Scenario Router
+          Open Announcement Router
         </button>
       </div>
 

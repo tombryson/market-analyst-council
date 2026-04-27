@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import GanttMappingDemo from './components/GanttMappingDemo';
 import GanttIntelligenceLab from './components/GanttIntelligenceLab';
+import AnnouncementRouterMonitor from './components/AnnouncementRouterMonitor';
 import { api } from './api';
 import './App.css';
 
@@ -38,17 +39,39 @@ function CouncilApp() {
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  const loadConversations = useCallback(async () => {
+    try {
+      const convs = await api.listConversations();
+      setConversations(convs);
+    } catch (error) {
+      console.error('Failed to load conversations:', error);
+    }
+  }, []);
+
+  const loadConversation = useCallback(async (id) => {
+    try {
+      const conv = await api.getConversation(id);
+      setCurrentConversation(conv);
+    } catch (error) {
+      console.error('Failed to load conversation:', error);
+      if (String(id || '') === String(currentConversationId || '')) {
+        setCurrentConversationId(null);
+        setCurrentConversation(null);
+      }
+    }
+  }, [currentConversationId]);
+
   // Load conversations on mount
   useEffect(() => {
     loadConversations();
-  }, []);
+  }, [loadConversations]);
 
   // Load conversation details when selected
   useEffect(() => {
     if (currentConversationId) {
       loadConversation(currentConversationId);
     }
-  }, [currentConversationId]);
+  }, [currentConversationId, loadConversation]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -72,29 +95,7 @@ function CouncilApp() {
       loadConversations();
     }, 2000);
     return () => window.clearInterval(interval);
-  }, [currentConversationId, currentConversation]);
-
-  const loadConversations = async () => {
-    try {
-      const convs = await api.listConversations();
-      setConversations(convs);
-    } catch (error) {
-      console.error('Failed to load conversations:', error);
-    }
-  };
-
-  const loadConversation = async (id) => {
-    try {
-      const conv = await api.getConversation(id);
-      setCurrentConversation(conv);
-    } catch (error) {
-      console.error('Failed to load conversation:', error);
-      if (String(id || '') === String(currentConversationId || '')) {
-        setCurrentConversationId(null);
-        setCurrentConversation(null);
-      }
-    }
-  };
+  }, [currentConversationId, currentConversation, loadConversation, loadConversations]);
 
   const handleNewConversation = async () => {
     try {
@@ -122,7 +123,7 @@ function CouncilApp() {
   };
 
   const handleOpenScenarioRouter = () => {
-    navigate('/scenario-router');
+    navigate('/announcement-router');
   };
 
   const handleSendMessage = async (
@@ -481,8 +482,8 @@ function App() {
   if (path === '/gantt-lab') {
     return <GanttIntelligenceLab />;
   }
-  if (path === '/scenario-router') {
-    return <GanttIntelligenceLab monitorOnly />;
+  if (path === '/announcement-router' || path === '/scenario-router') {
+    return <AnnouncementRouterMonitor />;
   }
   return <CouncilApp />;
 }
