@@ -229,6 +229,49 @@ function scenarioTargetText(block) {
   return parts.join(' | ');
 }
 
+function countStatuses(items) {
+  const rows = Array.isArray(items) ? items : [];
+  return rows.reduce(
+    (acc, item) => {
+      const status = String(item?.status || '').trim().toLowerCase() || 'unknown';
+      acc.total += 1;
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    },
+    { total: 0, matched: 0, not_matched: 0, contradicted: 0, unclear: 0, unknown: 0 }
+  );
+}
+
+function compactStatusSummary(items, empty = 'none checked') {
+  const counts = countStatuses(items);
+  if (!counts.total) return empty;
+  const parts = [
+    counts.matched && `${counts.matched} hit`,
+    counts.contradicted && `${counts.contradicted} contradicted`,
+    counts.unclear && `${counts.unclear} unclear`,
+    counts.not_matched && `${counts.not_matched} not hit`,
+  ].filter(Boolean);
+  return parts.length ? parts.join(' | ') : `${counts.total} checked`;
+}
+
+function scenarioHitSummary(items) {
+  const rows = Array.isArray(items) ? items : [];
+  const totals = { bull: 0, base: 0, bear: 0 };
+  const hits = { bull: 0, base: 0, bear: 0 };
+  rows.forEach((item) => {
+    const scenario = String(item?.scenario || '').trim().toLowerCase();
+    if (!Object.prototype.hasOwnProperty.call(totals, scenario)) return;
+    totals[scenario] += 1;
+    if (String(item?.status || '').trim().toLowerCase() === 'matched') hits[scenario] += 1;
+  });
+  return ['bull', 'base', 'bear'].map((name) => ({
+    name,
+    label: labelScenarioPath(name),
+    hits: hits[name],
+    total: totals[name],
+  }));
+}
+
 function conditionStateLabel(item, fallback) {
   const status = String(item?.status || '').trim();
   const severity = String(item?.severity || '').trim();
@@ -261,7 +304,7 @@ function DetailList({ title, items, conflict = false, market = false }) {
   if (!items.length) return null;
   return (
     <>
-      <h4>{title}</h4>
+      {title && <h4>{title}</h4>}
       <div className="scenario-router-detail-list">
         {items.map((item, idx) => (
           <div key={`${title}-${idx}`} className={`scenario-router-detail-item ${conflict ? 'is-conflict' : ''}`}>
@@ -274,12 +317,33 @@ function DetailList({ title, items, conflict = false, market = false }) {
   );
 }
 
-function ConditionChecks({ title, items }) {
+function CompactStat({ label, value, tone = '' }) {
+  return (
+    <div className={`announcement-router-compact-stat ${tone ? `tone-${tone}` : ''}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function CollapsibleSection({ title, summary, open = false, children }) {
+  return (
+    <details className="announcement-router-drilldown" open={open}>
+      <summary>
+        <strong>{title}</strong>
+        {summary && <span>{summary}</span>}
+      </summary>
+      <div className="announcement-router-drilldown-body">{children}</div>
+    </details>
+  );
+}
+
+function ConditionChecks({ title = '', items }) {
   const rows = Array.isArray(items) ? items : [];
   if (!rows.length) return null;
   return (
     <>
-      <h4>{title}</h4>
+      {title && <h4>{title}</h4>}
       <div className="announcement-router-condition-checks">
         {rows.map((item, idx) => (
           <div key={`${title}-${idx}`} className="announcement-router-condition-check">
@@ -297,6 +361,29 @@ function ConditionChecks({ title, items }) {
   );
 }
 
+function ConditionSummary({ announcementChecks, watchlistChecks, marketConditions }) {
+  const scenarioRows = scenarioHitSummary(announcementChecks);
+  return (
+    <div className="announcement-router-condition-summary">
+      <div className="announcement-router-scenario-hit-strip">
+        {scenarioRows.map((row) => (
+          <CompactStat
+            key={row.name}
+            label={row.label}
+            value={`${row.hits}/${row.total || 0} hit`}
+            tone={row.name}
+          />
+        ))}
+      </div>
+      <div className="announcement-router-compact-grid">
+        <CompactStat label="Announcement checks" value={compactStatusSummary(announcementChecks)} />
+        <CompactStat label="Watchlist checks" value={compactStatusSummary(watchlistChecks)} />
+        <CompactStat label="Market backdrop" value={compactStatusSummary(marketConditions, 'not checked')} />
+      </div>
+    </div>
+  );
+}
+
 function ThesisSnapshot({ snapshot, router }) {
   const scenarios = snapshot?.scenarios && typeof snapshot.scenarios === 'object' ? snapshot.scenarios : {};
   const watchlist = snapshot?.monitoring_watchlist && typeof snapshot.monitoring_watchlist === 'object'
@@ -306,10 +393,18 @@ function ThesisSnapshot({ snapshot, router }) {
   const redFlags = Array.isArray(watchlist.red_flags) ? watchlist.red_flags : [];
   const confirmatorySignals = Array.isArray(watchlist.confirmatory_signals) ? watchlist.confirmatory_signals : [];
   if (!Object.keys(scenarios).length && !redFlags.length && !confirmatorySignals.length && !verification.length) return null;
+  const hasRouterHit = Boolean(
+    Number(router?.matched_conditions_count || 0) ||
+    Number(router?.triggered_watchlist_count || 0) ||
+    String(router?.path_transition || '').trim()
+  );
 
   return (
-    <details className="announcement-router-thesis-snapshot" open>
-      <summary>Thesis Map Used For This Decision</summary>
+    <details className="announcement-router-thesis-snapshot" open={hasRouterHit}>
+      <summary>
+        <strong>Thesis Map Used For This Decision</strong>
+        <span>bull/base/bear conditions from the saved lab run</span>
+      </summary>
       <div className="announcement-router-path-explainer">
         {pathExplanation(router)}
       </div>
@@ -330,30 +425,35 @@ function ThesisSnapshot({ snapshot, router }) {
                   {block.current_positioning}{block.current_positioning && block.why_current_positioning ? ' | ' : ''}{block.why_current_positioning}
                 </p>
               )}
-              {!!required.length && <h5>Required</h5>}
-              {required.map((item, idx) => (
-                <div key={`req-${name}-${idx}`} className="announcement-router-thesis-condition">
-                  <span>{conditionStateLabel(item, 'monitor')}</span>
-                  <strong>{item.condition}</strong>
-                  {conditionMetaText(item) && <em>{conditionMetaText(item)}</em>}
-                </div>
-              ))}
-              {!!failures.length && <h5>Failure</h5>}
-              {failures.map((item, idx) => (
-                <div key={`fail-${name}-${idx}`} className="announcement-router-thesis-condition is-risk">
-                  <span>{conditionStateLabel(item, 'at-risk')}</span>
-                  <strong>{item.condition}</strong>
-                  {conditionMetaText(item) && <em>{conditionMetaText(item)}</em>}
-                </div>
-              ))}
+              {!!(required.length || failures.length) && (
+                <details className="announcement-router-mini-details">
+                  <summary>{required.length} required | {failures.length} failure</summary>
+                  {!!required.length && <h5>Required</h5>}
+                  {required.map((item, idx) => (
+                    <div key={`req-${name}-${idx}`} className="announcement-router-thesis-condition">
+                      <span>{conditionStateLabel(item, 'monitor')}</span>
+                      <strong>{item.condition}</strong>
+                      {conditionMetaText(item) && <em>{conditionMetaText(item)}</em>}
+                    </div>
+                  ))}
+                  {!!failures.length && <h5>Failure</h5>}
+                  {failures.map((item, idx) => (
+                    <div key={`fail-${name}-${idx}`} className="announcement-router-thesis-condition is-risk">
+                      <span>{conditionStateLabel(item, 'at-risk')}</span>
+                      <strong>{item.condition}</strong>
+                      {conditionMetaText(item) && <em>{conditionMetaText(item)}</em>}
+                    </div>
+                  ))}
+                </details>
+              )}
             </article>
           );
         })}
       </div>
 
       {!!(redFlags.length || confirmatorySignals.length) && (
-        <>
-          <h4>Monitoring Watchlist</h4>
+        <details className="announcement-router-mini-details">
+          <summary>Monitoring Watchlist | {redFlags.length} red flags, {confirmatorySignals.length} confirmatory</summary>
           <div className="announcement-router-watchlist-grid">
             {redFlags.map((item, idx) => (
               <div key={`red-${idx}`} className="announcement-router-thesis-condition is-risk">
@@ -370,12 +470,12 @@ function ThesisSnapshot({ snapshot, router }) {
               </div>
             ))}
           </div>
-        </>
+        </details>
       )}
 
       {!!verification.length && (
-        <>
-          <h4>Verification Queue</h4>
+        <details className="announcement-router-mini-details">
+          <summary>Verification Queue | {verification.length} item{verification.length === 1 ? '' : 's'}</summary>
           <div className="announcement-router-condition-checks">
             {verification.map((item, idx) => (
               <div key={`verify-${idx}`} className="announcement-router-condition-check">
@@ -389,7 +489,7 @@ function ThesisSnapshot({ snapshot, router }) {
               </div>
             ))}
           </div>
-        </>
+        </details>
       )}
     </details>
   );
@@ -446,13 +546,22 @@ function DecisionPanel({ router, emptyTitle = 'No announcement decision attached
   return (
     <article className="scenario-router-column announcement-router-decision-panel">
       <h4>Selected Filing Decision</h4>
-      <DetailRow label="Announcement" value={routerTitle(router)} />
-      <DetailRow label="Official source" value={router?.source_type ? titleizeKey(router.source_type) : 'Unknown'} />
-      <DetailRow label="Router outcome" value={routerOutcomeLabel(router)} tone={directHits ? scenarioTone(router?.current_path) : ''} />
-      <DetailRow label="Saved lab path" value={labelScenarioPath(router?.baseline_path || router?.current_path)} tone={scenarioTone(router?.baseline_path || router?.current_path)} />
-      <DetailRow label="Recommended action" value={labelScenarioAction(router?.action)} />
-      <DetailRow label="Materiality" value={router?.impact_level ? titleizeKey(router.impact_level) : 'Not assessed'} />
-      <DetailRow label="Last evaluated" value={router?.saved_at_utc ? fmtRelativeSince(router.saved_at_utc) : 'n/a'} />
+      <div className="announcement-router-decision-hero">
+        <div>
+          <span>{router?.ticker || 'Selected filing'}</span>
+          <strong>{routerOutcomeLabel(router)}</strong>
+          <em>{routerTitle(router)}</em>
+        </div>
+        <b className={`announcement-router-action-pill action-${String(router?.action || 'watch').toLowerCase()}`}>
+          {labelScenarioAction(router?.action)}
+        </b>
+      </div>
+      <div className="announcement-router-metric-grid">
+        <DetailRow label="Saved lab path" value={labelScenarioPath(router?.baseline_path || router?.current_path)} tone={scenarioTone(router?.baseline_path || router?.current_path)} />
+        <DetailRow label="Materiality" value={router?.impact_level ? titleizeKey(router.impact_level) : 'Not assessed'} />
+        <DetailRow label="Official source" value={router?.source_type ? titleizeKey(router.source_type) : 'Unknown'} />
+        <DetailRow label="Last evaluated" value={router?.saved_at_utc ? fmtRelativeSince(router.saved_at_utc) : 'n/a'} />
+      </div>
       <div className={`announcement-router-impact-callout ${directHits ? 'has-hit' : 'no-hit'}`}>
         <strong>{directHits ? `${directHits} announcement thesis hit${directHits === 1 ? '' : 's'}` : 'No announcement-thesis hit'}</strong>
         <span>{directHits ? 'The filing matched mapped lab conditions below.' : 'The filing did not match the bull/base/bear conditions. Market facts are shown separately as backdrop.'}</span>
@@ -464,16 +573,46 @@ function DecisionPanel({ router, emptyTitle = 'No announcement decision attached
           <strong>Primary source:</strong> <a href={router.source_url} target="_blank" rel="noreferrer">Open filing</a>
         </div>
       )}
+      <ConditionSummary
+        announcementChecks={announcementChecks}
+        watchlistChecks={watchlistChecks}
+        marketConditions={marketConditions}
+      />
       <DetailList title="Matched Thesis Conditions" items={matchedConditions} />
       <DetailList title="Watchlist Hits" items={watchHits} />
       <DetailList title="Conflicts With Saved Run" items={conflicts} conflict />
       <DetailList title="Supporting Findings" items={findings} />
-      <ConditionChecks title="Announcement Conditions Checked" items={announcementChecks} />
-      <ConditionChecks title="Watchlist Conditions Checked" items={watchlistChecks} />
-      <DetailList title="Market Conditions Checked" items={marketConditions} market />
+      {!!announcementChecks.length && (
+        <CollapsibleSection
+          title="Announcement Conditions Checked"
+          summary={compactStatusSummary(announcementChecks)}
+          open={directHits > 0}
+        >
+          <ConditionChecks items={announcementChecks} />
+        </CollapsibleSection>
+      )}
+      {!!watchlistChecks.length && (
+        <CollapsibleSection
+          title="Watchlist Conditions Checked"
+          summary={compactStatusSummary(watchlistChecks)}
+          open={watchHits.length > 0}
+        >
+          <ConditionChecks items={watchlistChecks} />
+        </CollapsibleSection>
+      )}
+      {!!marketConditions.length && (
+        <CollapsibleSection
+          title="Market Conditions Checked"
+          summary={compactStatusSummary(marketConditions)}
+        >
+          <DetailList title="" items={marketConditions} market />
+        </CollapsibleSection>
+      )}
       {!!Object.keys(router?.market_facts_used || {}).length && (
-        <>
-          <h4>Market Facts Used</h4>
+        <CollapsibleSection
+          title="Market Facts Used"
+          summary={`${Object.keys(router.market_facts_used || {}).length} value${Object.keys(router.market_facts_used || {}).length === 1 ? '' : 's'}`}
+        >
           <div className="scenario-router-chip-list">
             {Object.entries(router.market_facts_used || {}).map(([key, value]) => (
               <span key={`market-${key}`} className="scenario-router-chip">
@@ -481,11 +620,10 @@ function DecisionPanel({ router, emptyTitle = 'No announcement decision attached
               </span>
             ))}
           </div>
-        </>
+        </CollapsibleSection>
       )}
       {!!followUps.length && (
-        <>
-          <h4>Next Steps</h4>
+        <CollapsibleSection title="Next Steps" summary={`${followUps.length} suggested`}>
           <div className="scenario-router-detail-list">
             {followUps.map((item, idx) => (
               <div key={`follow-up-${idx}`} className="scenario-router-detail-item">
@@ -493,7 +631,7 @@ function DecisionPanel({ router, emptyTitle = 'No announcement decision attached
               </div>
             ))}
           </div>
-        </>
+        </CollapsibleSection>
       )}
       <ThesisSnapshot snapshot={router?.thesis_snapshot} router={router} />
       <details className="announcement-router-trace-details">
@@ -665,7 +803,7 @@ export default function AnnouncementRouterMonitor({
             <article className="scenario-router-column announcement-router-list-column">
               <div className="announcement-router-list-head">
                 <h4>Routed Announcements</h4>
-                <span>{Math.min(recentEvents.length, 10)} of {recentEvents.length} shown</span>
+                <span>latest {Math.min(recentEvents.length, 10)} shown</span>
               </div>
               <div className="scenario-router-event-list">
                 {recentEvents.slice(0, 10).map((row) => (
