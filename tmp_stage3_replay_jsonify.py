@@ -227,7 +227,7 @@ async def main() -> None:
     )
     parser.add_argument(
         "--jsonifier-model",
-        default="openai/gpt-4o-mini",
+        default="openai/gpt-5-mini",
         help="Model used to normalize chairman output into strict JSON.",
     )
     parser.add_argument(

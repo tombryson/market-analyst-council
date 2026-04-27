@@ -146,7 +146,7 @@ Optimized Search Query:"""
 
     try:
         # Use fast, cheap model for reformulation
-        response = await query_model("google/gemini-2.5-flash", messages, timeout=15.0)
+        response = await query_model("google/gemini-3-flash-preview", messages, timeout=15.0)
 
         if response and response.get('content'):
             query = response['content'].strip().strip('"\'')

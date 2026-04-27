@@ -124,8 +124,8 @@ COUNCIL_MODELS = _COUNCIL_MODELS or [
     "x-ai/grok-4.20",
     "qwen/qwen3.6-plus",
     "z-ai/glm-5.1",
-    "google/gemma-4-26b-a4b-it",
-    "moonshotai/kimi-k2.5",
+    "google/gemma-4-31b-it",
+    "moonshotai/kimi-k2.6",
 ]
 
 # Chairman model - synthesizes final response

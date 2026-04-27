@@ -72,7 +72,7 @@ NEWSWIRE_DOMAINS = (
     "globenewswire.com",
     "prnewswire.com",
 )
-DEFAULT_US_PS_MODEL = "openai/gpt-4o-mini"
+DEFAULT_US_PS_MODEL = "openai/gpt-5-mini"
 DEFAULT_OFFICIAL_SITE_FILTER_MODEL = os.getenv("OFFICIAL_SITE_FILTER_MODEL", "openai/gpt-5-mini")
 
 US_PS_FORM_WEIGHTS = {

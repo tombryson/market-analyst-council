@@ -288,7 +288,7 @@ Concise summary:"""
             messages = [{"role": "user", "content": summary_prompt}]
 
             try:
-                response = await query_model("google/gemini-2.5-flash", messages, timeout=30.0)
+                response = await query_model("google/gemini-3-flash-preview", messages, timeout=30.0)
                 if response and response.get('content'):
                     chunk_summaries.append(response['content'])
             except Exception as e:
@@ -318,7 +318,7 @@ Summary:"""
     messages = [{"role": "user", "content": final_prompt}]
 
     try:
-        response = await query_model("google/gemini-2.5-flash", messages, timeout=45.0)
+        response = await query_model("google/gemini-3-flash-preview", messages, timeout=45.0)
         if response and response.get('content'):
             return response['content']
     except Exception as e:
