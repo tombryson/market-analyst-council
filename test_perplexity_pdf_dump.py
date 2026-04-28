@@ -59,6 +59,7 @@ INJECTION_MIN_IMPORTANCE_SCORE = 80
 US_EXCHANGE_IDS = {"nyse", "nasdaq"}
 CANADIAN_EXCHANGE_IDS = {"tsx", "tsxv", "cse"}
 ASX_EXCHANGE_IDS = {"asx"}
+LSE_EXCHANGE_IDS = {"lse", "aim"}
 US_HIGH_SIGNAL_SEC_FORMS = {
     "8-K",
     "10-Q",
@@ -157,6 +158,54 @@ CANADIAN_PS_NEGATIVE_KEYWORDS = (
     "early warning report",
     "notice of annual meeting",
     "agm notice",
+)
+
+LSE_PS_POSITIVE_KEYWORDS = (
+    "interim results",
+    "final results",
+    "annual results",
+    "trading update",
+    "contract",
+    "order",
+    "contract award",
+    "selects",
+    "guidance",
+    "forecast",
+    "placing",
+    "fundraise",
+    "fundraising",
+    "funding",
+    "subscription",
+    "debt facility",
+    "acquisition",
+    "disposal",
+    "joint venture",
+    "annual report",
+    "investor presentation",
+    "resource update",
+    "reserve update",
+    "operations update",
+    "production update",
+)
+
+LSE_PS_NEGATIVE_KEYWORDS = (
+    "holding(s) in company",
+    "holdings in company",
+    "director/pdmr shareholding",
+    "director dealing",
+    "pdmr",
+    "exercise of options",
+    "tr-1",
+    "tr - 1",
+    "total voting rights",
+    "annual general meeting",
+    "change of registered office",
+    "appointment of joint corporate broker",
+    "appointment of broker",
+    "notice of annual general meeting",
+    "notice of agm",
+    "result of agm",
+    "block listing",
 )
 
 
@@ -679,7 +728,7 @@ def _resolve_exchange_profile(
         for item in list(params.get("allowed_domain_suffixes", []) or [])
         if str(item).strip()
     ]
-    if not allowed_domains:
+    if not allowed_domains and exchange == "asx":
         allowed_domains = list(DEFAULT_ALLOWED_DOMAIN_SUFFIXES)
     params["allowed_domain_suffixes"] = allowed_domains
     params["exchange"] = exchange
@@ -704,6 +753,7 @@ def _build_candidate_row(
     discovery_tier: int,
     discovery_method: str,
     source_snippet: str = "",
+    issuer_validation: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     url = str(source_url or "").strip()
     dt = published_dt if isinstance(published_dt, datetime) else None
@@ -717,6 +767,7 @@ def _build_candidate_row(
         "discovery_tier": int(discovery_tier),
         "discovery_method": str(discovery_method or "").strip(),
         "source_snippet": str(source_snippet or "").strip(),
+        "issuer_validation": dict(issuer_validation or {}),
     }
 
 
@@ -1833,6 +1884,193 @@ def _parse_asx_datetime(date_text: str, time_text: str = "") -> Optional[datetim
     return base
 
 
+def _parse_lse_datetime(date_text: str, time_text: str = "") -> Optional[datetime]:
+    raw_date = re.sub(r"\s+", " ", str(date_text or "").strip())
+    raw_time = re.sub(r"\s+", " ", str(time_text or "").strip().upper())
+    if not raw_date:
+        return None
+    raw = f"{raw_date} {raw_time}".strip()
+    for fmt in ("%d %b %Y %I:%M %p", "%d %B %Y %I:%M %p", "%d %b %Y %H:%M", "%d %B %Y %H:%M"):
+        try:
+            return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
+        except Exception:
+            continue
+    for fmt in ("%d %b %Y", "%d %B %Y"):
+        try:
+            return datetime.strptime(raw_date, fmt).replace(tzinfo=timezone.utc)
+        except Exception:
+            continue
+    return None
+
+
+def _classify_lse_rns(title: str, source: str = "") -> tuple[bool, int, str]:
+    text = " ".join([str(title or ""), str(source or "")]).lower()
+    if any(token in text for token in LSE_PS_NEGATIVE_KEYWORDS):
+        return False, 4, "low_signal_admin"
+    if any(token in text for token in LSE_PS_POSITIVE_KEYWORDS):
+        return True, 1, "material_rns"
+    if str(source or "").strip().lower() == "rns reach":
+        return False, 3, "rns_reach"
+    return False, 2, "routine_rns"
+
+
+def _parse_investegate_company_rows(html_text: str, base_url: str) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    if not str(html_text or "").strip():
+        return rows
+
+    if BS4_AVAILABLE and BeautifulSoup is not None:
+        soup = BeautifulSoup(str(html_text or ""), "html.parser")
+        for tr in soup.select("table.table-investegate tr"):
+            cells = tr.find_all(["td", "th"])
+            if len(cells) < 4:
+                continue
+            date_text = cells[0].get_text(" ", strip=True)
+            time_text = cells[1].get_text(" ", strip=True)
+            source_text = cells[2].get_text(" ", strip=True)
+            link = cells[3].find("a", href=True)
+            if not link:
+                continue
+            title = re.sub(r"\s+", " ", link.get_text(" ", strip=True)).strip()
+            href = urljoin(base_url, str(link.get("href", "")).strip())
+            if "/announcement/rns/" not in href.lower():
+                continue
+            published_dt = _parse_lse_datetime(date_text, time_text)
+            is_ps, priority, category = _classify_lse_rns(title, source_text)
+            rows.append(
+                {
+                    "url": href,
+                    "title": title or "RNS announcement",
+                    "source_type": source_text,
+                    "published_dt": published_dt,
+                    "published_at": published_dt.strftime("%Y-%m-%d") if published_dt else "",
+                    "price_sensitive": bool(is_ps),
+                    "priority": int(priority),
+                    "category": category,
+                }
+            )
+        return rows
+
+    row_chunks = re.findall(r"(?is)<tr[^>]*>(.*?)</tr>", str(html_text or ""))
+    for chunk in row_chunks:
+        if "/announcement/rns/" not in chunk.lower():
+            continue
+        cells = re.findall(r"(?is)<td[^>]*>(.*?)</td>", chunk)
+        if len(cells) < 4:
+            continue
+        date_text = _clean_html_fragment(cells[0])
+        time_text = _clean_html_fragment(cells[1])
+        source_text = _clean_html_fragment(cells[2])
+        link_match = re.search(r'(?is)<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', cells[3])
+        if not link_match:
+            continue
+        href = urljoin(base_url, str(link_match.group(1) or "").strip())
+        title = _clean_html_fragment(link_match.group(2))
+        published_dt = _parse_lse_datetime(date_text, time_text)
+        is_ps, priority, category = _classify_lse_rns(title, source_text)
+        rows.append(
+            {
+                "url": href,
+                "title": title or "RNS announcement",
+                "source_type": source_text,
+                "published_dt": published_dt,
+                "published_at": published_dt.strftime("%Y-%m-%d") if published_dt else "",
+                "price_sensitive": bool(is_ps),
+                "priority": int(priority),
+                "category": category,
+            }
+        )
+    return rows
+
+
+async def _discover_investegate_rns_sources(
+    client: httpx.AsyncClient,
+    *,
+    symbol: str,
+    lookback_days: int,
+    max_rows: int,
+    max_pages: int = 4,
+) -> List[Dict[str, Any]]:
+    normalized_symbol = _normalize_ticker_symbol(symbol)
+    if not normalized_symbol:
+        return []
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max(1, int(lookback_days or 365)))
+    limit = max(1, int(max_rows or 30))
+    rows: List[Dict[str, Any]] = []
+    seen_urls: set[str] = set()
+    base_url = f"https://www.investegate.co.uk/company/{quote(normalized_symbol)}"
+
+    for page in range(1, max(1, int(max_pages)) + 1):
+        page_url = base_url if page == 1 else _with_query_params(base_url, {"page": str(page)})
+        try:
+            response = await _http_get_with_sec_fallback(client, page_url)
+        except Exception:
+            continue
+        if response.status_code >= 400:
+            continue
+        page_rows = _parse_investegate_company_rows(str(response.text or ""), page_url)
+        if not page_rows:
+            if page > 1:
+                break
+            continue
+        added_this_page = 0
+        for row in page_rows:
+            source_url = str(row.get("url", "")).strip()
+            if not source_url or source_url in seen_urls:
+                continue
+            seen_urls.add(source_url)
+            published_dt = row.get("published_dt") if isinstance(row.get("published_dt"), datetime) else None
+            if published_dt and published_dt < cutoff:
+                continue
+            priority = int(row.get("priority", 3) or 3)
+            if priority >= 4:
+                continue
+            is_ps = bool(row.get("price_sensitive", False))
+            score = {1: 1.0, 2: 0.82, 3: 0.62, 4: 0.22}.get(priority, 0.5)
+            rows.append(
+                {
+                    "url": source_url,
+                    "title": str(row.get("title", "")).strip() or "RNS announcement",
+                    "published_at": str(row.get("published_at", "")).strip(),
+                    "content": (
+                        "Deterministic LSE/AIM Investegate RNS lane. "
+                        f"source={str(row.get('source_type', '')).strip() or 'RNS'} "
+                        f"category={str(row.get('category', '')).strip() or 'routine_rns'} "
+                        f"priority={priority}. "
+                        + ("material rns announcement. " if is_ps else "")
+                    ),
+                    "score": score,
+                    "deterministic_source_kind": "lse_investegate_rns",
+                    "price_sensitive_seed": is_ps,
+                    "rns_source_type": str(row.get("source_type", "")).strip(),
+                    "rns_category": str(row.get("category", "")).strip(),
+                    "rns_priority": priority,
+                    "issuer_validation": {
+                        "status": "match",
+                        "method": "deterministic_investegate_company_page",
+                        "ticker_symbol": normalized_symbol,
+                    },
+                }
+            )
+            added_this_page += 1
+            if len(rows) >= limit:
+                break
+        if len(rows) >= limit:
+            break
+        if added_this_page == 0 and page > 1:
+            break
+
+    rows.sort(
+        key=lambda row: (
+            _parse_iso_date(str(row.get("published_at", "")).strip())
+            or datetime(1970, 1, 1, tzinfo=timezone.utc),
+            float(row.get("score", 0.0) or 0.0),
+        ),
+        reverse=True,
+    )
+    return rows[:limit]
+
+
 def _parse_asx_announcement_rows(html_text: str) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     if not html_text:
@@ -2774,6 +3012,7 @@ def _build_price_sensitivity_assessment(
     exchange = str(exchange_id or "").strip().lower()
     is_us = exchange in US_EXCHANGE_IDS
     is_canadian = exchange in CANADIAN_EXCHANGE_IDS
+    is_lse = exchange in LSE_EXCHANGE_IDS
     text = " ".join(
         [
             str(title or ""),
@@ -2812,6 +3051,9 @@ def _build_price_sensitivity_assessment(
     elif is_canadian:
         pos_hits = [kw for kw in CANADIAN_PS_POSITIVE_KEYWORDS if kw in low]
         neg_hits = [kw for kw in CANADIAN_PS_NEGATIVE_KEYWORDS if kw in low]
+    elif is_lse:
+        pos_hits = [kw for kw in LSE_PS_POSITIVE_KEYWORDS if kw in low]
+        neg_hits = [kw for kw in LSE_PS_NEGATIVE_KEYWORDS if kw in low]
     else:
         pos_hits = []
         neg_hits = []
@@ -2820,6 +3062,8 @@ def _build_price_sensitivity_assessment(
         reason_codes.append("material_keyword_hit")
     if is_canadian:
         high_impact_hits = [kw for kw in CANADIAN_PS_HIGH_IMPACT_KEYWORDS if kw in low]
+    elif is_lse:
+        high_impact_hits = [kw for kw in LSE_PS_POSITIVE_KEYWORDS if kw in low]
     else:
         high_impact_hits = []
     if high_impact_hits:
@@ -2830,13 +3074,23 @@ def _build_price_sensitivity_assessment(
         reason_codes.append("low_signal_keyword_hit")
 
     score = max(0.0, min(1.50, score))
-    threshold = 0.72 if is_canadian else 0.72
+    threshold = 0.72 if (is_canadian or is_lse) else 0.72
     if is_canadian and neg_hits and not explicit_hit:
         threshold += 0.06
+    if is_lse and token_marker:
+        # RNS rows do not expose a universal "price sensitive" flag. A
+        # deterministic RNS lane plus material title token is sufficient signal.
+        score += 0.44
+        reason_codes.append("lse_rns_material_title")
+    if is_lse and neg_hits and not explicit_hit:
+        threshold += 0.12
     is_ps = bool(score >= threshold)
     if is_canadian and is_ps and not explicit_hit and not token_marker and len(pos_hits) < 2:
         is_ps = False
         reason_codes.append("insufficient_canadian_signal_density")
+    if is_lse and is_ps and neg_hits and not pos_hits and not explicit_hit:
+        is_ps = False
+        reason_codes.append("lse_low_signal_notice")
     margin = abs(score - threshold)
     if not reason_codes:
         confidence = 0.45
@@ -2850,6 +3104,8 @@ def _build_price_sensitivity_assessment(
         confidence = max(confidence, 0.76)
     if is_canadian and token_marker and is_ps:
         confidence = max(confidence, 0.72)
+    if is_lse and token_marker and is_ps:
+        confidence = max(confidence, 0.74)
 
     label = "uncertain"
     if confidence >= 0.86:
@@ -3699,6 +3955,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Perplexity recent-PDF full-text dump")
     parser.add_argument("--query", required=True, help="User query for Perplexity retrieval")
     parser.add_argument("--ticker", default="", help="Ticker like ASX:WWI")
+    parser.add_argument("--company-name", default="", help="Target issuer/company name for identity gates")
     parser.add_argument(
         "--exchange",
         default="",
@@ -4802,6 +5059,7 @@ async def _build_injection_bundle_from_worker_summary(
 
 async def _run(args: argparse.Namespace) -> int:
     load_dotenv()
+    target_company_name = re.sub(r"\s+", " ", str(args.company_name or "").strip())
     exchange_profile = _resolve_exchange_profile(
         query=str(args.query or ""),
         ticker=str(args.ticker or ""),
@@ -4852,6 +5110,7 @@ async def _run(args: argparse.Namespace) -> int:
 
     deterministic_canadian_mode = "none"
     deterministic_asx_mode = "none"
+    deterministic_lse_mode = "none"
     if not bool(args.canadian_official_site_only):
         if (
             exchange_id == "tsxv"
@@ -4864,6 +5123,9 @@ async def _run(args: argparse.Namespace) -> int:
     if exchange_id in ASX_EXCHANGE_IDS:
         deterministic_asx_mode = "marketindex_asxpdf"
     asx_deterministic_primary_active = deterministic_asx_mode != "none"
+    if exchange_id in LSE_EXCHANGE_IDS:
+        deterministic_lse_mode = "investegate_rns"
+    lse_deterministic_primary_active = deterministic_lse_mode != "none"
 
     provider = PerplexityResearchProvider()
     official_focus_brief = ""
@@ -4876,6 +5138,7 @@ async def _run(args: argparse.Namespace) -> int:
     print(
         "[retrieve] start "
         f"exchange={exchange_id} deterministic_canadian_mode={deterministic_canadian_mode} "
+        f"deterministic_lse_mode={deterministic_lse_mode} "
         f"allowed_domains={','.join(allowed_domain_suffixes)} "
         f"max_sources={max(1, int(requested_max_sources))}",
         flush=True,
@@ -4908,6 +5171,7 @@ async def _run(args: argparse.Namespace) -> int:
         "self_scrape_official_added": 0,
         "self_scrape_asx_marketindex_added": 0,
         "self_scrape_asx_direct_added": 0,
+        "self_scrape_lse_investegate_added": 0,
         "post_merge_source_count": int(len(sources)),
         "perplexity_empty": bool(not sources),
         "perplexity_error": perplexity_error,
@@ -5221,8 +5485,108 @@ async def _run(args: argparse.Namespace) -> int:
                 flush=True,
             )
 
+    # Deterministic LSE/AIM primary lane:
+    # Investegate exposes stable per-ticker RNS listing pages that are reliable
+    # enough to seed the prepass without relying on generic web search results.
+    if lse_deterministic_primary_active:
+        ticker_symbol = _normalize_ticker_symbol(str(args.ticker or ""))
+        deterministic_lse_sources: List[Dict[str, Any]] = []
+        if ticker_symbol:
+            timeout = httpx.Timeout(35.0, connect=15.0, read=35.0, write=15.0)
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/126.0.0.0 Safari/537.36"
+                )
+            }
+            async with httpx.AsyncClient(timeout=timeout, follow_redirects=True, headers=headers) as rns_client:
+                deterministic_lse_sources = await _await_with_phase_progress(
+                    _discover_investegate_rns_sources(
+                        rns_client,
+                        symbol=ticker_symbol,
+                        lookback_days=lookback_days,
+                        max_rows=max(
+                            40,
+                            int(requested_max_sources),
+                            int(max(target_ps_default + target_non_ps_default, int(args.top) * 2)),
+                        ),
+                    ),
+                    label="self-scrape-lse-investegate",
+                    interval_seconds=10.0,
+                )
+
+        if deterministic_lse_sources:
+            supplement_sources: List[Dict[str, Any]] = []
+            for row in list(sources or []):
+                source_url = str(row.get("url", "")).strip()
+                if not source_url:
+                    continue
+                host = urlparse(source_url).netloc.lower().strip()
+                if official_domain and _host_matches_suffix(host, official_domain):
+                    supplement_sources.append(row)
+
+            merged_lse_sources: Dict[str, Dict[str, Any]] = {}
+            for row in list(deterministic_lse_sources) + list(supplement_sources):
+                row_url = str(row.get("url", "")).strip()
+                if not row_url:
+                    continue
+                existing = merged_lse_sources.get(row_url)
+                if not existing:
+                    merged_lse_sources[row_url] = row
+                    continue
+                existing_dt = _parse_iso_date(str(existing.get("published_at", "")).strip()) or _parse_date_from_pdf_url(
+                    str(existing.get("url", "")).strip()
+                )
+                row_dt = _parse_iso_date(str(row.get("published_at", "")).strip()) or _parse_date_from_pdf_url(row_url)
+                existing_score = float(existing.get("score", 0.0) or 0.0)
+                row_score = float(row.get("score", 0.0) or 0.0)
+                if (row_dt or datetime(1970, 1, 1, tzinfo=timezone.utc)) > (
+                    existing_dt or datetime(1970, 1, 1, tzinfo=timezone.utc)
+                ) or row_score > existing_score:
+                    merged_lse_sources[row_url] = row
+
+            sources = list(merged_lse_sources.values())
+            sources.sort(
+                key=lambda row: (
+                    _parse_iso_date(str(row.get("published_at", "")).strip())
+                    or _parse_date_from_pdf_url(str(row.get("url", "")).strip())
+                    or datetime(1970, 1, 1, tzinfo=timezone.utc),
+                    float(row.get("score", 0.0) or 0.0),
+                ),
+                reverse=True,
+            )
+            retrieval_lanes["self_scrape_lse_investegate_added"] = int(len(deterministic_lse_sources))
+            retrieval_lanes["post_merge_source_count"] = int(len(sources))
+            print(
+                "[lse-deterministic] complete "
+                f"mode={deterministic_lse_mode} deterministic_sources={len(deterministic_lse_sources)} "
+                f"post_merge={len(sources)}",
+                flush=True,
+            )
+            _print_source_preview("lse-deterministic", sources, url_key="url", limit=10)
+        else:
+            print(
+                "[lse-deterministic] no Investegate RNS rows found; falling back to existing retrieval sources",
+                flush=True,
+            )
+
     # Issuer-identity gate (agent-based): filter merged source pool before deterministic source construction.
-    if (exchange_id in CANADIAN_EXCHANGE_IDS or exchange_id in ASX_EXCHANGE_IDS) and sources:
+    lse_deterministic_sources_found = bool(
+        exchange_id in LSE_EXCHANGE_IDS
+        and int(retrieval_lanes.get("self_scrape_lse_investegate_added", 0) or 0) > 0
+    )
+    if lse_deterministic_sources_found:
+        retrieval_lanes["issuer_source_filter"] = {
+            "enabled": not bool(args.disable_official_site_filter),
+            "attempted": 0,
+            "applied": 1,
+            "selected_rows": int(len(sources)),
+            "dropped_rows": 0,
+            "mode": "deterministic_lse_investegate_company_page",
+            "error": "",
+        }
+    elif (exchange_id in CANADIAN_EXCHANGE_IDS or exchange_id in ASX_EXCHANGE_IDS or exchange_id in LSE_EXCHANGE_IDS) and sources:
         issuer_filter_result = await _apply_issuer_source_mini_filter(
             rows=sources,
             ticker=str(args.ticker or ""),
@@ -5572,6 +5936,9 @@ async def _run(args: argparse.Namespace) -> int:
         if str(source.get("deterministic_source_kind", "")).strip() == "asx_marketindex_pdf":
             discovery_method = "tier1_asx_marketindex_deterministic"
             discovery_tier = 1
+        elif str(source.get("deterministic_source_kind", "")).strip() == "lse_investegate_rns":
+            discovery_method = "tier1_lse_investegate_rns"
+            discovery_tier = 1
         row = _build_candidate_row(
             source_url=source_url,
             title=title,
@@ -5580,6 +5947,7 @@ async def _run(args: argparse.Namespace) -> int:
             discovery_tier=discovery_tier,
             discovery_method=discovery_method,
             source_snippet=snippet,
+            issuer_validation=dict(source.get("issuer_validation", {}) or {}),
         )
         if _is_allowed_domain(source_url, allowed_domain_suffixes):
             candidate_rows.append(row)
@@ -5768,7 +6136,7 @@ async def _run(args: argparse.Namespace) -> int:
                 client,
                 row["source_url"],
                 allowed_domain_suffixes,
-                allow_source_fallback_decode=bool(exchange_id in CANADIAN_EXCHANGE_IDS),
+                allow_source_fallback_decode=bool(exchange_id in CANADIAN_EXCHANGE_IDS or exchange_id in LSE_EXCHANGE_IDS),
             )
             for discovered in discovered_entries:
                 resolved_pdf = str(discovered.get("pdf_url", "")).strip()
@@ -5990,7 +6358,8 @@ async def _run(args: argparse.Namespace) -> int:
             "[selection] "
             f"selected_primary={len(selected_primary)} ps={selected_primary_ps} "
             f"non_ps={selected_primary_non_ps} target_ps={target_ps} target_non_ps={target_non_ps} "
-            f"deterministic_mode={deterministic_canadian_mode}",
+            f"deterministic_canadian_mode={deterministic_canadian_mode} "
+            f"deterministic_lse_mode={deterministic_lse_mode}",
             flush=True,
         )
         _print_source_preview("selection", selected_primary, url_key="pdf_url", limit=8)
@@ -6174,10 +6543,16 @@ async def _run(args: argparse.Namespace) -> int:
             "Canadian deterministic primary lane active: primary documents selected by latest published date "
             f"(mode={deterministic_canadian_mode})."
         )
+    if lse_deterministic_primary_active:
+        selection_notes.append(
+            "LSE/AIM deterministic RNS lane active: primary announcements selected from Investegate RNS listings "
+            f"(mode={deterministic_lse_mode})."
+        )
 
     manifest = {
         "query": args.query,
         "ticker": args.ticker,
+        "company_name": target_company_name,
         "exchange": exchange_id,
         "official_issuer_site": official_site,
         "depth": args.depth,
@@ -6185,6 +6560,7 @@ async def _run(args: argparse.Namespace) -> int:
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "exchange_retrieval_profile": exchange_profile,
         "deterministic_canadian_mode": deterministic_canadian_mode,
+        "deterministic_lse_mode": deterministic_lse_mode,
         "us_fallback_chain": us_fallback_chain,
         "price_sensitivity_layer_report": us_ps_model_layer_report,
         "allowed_domains": list(allowed_domain_suffixes),
@@ -6368,7 +6744,7 @@ async def _run(args: argparse.Namespace) -> int:
                     exchange_profile=exchange_profile,
                     contamination_gate_model=str(args.official_site_filter_model or ""),
                     target_ticker=str(args.ticker or ""),
-                    target_company=str(manifest.get("company_name", "") or ""),
+                    target_company=str(manifest.get("company_name", "") or target_company_name or ""),
                 )
                 injection_bundle_json = str(bundle_info.get("bundle_json", ""))
                 injection_bundle_markdown = str(bundle_info.get("bundle_markdown", ""))
@@ -6412,6 +6788,7 @@ async def _run(args: argparse.Namespace) -> int:
         f"- retrieval_lane_perplexity_seed_sources: {int(retrieval_lanes.get('perplexity_seed_sources', 0) or 0)}",
         f"- retrieval_lane_self_scrape_globe_candidates: {int(retrieval_lanes.get('self_scrape_globe_added', 0) or 0)}",
         f"- retrieval_lane_self_scrape_official_candidates: {int(retrieval_lanes.get('self_scrape_official_added', 0) or 0)}",
+        f"- retrieval_lane_self_scrape_lse_investegate_added: {int(retrieval_lanes.get('self_scrape_lse_investegate_added', 0) or 0)}",
         f"- retrieval_lane_post_merge_sources: {int(retrieval_lanes.get('post_merge_source_count', 0) or 0)}",
         f"- retrieval_lane_final_sources: {int(retrieval_lanes.get('final_source_count', len(sources)) or 0)}",
         f"- retrieval_lane_perplexity_empty: {bool(retrieval_lanes.get('perplexity_empty', False))}",

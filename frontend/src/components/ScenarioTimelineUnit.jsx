@@ -18,7 +18,12 @@ const LANE_AXIS_STYLE = {
 function fmtMoney(value, currency = 'AUD') {
   const n = Number(value);
   if (!Number.isFinite(n)) return 'n/a';
-  const symbol = currency === 'AUD' ? 'A$' : '$';
+  const code = String(currency || '').toUpperCase();
+  if (code === 'GBP') return `£${n.toFixed(2)}`;
+  if (code === 'GBP_PENCE' || code === 'GBX' || code === 'GBPENCE') {
+    return `${n >= 10 ? n.toFixed(0) : n.toFixed(2)}p`;
+  }
+  const symbol = code === 'AUD' ? 'A$' : code === 'USD' ? 'US$' : '$';
   return `${symbol}${n.toFixed(2)}`;
 }
 

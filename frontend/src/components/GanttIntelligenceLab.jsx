@@ -50,8 +50,21 @@ function fmtPct(value) {
 function fmtMoney(value, currency = 'AUD') {
   const n = Number(value);
   if (!Number.isFinite(n)) return 'n/a';
-  const symbol = currency === 'AUD' ? 'A$' : '$';
+  const code = String(currency || '').toUpperCase();
+  if (code === 'GBP') return `£${n.toFixed(2)}`;
+  if (code === 'GBP_PENCE' || code === 'GBX' || code === 'GBPENCE') {
+    return `${n >= 10 ? n.toFixed(0) : n.toFixed(2)}p`;
+  }
+  const symbol = code === 'AUD' ? 'A$' : code === 'USD' ? 'US$' : '$';
   return `${symbol}${n.toFixed(2)}`;
+}
+
+function normalizeCurrencyCode(value) {
+  const raw = String(value || '').trim().toUpperCase();
+  if (!raw) return '';
+  if (raw === 'GBX' || raw === 'GBP_PENCE' || raw === 'GBPENCE' || raw === 'PENCE') return 'GBP_PENCE';
+  if (raw === 'GBP' || raw === 'AUD' || raw === 'USD' || raw === 'CAD' || raw === 'EUR') return raw;
+  return raw;
 }
 
 function titleizeKey(key) {
@@ -665,6 +678,45 @@ function weightedTargetForHorizon(targets = {}, probs = {}) {
   }
   if (probSum > 0) return weightedSum / probSum;
   return toNumberOrNull(targets?.base);
+}
+
+function targetScaleFactorForCurrent(currentPrice, targetValues = []) {
+  const current = toNumberOrNull(currentPrice);
+  if (current == null || current <= 0) return 1;
+  const med = median(
+    (targetValues || [])
+      .map((v) => toNumberOrNull(v))
+      .filter((v) => v != null && v > 0)
+  );
+  if (med == null || med <= 0) return 1;
+
+  // Handles GBp-vs-GBP and cents-vs-dollars extraction mismatches without
+  // changing genuinely comparable targets.
+  if (current >= 20 && med <= current / 20) return 100;
+  if (current <= 20 && med >= current * 20) return 0.01;
+  return 1;
+}
+
+function scalePrice(value, factor = 1) {
+  const n = toNumberOrNull(value);
+  if (n == null) return null;
+  return n * factor;
+}
+
+function scaleTargets(targets = {}, factor = 1) {
+  return {
+    bear: scalePrice(targets?.bear, factor),
+    base: scalePrice(targets?.base, factor),
+    bull: scalePrice(targets?.bull, factor),
+  };
+}
+
+function inferPriceDisplayCurrency(currency, currentPrice, targetScaleFactor = 1) {
+  const code = normalizeCurrencyCode(currency);
+  if (code === 'GBP' && (targetScaleFactor === 100 || Number(currentPrice) >= 20)) {
+    return 'GBP_PENCE';
+  }
+  return code || 'AUD';
 }
 
 const PRICE_REBASE_STORAGE_KEY = 'llm-council:gantt-price-rebase:v1';
@@ -1288,9 +1340,12 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
     navigateTo('/announcement-router');
   }, []);
 
-  const currency =
+  const currency = normalizeCurrencyCode(
     stage3?.market_data_provenance?.prepass_currency ||
-    'AUD';
+    stage3?.market_data?.currency ||
+    stage3?.market_facts?.normalized_facts?.currency ||
+    'AUD'
+  );
   const qScore = Number(stage3?.quality_score?.total);
   const vScore = Number(stage3?.value_score?.total);
 
@@ -1298,24 +1353,32 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
   const targets24 = stage3?.price_targets?.scenario_targets?.['24m'] || {};
   const p12 = stage3?.price_targets?.scenario_probabilities?.['12m'] || {};
   const p24 = stage3?.price_targets?.scenario_probabilities?.['24m'] || {};
-  const weighted12 = weightedTargetForHorizon(targets12, p12);
-  const weighted24 = toNumberOrNull(stage3?.price_targets?.prob_weighted_target_24m)
-    ?? weightedTargetForHorizon(targets24, p24);
   const currentSpotPrice = useMemo(
     () => inferCurrentPrice(stage3, selectedPayload),
     [stage3, selectedPayload]
   );
-  const displayCurrentSpotPrice = rebasePrice(currentSpotPrice, priceRebaseFactor);
-  const displayTargets12 = rebaseTargets({
+  const rawDisplayTargets12 = {
     bear: targets12.bear,
     base: toNumberOrNull(targets12.base) ?? toNumberOrNull(stage3?.price_targets?.target_12m),
     bull: targets12.bull,
-  }, priceRebaseFactor);
-  const displayTargets24 = rebaseTargets({
+  };
+  const rawDisplayTargets24 = {
     bear: toNumberOrNull(targets24.bear) ?? toNumberOrNull(targets12.bear),
     base: toNumberOrNull(targets24.base) ?? toNumberOrNull(stage3?.price_targets?.target_24m),
     bull: toNumberOrNull(targets24.bull) ?? toNumberOrNull(targets12.bull),
-  }, priceRebaseFactor);
+  };
+  const targetScaleFactor = targetScaleFactorForCurrent(currentSpotPrice, [
+    ...Object.values(rawDisplayTargets12),
+    ...Object.values(rawDisplayTargets24),
+  ]);
+  const scaledTargets12 = scaleTargets(rawDisplayTargets12, targetScaleFactor);
+  const scaledTargets24 = scaleTargets(rawDisplayTargets24, targetScaleFactor);
+  const weighted12 = weightedTargetForHorizon(scaledTargets12, p12);
+  const weighted24 = weightedTargetForHorizon(scaledTargets24, p24);
+  const priceDisplayCurrency = inferPriceDisplayCurrency(currency, currentSpotPrice, targetScaleFactor);
+  const displayCurrentSpotPrice = rebasePrice(currentSpotPrice, priceRebaseFactor);
+  const displayTargets12 = rebaseTargets(scaledTargets12, priceRebaseFactor);
+  const displayTargets24 = rebaseTargets(scaledTargets24, priceRebaseFactor);
   const displayWeighted12 = rebasePrice(weighted12, priceRebaseFactor);
   const displayWeighted24 = rebasePrice(weighted24, priceRebaseFactor);
 
@@ -1579,7 +1642,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
         ))}
         <div className="score-card tone-base">
           <label>24M Prob-Weighted</label>
-          <div className="score-value">{fmtMoney(weighted24, currency)}</div>
+          <div className="score-value">{fmtMoney(displayWeighted24, priceDisplayCurrency)}</div>
         </div>
         <div className="stats-heading-wrap score-card tone-base" tabIndex={0}>
           <label>Stats</label>
@@ -1619,7 +1682,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
       {!monitorOnly && (
       <ScenarioTimelineUnit
         data={chartPayload}
-        currency={currency}
+        currency={priceDisplayCurrency}
         timelineBars={timelineBars}
         orientation={timelineOrientation}
       />
@@ -1644,7 +1707,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
             </div>
             <div className="snapshot-meta-row">
               <span>Current Price</span>
-              <strong>{fmtMoney(displayCurrentSpotPrice, currency)}</strong>
+              <strong>{fmtMoney(displayCurrentSpotPrice, priceDisplayCurrency)}</strong>
             </div>
             {activePriceRebase && (
               <div className="snapshot-adjust-note">
@@ -1654,17 +1717,17 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
             <h4>Price Scenarios</h4>
             <div className="snapshot-horizon">
               <div className="snapshot-horizon-title">12M</div>
-              <div className="snapshot-scenario-row"><span>Bear</span><span>{fmtMoney(displayTargets12.bear, currency)}</span><span>{fmtPct(normalizeProb(p12.bear))}</span></div>
-              <div className="snapshot-scenario-row"><span>Base</span><span>{fmtMoney(displayTargets12.base, currency)}</span><span>{fmtPct(normalizeProb(p12.base))}</span></div>
-              <div className="snapshot-scenario-row"><span>Bull</span><span>{fmtMoney(displayTargets12.bull, currency)}</span><span>{fmtPct(normalizeProb(p12.bull))}</span></div>
-              <div className="snapshot-scenario-row snapshot-scenario-row-em"><span>Prob-weighted</span><strong>{fmtMoney(displayWeighted12, currency)}</strong><span /></div>
+              <div className="snapshot-scenario-row"><span>Bear</span><span>{fmtMoney(displayTargets12.bear, priceDisplayCurrency)}</span><span>{fmtPct(normalizeProb(p12.bear))}</span></div>
+              <div className="snapshot-scenario-row"><span>Base</span><span>{fmtMoney(displayTargets12.base, priceDisplayCurrency)}</span><span>{fmtPct(normalizeProb(p12.base))}</span></div>
+              <div className="snapshot-scenario-row"><span>Bull</span><span>{fmtMoney(displayTargets12.bull, priceDisplayCurrency)}</span><span>{fmtPct(normalizeProb(p12.bull))}</span></div>
+              <div className="snapshot-scenario-row snapshot-scenario-row-em"><span>Prob-weighted</span><strong>{fmtMoney(displayWeighted12, priceDisplayCurrency)}</strong><span /></div>
             </div>
             <div className="snapshot-horizon">
               <div className="snapshot-horizon-title">24M</div>
-              <div className="snapshot-scenario-row"><span>Bear</span><span>{fmtMoney(displayTargets24.bear, currency)}</span><span>{fmtPct(normalizeProb(p24.bear))}</span></div>
-              <div className="snapshot-scenario-row"><span>Base</span><span>{fmtMoney(displayTargets24.base, currency)}</span><span>{fmtPct(normalizeProb(p24.base))}</span></div>
-              <div className="snapshot-scenario-row"><span>Bull</span><span>{fmtMoney(displayTargets24.bull, currency)}</span><span>{fmtPct(normalizeProb(p24.bull))}</span></div>
-              <div className="snapshot-scenario-row snapshot-scenario-row-em"><span>Prob-weighted</span><strong>{fmtMoney(displayWeighted24, currency)}</strong><span /></div>
+              <div className="snapshot-scenario-row"><span>Bear</span><span>{fmtMoney(displayTargets24.bear, priceDisplayCurrency)}</span><span>{fmtPct(normalizeProb(p24.bear))}</span></div>
+              <div className="snapshot-scenario-row"><span>Base</span><span>{fmtMoney(displayTargets24.base, priceDisplayCurrency)}</span><span>{fmtPct(normalizeProb(p24.base))}</span></div>
+              <div className="snapshot-scenario-row"><span>Bull</span><span>{fmtMoney(displayTargets24.bull, priceDisplayCurrency)}</span><span>{fmtPct(normalizeProb(p24.bull))}</span></div>
+              <div className="snapshot-scenario-row snapshot-scenario-row-em"><span>Prob-weighted</span><strong>{fmtMoney(displayWeighted24, priceDisplayCurrency)}</strong><span /></div>
             </div>
           </article>
 
@@ -1759,8 +1822,8 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
               const failures = Array.isArray(block.failure_conditions) ? block.failure_conditions : [];
               const rawTarget12 = toNumberOrNull(block.target_12m) ?? toNumberOrNull(targets12?.[name]);
               const rawTarget24 = toNumberOrNull(block.target_24m) ?? toNumberOrNull(targets24?.[name]);
-              const target12 = rebasePrice(rawTarget12, priceRebaseFactor);
-              const target24 = rebasePrice(rawTarget24, priceRebaseFactor);
+              const target12 = rebasePrice(scalePrice(rawTarget12, targetScaleFactor), priceRebaseFactor);
+              const target24 = rebasePrice(scalePrice(rawTarget24, targetScaleFactor), priceRebaseFactor);
               const prob = toNumberOrNull(block.probability_24m_pct ?? block.probability_pct);
               const logicRequired = String(block?.condition_logic?.required_conditions || '').trim();
               const logicFailure = String(block?.condition_logic?.failure_conditions || '').trim();
@@ -1773,9 +1836,9 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
                     <strong>{name.toUpperCase()}</strong>
                     {(target12 != null || target24 != null) && (
                       <span>
-                        {target12 != null ? `12M ${fmtMoney(target12, currency)}` : '12M -'}
+                        {target12 != null ? `12M ${fmtMoney(target12, priceDisplayCurrency)}` : '12M -'}
                         {' · '}
-                        {target24 != null ? `24M ${fmtMoney(target24, currency)}` : '24M -'}
+                        {target24 != null ? `24M ${fmtMoney(target24, priceDisplayCurrency)}` : '24M -'}
                       </span>
                     )}
                     {prob != null && <span>Prob {fmtPct(prob)}</span>}

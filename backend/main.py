@@ -1601,6 +1601,8 @@ async def _prepare_stage1_authoritative_prepass_bundle(
         "--target-non-price-sensitive",
         str(target_non_price_sensitive),
     ]
+    if str(company_name or "").strip():
+        cmd.extend(["--company-name", str(company_name).strip()])
     if max_sources_default > 0:
         cmd.extend(["--max-sources", str(max_sources_default)])
     if lookback_days_default > 0:
