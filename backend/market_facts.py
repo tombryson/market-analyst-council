@@ -30,6 +30,9 @@ TEMPLATE_COMMODITY_PROFILE = {
     "lithium_miner": "lithium",
     "silver_miner": "silver",
     "uranium_miner": "uranium",
+    "iron_ore_miner": "iron_ore",
+    "rare_earths_critical_minerals": "rare_earths",
+    "coal_miner": "coal",
     "energy_oil_gas": "oil_gas",
 }
 
@@ -39,6 +42,9 @@ COMPANY_TYPE_COMMODITY_PROFILE = {
     "lithium_miner": "lithium",
     "silver_miner": "silver",
     "uranium_miner": "uranium",
+    "iron_ore_miner": "iron_ore",
+    "rare_earths_critical_minerals": "rare_earths",
+    "coal_miner": "coal",
     "energy_oil_gas": "oil_gas",
 }
 
@@ -59,6 +65,14 @@ COMMODITY_FIELD_RANGES: Dict[str, Tuple[float, float]] = {
     "wti_price_aud_bbl": (1.0, 2_000.0),
     "henry_hub_price_usd_mmbtu": (0.1, 200.0),
     "henry_hub_price_aud_mmbtu": (0.1, 400.0),
+    "iron_ore_price_usd_t": (1.0, 1_000.0),
+    "iron_ore_price_aud_t": (1.0, 2_000.0),
+    "newcastle_coal_price_usd_t": (1.0, 1_000.0),
+    "newcastle_coal_price_aud_t": (1.0, 2_000.0),
+    "hard_coking_coal_price_usd_t": (1.0, 1_000.0),
+    "hard_coking_coal_price_aud_t": (1.0, 2_000.0),
+    "ndpr_oxide_price_usd_kg": (1.0, 1_000.0),
+    "ndpr_oxide_price_aud_kg": (1.0, 2_000.0),
 }
 COMMODITY_FIELDS = tuple(COMMODITY_FIELD_RANGES.keys())
 
@@ -75,6 +89,42 @@ COMMODITY_FALLBACK_CONFIG: Dict[str, Dict[str, Any]] = {
             r"(?:US\$|USD\s*)([0-9]+(?:\.[0-9]+)?)\s*(?:/|per)?\s*(?:lb|lbs|pound)",
         ),
     },
+    "iron_ore": {
+        "usd_key": "iron_ore_price_usd_t",
+        "aud_key": "iron_ore_price_aud_t",
+        "price_queries": (
+            "current iron ore 62% Fe spot price USD per tonne",
+            "current iron ore benchmark 62 Fe price USD/t",
+        ),
+        "price_patterns": (
+            r"(?:iron ore|62% fe|62 fe)[^\n]{0,100}?(?:US\$|USD\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:/|per)?\s*(?:t|tonne|metric ton)",
+            r"(?:US\$|USD\s*)([0-9]+(?:\.[0-9]+)?)\s*(?:/|per)?\s*(?:t|tonne|metric ton)",
+        ),
+    },
+    "coal": {
+        "usd_key": "newcastle_coal_price_usd_t",
+        "aud_key": "newcastle_coal_price_aud_t",
+        "price_queries": (
+            "current Newcastle thermal coal spot price USD per tonne",
+            "current hard coking coal price USD per tonne",
+        ),
+        "price_patterns": (
+            r"(?:newcastle|thermal coal|coal)[^\n]{0,100}?(?:US\$|USD\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:/|per)?\s*(?:t|tonne|metric ton)",
+            r"(?:US\$|USD\s*)([0-9]+(?:\.[0-9]+)?)\s*(?:/|per)?\s*(?:t|tonne|metric ton)",
+        ),
+    },
+    "rare_earths": {
+        "usd_key": "ndpr_oxide_price_usd_kg",
+        "aud_key": "ndpr_oxide_price_aud_kg",
+        "price_queries": (
+            "current NdPr oxide price USD per kg",
+            "current neodymium praseodymium oxide price USD/kg",
+        ),
+        "price_patterns": (
+            r"(?:ndpr|neodymium praseodymium|praseodymium neodymium)[^\n]{0,100}?(?:US\$|USD\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:/|per)?\s*(?:kg|kilogram)",
+            r"(?:US\$|USD\s*)([0-9]+(?:\.[0-9]+)?)\s*(?:/|per)?\s*(?:kg|kilogram)",
+        ),
+    },
 }
 
 AUDUSD_PATTERNS: Tuple[str, ...] = (
@@ -89,7 +139,7 @@ def _resolve_commodity_profile(
 ) -> Optional[str]:
     template_key = str(template_id or "").strip().lower()
     company_key = str(company_type or "").strip().lower()
-    allowed_profiles = {"gold", "copper", "lithium", "silver", "uranium", "oil_gas", "none", ""}
+    allowed_profiles = {"gold", "copper", "lithium", "silver", "uranium", "iron_ore", "rare_earths", "coal", "oil_gas", "none", ""}
     if template_key:
         try:
             from .template_loader import get_template_loader

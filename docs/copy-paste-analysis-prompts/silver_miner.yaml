@@ -31,7 +31,19 @@ scoring_factors:
   - M&A Strategic Value
 usage:
   copy_this_field: copy_paste_prompt
+  copy_research_brief_field: research_brief
   note: Generated manual-use copy/paste prompt.
+research_brief: |-
+  Investment analysis prompt:
+  - Template: silver_miner
+  - Company name: [COMPANY_NAME].
+  - Company type: silver_miner.
+  - Exchange: [EXCHANGE_CODE].
+  - Keep outputs decision-grade, evidence-linked, and explicit about assumptions.
+
+  - Run a dedicated sector-macro lane (silver): capture 2-4 recent sources on silver market drivers (industrial demand, PV/electronics demand, mine supply disruptions, gold/silver ratio regime) and tie each macro point to scenario assumptions.
+  Exchange assumptions:
+  Exchange profile: listing venue not preselected. Infer filing sources from the company's exchange, domicile, regulator, and primary documents; do not assume one exchange-specific filing format by default.
 copy_paste_prompt: |-
   Investment analysis prompt:
   - Template: silver_miner

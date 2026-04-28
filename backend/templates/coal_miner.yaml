@@ -1,0 +1,345 @@
+id: coal_miner
+name: Coal Miner
+description: Investment analysis for thermal and metallurgical coal miners
+category: resources
+version: '1.0'
+author: LLM Council
+company_types:
+- coal_miner
+template_behavior:
+  commodity_profile: coal
+  supplementary_sector_label: coal mining sector
+  cashflow_schema:
+    mode: auto
+    min_reporting_periods: 3
+    require_operating_cashflow: true
+    detection_max_sources: 28
+  stage1_research_lanes:
+  - 'Run a dedicated sector-macro lane (coal): capture 2-4 recent sources on thermal/met coal prices, China/India demand,
+    steel cycle, energy security, freight, ESG finance constraints, and regulation; tie each point to scenario assumptions.'
+  stage3_scoring_factors:
+    quality:
+    - Asset/Reserve Quality
+    - Cost Curve Position
+    - Market Access
+    - Management
+    - Funding/Balance Sheet
+    - ESG/Regulatory Risk
+    value:
+    - NAV vs Market Cap
+    - EV/Reserve Tonne
+    - FCF Yield Through Cycle
+    - Cost Competitiveness
+    - Capital Return Capacity
+auto_detect_keywords:
+- coal
+- thermal coal
+- metallurgical coal
+- met coal
+- coking coal
+- pci coal
+- seaborne coal
+- mine plan
+- strip ratio
+- coal price
+- steelmaking coal
+inputs:
+- ticker
+- company_name
+- market_data
+- pdf_documents
+output_schema:
+  type: object
+  required_fields:
+  - analysis_type
+  - ticker
+  - company_name
+  - quality_score
+  - value_score
+  - price_targets
+  - investment_recommendation
+  structure:
+    analysis_type: coal_miner
+    ticker: string
+    company_name: string
+    analysis_date: ISO-8601
+    market_data:
+      current_price: float
+      market_cap_m: float
+      shares_outstanding_m: float
+      enterprise_value_m: float
+      currency: string
+    quality_score:
+      total: float (0-100)
+      breakdown: object
+    value_score:
+      total: float (0-100)
+      breakdown: object
+    price_targets:
+      current_price: float
+      scenario_targets: object
+      scenario_probabilities: object
+      prob_weighted_target_12m: float
+      prob_weighted_target_24m: float
+    development_timeline: array
+    monitoring_watchlist: object
+    thesis_map: object
+    management_competition_assessment: object
+    verification_required_fields: array
+    investment_recommendation:
+      rating: BUY/HOLD/SELL
+      conviction: HIGH/MEDIUM/LOW
+      summary: string
+verification_schema:
+  fact_digest:
+    sections:
+      timelines_deadlines:
+        keywords:
+        - timeline
+        - guidance
+        - target
+        - milestone
+        - q1
+        - q2
+        - q3
+        - q4
+        - h1
+        - h2
+        - fy
+      financing_deals:
+        keywords:
+        - facility
+        - debt
+        - refinance
+        - placement
+        - buyback
+        - dividend
+        - covenant
+        - liquidity
+      project_economics:
+        keywords:
+        - revenue
+        - ebitda
+        - margin
+        - cash flow
+        - capex
+        - opex
+        - cost
+        - return
+        - yield
+        - thermal coal
+        - met coal
+        - coking coal
+        - strip ratio
+        - coal price
+        - royalty
+        - export
+      market_share_structure:
+        keywords:
+        - market cap
+        - enterprise value
+        - shares
+        - valuation
+        - multiple
+        - market share
+      management_governance:
+        keywords:
+        - management
+        - board
+        - ceo
+        - cfo
+        - governance
+        - insider
+        - capital allocation
+      operational_objectives:
+        keywords:
+        - growth
+        - expansion
+        - utilization
+        - throughput
+        - volume
+        - efficiency
+        - guidance
+      risks_constraints:
+        keywords:
+        - risk
+        - headwind
+        - regulatory
+        - cost inflation
+        - execution
+        - commodity price
+        - demand slowdown
+        - esg financing
+        - permit
+        - carbon policy
+        - mine closure
+        - rehabilitation
+      catalysts_tailwinds:
+        keywords:
+        - tailwind
+        - catalyst
+        - margin expansion
+        - contract win
+        - approval
+        - asset sale
+        - strategic
+    timeline_terms:
+    - production guidance
+    - reserve update
+    - mine plan
+    - permit
+    - contract
+    - dividend
+    - buyback
+    - q1
+    - q2
+    - q3
+    - q4
+    timeline_focus_terms:
+    - production
+    - coal price
+    - cost
+    - permit
+    - capital return
+    conflict:
+      field: guidance_or_operating_target_window
+      terms:
+      - guidance
+      - production target
+      - coal price
+      - mine plan
+      - cost
+      max_shift_quarters: 2
+      resolution_rule: prefer newest dated primary-source guidance
+  compliance:
+    section_markers:
+      quality_score:
+        markers:
+        - quality score
+        - quality_score
+        critical: true
+      value_score:
+        markers:
+        - value score
+        - value_score
+        critical: true
+      price_targets:
+        markers:
+        - 12-month
+        - 24-month
+        - price target
+        - price_targets
+        - probability-weighted
+        - scenario probabilities
+        critical: true
+      development_timeline:
+        markers:
+        - development timeline
+        - timeline
+        - milestone
+        - development_timeline
+        critical: true
+rubric: |
+  Run an investment analysis on [Company Name] using this coal miner rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to earnings quality, cash-flow durability, balance-sheet risk, regulation, operating execution, or scenario confidence.
+
+  First classify the business:
+  * Thermal coal producer: value driven by seaborne energy coal prices, quality specs, royalties, logistics, and policy/finance risk.
+  * Metallurgical coal producer: value driven by steel cycle, hard coking/PCI mix, quality, cost curve, and customer base.
+  * Developer/restart: value driven by permits, mine plan, infrastructure, rehabilitation obligations, and funding access.
+  * Diversified coal platform: separate thermal, met, logistics, trading, and capital-return streams.
+
+  Use that classification to decide valuation emphasis:
+  * Producers: FCF yield through the cycle, EV/EBITDA, reserves, sustaining capex, rehabilitation obligations, and capital return.
+  * Developers: risked NAV with explicit ESG/funding/permitting discount.
+  * Met coal: normalize through steel cycle and quality premiums/discounts.
+  * Thermal coal: stress test policy, financing access, royalties, and terminal logistics.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Operating summary and timeline to the next material regulatory, operating, financial, or strategic milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks, key opportunities, monitoring watchlist, and verification queue.
+
+  Step 1: Business Model and Earnings-Quality Workup
+  * Establish the current revenue, earnings, cash-flow, balance-sheet, and capital-allocation baseline from primary evidence.
+  * Separate recurring, contracted, regulated, transactional, commodity-linked, project, and one-off earnings streams. Do not value them with one blended multiple if their quality differs.
+  * Identify the 3-5 variables that actually move valuation for this company.
+  * Distinguish reported growth from organic growth, price/mix, volume, M&A, FX, working-capital timing, and accounting noise.
+  * Build a timeline to the next events that can change the thesis.
+
+  Sector-specific operating metrics to capture where relevant:
+  * Saleable production, reserve/resource tonnes, coal quality, strip ratio, cash cost/AISC, sustaining capex.
+  * Thermal/met split, benchmark prices, realized price, royalties, freight/logistics, contracts, export terminals.
+  * Rehab provisions, closure liabilities, net cash/debt, dividends/buybacks, financing access.
+
+  Sector-specific caution points:
+  * Do not ignore rehabilitation liabilities, closure costs, royalties, ESG finance constraints, or permit risk.
+  * Do not apply generic mining multiples without adjusting for thermal/met mix and policy risk.
+  * Normalize peak coal prices and stress test downside cash flow.
+
+  Step 2: Valuation Workup
+  * State the primary valuation anchor and why it is appropriate.
+  * Cross-check with at least one secondary method.
+  * Normalize earnings or cash flow where cycle position, one-offs, commodity prices, rates, or project timing distort the current period.
+  * Explain whether EBITDA, earnings, FCF, NAV, book value, AUM, reserves, or capacity metrics overstate or understate owner earnings.
+  * Do not let peer multiples override company-specific evidence on quality, leverage, growth, cyclicality, governance, or cash conversion.
+
+  Step 3: Quality Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Quality factor weightings:
+  * Asset/Reserve Quality: 20%
+  * Cost Curve Position: 20%
+  * Market Access: 15%
+  * Management: 15%
+  * Funding/Balance Sheet: 15%
+  * ESG/Regulatory Risk: 15%
+
+  Quality scoring formula:
+  * Quality Score = sum(weighted factor scores), 0-100.
+
+  Quality grading bands:
+  * 85-100: top-tier business with durable economics, strong evidence, resilient balance sheet, and clear execution.
+  * 70-84: good business with clear strengths and manageable risks.
+  * 50-69: mixed quality; attractive elements offset by cycle, execution, funding, or disclosure concerns.
+  * Below 50: weak economics, weak evidence, or material governance/balance-sheet risk.
+
+  Step 4: Value Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Value factor weightings:
+  * NAV vs Market Cap: 30%
+  * EV/Reserve Tonne: 20%
+  * FCF Yield Through Cycle: 20%
+  * Cost Competitiveness: 15%
+  * Capital Return Capacity: 15%
+
+  Value scoring formula:
+  * Value Score = sum(weighted factor scores), 0-100.
+
+  Value grading bands:
+  * 85-100: materially undervalued relative to normalized fundamentals and risk.
+  * 70-84: undervalued with clear upside and manageable risks.
+  * 50-69: roughly fair value or upside offset by risk.
+  * Below 50: expensive or weakly supported by fundamentals.
+
+  Step 5: Scenario Framework and Price Targets
+  Provide bull, base, and bear cases with:
+  * 12M target and 24M target.
+  * Probability for each scenario.
+  * Short description of what operationally changes.
+  * Current positioning (bull-leaning, base-leaning, mixed, bear-leaning).
+  * Explicit conditions that must hold.
+  * Explicit failure conditions.
+
+  Scenario design rules:
+  * Bull/base/bear must differ by operating assumptions, balance-sheet outcomes, and valuation evidence, not only by exit multiple.
+  * Tie each scenario to measurable trigger conditions the scenario router can later monitor.
+  * State which assumptions are known, estimated, or disputed.
+
+  Cross-check requirements before final output:
+  * Ensure scenario targets reconcile to current share count, enterprise value, net debt/cash, and currency.
+  * Ensure valuation does not double-count cash, debt, capex, funding gaps, or one-off earnings.
+  * Ensure missing data is handled as a verification item, not as a silent assumption.

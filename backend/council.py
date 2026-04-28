@@ -170,9 +170,13 @@ def _is_retryable_stage1_error(error_text: str) -> bool:
 
 
 def _is_gpt_5_4_model(model: str) -> bool:
-    """Return True when the model is GPT-5.4 and should default to low reasoning."""
+    """Return True when the OpenAI GPT-5.x research model should default to low reasoning."""
     key = str(model or "").strip().lower()
-    return key in {"openai/gpt-5.4", "gpt-5.4"} or key.endswith("/gpt-5.4")
+    return (
+        key in {"openai/gpt-5.4", "gpt-5.4", "openai/gpt-5.5", "gpt-5.5"}
+        or key.endswith("/gpt-5.4")
+        or key.endswith("/gpt-5.5")
+    )
 
 
 def _build_stage1_attempt_profile(

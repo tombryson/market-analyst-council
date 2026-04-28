@@ -10,6 +10,9 @@ SUPPORTED_TEMPLATE_IDS = [
     "lithium_miner",
     "uranium_miner",
     "bauxite_miner",
+    "iron_ore_miner",
+    "rare_earths_critical_minerals",
+    "coal_miner",
     "diversified_miner",
 ]
 SUPPORTED_FAMILY_IDS = ["resources"]

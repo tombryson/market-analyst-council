@@ -59,6 +59,13 @@ def _export_payload(template: Dict[str, Any], source_path: str) -> Dict[str, Any
         company_name=COMPANY_PLACEHOLDER,
         include_rubric=True,
     )
+    research_brief = loader.get_copy_paste_research_brief(
+        template_id,
+        company_type=company_types[0] if company_types else template_id,
+        exchange=None,
+        company_name=COMPANY_PLACEHOLDER,
+        include_rubric=False,
+    ).replace("\n\nAnalysis rubric:\n(omitted)", "").strip()
 
     return {
         "template_id": template_id,
@@ -84,8 +91,10 @@ def _export_payload(template: Dict[str, Any], source_path: str) -> Dict[str, Any
         },
         "usage": {
             "copy_this_field": "copy_paste_prompt",
+            "copy_research_brief_field": "research_brief",
             "note": "Generated manual-use copy/paste prompt.",
         },
+        "research_brief": LiteralString(research_brief),
         "copy_paste_prompt": LiteralString(copy_paste_prompt),
     }
 
@@ -125,6 +134,8 @@ def main() -> int:
         "Generated from source templates, not hand-written copies.",
         "",
         "Use the `copy_paste_prompt` field for external model interfaces. If a template defines `copy_paste_rubric`, that copy/paste-specific rubric is used.",
+        "",
+        "Use the `research_brief` field when the UI needs the short asset-class research brief without the full scoring rubric.",
         "",
         "Regenerate with:",
         "",

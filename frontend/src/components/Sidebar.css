@@ -81,6 +81,28 @@
   border-color: #1f2937;
 }
 
+.portfolio-positioning-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 10px;
+  background: #2f2410;
+  border: 1px solid #b9862f;
+  border-radius: 6px;
+  color: #fff0c2;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  transition: background 0.2s, border-color 0.2s;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.portfolio-positioning-btn:hover {
+  background: #463113;
+  border-color: #d9a441;
+}
+
 .conversation-list {
   flex: 1;
   overflow-y: auto;

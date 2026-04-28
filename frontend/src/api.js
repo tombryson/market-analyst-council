@@ -139,6 +139,56 @@ export const api = {
   },
 
   /**
+   * List portfolio positioning memo artifacts.
+   */
+  async listPortfolioPositioningRuns(limit = 20) {
+    const qs = new URLSearchParams();
+    qs.set('limit', String(limit));
+    const { response, body } = await fetchJsonWithRetry(
+      `${API_BASE}/api/portfolio-positioning-runs?${qs.toString()}`,
+      { method: 'GET' },
+      { retries: 3, timeoutMs: 30000 }
+    );
+    if (!response.ok) {
+      const detail = errorDetailFromPayload(body);
+      throw new Error(detail ? `Failed to list portfolio positioning runs: ${detail}` : 'Failed to list portfolio positioning runs');
+    }
+    return body;
+  },
+
+  /**
+   * Load one portfolio positioning memo artifact.
+   */
+  async getPortfolioPositioningRun(runId) {
+    const { response, body } = await fetchJsonWithRetry(
+      `${API_BASE}/api/portfolio-positioning-runs/${encodeURIComponent(runId)}`,
+      { method: 'GET' },
+      { retries: 3, timeoutMs: 30000 }
+    );
+    if (!response.ok) {
+      const detail = errorDetailFromPayload(body);
+      throw new Error(detail ? `Failed to load portfolio positioning run: ${detail}` : 'Failed to load portfolio positioning run');
+    }
+    return body;
+  },
+
+  /**
+   * Delete one portfolio positioning memo artifact family.
+   */
+  async deletePortfolioPositioningRun(runId) {
+    const { response, body } = await fetchJsonWithRetry(
+      `${API_BASE}/api/portfolio-positioning-runs/${encodeURIComponent(runId)}`,
+      { method: 'DELETE' },
+      { retries: 2, timeoutMs: 30000 }
+    );
+    if (!response.ok) {
+      const detail = errorDetailFromPayload(body);
+      throw new Error(detail ? `Failed to delete portfolio positioning run: ${detail}` : 'Failed to delete portfolio positioning run');
+    }
+    return body;
+  },
+
+  /**
    * Load one integration-ready report packet for a run.
    */
   async getRunReportPacket(runId) {

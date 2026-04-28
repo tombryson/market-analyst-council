@@ -8,6 +8,7 @@ export default function Sidebar({
   onOpenTimelineDemo,
   onOpenTimelineLab,
   onOpenScenarioRouter,
+  onOpenPortfolioPositioning,
 }) {
   return (
     <div className="sidebar">
@@ -36,6 +37,13 @@ export default function Sidebar({
           type="button"
         >
           Open Announcement Router
+        </button>
+        <button
+          className="portfolio-positioning-btn"
+          onClick={onOpenPortfolioPositioning}
+          type="button"
+        >
+          Open Portfolio Memos
         </button>
       </div>
 

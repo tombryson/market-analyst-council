@@ -12,6 +12,7 @@ from typing import List, Dict, Any, Optional, Tuple
 import uuid
 import json
 import asyncio
+import contextlib
 import re
 import sys
 import os
@@ -80,6 +81,9 @@ OUTPUTS_DIR = Path(
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 JOBS_OUTPUTS_DIR = Path(os.getenv("ANALYSIS_JOBS_DIR", str(OUTPUTS_DIR / "jobs")))
 JOBS_META_DIR = JOBS_OUTPUTS_DIR / "meta"
+PORTFOLIO_POSITIONING_OUTPUTS_DIR = Path(
+    os.getenv("PORTFOLIO_POSITIONING_OUTPUTS_DIR", str(JOBS_OUTPUTS_DIR / "portfolio_positioning"))
+)
 PREPASS_OUTPUTS_DIR = Path(
     os.getenv("ANALYSIS_PREPASS_DIR", str(JOBS_OUTPUTS_DIR / "prepass"))
 )
@@ -92,6 +96,11 @@ GANTT_RUN_LIST_CACHE_TTL_SEC = max(
     int(os.getenv("GANTT_RUN_LIST_CACHE_TTL_SEC", "15")),
 )
 _GANTT_RUN_LIST_CACHE: Dict[str, Any] = {
+    "expires_at": 0.0,
+    "key": None,
+    "runs": None,
+}
+_PORTFOLIO_POSITIONING_RUN_LIST_CACHE: Dict[str, Any] = {
     "expires_at": 0.0,
     "key": None,
     "runs": None,
@@ -411,6 +420,55 @@ def _store_portfolio_context_for_job(
     return target
 
 
+def _summarize_portfolio_context_for_job(portfolio_context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Keep job metadata readable; the raw context is stored only as a temporary worker input."""
+    if not isinstance(portfolio_context, dict):
+        return {}
+
+    asset_classes = portfolio_context.get("asset_classes") if isinstance(portfolio_context.get("asset_classes"), list) else []
+    available_asset_classes = (
+        portfolio_context.get("available_asset_classes")
+        if isinstance(portfolio_context.get("available_asset_classes"), list)
+        else []
+    )
+    positions = portfolio_context.get("positions") if isinstance(portfolio_context.get("positions"), list) else []
+    portfolio = portfolio_context.get("portfolio") if isinstance(portfolio_context.get("portfolio"), dict) else {}
+    overlay = portfolio_context.get("overlay") if isinstance(portfolio_context.get("overlay"), dict) else {}
+
+    def _asset_label(row: Any) -> str:
+        if isinstance(row, dict):
+            return str(row.get("asset_class") or row.get("display_name") or "").strip()
+        return str(row or "").strip()
+
+    return {
+        "as_of": str(portfolio_context.get("as_of") or "").strip(),
+        "asset_class_count": len(asset_classes),
+        "available_asset_class_count": len(available_asset_classes),
+        "position_count": len(positions),
+        "available_asset_classes": [
+            _asset_label(row)
+            for row in available_asset_classes
+            if _asset_label(row)
+        ][:80],
+        "portfolio": {
+            "total_value": portfolio.get("total_value"),
+            "cash_pct": portfolio.get("cash_pct") if portfolio.get("cash_pct") is not None else portfolio.get("cash_on_hand_pct"),
+        },
+        "overlay": {
+            "q1_exposure_pct": overlay.get("q1_exposure_pct") if overlay.get("q1_exposure_pct") is not None else overlay.get("effective_q1_pct"),
+            "status": overlay.get("status"),
+        },
+    }
+
+
+def _sanitize_analysis_request_payload(request_payload: Dict[str, Any]) -> Dict[str, Any]:
+    sanitized = dict(request_payload or {})
+    if isinstance(sanitized.get("portfolio_context"), dict):
+        sanitized["portfolio_context_summary"] = _summarize_portfolio_context_for_job(sanitized.get("portfolio_context"))
+        sanitized.pop("portfolio_context", None)
+    return sanitized
+
+
 async def _prepare_generated_supplementary_for_job(
     *,
     job_id: str,
@@ -686,6 +744,26 @@ def _extract_stage3_result_from_artifact(payload: Dict[str, Any]) -> Optional[Di
         }
 
     return None
+
+
+def _is_portfolio_positioning_artifact(
+    payload: Dict[str, Any],
+    structured: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """Identify portfolio-level artifacts so they do not leak into stock-analysis views."""
+    if not isinstance(payload, dict):
+        return False
+    if str(payload.get("analysis_kind") or "").strip() == "portfolio_positioning":
+        return True
+    if isinstance(structured, dict) and str(structured.get("analysis_kind") or "").strip() == "portfolio_positioning":
+        return True
+    top_level_structured = payload.get("structured_data")
+    if (
+        isinstance(top_level_structured, dict)
+        and str(top_level_structured.get("analysis_kind") or "").strip() == "portfolio_positioning"
+    ):
+        return True
+    return False
 
 
 def _read_text_if_exists(path: Path) -> str:
@@ -985,10 +1063,36 @@ def _resolve_run_artifact_path(run_id: str) -> Path:
     return primary
 
 
+def _portfolio_positioning_search_roots() -> List[Path]:
+    roots = [PORTFOLIO_POSITIONING_OUTPUTS_DIR, JOBS_OUTPUTS_DIR, OUTPUTS_DIR]
+    unique: Dict[str, Path] = {}
+    for root in roots:
+        try:
+            unique[str(root.resolve())] = root
+        except Exception:
+            unique[str(root)] = root
+    return list(unique.values())
+
+
+def _resolve_portfolio_positioning_artifact_path(run_id: str) -> Path:
+    safe_name = Path(run_id).name
+    for root in _portfolio_positioning_search_roots():
+        candidate = root / safe_name
+        if candidate.exists() and candidate.is_file():
+            return candidate
+    return PORTFOLIO_POSITIONING_OUTPUTS_DIR / safe_name
+
+
 def _invalidate_gantt_run_cache() -> None:
     _GANTT_RUN_LIST_CACHE["expires_at"] = 0.0
     _GANTT_RUN_LIST_CACHE["key"] = None
     _GANTT_RUN_LIST_CACHE["runs"] = None
+
+
+def _invalidate_portfolio_positioning_run_cache() -> None:
+    _PORTFOLIO_POSITIONING_RUN_LIST_CACHE["expires_at"] = 0.0
+    _PORTFOLIO_POSITIONING_RUN_LIST_CACHE["key"] = None
+    _PORTFOLIO_POSITIONING_RUN_LIST_CACHE["runs"] = None
 
 
 def _normalize_run_ticker(value: Any) -> str:
@@ -1043,6 +1147,35 @@ def _collect_run_related_paths(run_id: str) -> List[Path]:
     return sorted(related.values(), key=lambda path: str(path))
 
 
+def _collect_portfolio_positioning_related_paths(run_id: str) -> List[Path]:
+    safe_name = Path(run_id).name
+    canonical_path = _resolve_portfolio_positioning_artifact_path(safe_name)
+    if not canonical_path.exists() or not canonical_path.is_file():
+        return []
+
+    related: Dict[str, Path] = {}
+    stem = canonical_path.stem
+
+    for candidate in canonical_path.parent.iterdir():
+        if not candidate.is_file():
+            continue
+        if candidate.name == canonical_path.name or candidate.name.startswith(f"{stem}."):
+            related[str(candidate.resolve())] = candidate
+
+    if JOBS_META_DIR.exists():
+        for meta_path in JOBS_META_DIR.glob("*.json"):
+            try:
+                meta_payload = json.loads(meta_path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            meta_run_id = Path(str(meta_payload.get("run_id") or "")).name
+            meta_output_id = Path(str(meta_payload.get("output_path") or "")).name
+            if safe_name and safe_name in {meta_run_id, meta_output_id}:
+                related[str(meta_path.resolve())] = meta_path
+
+    return sorted(related.values(), key=lambda path: str(path))
+
+
 def _utc_now_iso() -> str:
     return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
@@ -1050,6 +1183,7 @@ def _utc_now_iso() -> str:
 def _ensure_analysis_job_dirs() -> None:
     JOBS_OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
     JOBS_META_DIR.mkdir(parents=True, exist_ok=True)
+    PORTFOLIO_POSITIONING_OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
     PREPASS_OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -1058,6 +1192,12 @@ def _build_analysis_job_env() -> Dict[str, str]:
     env.setdefault("ANALYSIS_JOBS_DIR", str(JOBS_OUTPUTS_DIR))
     env.setdefault("ANALYSIS_PREPASS_DIR", str(PREPASS_OUTPUTS_DIR))
     return env
+
+
+ANALYSIS_JOB_HEARTBEAT_SECONDS = max(
+    5.0,
+    float(os.getenv("ANALYSIS_JOB_HEARTBEAT_SECONDS", "10") or 10),
+)
 
 
 def _job_meta_path(job_id: str) -> Path:
@@ -1162,7 +1302,7 @@ def _backfill_job_record_metadata(job: Dict[str, Any]) -> bool:
         return False
 
     changed = False
-    request_payload = dict(job.get("request") or {})
+    request_payload = _sanitize_analysis_request_payload(dict(job.get("request") or {}))
     output_path = Path(str(job.get("output_path") or ""))
     run_id = Path(str(job.get("run_id") or "")).name
 
@@ -1774,6 +1914,31 @@ async def _consume_process_stream(
         await _append_job_stream_line(job_id=job_id, key=key, text=text)
 
 
+async def _heartbeat_analysis_job(
+    *,
+    job_id: str,
+    process: asyncio.subprocess.Process,
+) -> None:
+    """Keep SSE clients alive during long model calls with no subprocess stdout."""
+    heartbeat_count = 0
+    while process.returncode is None:
+        await asyncio.sleep(float(ANALYSIS_JOB_HEARTBEAT_SECONDS))
+        if process.returncode is not None:
+            break
+        heartbeat_count += 1
+        now = _utc_now_iso()
+        async with ANALYSIS_JOBS_LOCK:
+            job = ANALYSIS_JOBS.get(str(job_id))
+            if not isinstance(job, dict):
+                break
+            if str(job.get("status") or "").lower() != "running":
+                break
+            job["last_output_at"] = now
+            job["heartbeat_at"] = now
+            job["heartbeat_count"] = heartbeat_count
+            _persist_job_record(job)
+
+
 async def _run_analysis_job(
     *,
     job_id: str,
@@ -1826,6 +1991,12 @@ async def _run_analysis_job(
         )
         await _set_job_fields(job_id, pid=int(process.pid or 0))
 
+        heartbeat_task = asyncio.create_task(
+            _heartbeat_analysis_job(
+                job_id=job_id,
+                process=process,
+            )
+        )
         stdout_task = asyncio.create_task(
             _consume_process_stream(
                 job_id=job_id,
@@ -1842,6 +2013,9 @@ async def _run_analysis_job(
         )
 
         await process.wait()
+        heartbeat_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await heartbeat_task
         await asyncio.gather(stdout_task, stderr_task)
         returncode = int(process.returncode or 0)
 
@@ -1869,6 +2043,10 @@ async def _run_analysis_job(
         }
         if status == "succeeded":
             fields["error"] = ""
+            if str((request_payload or {}).get("job_type") or "").strip().lower() == "portfolio_positioning":
+                _invalidate_portfolio_positioning_run_cache()
+            else:
+                _invalidate_gantt_run_cache()
         else:
             fields["error"] = (
                 f"analysis subprocess failed (returncode={returncode})"
@@ -1947,6 +2125,8 @@ def _public_job_view(job: Dict[str, Any]) -> Dict[str, Any]:
         "started_at": str(job.get("started_at") or ""),
         "finished_at": str(job.get("finished_at") or ""),
         "last_output_at": str(job.get("last_output_at") or ""),
+        "heartbeat_at": str(job.get("heartbeat_at") or ""),
+        "heartbeat_count": int(job.get("heartbeat_count") or 0),
         "run_id": str(job.get("run_id") or ""),
         "output_path": str(job.get("output_path") or ""),
         "returncode": job.get("returncode"),
@@ -3014,6 +3194,170 @@ def _canonical_run_id_for_listing(filename: str) -> str:
     return safe_name
 
 
+def _build_portfolio_positioning_run_label(filename: str, structured: Dict[str, Any], payload: Dict[str, Any]) -> str:
+    label = str(payload.get("label") or payload.get("run_label") or "").strip()
+    analysis_date = str(structured.get("analysis_date") or payload.get("analysis_date") or "").strip()
+    date_label = ""
+    if analysis_date:
+        try:
+            dt = datetime.fromisoformat(analysis_date.replace("Z", "+00:00"))
+            date_label = dt.strftime("%Y-%m-%d")
+        except Exception:
+            date_label = analysis_date[:10]
+    head = label or "Portfolio Positioning Memo"
+    if date_label:
+        return f"{head} ({date_label})"
+    return head or filename
+
+
+@app.get("/api/portfolio-positioning-runs")
+async def list_portfolio_positioning_runs(limit: int = 20):
+    """List portfolio-positioning memo artifacts without mixing them into stock analysis runs."""
+    safe_limit = max(1, int(limit))
+    now_ts = time.time()
+    cache_key = _PORTFOLIO_POSITIONING_RUN_LIST_CACHE.get("key")
+    cache_runs = _PORTFOLIO_POSITIONING_RUN_LIST_CACHE.get("runs")
+    cache_expiry = float(_PORTFOLIO_POSITIONING_RUN_LIST_CACHE.get("expires_at") or 0.0)
+    requested_cache_key = str(safe_limit)
+    if (
+        isinstance(cache_runs, list)
+        and cache_key == requested_cache_key
+        and now_ts <= cache_expiry
+    ):
+        return {"runs": cache_runs}
+
+    all_json: List[Path] = []
+    for root in _portfolio_positioning_search_roots():
+        if root.exists():
+            all_json.extend(root.glob("*.json"))
+    all_json = sorted({str(path.resolve()): path for path in all_json}.values(), key=lambda p: p.stat().st_mtime, reverse=True)
+
+    runs: List[Dict[str, Any]] = []
+    for path in all_json:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        structured = _extract_stage3_structured_from_artifact(payload)
+        if not isinstance(structured, dict) or not _is_portfolio_positioning_artifact(payload, structured):
+            continue
+
+        updated_at = datetime.utcfromtimestamp(path.stat().st_mtime).replace(microsecond=0).isoformat() + "Z"
+        runs.append(
+            {
+                "id": path.name,
+                "file": path.name,
+                "label": _build_portfolio_positioning_run_label(path.stem, structured, payload),
+                "analysis_kind": "portfolio_positioning",
+                "analysis_date": structured.get("analysis_date"),
+                "updated_at": updated_at,
+                "mode": structured.get("mode") or payload.get("mode"),
+                "summary_fields": _build_summary_fields(structured, {}),
+            }
+        )
+        if len(runs) >= safe_limit:
+            break
+
+    _PORTFOLIO_POSITIONING_RUN_LIST_CACHE["key"] = requested_cache_key
+    _PORTFOLIO_POSITIONING_RUN_LIST_CACHE["runs"] = runs
+    _PORTFOLIO_POSITIONING_RUN_LIST_CACHE["expires_at"] = now_ts + float(GANTT_RUN_LIST_CACHE_TTL_SEC)
+    return {"runs": runs}
+
+
+@app.get("/api/portfolio-positioning-runs/{run_id}")
+async def get_portfolio_positioning_run(run_id: str):
+    """Load one portfolio-positioning artifact for the dedicated portfolio memo UI."""
+    safe_name = Path(run_id).name
+    path = _resolve_portfolio_positioning_artifact_path(safe_name)
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Portfolio positioning artifact not found")
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Failed to parse artifact: {exc}") from exc
+
+    stage3_result = _extract_stage3_result_from_artifact(payload) or {}
+    structured = stage3_result.get("structured_data")
+    if not isinstance(structured, dict) or not _is_portfolio_positioning_artifact(payload, structured):
+        raise HTTPException(status_code=400, detail="Artifact is not a portfolio positioning memo")
+
+    artifact_updated_at = datetime.utcfromtimestamp(path.stat().st_mtime).replace(microsecond=0).isoformat() + "Z"
+    analyst_document = stage3_result.get("analyst_document") if isinstance(stage3_result, dict) else {}
+    chairman_document = stage3_result.get("chairman_document") if isinstance(stage3_result, dict) else {}
+    if not isinstance(analyst_document, dict):
+        analyst_document = {}
+    if not isinstance(chairman_document, dict):
+        chairman_document = {}
+    memo_markdown = (
+        str(payload.get("chairman_memo_markdown") or "").strip()
+        or str(payload.get("analyst_memo_markdown") or "").strip()
+        or str((chairman_document or {}).get("content_markdown") or "").strip()
+        or str((analyst_document or {}).get("content_markdown") or "").strip()
+    )
+
+    return {
+        "id": safe_name,
+        "file": safe_name,
+        "label": _build_portfolio_positioning_run_label(path.stem, structured, payload),
+        "analysis_kind": "portfolio_positioning",
+        "structured_data": structured,
+        "portfolio_snapshot": payload.get("portfolio_snapshot") if isinstance(payload.get("portfolio_snapshot"), dict) else {},
+        "evidence_brief": payload.get("evidence_brief") if isinstance(payload.get("evidence_brief"), dict) else {},
+        "allocator_council_runs": payload.get("allocator_council_runs") if isinstance(payload.get("allocator_council_runs"), list) else [],
+        "macro_positioning": payload.get("macro_positioning") if isinstance(payload.get("macro_positioning"), dict) else {},
+        "allocator_commentary": payload.get("allocator_commentary") if isinstance(payload.get("allocator_commentary"), dict) else {},
+        "updated_at": artifact_updated_at,
+        "summary_fields": _build_summary_fields(structured, {}),
+        "analyst_memo_markdown": str(payload.get("analyst_memo_markdown") or "").strip(),
+        "chairman_memo_markdown": str(payload.get("chairman_memo_markdown") or "").strip() or memo_markdown,
+        "memo_markdown": memo_markdown,
+        "analyst_document": analyst_document,
+        "chairman_document": chairman_document,
+    }
+
+
+@app.delete("/api/portfolio-positioning-runs/{run_id}")
+async def delete_portfolio_positioning_run(run_id: str):
+    safe_name = Path(run_id).name
+    related_paths = _collect_portfolio_positioning_related_paths(safe_name)
+    if not related_paths:
+        raise HTTPException(status_code=404, detail="Portfolio positioning artifact not found")
+
+    deleted: List[str] = []
+    failed: List[Dict[str, str]] = []
+    for path in related_paths:
+        try:
+            path.unlink(missing_ok=True)
+            try:
+                deleted.append(str(path.relative_to(PROJECT_ROOT)))
+            except Exception:
+                deleted.append(str(path))
+        except Exception as exc:
+            failed.append({"path": str(path), "error": str(exc)})
+
+    _invalidate_portfolio_positioning_run_cache()
+
+    status = "deleted" if not failed else ("partial" if deleted else "failed")
+    if not deleted and failed:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": status,
+                "run_id": safe_name,
+                "deleted_count": 0,
+                "failed": failed,
+            },
+        )
+    return {
+        "status": status,
+        "run_id": safe_name,
+        "deleted_count": len(deleted),
+        "deleted": deleted,
+        "failed": failed,
+    }
+
+
 @app.get("/api/gantt-runs")
 async def list_gantt_runs(limit: int = 20, ticker: Optional[str] = None):
     """List recent output artifacts that contain Stage 3 structured data."""
@@ -3071,6 +3415,8 @@ async def list_gantt_runs(limit: int = 20, ticker: Optional[str] = None):
         structured = _extract_stage3_structured_from_artifact(payload)
         if not isinstance(structured, dict) or not structured:
             continue
+        if _is_portfolio_positioning_artifact(payload, structured):
+            continue
         run_ticker = _normalize_run_ticker(structured.get("ticker"))
         run_ticker_aliases = _run_ticker_aliases(run_ticker)
         if ticker_filter_aliases and not (run_ticker_aliases & ticker_filter_aliases):
@@ -3120,6 +3466,11 @@ async def get_gantt_run(run_id: str):
     structured = stage3_result.get("structured_data")
     if not isinstance(structured, dict) or not structured:
         raise HTTPException(status_code=400, detail="Artifact does not contain Stage 3 structured data")
+    if _is_portfolio_positioning_artifact(payload, structured):
+        raise HTTPException(
+            status_code=400,
+            detail="Portfolio positioning artifacts must be loaded via /api/portfolio-positioning-runs/{run_id}",
+        )
 
     # Backfill current share price for charting if Stage 3/jsonifier omitted it.
     market_data = structured.get("market_data")
@@ -3194,6 +3545,20 @@ async def get_gantt_run(run_id: str):
 async def delete_gantt_run(run_id: str):
     safe_name = Path(run_id).name
     canonical_id = _canonical_run_id_for_listing(safe_name)
+    existing_path = _resolve_run_artifact_path(canonical_id)
+    if existing_path.exists() and existing_path.is_file():
+        try:
+            existing_payload = json.loads(existing_path.read_text(encoding="utf-8"))
+            existing_structured = _extract_stage3_structured_from_artifact(existing_payload)
+            if _is_portfolio_positioning_artifact(existing_payload, existing_structured):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Portfolio positioning artifacts must be deleted via /api/portfolio-positioning-runs/{run_id}",
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass
     related_paths = _collect_run_related_paths(canonical_id)
     if not related_paths:
         raise HTTPException(status_code=404, detail="Run artifact not found")
@@ -3558,7 +3923,11 @@ async def create_analysis_job(
 
     _ensure_analysis_job_dirs()
     output_name = _build_job_run_filename(job_request)
-    output_path = JOBS_OUTPUTS_DIR / output_name
+    output_path = (
+        PORTFOLIO_POSITIONING_OUTPUTS_DIR / output_name
+        if job_kind == "portfolio_positioning"
+        else JOBS_OUTPUTS_DIR / output_name
+    )
     job_id = str(uuid.uuid4())
     supplementary_upload_path: Optional[Path] = None
     portfolio_context_path: Optional[Path] = None
@@ -3600,6 +3969,7 @@ async def create_analysis_job(
         if hasattr(job_request, "model_dump")
         else job_request.dict()
     )
+    request_payload = _sanitize_analysis_request_payload(request_payload)
     if supplementary_upload_path is not None:
         request_payload["supplementary_file"] = supplementary_filename or "supplementary_document"
     job_record = {
@@ -3735,6 +4105,14 @@ async def get_analysis_job_result(job_id: str):
     if status != "succeeded" or not run_id:
         raise HTTPException(status_code=409, detail=f"Analysis job not completed (status={status})")
 
+    if str((job.get("request") or {}).get("job_type") or "").strip().lower() == "portfolio_positioning":
+        run_payload = await get_portfolio_positioning_run(run_id)
+        return {
+            "job": _public_job_view(job),
+            "run": run_payload,
+            "report_packet": None,
+        }
+
     run_payload = await get_gantt_run(run_id)
     report_packet = _build_integration_packet(run_id=run_id, run_payload=run_payload)
     return {
@@ -3774,6 +4152,8 @@ async def stream_analysis_job_events(job_id: str, poll_ms: int = 1000):
                 payload.get("progress_pct"),
                 payload.get("stage_message"),
                 payload.get("last_output_at"),
+                payload.get("heartbeat_at"),
+                payload.get("heartbeat_count"),
                 payload.get("run_id"),
                 payload.get("error"),
             )

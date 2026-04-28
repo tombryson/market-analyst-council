@@ -30,7 +30,19 @@ scoring_factors:
   - Strategic Value
 usage:
   copy_this_field: copy_paste_prompt
+  copy_research_brief_field: research_brief
   note: Generated manual-use copy/paste prompt.
+research_brief: |-
+  Investment analysis prompt:
+  - Template: technology_platforms
+  - Company name: [COMPANY_NAME].
+  - Company type: technology_platforms.
+  - Exchange: [EXCHANGE_CODE].
+  - Keep outputs decision-grade, evidence-linked, and explicit about assumptions.
+
+  - Run a dedicated sector lane (technology platforms): capture 2-4 recent sources on demand/advertising or payments volumes, competitive intensity, regulatory risk, and margin path; tie each point to scenario assumptions.
+  Exchange assumptions:
+  Exchange profile: listing venue not preselected. Infer filing sources from the company's exchange, domicile, regulator, and primary documents; do not assume one exchange-specific filing format by default.
 copy_paste_prompt: |-
   Investment analysis prompt:
   - Template: technology_platforms

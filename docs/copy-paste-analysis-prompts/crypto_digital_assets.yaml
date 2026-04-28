@@ -1,0 +1,181 @@
+template_id: crypto_digital_assets
+template_name: Crypto & Digital Assets
+category: technology
+source_yaml: backend/templates/crypto_digital_assets.yaml
+placeholders:
+  company_name: '[COMPANY_NAME]'
+  ticker: '[EXCHANGE_CODE]:[TICKER]'
+  exchange: '[EXCHANGE_CODE]'
+  instruction: Replace placeholders before pasting into an external model interface.
+generation_source:
+  generated_by: scripts/export_copy_paste_analysis_prompts.py
+  source_of_truth: backend/templates/*.yaml plus backend/template_loader.py
+  copy_paste_prompt_renderer: TemplateLoader.get_copy_paste_research_brief(..., include_rubric=True)
+  core_rubric_renderer_used_inside_prompt: TemplateLoader.render_copy_paste_rubric(...) / fallback rubric builder
+company_types:
+- crypto_digital_assets
+scoring_factors:
+  quality:
+  - Regulatory/Compliance Position
+  - Platform/Infrastructure Quality
+  - Revenue Durability
+  - Balance Sheet/Treasury Risk
+  - Security/Operational Risk
+  - Governance
+  value:
+  - Cycle-Normalized Earnings vs Market Cap
+  - Asset/Treasury Value
+  - FCF Yield
+  - Platform Optionality
+  - Strategic Value
+usage:
+  copy_this_field: copy_paste_prompt
+  copy_research_brief_field: research_brief
+  note: Generated manual-use copy/paste prompt.
+research_brief: |-
+  Investment analysis prompt:
+  - Template: crypto_digital_assets
+  - Company name: [COMPANY_NAME].
+  - Company type: crypto_digital_assets.
+  - Exchange: [EXCHANGE_CODE].
+  - Keep outputs decision-grade, evidence-linked, and explicit about assumptions.
+
+  - Run a dedicated sector lane (crypto/digital assets): capture 2-4 recent sources on crypto prices, ETF/flow trends, regulation, mining difficulty/hashprice, stablecoin policy, custody/security, and exchange volumes; tie each point to scenario assumptions.
+  Exchange assumptions:
+  Exchange profile: listing venue not preselected. Infer filing sources from the company's exchange, domicile, regulator, and primary documents; do not assume one exchange-specific filing format by default.
+copy_paste_prompt: |-
+  Investment analysis prompt:
+  - Template: crypto_digital_assets
+  - Company name: [COMPANY_NAME].
+  - Company type: crypto_digital_assets.
+  - Exchange: [EXCHANGE_CODE].
+  - Keep outputs decision-grade, evidence-linked, and explicit about assumptions.
+
+  - Run a dedicated sector lane (crypto/digital assets): capture 2-4 recent sources on crypto prices, ETF/flow trends, regulation, mining difficulty/hashprice, stablecoin policy, custody/security, and exchange volumes; tie each point to scenario assumptions.
+  Exchange assumptions:
+  Exchange profile: listing venue not preselected. Infer filing sources from the company's exchange, domicile, regulator, and primary documents; do not assume one exchange-specific filing format by default.
+
+  Analysis rubric:
+  Data sourcing rules:
+  * If source documents are not attached, actively retrieve and review primary sources before analysis.
+  * Source market data from official exchange sources, regulator filings, and reliable market-data providers for the listing venue.
+  * Source company, project, operating, financial, and industry data from primary regulator filings, official exchange announcements, and company investor materials.
+  * Prioritise exchange filings, annual/interim reports, quarterly updates, investor presentations, official company materials, regulator filings, and named primary-source documents.
+  * Use secondary sources only where they add factual context not available in primary filings; label secondary-source facts clearly.
+  * For every key numeric input used in valuation, Quality, Value, or price targets, provide:
+    1) value used
+    2) source URL + document date
+    3) ESTIMATE tag with one-line justification if inferred.
+  * Use current listing currency market and sector inputs and relevant base-currency FX conversion where project economics are reported in a different currency where relevant; state source and timestamp.
+
+  Run an investment analysis on [COMPANY_NAME] using this crypto & digital assets rubric. If data is unavailable, state the gap, explain whether it matters to valuation, and continue. Do not penalise missing disclosure unless the missing item is material to revenue quality, cash-flow durability, balance-sheet risk, regulatory risk, operating execution, or scenario confidence.
+
+  First classify the business:
+  * Crypto exchange/broker: value driven by trading volumes, take-rate, custody/staking revenue, compliance, and cycle exposure.
+  * Bitcoin/crypto miner: value driven by hashprice, energy cost, fleet efficiency, uptime, difficulty, treasury, and capex.
+  * Custody/infrastructure: value driven by institutional adoption, AUC/AUM, security, regulation, and recurring fees.
+  * Treasury/holding company: value driven by marked asset value, leverage, dilution, premium/discount, and governance.
+
+  Use that classification to decide valuation emphasis:
+  * Exchanges: cycle-normalized revenue, take-rate, expense discipline, custody/staking durability, and regulatory risk.
+  * Miners: NAV/EV per hash, hashprice sensitivity, energy cost, fleet efficiency, capex, and balance sheet.
+  * Custody/infrastructure: recurring fee revenue, security record, client quality, and operating leverage.
+  * Treasury companies: mark-to-market asset value, premium/discount, leverage, dilution, and capital allocation.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Operating summary and timeline to the next material financial, operating, regulatory, product, or strategic milestones.
+  * Quantitative and qualitative headwinds/tailwinds with explicit thresholds and directional valuation impact.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Key risks, key opportunities, monitoring watchlist, and verification queue.
+
+  Document review (complete before valuation):
+  For each major valuation-relevant document (annual/interim report, quarterly update, investor presentation, technical report, financing update, operating update, regulatory filing, or material announcement), provide:
+  * Document title/date/announcement reference.
+  * 4-6 extracted key points.
+  * Relevance to valuation inputs (what changed and why it matters).
+  * Implications for investment outlook (positives and negatives).
+  * Market pricing assessment: one separate paragraph on whether market pricing appears to reflect the document's information.
+
+  Step 1: Business Model and Earnings-Quality Workup
+  * Establish the current revenue, earnings, cash-flow, balance-sheet, and capital-allocation baseline from primary evidence.
+  * Separate recurring, contracted, transactional, cyclical, commodity-linked, project, advertising, licensing, and one-off earnings streams. Do not value them with one blended multiple if their quality differs.
+  * Identify the 3-5 variables that actually move valuation for this company.
+  * Distinguish reported growth from organic growth, price/mix, volume, M&A, FX, working-capital timing, and accounting noise.
+  * Build a timeline to the next events that can change the thesis.
+
+  Sector-specific operating metrics to capture where relevant:
+  * Crypto prices, trading volume, take-rate, AUC/AUM, staking/custody revenue, stablecoin balances.
+  * Hashrate, hashprice, mining difficulty, fleet efficiency, power cost, uptime, capex, treasury holdings.
+  * Regulatory actions, licences, security incidents, net cash/debt, dilution, share issuance.
+
+  Sector-specific caution points:
+  * Do not value bull-market trading volumes or hashprice as permanent.
+  * Do not ignore regulatory enforcement, custody/security risk, token concentration, leverage, dilution, or power contracts.
+  * Separate operating earnings from mark-to-market treasury gains.
+
+  Step 2: Valuation Workup
+  * State the primary valuation anchor and why it is appropriate.
+  * Cross-check with at least one secondary method.
+  * Normalize earnings or cash flow where cycle position, one-offs, commodity prices, rates, regulation, product cycles, or project timing distort the current period.
+  * Explain whether EBITDA, earnings, FCF, NAV, book value, reserves, subscribers, users, bookings, volumes, or capacity metrics overstate or understate owner earnings.
+  * Do not let peer multiples override company-specific evidence on quality, leverage, growth, cyclicality, governance, or cash conversion.
+
+  Step 3: Quality Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Quality factor weightings:
+  * Regulatory/Compliance Position: 20%
+  * Platform/Infrastructure Quality: 20%
+  * Revenue Durability: 15%
+  * Balance Sheet/Treasury Risk: 15%
+  * Security/Operational Risk: 15%
+  * Governance: 15%
+
+  Quality scoring formula:
+  * Quality Score = sum(weighted factor scores), 0-100.
+
+  Quality grading bands:
+  * 85-100: top-tier business with durable economics, strong evidence, resilient balance sheet, and clear execution.
+  * 70-84: good business with clear strengths and manageable risks.
+  * 50-69: mixed quality; attractive elements offset by cycle, execution, funding, or disclosure concerns.
+  * Below 50: weak economics, weak evidence, or material governance/balance-sheet risk.
+
+  Step 4: Value Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Value factor weightings:
+  * Cycle-Normalized Earnings vs Market Cap: 30%
+  * Asset/Treasury Value: 20%
+  * FCF Yield: 20%
+  * Platform Optionality: 15%
+  * Strategic Value: 15%
+
+  Value scoring formula:
+  * Value Score = sum(weighted factor scores), 0-100.
+
+  Value grading bands:
+  * 85-100: materially undervalued relative to normalized fundamentals and risk.
+  * 70-84: undervalued with clear upside and manageable risks.
+  * 50-69: roughly fair value or upside offset by risk.
+  * Below 50: expensive or weakly supported by fundamentals.
+
+  Step 5: Scenario Framework and Price Targets
+  Provide bull, base, and bear cases with:
+  * 12M target and 24M target.
+  * Probability for each scenario.
+  * Short description of what operationally changes.
+  * Current positioning (bull-leaning, base-leaning, mixed, bear-leaning).
+  * Explicit conditions that must hold.
+  * Explicit failure conditions.
+
+  Scenario design rules:
+  * Bull/base/bear must differ by operating assumptions, balance-sheet outcomes, and valuation evidence, not only by exit multiple.
+  * Tie each scenario to measurable trigger conditions the scenario router can later monitor.
+  * State which assumptions are known, estimated, or disputed.
+
+  Cross-check requirements before final output:
+  * Ensure scenario targets reconcile to current share count, enterprise value, net debt/cash, and currency.
+  * Ensure valuation does not double-count cash, debt, capex, funding gaps, one-off earnings, or optionality.
+  * Ensure missing data is handled as a verification item, not as a silent assumption.

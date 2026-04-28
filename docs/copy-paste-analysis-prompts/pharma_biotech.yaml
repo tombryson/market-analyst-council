@@ -31,7 +31,19 @@ scoring_factors:
   - Strategic Value
 usage:
   copy_this_field: copy_paste_prompt
+  copy_research_brief_field: research_brief
   note: Generated manual-use copy/paste prompt.
+research_brief: |-
+  Investment analysis prompt:
+  - Template: pharma_biotech
+  - Company name: [COMPANY_NAME].
+  - Company type: pharma_biotech.
+  - Exchange: [EXCHANGE_CODE].
+  - Keep outputs decision-grade, evidence-linked, and explicit about assumptions.
+
+  - Run a dedicated sector lane (pharma/biotech): capture 2-4 recent sources on regulatory/pipeline backdrop (peer readout calendar, FDA/EMA policy signals, payer/reimbursement pressure, sector financing window) and tie each point to scenario assumptions.
+  Exchange assumptions:
+  Exchange profile: listing venue not preselected. Infer filing sources from the company's exchange, domicile, regulator, and primary documents; do not assume one exchange-specific filing format by default.
 copy_paste_prompt: |-
   Investment analysis prompt:
   - Template: pharma_biotech

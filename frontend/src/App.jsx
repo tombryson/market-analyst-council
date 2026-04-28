@@ -4,6 +4,7 @@ import ChatInterface from './components/ChatInterface';
 import GanttMappingDemo from './components/GanttMappingDemo';
 import GanttIntelligenceLab from './components/GanttIntelligenceLab';
 import AnnouncementRouterMonitor from './components/AnnouncementRouterMonitor';
+import PortfolioPositioningLab from './components/PortfolioPositioningLab';
 import { api } from './api';
 import './App.css';
 
@@ -124,6 +125,10 @@ function CouncilApp() {
 
   const handleOpenScenarioRouter = () => {
     navigate('/announcement-router');
+  };
+
+  const handleOpenPortfolioPositioning = () => {
+    navigate('/portfolio-positioning');
   };
 
   const handleSendMessage = async (
@@ -453,6 +458,7 @@ function CouncilApp() {
         onOpenTimelineDemo={handleOpenTimelineDemo}
         onOpenTimelineLab={handleOpenTimelineLab}
         onOpenScenarioRouter={handleOpenScenarioRouter}
+        onOpenPortfolioPositioning={handleOpenPortfolioPositioning}
       />
       <ChatInterface
         conversation={currentConversation}
@@ -484,6 +490,9 @@ function App() {
   }
   if (path === '/announcement-router' || path === '/scenario-router') {
     return <AnnouncementRouterMonitor />;
+  }
+  if (path === '/portfolio-positioning' || path === '/portfolio-positioning-memos') {
+    return <PortfolioPositioningLab />;
   }
   return <CouncilApp />;
 }

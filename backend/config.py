@@ -314,7 +314,7 @@ COUNCIL_EXECUTION_MODE = os.getenv("COUNCIL_EXECUTION_MODE", "local").strip().lo
 # Note: Perplexity model IDs can differ from OpenRouter IDs (e.g. xai/... vs x-ai/...).
 _PERPLEXITY_COUNCIL_MODELS = _get_csv("PERPLEXITY_COUNCIL_MODELS")
 PERPLEXITY_COUNCIL_MODELS = _PERPLEXITY_COUNCIL_MODELS or [
-    "openai/gpt-5.4",
+    "openai/gpt-5.5",
     "google/gemini-3.1-pro-preview",
     "anthropic/claude-sonnet-4-6",
 ]
@@ -374,7 +374,7 @@ PERPLEXITY_API_URL = os.getenv(
     "PERPLEXITY_API_URL",
     "https://api.perplexity.ai/v1/responses",
 )
-PERPLEXITY_MODEL = os.getenv("PERPLEXITY_MODEL", "openai/gpt-5.4")
+PERPLEXITY_MODEL = os.getenv("PERPLEXITY_MODEL", "openai/gpt-5.5")
 PERPLEXITY_PRESET = os.getenv("PERPLEXITY_PRESET", "deep-research")
 PERPLEXITY_PRESET_STRATEGY = os.getenv(
     "PERPLEXITY_PRESET_STRATEGY",
