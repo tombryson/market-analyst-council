@@ -691,6 +691,66 @@ class ThesisComparatorTests(unittest.TestCase):
         self.assertNotIn("base_required_fid_by_dec_2026", report.matched_condition_ids)
         self.assertEqual(report.affected_domains, ["resource"])
 
+    def test_watchlist_label_in_derived_text_does_not_create_false_hit(self):
+        baseline_run = BaselineRunPacket(
+            run_id="run-watchlist-label-1",
+            ticker="ASX:WWI",
+            exchange="ASX",
+            company_name="West Wits Mining Limited",
+            lab_payload={
+                "structured_data": {
+                    "extended_analysis": {"current_thesis_state": {"leaning": "bull"}},
+                    "thesis_map": {
+                        "bull": {"required_conditions": [], "failure_conditions": []},
+                        "base": {"required_conditions": [], "failure_conditions": []},
+                        "bear": {"required_conditions": [], "failure_conditions": []},
+                    },
+                    "monitoring_watchlist": {
+                        "red_flags": [
+                            {
+                                "watch_id": "red_flag_equity_raise_gt_10pct",
+                                "condition": "Any equity raise >10% of market cap",
+                                "severity": "high",
+                            }
+                        ],
+                        "confirmatory_signals": [],
+                    },
+                }
+            },
+        )
+        facts = AnnouncementFacts(
+            event_id="evt-wwi-quarterly-1",
+            ticker="ASX:WWI",
+            title="Quarterly Activities & Cashflow Reports",
+            summary="Router context mentions watchlist label: Any equity raise >10% of market cap.",
+            extracted_facts=[
+                "Derived checklist text repeated Any equity raise >10% of market cap.",
+                "Quarterly operating update contained no capital raising announcement.",
+            ],
+            raw_text_excerpt=(
+                "West Wits Mining released its quarterly activities report. "
+                "The company reported mine development, production progress, cash receipts, "
+                "and operating expenditure for the quarter."
+            ),
+            material_topics=["operations"],
+            evidence=[
+                EvidenceRef(
+                    source_title="Quarterly Activities & Cashflow Reports",
+                    quote_excerpt="The company reported mine development and operating expenditure for the quarter.",
+                )
+            ],
+        )
+
+        report = self.comparator.compare(facts, baseline_run)
+
+        self.assertEqual(report.current_path, "bull")
+        self.assertEqual(report.path_transition, "")
+        self.assertNotEqual(report.impact_level, "high")
+        self.assertFalse(report.triggered_watchlist_ids)
+        evals = [item for item in report.condition_evaluations if item.condition_id == "red_flag_equity_raise_gt_10pct"]
+        self.assertEqual(len(evals), 1)
+        self.assertEqual(evals[0].status, "not_matched")
+
 
 class ScenarioRouterServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_process_announcement_event_runs_pipeline_and_persists(self):

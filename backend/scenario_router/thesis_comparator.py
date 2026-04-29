@@ -88,18 +88,19 @@ class ThesisComparator:
         watchlist = structured.get("monitoring_watchlist") if isinstance(structured.get("monitoring_watchlist"), dict) else {}
         baseline_path = self._normalize_path((current_state or {}).get("leaning"))
 
-        haystack = self._build_haystack(facts)
+        context_haystack = self._build_haystack(facts)
+        evidence_haystack = self._build_evidence_haystack(facts) or context_haystack
         evidence = facts.evidence[0] if facts.evidence else EvidenceRef(source_title=facts.title)
         market_facts = self._normalized_market_facts(facts.market_facts)
 
         evaluations: List[ConditionEvaluation] = []
         for scenario in ("bull", "base", "bear"):
             block = thesis_map.get(scenario) if isinstance(thesis_map, dict) else {}
-            evaluations.extend(self._evaluate_items(block.get("required_conditions") or [], scenario, "required", haystack, market_facts, evidence))
-            evaluations.extend(self._evaluate_items(block.get("failure_conditions") or [], scenario, "failure", haystack, market_facts, evidence))
+            evaluations.extend(self._evaluate_items(block.get("required_conditions") or [], scenario, "required", evidence_haystack, market_facts, evidence))
+            evaluations.extend(self._evaluate_items(block.get("failure_conditions") or [], scenario, "failure", evidence_haystack, market_facts, evidence))
 
-        evaluations.extend(self._evaluate_watchlist(watchlist.get("red_flags") or [], "red_flag", haystack, market_facts, evidence))
-        evaluations.extend(self._evaluate_watchlist(watchlist.get("confirmatory_signals") or [], "confirmatory", haystack, market_facts, evidence))
+        evaluations.extend(self._evaluate_watchlist(watchlist.get("red_flags") or [], "red_flag", evidence_haystack, market_facts, evidence))
+        evaluations.extend(self._evaluate_watchlist(watchlist.get("confirmatory_signals") or [], "confirmatory", evidence_haystack, market_facts, evidence))
 
         matched_evals = [item for item in evaluations if item.status == "matched"]
         announcement_matched_evals = [
@@ -124,8 +125,8 @@ class ThesisComparator:
         red_flag_hits = self._matched_count(announcement_matched_evals, group="red_flag")
         confirmatory_hits = self._matched_count(announcement_matched_evals, group="confirmatory")
 
-        positive = self._contains_any(haystack, POSITIVE_TOKENS)
-        negative = self._contains_any(haystack, NEGATIVE_TOKENS)
+        positive = self._contains_any(evidence_haystack, POSITIVE_TOKENS)
+        negative = self._contains_any(evidence_haystack, NEGATIVE_TOKENS)
         affected_domains = self._infer_domains(
             facts=facts,
             matched_evaluations=announcement_matched_evals,
@@ -214,6 +215,13 @@ class ThesisComparator:
     def _build_haystack(facts: AnnouncementFacts) -> str:
         parts = [facts.title, facts.summary, facts.raw_text_excerpt] + list(facts.extracted_facts or [])
         return "\n".join(str(part or "") for part in parts).lower()
+
+    @staticmethod
+    def _build_evidence_haystack(facts: AnnouncementFacts) -> str:
+        """Primary filing text only; excludes derived summaries and router labels."""
+        quote_excerpts = [item.quote_excerpt for item in (facts.evidence or []) if str(item.quote_excerpt or "").strip()]
+        parts = [facts.title, facts.raw_text_excerpt] + quote_excerpts
+        return "\n".join(str(part or "") for part in parts if str(part or "").strip()).lower()
 
     @staticmethod
     def _normalized_market_facts(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -307,15 +315,28 @@ class ThesisComparator:
             )
 
         phrases = self._condition_phrases(item)
-        matched_phrase = next((phrase for phrase in phrases if self._phrase_matches(phrase, haystack)), "")
+        matched = next(
+            (
+                (phrase, source)
+                for phrase, source in phrases
+                if self._phrase_matches(
+                    phrase,
+                    haystack,
+                    allow_token_fallback=(source == "evidence_hook"),
+                )
+            ),
+            ("", ""),
+        )
+        matched_phrase, matched_source = matched
         if matched_phrase:
+            source_label = "evidence hook" if matched_source == "evidence_hook" else "condition phrase"
             return ConditionEvaluation(
                 condition_id=condition_id,
                 scenario=scenario,
                 group=group,
                 label=label,
                 status="matched",
-                reason=f"Matched announcement text via phrase: {matched_phrase}",
+                reason=f"Matched primary filing text via {source_label}: {matched_phrase}",
                 confidence=0.78 if group in {"required", "confirmatory"} else 0.84,
                 matched_via="text",
                 severity=severity,
@@ -446,15 +467,15 @@ class ThesisComparator:
         return False
 
     @staticmethod
-    def _condition_phrases(item: Dict[str, Any]) -> List[str]:
-        phrases: List[str] = []
+    def _condition_phrases(item: Dict[str, Any]) -> List[Tuple[str, str]]:
+        phrases: List[Tuple[str, str]] = []
         value = str(item.get("condition") or "").strip()
         if value and ThesisComparator._is_meaningful_support_phrase(value):
-            phrases.append(value)
+            phrases.append((value, "condition"))
         for value in item.get("evidence_hooks") or []:
             text = str(value or "").strip()
             if ThesisComparator._is_meaningful_support_phrase(text):
-                phrases.append(text)
+                phrases.append((text, "evidence_hook"))
         return phrases[:6]
 
     @staticmethod
@@ -467,12 +488,14 @@ class ThesisComparator:
         return len(phrase) >= 12
 
     @staticmethod
-    def _phrase_matches(phrase: str, haystack: str) -> bool:
+    def _phrase_matches(phrase: str, haystack: str, *, allow_token_fallback: bool = False) -> bool:
         low = str(phrase or "").strip().lower()
         if not low:
             return False
         if low in haystack:
             return True
+        if not allow_token_fallback:
+            return False
         terms = [term for term in re.split(r"[^a-z0-9]+", low) if len(term) >= 5]
         if len(terms) < 3:
             return False
