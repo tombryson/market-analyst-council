@@ -89,9 +89,9 @@ function labelScenarioAction(value) {
 
 function labelScenarioTransition(value) {
   const transition = String(value || '').trim().toLowerCase();
-  if (!transition || !transition.includes('->')) return 'No change';
+  if (!transition || !transition.includes('->')) return 'No scenario change';
   const [from, to] = transition.split('->').map((part) => labelScenarioPath(part));
-  return `Changed from ${from} to ${to}`;
+  return `${from} to ${to}`;
 }
 
 function scenarioTone(name) {
@@ -169,16 +169,16 @@ function explainRouterDecision(router) {
     : Object.keys(router.market_facts_used || {}).length;
 
   if (!matchedCount && !watchCount && marketCount) {
-    return 'The announcement did not match any thesis condition in the saved report. Market data was checked separately, but that does not make the filing a thesis-changing event.';
+    return 'No announcement-based thesis condition matched. The prior lab leaning below is the saved view from before this filing, not a fresh recommendation from this announcement.';
   }
   if (!matchedCount && !watchCount && action === 'ignore') {
-    return 'The announcement was found, read, and did not change the saved report.';
+    return 'The filing was resolved to a primary source and did not change the prior lab leaning.';
   }
   if (transition) {
-    return `This announcement changes the saved report view: ${labelScenarioTransition(transition)}.`;
+    return `The filing maps to ${labelScenarioTransition(transition)}. ${labelScenarioAction(action)}.`;
   }
   if (matchedCount || watchCount) {
-    return `The announcement matched ${matchedCount + watchCount} monitored condition(s), but the overall saved report view stayed the same.`;
+    return `The filing hit ${matchedCount + watchCount} monitored condition(s), but did not move the prior lab leaning.`;
   }
   return routerReason(router);
 }
@@ -189,26 +189,17 @@ function routerOutcomeLabel(router) {
   const matched = Number(router.matched_conditions_count || 0);
   const watched = Number(router.triggered_watchlist_count || 0);
   const action = String(router.action || '').trim().toLowerCase();
-  if (transition) return 'Saved report changed';
-  if (matched || watched) return `${matched + watched} condition${matched + watched === 1 ? '' : 's'} hit`;
+  if (transition) return labelScenarioTransition(transition);
+  if (matched || watched) return `${matched + watched} thesis condition${matched + watched === 1 ? '' : 's'} hit`;
   if (action === 'ignore') return 'No thesis impact';
-  if (action === 'watch') return 'No filing-driven change';
+  if (action === 'watch') return 'Watch only';
   return labelScenarioAction(action);
 }
 
 function pathExplanation(router) {
   const path = String(router?.baseline_path || router?.current_path || '').trim();
   if (!path) return '';
-  return `Before this announcement, the saved company report was using the ${labelScenarioPath(path)}. This only changes when the announcement proves or contradicts one of the saved bull/base/bear tests.`;
-}
-
-function savedReportBeforeFiling(router) {
-  return labelScenarioPath(router?.baseline_path || router?.current_path);
-}
-
-function filingChangeLabel(router) {
-  const transition = String(router?.path_transition || '').trim();
-  return transition ? labelScenarioTransition(transition) : 'No change';
+  return `${labelScenarioPath(path)} is the saved leaning from the latest lab run before this announcement. The router only changes it when the filing hits mapped bull/base/bear conditions.`;
 }
 
 function conditionTone(status, group = '') {
@@ -387,7 +378,7 @@ function ConditionSummary({ announcementChecks, watchlistChecks, marketCondition
       <div className="announcement-router-compact-grid">
         <CompactStat label="Announcement checks" value={compactStatusSummary(announcementChecks)} />
         <CompactStat label="Watchlist checks" value={compactStatusSummary(watchlistChecks)} />
-        <CompactStat label="Market checks" value={compactStatusSummary(marketConditions, 'not checked')} />
+        <CompactStat label="Market backdrop" value={compactStatusSummary(marketConditions, 'not checked')} />
       </div>
     </div>
   );
@@ -547,14 +538,14 @@ function DecisionPanel({ router, emptyTitle = 'No announcement decision attached
     return (
       <article className="scenario-router-column announcement-router-empty-panel">
         <h4>{emptyTitle}</h4>
-        <p>{emptyCopy || 'This company report has no saved announcement check. Unrelated announcements from other companies are not shown here.'}</p>
+        <p>{emptyCopy || 'This run has no saved announcement-router artifact. The lab view will not show unrelated global router events.'}</p>
       </article>
     );
   }
 
   return (
     <article className="scenario-router-column announcement-router-decision-panel">
-      <h4>Filing Impact</h4>
+      <h4>Selected Filing Decision</h4>
       <div className="announcement-router-decision-hero">
         <div>
           <span>{router?.ticker || 'Selected filing'}</span>
@@ -566,23 +557,23 @@ function DecisionPanel({ router, emptyTitle = 'No announcement decision attached
         </b>
       </div>
       <div className="announcement-router-metric-grid">
-        <DetailRow label="Saved report before filing" value={savedReportBeforeFiling(router)} tone={scenarioTone(router?.baseline_path || router?.current_path)} />
-        <DetailRow label="Did the filing change it?" value={filingChangeLabel(router)} />
-        <DetailRow label="Recommended action" value={labelScenarioAction(router?.action)} />
-        <DetailRow label="Importance" value={router?.impact_level ? titleizeKey(router.impact_level) : 'Not assessed'} />
+        <DetailRow label="Prior lab leaning" value={labelScenarioPath(router?.baseline_path || router?.current_path)} tone={scenarioTone(router?.baseline_path || router?.current_path)} />
+        <DetailRow label="Materiality" value={router?.impact_level ? titleizeKey(router.impact_level) : 'Not assessed'} />
+        <DetailRow label="Official source" value={router?.source_type ? titleizeKey(router.source_type) : 'Unknown'} />
+        <DetailRow label="Last evaluated" value={router?.saved_at_utc ? fmtRelativeSince(router.saved_at_utc) : 'n/a'} />
       </div>
       <div className="scenario-router-detail-note">
-        <strong>Plain English:</strong> the first box is what the saved company report already said before this announcement. The filing result is whether this new announcement changes that saved report.
+        <strong>Prior lab leaning:</strong> this is the bull/base/bear scenario saved in the lab before the filing was checked. It is not the filing verdict.
       </div>
       <div className={`announcement-router-impact-callout ${directHits ? 'has-hit' : 'no-hit'}`}>
-        <strong>{directHits ? `${directHits} filing condition${directHits === 1 ? '' : 's'} hit` : 'No filing condition hit'}</strong>
-        <span>{directHits ? 'The announcement matched saved report conditions below.' : 'The announcement did not prove or disprove any mapped thesis condition. Market facts are shown separately as context.'}</span>
+        <strong>{directHits ? `${directHits} announcement thesis hit${directHits === 1 ? '' : 's'}` : 'No announcement-thesis hit'}</strong>
+        <span>{directHits ? 'The filing matched mapped lab conditions below.' : 'The filing did not match the bull/base/bear conditions. Market facts are shown separately as backdrop.'}</span>
       </div>
       {explainRouterDecision(router) && <div className="scenario-router-detail-note">{explainRouterDecision(router)}</div>}
-      {routerReason(router) && <div className="scenario-router-detail-note"><strong>System reason:</strong> {routerReason(router)}</div>}
+      {routerReason(router) && <div className="scenario-router-detail-note"><strong>Decision reason:</strong> {routerReason(router)}</div>}
       {router?.source_url && (
         <div className="scenario-router-detail-note">
-          <strong>Source:</strong> <a href={router.source_url} target="_blank" rel="noreferrer">Open filing</a>
+          <strong>Primary source:</strong> <a href={router.source_url} target="_blank" rel="noreferrer">Open filing</a>
         </div>
       )}
       <ConditionSummary
@@ -730,7 +721,7 @@ export default function AnnouncementRouterMonitor({
           <div>
             <h3>Announcement Thesis Router</h3>
             <p className="scenario-router-monitor-copy">
-              Announcement checks for this company report only. Other companies are not mixed into this page.
+              Run-specific announcement checks. Global router events are not mixed into this lab view.
             </p>
           </div>
           <div className="scenario-router-monitor-actions">
@@ -832,7 +823,7 @@ export default function AnnouncementRouterMonitor({
                     </div>
                     <div className="scenario-router-event-title">{row.title || 'Untitled announcement'}</div>
                     <div className="scenario-router-event-meta">
-                      Report before filing: {labelScenarioPath(row.baseline_path || row.current_path)} | Source: {row.source_type || 'unknown'} | {fmtMs(row.processing_duration_ms)} | {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
+                      Before filing: {labelScenarioPath(row.baseline_path || row.current_path)} | {row.source_type || 'unknown source'} | {fmtMs(row.processing_duration_ms)} | {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
                     </div>
                     {row.action_reason && <div className="scenario-router-event-reason">{row.action_reason}</div>}
                     {row.error_reason && <div className="scenario-router-detail-note">{row.error_reason}</div>}
