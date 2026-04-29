@@ -66,9 +66,9 @@ function fmtRelativeSince(value) {
 
 function labelScenarioPath(value) {
   const path = String(value || '').trim().toLowerCase();
-  if (path === 'bull') return 'Bull case';
-  if (path === 'base') return 'Base case';
-  if (path === 'bear') return 'Bear case';
+  if (path === 'bull') return 'Bull scenario';
+  if (path === 'base') return 'Base scenario';
+  if (path === 'bear') return 'Bear scenario';
   if (path === 'mixed') return 'Mixed / unclear';
   return 'Not assessed';
 }
@@ -169,16 +169,16 @@ function explainRouterDecision(router) {
     : Object.keys(router.market_facts_used || {}).length;
 
   if (!matchedCount && !watchCount && marketCount) {
-    return 'No announcement-based thesis condition matched. The saved lab path below is the pre-existing lab view, not a fresh recommendation from this filing.';
+    return 'No announcement-based thesis condition matched. The prior lab leaning below is the saved view from before this filing, not a fresh recommendation from this announcement.';
   }
   if (!matchedCount && !watchCount && action === 'ignore') {
-    return 'The filing was resolved to a primary source and did not change the saved thesis path.';
+    return 'The filing was resolved to a primary source and did not change the prior lab leaning.';
   }
   if (transition) {
     return `The filing maps to ${labelScenarioTransition(transition)}. ${labelScenarioAction(action)}.`;
   }
   if (matchedCount || watchCount) {
-    return `The filing hit ${matchedCount + watchCount} monitored condition(s), but did not move the thesis path.`;
+    return `The filing hit ${matchedCount + watchCount} monitored condition(s), but did not move the prior lab leaning.`;
   }
   return routerReason(router);
 }
@@ -199,7 +199,7 @@ function routerOutcomeLabel(router) {
 function pathExplanation(router) {
   const path = String(router?.baseline_path || router?.current_path || '').trim();
   if (!path) return '';
-  return `${labelScenarioPath(path)} is the saved path from the latest lab run. It only changes here when the announcement hits mapped bull/base/bear conditions.`;
+  return `${labelScenarioPath(path)} is the saved leaning from the latest lab run before this announcement. The router only changes it when the filing hits mapped bull/base/bear conditions.`;
 }
 
 function conditionTone(status, group = '') {
@@ -557,10 +557,13 @@ function DecisionPanel({ router, emptyTitle = 'No announcement decision attached
         </b>
       </div>
       <div className="announcement-router-metric-grid">
-        <DetailRow label="Saved lab path" value={labelScenarioPath(router?.baseline_path || router?.current_path)} tone={scenarioTone(router?.baseline_path || router?.current_path)} />
+        <DetailRow label="Prior lab leaning" value={labelScenarioPath(router?.baseline_path || router?.current_path)} tone={scenarioTone(router?.baseline_path || router?.current_path)} />
         <DetailRow label="Materiality" value={router?.impact_level ? titleizeKey(router.impact_level) : 'Not assessed'} />
         <DetailRow label="Official source" value={router?.source_type ? titleizeKey(router.source_type) : 'Unknown'} />
         <DetailRow label="Last evaluated" value={router?.saved_at_utc ? fmtRelativeSince(router.saved_at_utc) : 'n/a'} />
+      </div>
+      <div className="scenario-router-detail-note">
+        <strong>Prior lab leaning:</strong> this is the bull/base/bear scenario saved in the lab before the filing was checked. It is not the filing verdict.
       </div>
       <div className={`announcement-router-impact-callout ${directHits ? 'has-hit' : 'no-hit'}`}>
         <strong>{directHits ? `${directHits} announcement thesis hit${directHits === 1 ? '' : 's'}` : 'No announcement-thesis hit'}</strong>
@@ -820,7 +823,7 @@ export default function AnnouncementRouterMonitor({
                     </div>
                     <div className="scenario-router-event-title">{row.title || 'Untitled announcement'}</div>
                     <div className="scenario-router-event-meta">
-                      Saved path: {labelScenarioPath(row.baseline_path || row.current_path)} | {row.source_type || 'unknown source'} | {fmtMs(row.processing_duration_ms)} | {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
+                      Before filing: {labelScenarioPath(row.baseline_path || row.current_path)} | {row.source_type || 'unknown source'} | {fmtMs(row.processing_duration_ms)} | {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
                     </div>
                     {row.action_reason && <div className="scenario-router-event-reason">{row.action_reason}</div>}
                     {row.error_reason && <div className="scenario-router-detail-note">{row.error_reason}</div>}
