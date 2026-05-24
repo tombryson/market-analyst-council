@@ -46,6 +46,28 @@ function sentence(value, fallback = 'Not assessed') {
   return text || fallback;
 }
 
+function humanizeAssetLabel(value, fallback = 'Unnamed sleeve') {
+  const raw = String(value || '').trim();
+  if (!raw) return fallback;
+  const spaced = raw.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!spaced) return fallback;
+  if (spaced === spaced.toLowerCase() || spaced === spaced.toUpperCase()) {
+    return spaced.replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+  return spaced;
+}
+
+function assetLabel(row, fallback = 'Unnamed sleeve', { caps = false } = {}) {
+  const rawName = String(row?.display_name || row?.asset_class || '').trim();
+  const assetClass = String(row?.asset_class || '').trim();
+  const normalizedName = rawName.replace(/[^a-z0-9]+/gi, '').toUpperCase();
+  const normalizedAsset = assetClass.replace(/[^a-z0-9]+/gi, '').toUpperCase();
+  const label = normalizedName && normalizedName === normalizedAsset
+    ? humanizeAssetLabel(rawName, fallback)
+    : humanizeAssetLabel(rawName, fallback);
+  return caps ? label.toUpperCase() : label;
+}
+
 function cleanRunLabel(value) {
   const text = String(value || '').trim();
   if (!text) return 'Portfolio memo';
@@ -107,9 +129,9 @@ function AllocationTable({ rows }) {
                   width: `${width}%`,
                   '--segment-index': idx,
                 }}
-                title={`${sentence(row?.display_name || row?.asset_class, 'Unnamed sleeve')}: ${formatPct(row?.target_pct)}`}
+                title={`${assetLabel(row)}: ${formatPct(row?.target_pct)}`}
               >
-                {width >= 7 ? <span>{sentence(row?.asset_class || row?.display_name, '')}</span> : null}
+                {width >= 7 ? <span>{assetLabel(row, '')}</span> : null}
               </div>
             );
           })}
@@ -131,7 +153,7 @@ function AllocationTable({ rows }) {
           return (
             <div className="portfolio-allocation-grid-row" role="row" key={`${row?.asset_class || idx}`}>
               <span role="cell">
-                <strong>{sentence(row?.display_name || row?.asset_class, 'Unnamed sleeve')}</strong>
+                <strong>{assetLabel(row, 'Unnamed sleeve', { caps: true })}</strong>
                 <em>{sentence(row?.thesis_role, 'role not stated')}</em>
               </span>
               <span role="cell">{formatPct(row?.current_pct)}</span>
@@ -154,7 +176,7 @@ function AllocationTable({ rows }) {
             const conviction = String(row?.conviction || row?.implementation_priority || '').trim().toUpperCase() || 'N/A';
             return (
               <p key={`${row?.asset_class || idx}-rationale`}>
-                <strong>{sentence(row?.display_name || row?.asset_class, 'Unnamed sleeve')}</strong>
+                <strong>{assetLabel(row, 'Unnamed sleeve', { caps: true })}</strong>
                 <span> ({sentence(row?.thesis_role, 'role not stated')}) - {action} / {conviction}: </span>
                 {sentence(row?.rationale, 'No rationale supplied.')}
               </p>
@@ -162,6 +184,44 @@ function AllocationTable({ rows }) {
           })}
         </div>
       ) : null}
+    </section>
+  );
+}
+
+function CurrentSleeveDecisions({ rows }) {
+  const decisions = Array.isArray(rows) ? rows : [];
+  if (!decisions.length) return null;
+  return (
+    <section className="portfolio-panel allocation-panel">
+      <div className="portfolio-section-head">
+        <div>
+          <h2>Current Sleeve Decisions</h2>
+          <p>Every currently held asset class should be accounted for before new sleeves are added.</p>
+        </div>
+      </div>
+      <div className="portfolio-allocation-grid current-sleeves" role="table" aria-label="Current sleeve decisions">
+        <div className="portfolio-allocation-grid-row header" role="row">
+          <span role="columnheader">Current Sleeve</span>
+          <span role="columnheader">Current</span>
+          <span role="columnheader">Direction</span>
+          <span role="columnheader">Related</span>
+          <span role="columnheader">Rationale</span>
+        </div>
+        {decisions.map((row, idx) => {
+          const action = String(row?.action || 'REVIEW').toUpperCase();
+          return (
+            <div className="portfolio-allocation-grid-row" role="row" key={`${row?.asset_class || idx}-current`}>
+              <span role="cell">
+                <strong>{assetLabel(row, 'Unnamed sleeve', { caps: true })}</strong>
+              </span>
+              <span role="cell">{formatPct(row?.current_pct)}</span>
+              <span role="cell"><mark className={`portfolio-action ${toneForAction(action)}`}>{action}</mark></span>
+              <span role="cell">{sentence(row?.related_or_substitute_exposure, 'n/a')}</span>
+              <span role="cell">{sentence(row?.allocator_commentary || row?.rationale, 'Needs explicit reassessment.')}</span>
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }
@@ -336,7 +396,7 @@ export default function PortfolioPositioningLab() {
                   <p>{sentence(diagnosis.current_structure, 'No current-structure summary was saved.')}</p>
                   <div className="portfolio-chip-row">
                     {listFrom(diagnosis.dominant_asset_classes).slice(0, 6).map((item) => (
-                      <span key={item}>{item}</span>
+                      <span key={item}>{humanizeAssetLabel(item)}</span>
                     ))}
                   </div>
                 </section>
@@ -347,6 +407,7 @@ export default function PortfolioPositioningLab() {
                 </section>
               </div>
 
+              <CurrentSleeveDecisions rows={structured.current_sleeve_decisions} />
               <AllocationTable rows={structured.asset_class_targets} />
 
               <section className="portfolio-panel memo-panel">

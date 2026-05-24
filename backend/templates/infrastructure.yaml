@@ -1,0 +1,120 @@
+id: infrastructure
+name: Infrastructure
+description: Investment analysis for infrastructure owners, operators, developers, concession assets, and contracted essential-service platforms
+category: infrastructure
+version: '1.0'
+author: LLM Council
+company_types:
+- infrastructure
+template_behavior:
+  commodity_profile: none
+  supplementary_sector_label: infrastructure sector
+  cashflow_schema:
+    mode: auto
+    min_reporting_periods: 3
+    require_operating_cashflow: true
+    detection_max_sources: 28
+  stage1_research_lanes:
+  - 'Run a dedicated sector lane (infrastructure): capture 2-4 recent sources on regulated returns, concession terms, utilisation, traffic/volume trends, refinancing conditions, inflation linkage, and capex requirements; tie each point to scenario assumptions.'
+  stage3_scoring_factors:
+    quality:
+    - Asset Essentiality
+    - Contract/Regulatory Quality
+    - Cash Conversion
+    - Balance Sheet
+    - Management
+    - Governance
+    value:
+    - Intrinsic Value vs Market Cap
+    - FCF/Distribution Yield
+    - EV/EBITDA or RAB Multiple
+    - Growth/Capex Pipeline
+    - Strategic Value
+auto_detect_keywords:
+- infrastructure
+- concession
+- regulated asset
+- toll road
+- rail
+- port
+- airport
+- pipeline
+- contracted cash flow
+- regulated return
+- availability payment
+- essential services
+- utility-like
+inputs:
+- ticker
+- company_name
+- market_data
+- pdf_documents
+output_schema:
+  type: object
+  required_fields:
+  - analysis_type
+  - ticker
+  - company_name
+  - quality_score
+  - value_score
+  - price_targets
+  - investment_recommendation
+  structure:
+    analysis_type: infrastructure
+    ticker: string
+    company_name: string
+    analysis_date: ISO-8601
+    market_data:
+      current_price: float
+      market_cap_m: float
+      shares_outstanding_m: float
+      enterprise_value_m: float
+      currency: string
+    quality_score:
+      total: float (0-100)
+      breakdown: object
+    value_score:
+      total: float (0-100)
+      breakdown: object
+    price_targets:
+      current_price: float
+      scenario_targets: object
+      scenario_probabilities: object
+      prob_weighted_target_12m: float
+      prob_weighted_target_24m: float
+    development_timeline: array
+    thesis_map: object
+    management_competition_assessment: object
+    verification_required_fields: array
+    investment_recommendation:
+      rating: BUY/HOLD/SELL
+      conviction: HIGH/MEDIUM/LOW
+      summary: string
+verification_schema:
+  fact_digest:
+    sections:
+      timelines_deadlines:
+        keywords:
+        - concession
+        - regulatory reset
+        - guidance
+        - contract
+        - renewal
+        - capex
+      financing_deals:
+        keywords:
+        - debt
+        - refinance
+        - facility
+        - distribution
+        - equity raise
+      project_economics:
+        keywords:
+        - revenue
+        - ebitda
+        - free cash flow
+        - ffo
+        - occupancy
+        - utilisation
+        - traffic
+        - regulated asset base

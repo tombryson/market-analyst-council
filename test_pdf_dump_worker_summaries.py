@@ -1926,6 +1926,10 @@ def _normalize_summary_object(
     lane_meta = _compute_relevance_lanes(title_for_lanes, text_for_lanes)
     noise_meta = _compute_noise_profile(title_for_lanes, text_for_lanes)
     issuer_alignment = _detect_issuer_alignment(doc)
+    document_ref = dict(doc.get("document_ref", {}) or {})
+    retrieval_meta = dict(document_ref.get("retrieval_meta", {}) or {})
+    retrieval_ps = bool(retrieval_meta.get("price_sensitive_marker", False))
+    retrieval_ps_conf = float(retrieval_meta.get("price_sensitive_confidence", 0.0) or 0.0)
     source_url = str(doc.get("source_url", "") or "")
     wrapper_page = _is_wrapper_or_index_page(title_for_lanes, text_for_lanes, source_url)
     role_tags = _derive_document_role_tags(
@@ -2038,7 +2042,15 @@ def _normalize_summary_object(
         adjusted_keep = False
     if wrapper_page and not strong_material and adjusted_score < 70 and not adjusted_ps:
         adjusted_keep = False
+    if retrieval_ps and issuer_status not in {"mismatch", "related_party"}:
+        adjusted_ps = True
+        adjusted_score = max(adjusted_score, 82)
+        adjusted_tier = _tier_from_score(adjusted_score)
+        adjusted_is_important = True
+        adjusted_keep = True
     ps_conf = max(0.0, min(1.0, ps_conf_raw))
+    if retrieval_ps:
+        ps_conf = max(ps_conf, retrieval_ps_conf, 0.76)
     if auto_ps and ps_conf < 0.55:
         ps_conf = 0.55
     if not adjusted_ps:
@@ -2051,6 +2063,9 @@ def _normalize_summary_object(
     if reason_suffix:
         base_reason = reason_text or "model_assessment"
         reason_text = f"{base_reason}; {'; '.join(reason_suffix)}"
+    if retrieval_ps:
+        base_reason = reason_text or "model_assessment"
+        reason_text = f"{base_reason}; retrieval_price_sensitive_marker"
     if wrapper_page:
         base_reason = reason_text or "model_assessment"
         reason_text = f"{base_reason}; wrapper_page"
@@ -2166,6 +2181,7 @@ def _normalize_summary_object(
         "wrapper_page": bool(wrapper_page),
         "role_tags": role_tags,
         "issuer_validation": issuer_alignment,
+        "retrieval_meta": retrieval_meta,
     }
     if isinstance(vision_bundle, dict):
         out["source_meta"]["vision_meta"] = {

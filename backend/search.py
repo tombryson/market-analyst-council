@@ -182,6 +182,10 @@ def classify_asx_announcement(title: str, url: str) -> tuple[str, int]:
     # IMPORTANT (Priority 2) - Should download
     important_keywords = [
         'drilling results', 'assay results', 'exploration update',
+        'exploration program update', 'drilling program update',
+        'drilling program', 'exploration program',
+        'permit', 'permitting', 'approval', 'approvals',
+        'licence', 'license', 'ministry', 'work plan',
         'metallurgical', 'met test', 'offtake agreement', 'finance', 'funding',
         'acquisition', 'strategic', 'partnership', 'jv', 'joint venture',
         'production update', 'operational update'
@@ -417,12 +421,19 @@ async def scrape_marketindex_announcements(ticker: str, max_results: int = 80) -
                 context_window = html[window_start:window_end]
                 published_at = _extract_marketindex_row_date(context_window)
                 category, priority = classify_asx_announcement(title, pdf_url)
+                context_low = context_window.lower()
+                price_sensitive = (
+                    "icon-price-sensitive" in context_low
+                    or "price sensitive" in context_low
+                    or "price-sensitive" in context_low
+                )
 
                 announcements.append(
                     {
                         "title": title,
                         "url": pdf_url,
                         "published_at": published_at,
+                        "price_sensitive": bool(price_sensitive),
                         "category": category,
                         "priority": priority,
                     }

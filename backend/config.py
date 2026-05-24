@@ -121,11 +121,13 @@ LITEPARSE_TIMEOUT_SECONDS = _get_float("LITEPARSE_TIMEOUT_SECONDS", 240.0)
 _COUNCIL_MODELS = _get_csv("COUNCIL_MODELS")
 COUNCIL_MODELS = _COUNCIL_MODELS or [
     "minimax/minimax-m2.7",
-    "x-ai/grok-4.20",
-    "qwen/qwen3.6-plus",
+    "x-ai/grok-4.3",
+    "qwen/qwen3.7-max",
     "z-ai/glm-5.1",
     "google/gemma-4-31b-it",
     "moonshotai/kimi-k2.6",
+    "deepseek/deepseek-v4-pro",
+    "openrouter/owl-alpha",
 ]
 
 # Chairman model - synthesizes final response
@@ -156,7 +158,7 @@ CHAIRMAN_JSONIFIER_MAX_OUTPUT_TOKENS = _get_int(
 STAGE3_ANALYST_MEMO_ENABLED = _get_bool("STAGE3_ANALYST_MEMO_ENABLED", default=True)
 STAGE3_ANALYST_MEMO_MODEL = os.getenv(
     "STAGE3_ANALYST_MEMO_MODEL",
-    "google/gemini-3.1-flash-lite-preview",
+    "google/gemini-3.5-flash",
 ).strip()
 STAGE3_ANALYST_MEMO_TIMEOUT_SECONDS = _get_float(
     "STAGE3_ANALYST_MEMO_TIMEOUT_SECONDS",

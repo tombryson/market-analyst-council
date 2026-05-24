@@ -1,0 +1,127 @@
+id: base_metals_miner
+name: Base Metals Miner
+description: Investment analysis for base-metals miners, developers, and explorers where zinc, lead, nickel, tin, manganese, or mixed base metals drive value
+category: resources
+version: '1.0'
+author: LLM Council
+company_types:
+- base_metals_miner
+template_behavior:
+  commodity_profile: base_metals
+  supplementary_sector_label: base-metals mining sector
+  cashflow_schema:
+    mode: auto
+    min_reporting_periods: 3
+    require_operating_cashflow: true
+    detection_max_sources: 28
+  stage1_research_lanes:
+  - 'Run a dedicated sector-macro lane (base metals): capture 2-4 recent sources on zinc, lead, nickel, tin, manganese, inventory levels, China/industrial demand, supply disruptions, treatment charges, and FX; tie each point to scenario assumptions.'
+  stage3_scoring_factors:
+    quality:
+    - Jurisdiction
+    - Infrastructure
+    - Management
+    - Resource/Reserve Quality
+    - Funding
+    - ESG
+    value:
+    - Risked NAV vs Market Cap
+    - EV/Resource or EV/Reserve
+    - Expansion/Upside
+    - Cost Competitiveness
+    - Strategic Value
+auto_detect_keywords:
+- base metals
+- zinc
+- lead
+- nickel
+- tin
+- manganese
+- polymetallic
+- concentrate
+- sulphide
+- resource
+- reserve
+- mine
+- mining
+- jorc
+- feasibility
+inputs:
+- ticker
+- company_name
+- market_data
+- pdf_documents
+output_schema:
+  type: object
+  required_fields:
+  - analysis_type
+  - ticker
+  - company_name
+  - quality_score
+  - value_score
+  - price_targets
+  - investment_recommendation
+  structure:
+    analysis_type: base_metals_miner
+    ticker: string
+    company_name: string
+    analysis_date: ISO-8601
+    market_data:
+      current_price: float
+      market_cap_m: float
+      shares_outstanding_m: float
+      enterprise_value_m: float
+      currency: string
+    projects: array
+    quality_score:
+      total: float (0-100)
+      breakdown: object
+    value_score:
+      total: float (0-100)
+      breakdown: object
+    price_targets:
+      current_price: float
+      scenario_targets: object
+      scenario_probabilities: object
+      prob_weighted_target_12m: float
+      prob_weighted_target_24m: float
+    development_timeline: array
+    thesis_map: object
+    management_competition_assessment: object
+    verification_required_fields: array
+    investment_recommendation:
+      rating: BUY/HOLD/SELL
+      conviction: HIGH/MEDIUM/LOW
+      summary: string
+verification_schema:
+  fact_digest:
+    sections:
+      timelines_deadlines:
+        keywords:
+        - milestone
+        - feasibility
+        - dfs
+        - pfs
+        - permitting
+        - construction
+        - production
+      financing_deals:
+        keywords:
+        - placement
+        - debt
+        - offtake
+        - royalty
+        - streaming
+        - funding
+      project_economics:
+        keywords:
+        - resource
+        - reserve
+        - grade
+        - recovery
+        - capex
+        - opex
+        - aisc
+        - cash cost
+        - treatment charge
+        - concentrate

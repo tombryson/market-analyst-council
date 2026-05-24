@@ -208,6 +208,61 @@ LSE_PS_NEGATIVE_KEYWORDS = (
     "block listing",
 )
 
+ASX_PS_POSITIVE_KEYWORDS = (
+    "price-sensitive asx announcement",
+    "exploration update",
+    "exploration program update",
+    "drilling results",
+    "drilling program",
+    "drilling program update",
+    "assay results",
+    "resource update",
+    "reserve update",
+    "mineral resource",
+    "jorc",
+    "feasibility study",
+    "dfs",
+    "pfs",
+    "scoping study",
+    "project update",
+    "operations update",
+    "operational update",
+    "production update",
+    "permit",
+    "permitting",
+    "approval",
+    "approvals",
+    "licence",
+    "license",
+    "ministry",
+    "work plan",
+    "funding",
+    "placement",
+    "capital raising",
+    "loan facility",
+    "offtake",
+    "acquisition",
+    "joint venture",
+)
+
+ASX_PS_NEGATIVE_KEYWORDS = (
+    "appendix 2a",
+    "appendix 3b",
+    "appendix 3c",
+    "appendix 3x",
+    "appendix 3y",
+    "appendix 3z",
+    "change of director",
+    "director interest",
+    "becoming a substantial holder",
+    "change in substantial holding",
+    "ceasing to be a substantial holder",
+    "cleansing notice",
+    "notice of annual general meeting",
+    "application for quotation of securities",
+    "notification regarding unquoted securities",
+)
+
 
 async def _await_with_phase_progress(
     coro: Any,
@@ -608,6 +663,20 @@ def _is_allowed_domain(url: str, allowed_domain_suffixes: List[str]) -> bool:
 def _looks_like_pdf_url(url: str) -> bool:
     lower = str(url or "").lower()
     return lower.endswith(".pdf") or ".pdf?" in lower or "/asxpdf/" in lower
+
+
+def _asx_pdf_identity(url: str) -> str:
+    raw = str(url or "").strip()
+    if not raw:
+        return ""
+    parsed = urlparse(raw)
+    path = parsed.path.lower()
+    match = re.search(r"/asxpdf/(\d{8}/pdf/[a-z0-9._-]+\.pdf)", path, flags=re.IGNORECASE)
+    if match:
+        return f"asxpdf:{match.group(1).lower()}"
+    if "/asxpdf/" in path:
+        return f"asxpdf:{path.rsplit('/asxpdf/', 1)[-1].lower()}"
+    return raw.lower()
 
 
 def _looks_like_sec_filing_url(url: str) -> bool:
@@ -3013,6 +3082,7 @@ def _build_price_sensitivity_assessment(
     is_us = exchange in US_EXCHANGE_IDS
     is_canadian = exchange in CANADIAN_EXCHANGE_IDS
     is_lse = exchange in LSE_EXCHANGE_IDS
+    is_asx = exchange in ASX_EXCHANGE_IDS
     text = " ".join(
         [
             str(title or ""),
@@ -3054,6 +3124,9 @@ def _build_price_sensitivity_assessment(
     elif is_lse:
         pos_hits = [kw for kw in LSE_PS_POSITIVE_KEYWORDS if kw in low]
         neg_hits = [kw for kw in LSE_PS_NEGATIVE_KEYWORDS if kw in low]
+    elif is_asx:
+        pos_hits = [kw for kw in ASX_PS_POSITIVE_KEYWORDS if kw in low]
+        neg_hits = [kw for kw in ASX_PS_NEGATIVE_KEYWORDS if kw in low]
     else:
         pos_hits = []
         neg_hits = []
@@ -3064,6 +3137,32 @@ def _build_price_sensitivity_assessment(
         high_impact_hits = [kw for kw in CANADIAN_PS_HIGH_IMPACT_KEYWORDS if kw in low]
     elif is_lse:
         high_impact_hits = [kw for kw in LSE_PS_POSITIVE_KEYWORDS if kw in low]
+    elif is_asx:
+        high_impact_hits = [
+            kw
+            for kw in ASX_PS_POSITIVE_KEYWORDS
+            if kw in low
+            and kw
+            in {
+                "price-sensitive asx announcement",
+                "exploration program update",
+                "drilling program update",
+                "resource update",
+                "reserve update",
+                "mineral resource",
+                "feasibility study",
+                "dfs",
+                "pfs",
+                "permit",
+                "permitting",
+                "approval",
+                "approvals",
+                "licence",
+                "license",
+                "ministry",
+                "work plan",
+            }
+        ]
     else:
         high_impact_hits = []
     if high_impact_hits:
@@ -3082,7 +3181,12 @@ def _build_price_sensitivity_assessment(
         # deterministic RNS lane plus material title token is sufficient signal.
         score += 0.44
         reason_codes.append("lse_rns_material_title")
+    if is_asx and token_marker:
+        score += 0.44
+        reason_codes.append("asx_material_title")
     if is_lse and neg_hits and not explicit_hit:
+        threshold += 0.12
+    if is_asx and neg_hits and not explicit_hit and not token_marker:
         threshold += 0.12
     is_ps = bool(score >= threshold)
     if is_canadian and is_ps and not explicit_hit and not token_marker and len(pos_hits) < 2:
@@ -3091,6 +3195,9 @@ def _build_price_sensitivity_assessment(
     if is_lse and is_ps and neg_hits and not pos_hits and not explicit_hit:
         is_ps = False
         reason_codes.append("lse_low_signal_notice")
+    if is_asx and is_ps and neg_hits and not pos_hits and not explicit_hit:
+        is_ps = False
+        reason_codes.append("asx_low_signal_notice")
     margin = abs(score - threshold)
     if not reason_codes:
         confidence = 0.45
@@ -3106,6 +3213,8 @@ def _build_price_sensitivity_assessment(
         confidence = max(confidence, 0.72)
     if is_lse and token_marker and is_ps:
         confidence = max(confidence, 0.74)
+    if is_asx and (token_marker or high_impact_hits) and is_ps:
+        confidence = max(confidence, 0.76)
 
     label = "uncertain"
     if confidence >= 0.86:
@@ -4507,6 +4616,8 @@ async def _build_injection_bundle_from_worker_summary(
         host = urlparse(str(pdf_url or source_url or "")).netloc.lower()
         published_at = str(source.get("published_at", "")).strip()
         role_tags = [str(item).strip() for item in list(source.get("role_tags", []) or []) if str(item).strip()]
+        retrieval_meta = dict(source.get("retrieval_meta", {}) or {})
+        retrieval_price_sensitive = bool(retrieval_meta.get("price_sensitive_marker", False))
         family_key = _family_key(title, source_url)
         wrapper_page = (
             bool(source.get("wrapper_page", False))
@@ -4515,7 +4626,10 @@ async def _build_injection_bundle_from_worker_summary(
         )
         importance_score = int((row.get("importance", {}) or {}).get("importance_score", 0) or 0)
         importance_score = max(0, min(100, importance_score))
-        price_sensitive = bool((row.get("price_sensitive", {}) or {}).get("is_price_sensitive", False))
+        price_sensitive = bool(
+            (row.get("price_sensitive", {}) or {}).get("is_price_sensitive", False)
+            or retrieval_price_sensitive
+        )
         model_keep = bool((row.get("importance", {}) or {}).get("keep_for_injection", False))
         doc_text = _doc_text(summary)
         coverage = _coverage_tags(title, doc_text)
@@ -4551,6 +4665,7 @@ async def _build_injection_bundle_from_worker_summary(
             "role_tags": role_tags,
             "wrapper_page": wrapper_page,
             "issuer_validation": dict(source.get("issuer_validation", {}) or {}),
+            "retrieval_meta": retrieval_meta,
             "corroboration_score": 70,
             "rank_score": 0.0,
         }
@@ -4957,6 +5072,7 @@ async def _build_injection_bundle_from_worker_summary(
                 },
                 "source_meta": {
                     "issuer_validation": dict(item.get("issuer_validation", {}) or {}),
+                    "retrieval_meta": dict(item.get("retrieval_meta", {}) or {}),
                 },
             }
         )
@@ -5376,6 +5492,7 @@ async def _run(args: argparse.Namespace) -> int:
                 if category == "ignore":
                     continue
                 priority = int(row.get("priority", 3) or 3)
+                price_sensitive_seed = bool(row.get("price_sensitive", False))
                 score = {1: 1.0, 2: 0.85, 3: 0.65}.get(priority, 0.5)
                 deterministic_asx_sources.append(
                     {
@@ -5384,16 +5501,18 @@ async def _run(args: argparse.Namespace) -> int:
                         "published_at": str(row.get("published_at", "")).strip(),
                         "content": (
                             "Deterministic ASX Market Index announcement lane. "
-                            f"category={category or 'routine'} priority={priority}."
+                            + ("price-sensitive asx announcement. " if price_sensitive_seed else "")
+                            + f"category={category or 'routine'} priority={priority}."
                         ),
                         "score": score,
                         "deterministic_source_kind": "asx_marketindex_pdf",
+                        "price_sensitive_seed": price_sensitive_seed,
                         "marketindex_category": category,
                         "marketindex_priority": priority,
                     }
                 )
-        if not deterministic_asx_sources and ticker_symbol:
-            deterministic_asx_sources = await _await_with_phase_progress(
+        if ticker_symbol:
+            official_asx_sources = await _await_with_phase_progress(
                 _discover_direct_asx_primary_sources(
                     symbol=ticker_symbol,
                     lookback_days=lookback_days,
@@ -5406,6 +5525,7 @@ async def _run(args: argparse.Namespace) -> int:
                 label="self-scrape-asx-direct",
                 interval_seconds=10.0,
             )
+            deterministic_asx_sources.extend(official_asx_sources)
 
         if deterministic_asx_sources:
             supplement_sources: List[Dict[str, Any]] = []
@@ -5424,9 +5544,10 @@ async def _run(args: argparse.Namespace) -> int:
                 row_url = str(row.get("url", "")).strip()
                 if not row_url:
                     continue
-                existing = merged_asx_sources.get(row_url)
+                row_key = _asx_pdf_identity(row_url)
+                existing = merged_asx_sources.get(row_key)
                 if not existing:
-                    merged_asx_sources[row_url] = row
+                    merged_asx_sources[row_key] = row
                     continue
                 existing_dt = _parse_iso_date(str(existing.get("published_at", "")).strip()) or _parse_date_from_pdf_url(
                     str(existing.get("url", "")).strip()
@@ -5436,10 +5557,15 @@ async def _run(args: argparse.Namespace) -> int:
                 )
                 existing_score = float(existing.get("score", 0.0) or 0.0)
                 row_score = float(row.get("score", 0.0) or 0.0)
-                if (row_dt or datetime(1970, 1, 1, tzinfo=timezone.utc)) > (
-                    existing_dt or datetime(1970, 1, 1, tzinfo=timezone.utc)
-                ) or row_score > existing_score:
-                    merged_asx_sources[row_url] = row
+                row_is_seeded_ps = bool(row.get("price_sensitive_seed", False))
+                existing_is_seeded_ps = bool(existing.get("price_sensitive_seed", False))
+                if (
+                    (row_dt or datetime(1970, 1, 1, tzinfo=timezone.utc))
+                    > (existing_dt or datetime(1970, 1, 1, tzinfo=timezone.utc))
+                    or (row_is_seeded_ps and not existing_is_seeded_ps)
+                    or row_score > existing_score
+                ):
+                    merged_asx_sources[row_key] = row
 
             sources = list(merged_asx_sources.values())
             sources.sort(

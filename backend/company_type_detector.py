@@ -47,8 +47,12 @@ COMMODITY_MINER_TYPES = {
     "silver_miner",
     "uranium_miner",
     "copper_miner",
+    "base_metals_miner",
     "lithium_miner",
     "bauxite_miner",
+    "iron_ore_miner",
+    "rare_earths_critical_minerals",
+    "coal_miner",
 }
 
 

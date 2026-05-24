@@ -94,7 +94,7 @@ DEFAULT_FAST_ALLOCATOR_COUNCIL_MODELS = _parse_model_list(
         "PORTFOLIO_POSITIONING_FAST_ALLOCATOR_COUNCIL_MODELS",
         ",".join(
             [
-                "x-ai/grok-4.20",
+                "x-ai/grok-4.3",
                 "google/gemini-3.1-pro-preview",
             ]
         ),
@@ -107,7 +107,7 @@ DEFAULT_DEEP_ALLOCATOR_COUNCIL_MODELS = _parse_model_list(
             [
                 "openai/gpt-5.5",
                 "google/gemini-3.1-pro-preview",
-                "x-ai/grok-4.20",
+                "x-ai/grok-4.3",
             ]
         ),
     )
@@ -466,6 +466,30 @@ def _normalize_asset_key(value: Any) -> str:
     return re.sub(r"[^A-Z0-9]+", "", str(value or "").strip().upper())
 
 
+def _humanize_asset_label(value: Any, fallback: str = "") -> str:
+    text = str(value or "").strip()
+    if not text:
+        return fallback
+    if "_" in text or "-" in text:
+        text = re.sub(r"[_-]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return fallback
+    if text.islower() or text.isupper():
+        text = text.title()
+    return text
+
+
+def _memo_asset_label(row: Dict[str, Any], fallback: str = "") -> str:
+    raw_name = str(row.get("display_name") or row.get("asset_class") or "").strip()
+    asset_class = str(row.get("asset_class") or "").strip()
+    if raw_name and asset_class and _normalize_asset_key(raw_name) == _normalize_asset_key(asset_class):
+        raw_name = _humanize_asset_label(raw_name)
+    else:
+        raw_name = _humanize_asset_label(raw_name, fallback)
+    return (raw_name or fallback).upper()
+
+
 def _build_asset_class_vocabulary(snapshot: Dict[str, Any]) -> List[Dict[str, Any]]:
     seen: set[str] = set()
     rows: List[Dict[str, Any]] = []
@@ -789,11 +813,184 @@ def _asset_class_vocab_ids(asset_class_vocabulary: List[Dict[str, Any]]) -> List
     for row in asset_class_vocabulary:
         if not isinstance(row, dict):
             continue
-        asset_class = str(row.get("asset_class") or "").strip().upper()
+        asset_class = str(row.get("asset_class") or "").strip()
         if asset_class and asset_class not in seen:
             ids.append(asset_class)
             seen.add(asset_class)
     return ids
+
+
+EXPOSURE_BASKET_SPECS: List[Tuple[str, str, List[str]]] = [
+    (
+        "precious_metals",
+        "Physical and miner expressions of monetary/inflation hedges; miners add operating, equity-beta, funding, and jurisdiction risk.",
+        ["physical_gold", "gold_miners", "physical_silver", "silver_miners"],
+    ),
+    (
+        "energy_inflation",
+        "Oil/gas supply, energy-security, and energy-inflation expressions; producers and direct commodities are related but not interchangeable.",
+        ["energy_producers", "energy_commodities", "uranium_miners", "coal_miner", "coal_miners"],
+    ),
+    (
+        "electrification_critical_materials",
+        "Electrification, grid, AI-power, and strategic-supply-chain beta; copper, lithium, rare earths, uranium, and base metals should be reconciled as a basket.",
+        ["copper_miners", "lithium_miners", "rare_earths_critical_minerals", "base_metals_miners", "diversified_miners", "uranium_miners"],
+    ),
+    (
+        "defensive_equity",
+        "Defensive or less-cyclical equity ballast; especially relevant when the memo calls Q3/stagflation or Q4/deflation risks.",
+        ["consumer_staples", "healthcare_services", "pharma_biotech", "medtech", "utilities", "insurance"],
+    ),
+    (
+        "ai_power_infrastructure",
+        "AI capex, power scarcity, grids, datacentres, semiconductors, and platforms; includes enabling commodities where relevant.",
+        ["semiconductors", "technology_platforms", "software_saas", "datacentres", "utilities", "copper_miners", "uranium_miners"],
+    ),
+]
+
+
+def _display_by_asset_class(rows: List[Dict[str, Any]]) -> Dict[str, str]:
+    display: Dict[str, str] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        asset_class = str(row.get("asset_class") or "").strip()
+        if asset_class:
+            display[asset_class] = str(row.get("display_name") or asset_class).strip()
+    return display
+
+
+def _cash_asset_class_id(asset_class_vocabulary: List[Dict[str, Any]]) -> str:
+    for row in asset_class_vocabulary:
+        if not isinstance(row, dict):
+            continue
+        asset_class = str(row.get("asset_class") or "").strip()
+        if _normalize_asset_key(asset_class) == "CASH":
+            return asset_class
+    return "cash"
+
+
+def _current_asset_class_rows(snapshot: Dict[str, Any]) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for row in snapshot.get("asset_classes") or []:
+        if not isinstance(row, dict):
+            continue
+        asset_class = str(row.get("asset_class") or "").strip()
+        if not asset_class:
+            continue
+        current_pct = _clamp_pct(row.get("portfolio_pct"))
+        if current_pct <= 0:
+            continue
+        rows.append(
+            {
+                "asset_class": asset_class,
+                "display_name": str(row.get("display_name") or asset_class).strip(),
+                "current_pct": current_pct,
+                "value": round(_safe_float(row.get("value")), 2),
+            }
+        )
+
+    cash_pct = _clamp_pct(((snapshot.get("portfolio") or {}).get("cash_pct")))
+    if cash_pct > 0 and not any(_normalize_asset_key(row.get("asset_class")) == "CASH" for row in rows):
+        rows.append(
+            {
+                "asset_class": "cash",
+                "display_name": "Cash",
+                "current_pct": cash_pct,
+                "value": round(_safe_float(((snapshot.get("portfolio") or {}).get("cash_value"))), 2),
+            }
+        )
+    rows.sort(key=lambda row: _safe_float(row.get("current_pct")), reverse=True)
+    return rows
+
+
+def _candidate_new_asset_class_rows(
+    *,
+    snapshot: Dict[str, Any],
+    asset_class_vocabulary: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    current_keys = {_normalize_asset_key(row.get("asset_class")) for row in _current_asset_class_rows(snapshot)}
+    candidates: List[Dict[str, Any]] = []
+    for row in asset_class_vocabulary:
+        if not isinstance(row, dict):
+            continue
+        asset_class = str(row.get("asset_class") or "").strip()
+        if not asset_class or _normalize_asset_key(asset_class) in current_keys:
+            continue
+        candidates.append(
+            {
+                "asset_class": asset_class,
+                "display_name": str(row.get("display_name") or asset_class).strip(),
+            }
+        )
+    return candidates
+
+
+def _build_exposure_basket_context(
+    *,
+    snapshot: Dict[str, Any],
+    asset_class_vocabulary: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    display = _display_by_asset_class(asset_class_vocabulary)
+    current_by_key = {
+        _normalize_asset_key(row.get("asset_class")): row
+        for row in _current_asset_class_rows(snapshot)
+        if isinstance(row, dict)
+    }
+    available_by_key = {
+        _normalize_asset_key(row.get("asset_class")): row
+        for row in asset_class_vocabulary
+        if isinstance(row, dict)
+    }
+    baskets: List[Dict[str, Any]] = []
+    for basket_id, description, asset_classes in EXPOSURE_BASKET_SPECS:
+        members: List[Dict[str, Any]] = []
+        for asset_class in asset_classes:
+            key = _normalize_asset_key(asset_class)
+            vocab_row = available_by_key.get(key)
+            current_row = current_by_key.get(key, {})
+            if not vocab_row and not current_row:
+                continue
+            canonical = str((vocab_row or current_row).get("asset_class") or asset_class).strip()
+            members.append(
+                {
+                    "asset_class": canonical,
+                    "display_name": str(display.get(canonical) or (vocab_row or current_row).get("display_name") or canonical).strip(),
+                    "current_pct": _clamp_pct(current_row.get("current_pct")),
+                    "currently_held": bool(current_row),
+                }
+            )
+        if members:
+            baskets.append(
+                {
+                    "basket": basket_id,
+                    "description": description,
+                    "members": members,
+                    "current_pct": round(sum(_clamp_pct(row.get("current_pct")) for row in members), 2),
+                }
+            )
+    return baskets
+
+
+def _build_portfolio_context_packet(
+    *,
+    snapshot: Dict[str, Any],
+    asset_class_vocabulary: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    current_rows = _current_asset_class_rows(snapshot)
+    candidates = _candidate_new_asset_class_rows(snapshot=snapshot, asset_class_vocabulary=asset_class_vocabulary)
+    return {
+        "portfolio": snapshot.get("portfolio") if isinstance(snapshot.get("portfolio"), dict) else {},
+        "weight_diagnostics": snapshot.get("weight_diagnostics") if isinstance(snapshot.get("weight_diagnostics"), dict) else {},
+        "current_asset_classes": current_rows,
+        "candidate_new_asset_classes": candidates,
+        "exposure_baskets": _build_exposure_basket_context(snapshot=snapshot, asset_class_vocabulary=asset_class_vocabulary),
+        "rules": [
+            "Current asset classes are actual portfolio exposures; candidate_new_asset_classes are allowed proposals but not currently held.",
+            "Every current_asset_classes row must receive an explicit keep/add/trim/exit/review decision somewhere in the final portfolio memo.",
+            "Before replacing a current sleeve with a new sleeve, explain whether the new sleeve is a cleaner exposure, a lower-risk implementation, or a genuinely different macro exposure.",
+        ],
+    }
 
 
 def _build_asset_class_mapping_guidance(asset_class_vocabulary: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -1001,8 +1198,7 @@ def _build_research_query(user_query: str) -> str:
         )
     return (
         f"{base} "
-        "Start from macro conditions only. Do not anchor to any existing portfolio structure. "
-        "Decide what the ideal asset-class mix should be first, then compare against the current portfolio later. "
+        "Use the macro evidence to form an independent regime view, then allow portfolio-aware allocator lanes to test that view against current exposures. "
         "Do not recommend individual stocks."
     ).strip()
 
@@ -1097,7 +1293,7 @@ def _build_macro_environment_news_prompt(*, user_query: str) -> str:
         "Do not rename or rotate these quadrant definitions. "
         "Note the most prominent current investment themes being pushed by major brokers, strategists, or bank research desks where visible. "
         "Explain which asset classes deserve more capital and which deserve less in the current environment. "
-        "This brief must be independent of any existing portfolio. "
+        "This brief is macro evidence, not a final allocation; portfolio-aware allocator lanes may later compare it against current holdings. "
         "Output plain text only. Do NOT include URLs, citation markers, footnotes, source lists, markdown, or bullet points."
     )
     if focus:
@@ -1715,6 +1911,78 @@ def _normalize_evidence_asset_coverage(
             "allocation_relevance": str(row.get("allocation_relevance") or existing.get("allocation_relevance") or "").strip(),
         }
 
+    for row in evidence_brief.get("asset_class_implications") or []:
+        if not isinstance(row, dict):
+            continue
+        resolved = _resolve_allowed_asset_class(row.get("asset_class") or row.get("display_name"), allowed_index=allowed_index)
+        if not resolved:
+            continue
+        asset_class = str(resolved.get("asset_class") or "").strip()
+        if not asset_class:
+            continue
+        reason = str(row.get("reason") or row.get("rationale") or "").strip()
+        stance = str(row.get("stance") or "WATCH").strip().upper()
+        existing = by_asset.get(asset_class, {})
+        existing_strength = str(existing.get("evidence_strength") or "").strip().upper()
+        if existing_strength in {"", "NONE"} or str(existing.get("stance") or "").strip().upper() == "NOT_RELEVANT":
+            by_asset[asset_class] = {
+                "asset_class": asset_class,
+                "display_name": str(resolved.get("display_name") or asset_class).strip(),
+                "stance": stance if stance in {"OVERWEIGHT", "UNDERWEIGHT", "HOLD", "WATCH"} else "WATCH",
+                "evidence_strength": "MEDIUM" if reason else "LOW",
+                "evidence_summary": reason or "Asset-class implication was present in the evidence packet.",
+                "source_titles": [],
+                "allocation_relevance": reason or "Evidence packet included this sleeve as allocation-relevant.",
+            }
+
+    commodity_text_to_assets: List[Tuple[Tuple[str, ...], List[str]]] = [
+        (("GOLD",), ["physical_gold", "gold_miners"]),
+        (("SILVER",), ["physical_silver", "silver_miners"]),
+        (("COPPER",), ["copper_miners", "base_metals_miners"]),
+        (("OIL", "BRENT", "WTI", "GAS", "ENERGY"), ["energy_producers", "energy_commodities"]),
+        (("URANIUM", "NUCLEAR"), ["uranium_miners"]),
+        (("AGRIC", "WHEAT", "CORN", "SOY", "FOOD"), ["agriculture_agribusiness", "consumer_staples"]),
+        (("IRON",), ["iron_ore_miners", "diversified_miners"]),
+        (("LITHIUM",), ["lithium_miners"]),
+        (("RARE EARTH", "CRITICAL MINERAL"), ["rare_earths_critical_minerals"]),
+    ]
+    for row in evidence_brief.get("commodity_prices") or []:
+        if not isinstance(row, dict):
+            continue
+        text = " ".join(
+            [
+                str(row.get("commodity") or ""),
+                str(row.get("price_context") or ""),
+                str(row.get("portfolio_implication") or ""),
+            ]
+        ).upper()
+        if not text.strip():
+            continue
+        implication = str(row.get("portfolio_implication") or row.get("price_context") or "").strip()
+        for markers, asset_ids in commodity_text_to_assets:
+            if not any(marker in text for marker in markers):
+                continue
+            for asset_id in asset_ids:
+                resolved = _resolve_allowed_asset_class(asset_id, allowed_index=allowed_index)
+                if not resolved:
+                    continue
+                asset_class = str(resolved.get("asset_class") or "").strip()
+                if not asset_class:
+                    continue
+                existing = by_asset.get(asset_class, {})
+                existing_strength = str(existing.get("evidence_strength") or "").strip().upper()
+                if existing_strength in {"HIGH", "MEDIUM"} and str(existing.get("stance") or "").strip().upper() != "NOT_RELEVANT":
+                    continue
+                by_asset[asset_class] = {
+                    "asset_class": asset_class,
+                    "display_name": str(resolved.get("display_name") or asset_class).strip(),
+                    "stance": "WATCH",
+                    "evidence_strength": "LOW",
+                    "evidence_summary": implication or f"Commodity evidence referenced {row.get('commodity')}.",
+                    "source_titles": [],
+                    "allocation_relevance": implication or "Commodity tape is relevant to this sleeve but not sufficient alone for a forced allocation.",
+                }
+
     for row in asset_class_vocabulary:
         if not isinstance(row, dict):
             continue
@@ -1733,6 +2001,18 @@ def _normalize_evidence_asset_coverage(
 
     updated = dict(evidence_brief)
     updated["asset_class_coverage"] = list(by_asset.values())
+    coverage_rows = [row for row in updated["asset_class_coverage"] if isinstance(row, dict)]
+    non_none_rows = [
+        row
+        for row in coverage_rows
+        if str(row.get("evidence_strength") or "").strip().upper() != "NONE"
+        or str(row.get("stance") or "").strip().upper() != "NOT_RELEVANT"
+    ]
+    updated["asset_class_coverage_quality"] = {
+        "status": "ok" if non_none_rows else "failed_all_none",
+        "row_count": len(coverage_rows),
+        "non_none_row_count": len(non_none_rows),
+    }
     return updated
 
 
@@ -1986,19 +2266,60 @@ async def _run_chairman(
     mode: str,
     evidence_brief: Dict[str, Any],
     asset_class_vocabulary: List[Dict[str, Any]],
+    snapshot: Optional[Dict[str, Any]] = None,
     model_override: Optional[str] = None,
     lane_label: str = "chairman",
+    lane_strategy: str = "blind_macro_prior",
 ) -> Dict[str, Any]:
     chairman_model = str(model_override or _chairman_model_for_mode(mode)).strip()
     asset_class_mapping_guidance = _build_asset_class_mapping_guidance(asset_class_vocabulary)
+    portfolio_context = _build_portfolio_context_packet(
+        snapshot=snapshot or {},
+        asset_class_vocabulary=asset_class_vocabulary,
+    )
+    cash_asset_id = _cash_asset_class_id(asset_class_vocabulary)
+    lane_strategy = str(lane_strategy or "blind_macro_prior").strip().lower()
+    task_by_strategy = {
+        "blind_macro_prior": "Act as a top-down macro allocator. Build a macro-prior asset-class portfolio before considering the user's current holdings.",
+        "portfolio_aware_allocator": "Act as a portfolio-aware macro allocator. Judge the user's current asset-class exposures against the macro evidence before proposing target ranges.",
+        "exposure_equivalence_reviewer": "Act as an exposure-equivalence reviewer. Reconcile related sleeves before recommending adds/trims, especially physical metals versus miners and critical-materials baskets.",
+        "defensive_regime_reviewer": "Act as a defensive-regime reviewer. Stress-test whether the allocation is coherent with Q2/Q3/Q4 regime risks and the user's current defensive sleeves.",
+    }
+    strategy_rules: List[str] = []
+    if lane_strategy == "blind_macro_prior":
+        strategy_rules = [
+            "This lane is the only blind macro-prior lane: do not anchor to existing weights when setting initial target ranges.",
+            "Still use the provided current portfolio context only to label whether a recommended sleeve is already held or a new proposal.",
+        ]
+    else:
+        strategy_rules = [
+            "Start with current_asset_classes and explicitly judge every current nonzero sleeve before proposing new sleeves.",
+            "Do not treat candidate_new_asset_classes as current exposure; they are new-sleeve proposals only.",
+            "If a current sleeve already expresses the same regime exposure as a new sleeve, compare implementation quality before recommending a replacement.",
+            "Do not recommend trimming a current sleeve without naming the substitute exposure or the reason cash/fixed income is superior.",
+        ]
+    if lane_strategy == "exposure_equivalence_reviewer":
+        strategy_rules.extend(
+            [
+                "Use exposure_baskets as hard reconciliation checks. Do not add copper while trimming lithium or rare earths without explaining why the basket mix should change.",
+                "Do not add physical gold or physical silver while ignoring gold_miners or silver_miners; discuss beta, operating risk, valuation, and whether miner exposure partly satisfies the hedge.",
+                "Treat energy producers and direct energy commodities as related oil/inflation exposures, not unrelated sleeves.",
+            ]
+        )
+    if lane_strategy == "defensive_regime_reviewer":
+        strategy_rules.extend(
+            [
+                "If the regime call includes stagflation/Q3 or deflation/Q4 risk, explicitly assess consumer_staples, healthcare_services, pharma_biotech, utilities, insurance, cash, fixed_income, and precious metals.",
+                "Do not cut defensive sleeves merely because they are not high-beta macro winners; decide whether they provide ballast.",
+            ]
+        )
     prompt = {
-        "task": "Act as a top-down macro allocator. Build an ideal asset-class portfolio from the macro environment first, before seeing any existing holdings.",
+        "task": task_by_strategy.get(lane_strategy, task_by_strategy["blind_macro_prior"]),
         "rules": [
             "Return JSON only.",
             "Work at the asset-class level, not the stock level.",
             "This is not a Q1 overlay memo and not a balanced-fund diversification exercise.",
-            "Do not anchor to any existing portfolio or assume current weights are sensible.",
-            "Build the ideal portfolio from macro conditions first.",
+            *strategy_rules,
             f"Use this exact quadrant framework: Q1 = {QUADRANT_DEFINITIONS['Q1']}; Q2 = {QUADRANT_DEFINITIONS['Q2']}; Q3 = {QUADRANT_DEFINITIONS['Q3']}; Q4 = {QUADRANT_DEFINITIONS['Q4']}.",
             "Do not rotate, rename, or reinterpret the quadrant labels.",
             "Targets should be pragmatic ranges, not false precision.",
@@ -2022,7 +2343,7 @@ async def _run_chairman(
             "If the latest growth nowcast or current-year estimate is below 1%, treat that as a material slowdown and reflect it in the allocation logic.",
             "Use the quadrant assessment and the commodity tape directly; do not smooth them away into generic middle-of-the-road positioning.",
             "Every target row must represent a deliberate sleeve in the ideal portfolio. Do not emit placeholder 0-0-0 ranges just to mention a class.",
-            "If strategic_view.cash_target_pct is above zero, include a CASH target row when CASH is available in the asset-class vocabulary.",
+            f"If strategic_view.cash_target_pct is above zero, include a {cash_asset_id} target row when {cash_asset_id} is available in the asset-class vocabulary.",
             "Do not use EQUITY as a broad residual bucket when more specific supported sleeves are available.",
             "Keep strategic_view notes focused on investable implementation implications, not quadrant label exposition. Do not write notes like 'Q1 is rejected' unless it directly changes allocation.",
             "Use evidence_brief.asset_class_coverage as the coverage audit. It is not a forced allocation list.",
@@ -2063,6 +2384,16 @@ async def _run_chairman(
                     "rationale": "string"
                 }
             ],
+            "current_sleeve_actions": [
+                {
+                    "asset_class": "string",
+                    "display_name": "string",
+                    "current_pct": "number",
+                    "action": "ADD | HOLD | TRIM | EXIT | REVIEW | WATCH",
+                    "related_or_substitute_exposure": "string",
+                    "rationale": "string"
+                }
+            ],
             "implementation_notes": ["string"],
             "monitoring_triggers": [
                 {
@@ -2077,6 +2408,8 @@ async def _run_chairman(
         "evidence_brief": evidence_brief,
         "available_asset_class_vocabulary": asset_class_vocabulary,
         "asset_class_mapping_guidance": asset_class_mapping_guidance,
+        "portfolio_context": portfolio_context,
+        "lane_strategy": lane_strategy,
     }
 
     response = await query_model(
@@ -2095,10 +2428,12 @@ async def _run_chairman(
     parsed["query"] = query
     parsed["chairman_model"] = chairman_model
     parsed["council_lane"] = lane_label
+    parsed["lane_strategy"] = lane_strategy
     parsed["prompt_audit"] = {
         "stage": "allocator_lane",
         "model": chairman_model,
         "lane_label": lane_label,
+        "lane_strategy": lane_strategy,
         "prompt": prompt,
     }
     return _normalize_macro_positioning_taxonomy(parsed, asset_class_vocabulary=asset_class_vocabulary)
@@ -2124,9 +2459,15 @@ def _summarize_allocator_output(positioning: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "model": str(positioning.get("chairman_model") or "").strip(),
         "lane": str(positioning.get("council_lane") or "allocator").strip(),
+        "lane_strategy": str(positioning.get("lane_strategy") or "").strip(),
         "executive_summary": str(positioning.get("executive_summary") or "").strip(),
         "strategic_view": positioning.get("strategic_view") if isinstance(positioning.get("strategic_view"), dict) else {},
         "asset_class_targets": rows,
+        "current_sleeve_actions": [
+            row
+            for row in (positioning.get("current_sleeve_actions") or [])[:20]
+            if isinstance(row, dict)
+        ],
         "suggested_new_asset_classes": [
             row
             for row in (positioning.get("suggested_new_asset_classes") or [])[:12]
@@ -2157,6 +2498,7 @@ async def _run_allocator_judge(
     mode: str,
     evidence_brief: Dict[str, Any],
     asset_class_vocabulary: List[Dict[str, Any]],
+    snapshot: Optional[Dict[str, Any]] = None,
     allocator_outputs: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     valid_outputs = [row for row in allocator_outputs if isinstance(row, dict)]
@@ -2175,6 +2517,11 @@ async def _run_allocator_judge(
 
     judge_model = _chairman_model_for_mode(mode)
     asset_class_mapping_guidance = _build_asset_class_mapping_guidance(asset_class_vocabulary)
+    portfolio_context = _build_portfolio_context_packet(
+        snapshot=snapshot or {},
+        asset_class_vocabulary=asset_class_vocabulary,
+    )
+    cash_asset_id = _cash_asset_class_id(asset_class_vocabulary)
     prompt = {
         "task": "Act as the portfolio-positioning judge. Compare multiple independent allocator outputs built from the same macro evidence and produce one final best-judgement asset-class portfolio.",
         "rules": [
@@ -2188,11 +2535,18 @@ async def _run_allocator_judge(
             "Do not preserve unsupported company-analysis template labels in the final output.",
             "Do not mechanically average the allocators.",
             "Select the most defensible ranges based on evidence quality, internal coherence, and agreement across allocators.",
+            "Treat blind_macro_prior as useful but not final. Portfolio-aware and exposure-equivalence lanes should overrule it when they better account for the user's actual exposure.",
+            "Every current_asset_classes row with nonzero current_pct must be judged in current_sleeve_actions or included in asset_class_targets.",
+            "Do not treat candidate_new_asset_classes as current exposure; label them as new-sleeve proposals if selected.",
+            "Use exposure_baskets to prevent contradictory decisions inside a shared regime exposure.",
+            "If recommending physical_gold or physical_silver, explicitly decide how existing gold_miners or silver_miners should be handled.",
+            "If recommending copper_miners while trimming or ignoring lithium_miners or rare_earths_critical_minerals, explain the basket-level reason.",
+            "If Q3/stagflation or Q4/deflation is a live risk, explicitly address staples/healthcare/insurance/cash/fixed income/precious metals as defensive or hedge sleeves.",
             "If allocators disagree, explain the disagreement briefly and then choose a side.",
             "Prefer the output that best matches the evidence brief, commodity tape, rates, and quadrant logic.",
             "Do not invent placeholder target rows just to mention a sleeve.",
             "Concentrated allocations are acceptable when supported by the evidence.",
-            "If strategic_view.cash_target_pct is above zero, include a CASH target row when CASH is available in the asset-class vocabulary.",
+            f"If strategic_view.cash_target_pct is above zero, include a {cash_asset_id} target row when {cash_asset_id} is available in the asset-class vocabulary.",
             "Do not use EQUITY as a broad residual bucket when more specific supported sleeves are available.",
             "Use evidence_brief.asset_class_coverage to detect material omissions across allocator outputs.",
             "If all allocators omit an asset class with HIGH or MEDIUM evidence_strength and allocation relevance, preserve that as a disagreement/risk note or include the sleeve.",
@@ -2230,6 +2584,16 @@ async def _run_allocator_judge(
                     "rationale": "string"
                 }
             ],
+            "current_sleeve_actions": [
+                {
+                    "asset_class": "string",
+                    "display_name": "string",
+                    "current_pct": "number",
+                    "action": "ADD | HOLD | TRIM | EXIT | REVIEW | WATCH",
+                    "related_or_substitute_exposure": "string",
+                    "rationale": "string"
+                }
+            ],
             "implementation_notes": ["string"],
             "monitoring_triggers": [
                 {
@@ -2252,6 +2616,7 @@ async def _run_allocator_judge(
         "evidence_brief": evidence_brief,
         "available_asset_class_vocabulary": asset_class_vocabulary,
         "asset_class_mapping_guidance": asset_class_mapping_guidance,
+        "portfolio_context": portfolio_context,
         "allocator_outputs": [_summarize_allocator_output(item) for item in valid_outputs],
     }
 
@@ -2304,16 +2669,25 @@ async def _run_allocator_council(
     mode: str,
     evidence_brief: Dict[str, Any],
     asset_class_vocabulary: List[Dict[str, Any]],
+    snapshot: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     models = _allocator_council_models_for_mode(mode)
+    strategy_cycle = [
+        "blind_macro_prior",
+        "portfolio_aware_allocator",
+        "exposure_equivalence_reviewer",
+        "defensive_regime_reviewer",
+    ]
     tasks = [
         _run_chairman(
             query=query,
             mode=mode,
             evidence_brief=evidence_brief,
             asset_class_vocabulary=asset_class_vocabulary,
+            snapshot=snapshot,
             model_override=model,
             lane_label=f"allocator_{idx + 1}",
+            lane_strategy=strategy_cycle[min(idx, len(strategy_cycle) - 1)],
         )
         for idx, model in enumerate(models)
     ]
@@ -2351,6 +2725,7 @@ async def _run_allocator_council(
         mode=mode,
         evidence_brief=evidence_brief,
         asset_class_vocabulary=asset_class_vocabulary,
+        snapshot=snapshot,
         allocator_outputs=valid_outputs,
     )
     return judged, allocator_outputs
@@ -2481,6 +2856,11 @@ async def _run_allocator_commentary(
             "commodity_prices": (evidence_brief.get("commodity_prices") or [])[:12],
         },
         "asset_class_ranges_and_current_weights": asset_rows[:20],
+        "current_sleeve_decisions": [
+            row
+            for row in (structured.get("current_sleeve_decisions") or [])
+            if isinstance(row, dict)
+        ][:24],
         "current_asset_classes_not_in_ideal_map": [
             {
                 "asset_class": str(row.get("asset_class") or "").strip(),
@@ -2565,9 +2945,25 @@ def _apply_allocator_commentary(
             enriched["allocator_commentary"] = note
         enriched_unmapped.append(enriched)
 
+    enriched_current_decisions: List[Dict[str, Any]] = []
+    for row in structured.get("current_sleeve_decisions") or []:
+        if not isinstance(row, dict):
+            continue
+        key = _normalize_asset_key(row.get("asset_class") or row.get("display_name"))
+        comment = comments_by_key.get(key, {})
+        enriched = dict(row)
+        if comment:
+            enriched["action"] = str(comment.get("direction") or row.get("action") or "REVIEW").strip().upper()
+            enriched["conviction"] = str(comment.get("conviction") or row.get("conviction") or "").strip().upper()
+            note = str(comment.get("commentary") or "").strip()
+            if note:
+                enriched["allocator_commentary"] = note
+        enriched_current_decisions.append(enriched)
+
     updated = dict(structured)
     updated["asset_class_targets"] = enriched_targets
     updated["unmapped_current_asset_classes"] = enriched_unmapped
+    updated["current_sleeve_decisions"] = enriched_current_decisions
     updated["allocator_commentary"] = {
         "comparison_summary": str(commentary.get("comparison_summary") or "").strip(),
         "overall_conviction": str(commentary.get("overall_conviction") or "").strip().upper(),
@@ -2671,20 +3067,28 @@ def _merge_positioning_with_snapshot(
     diagnosis = _build_portfolio_diagnosis(snapshot)
     sharpened_quadrant = _sharpen_quadrant_assessment(evidence_brief)
     current_by_class: Dict[str, Dict[str, Any]] = {}
+    current_by_key: Dict[str, Dict[str, Any]] = {}
     for row in snapshot.get("asset_classes") or []:
         if not isinstance(row, dict):
             continue
         key = str(row.get("asset_class") or "").strip()
         if key:
             current_by_class[key] = row
+            current_by_key[_normalize_asset_key(key)] = row
+    cash_asset_class = "cash"
+    cash_display_name = "Cash"
+    cash_row = {
+        "asset_class": cash_asset_class,
+        "display_name": cash_display_name,
+        "portfolio_pct": _clamp_pct(((snapshot.get("portfolio") or {}).get("cash_pct"))),
+    }
     current_by_class.setdefault(
-        "CASH",
+        cash_asset_class,
         {
-            "asset_class": "CASH",
-            "display_name": "CASH",
-            "portfolio_pct": _clamp_pct(((snapshot.get("portfolio") or {}).get("cash_pct"))),
+            **cash_row,
         },
     )
+    current_by_key.setdefault("CASH", cash_row)
 
     merged_targets: List[Dict[str, Any]] = []
     unmapped_current_asset_classes: List[Dict[str, Any]] = []
@@ -2698,7 +3102,7 @@ def _merge_positioning_with_snapshot(
         asset_class = str(row.get("asset_class") or "").strip()
         if not asset_class:
             continue
-        current_row = current_by_class.get(asset_class, {})
+        current_row = current_by_class.get(asset_class) or current_by_key.get(_normalize_asset_key(asset_class), {})
         current_pct = _clamp_pct(current_row.get("portfolio_pct"))
         min_pct = _clamp_pct(row.get("min_pct"))
         target_pct = _clamp_pct(row.get("target_pct"))
@@ -2736,17 +3140,17 @@ def _merge_positioning_with_snapshot(
         )
 
     cash_target = _clamp_pct(((macro_positioning.get("strategic_view") or {}).get("cash_target_pct")) if isinstance(macro_positioning.get("strategic_view"), dict) else 0)
-    has_cash_target = any(str(row.get("asset_class") or "").strip().upper() == "CASH" for row in merged_targets)
+    has_cash_target = any(_normalize_asset_key(row.get("asset_class")) == "CASH" for row in merged_targets)
     if cash_target > 0 and not has_cash_target:
-        current_row = current_by_class.get("CASH", {})
+        current_row = current_by_key.get("CASH", {})
         current_pct = _clamp_pct(current_row.get("portfolio_pct"))
         min_pct = max(0.0, round(cash_target - 3.0, 2))
         max_pct = min(100.0, round(cash_target + 3.0, 2))
         action = _default_action_from_range(current_pct=current_pct, min_pct=min_pct, max_pct=max_pct)
         merged_targets.append(
             {
-                "asset_class": "CASH",
-                "display_name": "CASH",
+                "asset_class": cash_asset_class,
+                "display_name": cash_display_name,
                 "current_pct": current_pct,
                 "min_pct": min_pct,
                 "target_pct": cash_target,
@@ -2759,9 +3163,9 @@ def _merge_positioning_with_snapshot(
             }
         )
 
-    known = {str(row.get("asset_class") or "").strip() for row in merged_targets if isinstance(row, dict)}
+    known = {_normalize_asset_key(row.get("asset_class")) for row in merged_targets if isinstance(row, dict)}
     for asset_class, current_row in current_by_class.items():
-        if asset_class in known:
+        if _normalize_asset_key(asset_class) in known:
             continue
         current_pct = _clamp_pct(current_row.get("portfolio_pct"))
         if current_pct <= 0:
@@ -2776,6 +3180,57 @@ def _merge_positioning_with_snapshot(
                 "rationale": "Current sleeve is not a named priority in the independent macro-built ideal map and needs a separate reassessment.",
                 "implementation_priority": "medium",
                 "conviction": "",
+            }
+        )
+
+    model_actions_by_key: Dict[str, Dict[str, Any]] = {}
+    for row in macro_positioning.get("current_sleeve_actions") or []:
+        if not isinstance(row, dict):
+            continue
+        key = _normalize_asset_key(row.get("asset_class") or row.get("display_name"))
+        if key:
+            model_actions_by_key[key] = row
+
+    current_sleeve_decisions: List[Dict[str, Any]] = []
+    for row in merged_targets:
+        if not isinstance(row, dict):
+            continue
+        current_pct = _clamp_pct(row.get("current_pct"))
+        if current_pct <= 0:
+            continue
+        current_sleeve_decisions.append(
+            {
+                "asset_class": str(row.get("asset_class") or "").strip(),
+                "display_name": str(row.get("display_name") or row.get("asset_class") or "").strip(),
+                "current_pct": current_pct,
+                "min_pct": _clamp_pct(row.get("min_pct")),
+                "target_pct": _clamp_pct(row.get("target_pct")),
+                "max_pct": _clamp_pct(row.get("max_pct")),
+                "action": str(row.get("action") or "HOLD").strip().upper(),
+                "related_or_substitute_exposure": "",
+                "rationale": str(row.get("rationale") or "").strip(),
+                "source": "target_row",
+            }
+        )
+    for row in unmapped_current_asset_classes:
+        if not isinstance(row, dict):
+            continue
+        key = _normalize_asset_key(row.get("asset_class") or row.get("display_name"))
+        model_action = model_actions_by_key.get(key, {})
+        action = str(model_action.get("action") or row.get("action") or "REVIEW").strip().upper()
+        rationale = str(model_action.get("rationale") or row.get("rationale") or "").strip()
+        current_sleeve_decisions.append(
+            {
+                "asset_class": str(row.get("asset_class") or "").strip(),
+                "display_name": str(row.get("display_name") or row.get("asset_class") or "").strip(),
+                "current_pct": _clamp_pct(row.get("current_pct")),
+                "min_pct": 0.0,
+                "target_pct": _clamp_pct(row.get("current_pct")),
+                "max_pct": _clamp_pct(row.get("current_pct")),
+                "action": action,
+                "related_or_substitute_exposure": str(model_action.get("related_or_substitute_exposure") or "").strip(),
+                "rationale": rationale,
+                "source": "current_only",
             }
         )
 
@@ -2805,6 +3260,11 @@ def _merge_positioning_with_snapshot(
         for item in (macro_positioning.get("risk_flags") or [])
         if str(item).strip()
     ]
+    coverage_quality = evidence_brief.get("asset_class_coverage_quality") if isinstance(evidence_brief.get("asset_class_coverage_quality"), dict) else {}
+    if str(coverage_quality.get("status") or "").strip() == "failed_all_none":
+        risk_flags.append(
+            "Evidence coverage failed: every available asset class was marked NOT_RELEVANT/NONE, so final positioning must rely on macro narrative and portfolio-aware reconciliation rather than the coverage table."
+        )
     for row in coverage_audit.get("material_omissions") or []:
         if not isinstance(row, dict):
             continue
@@ -2836,6 +3296,7 @@ def _merge_positioning_with_snapshot(
         "broker_themes": evidence_brief.get("broker_themes") if isinstance(evidence_brief.get("broker_themes"), list) else [],
         "asset_class_targets": merged_targets,
         "unmapped_current_asset_classes": unmapped_current_asset_classes,
+        "current_sleeve_decisions": current_sleeve_decisions,
         "suggested_new_asset_classes": macro_positioning.get("suggested_new_asset_classes") if isinstance(macro_positioning.get("suggested_new_asset_classes"), list) else [],
         "current_vs_ideal": {
             "main_overweights": overweights[:8],
@@ -2903,6 +3364,7 @@ def _render_markdown(
     commodity_prices = structured.get("commodity_prices") if isinstance(structured.get("commodity_prices"), list) else []
     broker_themes = structured.get("broker_themes") if isinstance(structured.get("broker_themes"), list) else []
     unmapped_current_asset_classes = structured.get("unmapped_current_asset_classes") if isinstance(structured.get("unmapped_current_asset_classes"), list) else []
+    current_sleeve_decisions = structured.get("current_sleeve_decisions") if isinstance(structured.get("current_sleeve_decisions"), list) else []
     coverage_audit = structured.get("asset_class_coverage_audit") if isinstance(structured.get("asset_class_coverage_audit"), dict) else {}
     lines.append("## Current Shape")
     lines.append("")
@@ -3082,7 +3544,7 @@ def _render_markdown(
             for row in material_omissions[:8]:
                 if not isinstance(row, dict):
                     continue
-                name = str(row.get("display_name") or row.get("asset_class") or "").strip()
+                name = _memo_asset_label(row)
                 stance = str(row.get("stance") or "").strip()
                 strength = str(row.get("evidence_strength") or "").strip()
                 reason = str(row.get("reason") or "").strip()
@@ -3091,12 +3553,30 @@ def _render_markdown(
             for row in weak_targets[:8]:
                 if not isinstance(row, dict):
                     continue
-                name = str(row.get("display_name") or row.get("asset_class") or "").strip()
+                name = _memo_asset_label(row)
                 strength = str(row.get("evidence_strength") or "").strip()
                 reason = str(row.get("reason") or "").strip()
                 if name:
                     lines.append(f"- Weak direct evidence in targets: {name} ({strength}). {reason}")
             lines.append("")
+
+    if current_sleeve_decisions:
+        lines.append("## Current Sleeve Decisions")
+        lines.append("")
+        lines.append("| Current Sleeve | Current | Direction | Related / Substitute | Rationale |")
+        lines.append("| --- | ---: | --- | --- | --- |")
+        for row in current_sleeve_decisions[:24]:
+            if not isinstance(row, dict):
+                continue
+            name = _memo_asset_label(row)
+            if not name:
+                continue
+            current_pct = _clamp_pct(row.get("current_pct"))
+            action = str(row.get("action") or "REVIEW").strip().upper()
+            related = str(row.get("related_or_substitute_exposure") or "").strip()
+            rationale = str(row.get("allocator_commentary") or row.get("rationale") or "").strip()
+            lines.append(f"| {name} | {current_pct:.1f}% | {action} | {related or 'n/a'} | {rationale or 'Needs explicit reassessment.'} |")
+        lines.append("")
 
     lines.append("## Asset Class Targets")
     lines.append("")
@@ -3107,7 +3587,7 @@ def _render_markdown(
         for row in targets:
             if not isinstance(row, dict):
                 continue
-            name = str(row.get("display_name") or row.get("asset_class") or "").strip()
+            name = _memo_asset_label(row)
             current_pct = _clamp_pct(row.get("current_pct"))
             min_pct = _clamp_pct(row.get("min_pct"))
             target_pct = _clamp_pct(row.get("target_pct"))
@@ -3119,7 +3599,7 @@ def _render_markdown(
         for row in targets[:16]:
             if not isinstance(row, dict):
                 continue
-            name = str(row.get("display_name") or row.get("asset_class") or "").strip()
+            name = _memo_asset_label(row)
             rationale = str(row.get("allocator_commentary") or row.get("rationale") or "").strip()
             thesis_role = str(row.get("thesis_role") or "").strip()
             action = str(row.get("action") or "").strip().upper()
@@ -3139,7 +3619,7 @@ def _render_markdown(
         for row in unmapped_current_asset_classes[:16]:
             if not isinstance(row, dict):
                 continue
-            name = str(row.get("display_name") or row.get("asset_class") or "").strip()
+            name = _memo_asset_label(row)
             current_pct = _clamp_pct(row.get("current_pct"))
             action = str(row.get("action") or "REVIEW").strip().upper()
             conviction = str(row.get("conviction") or "").strip().upper()
@@ -3179,7 +3659,7 @@ def _render_markdown(
         for row in new_classes[:8]:
             if not isinstance(row, dict):
                 continue
-            name = str(row.get("display_name") or row.get("asset_class") or "").strip()
+            name = _memo_asset_label(row)
             target_pct = _clamp_pct(row.get("target_pct"))
             rationale = str(row.get("rationale") or "").strip()
             lines.append(f"- **{name}**: {target_pct:.1f}% target. {rationale}")
@@ -3263,6 +3743,7 @@ async def _run_single_portfolio_memo_lane(
         mode=mode,
         evidence_brief=evidence_brief,
         asset_class_vocabulary=asset_class_vocabulary,
+        snapshot=snapshot,
     )
     structured = _merge_positioning_with_snapshot(
         snapshot=snapshot,
@@ -3323,6 +3804,16 @@ def _summarize_portfolio_memo_lane(lane: Dict[str, Any]) -> Dict[str, Any]:
         "executive_summary": str(structured.get("executive_summary") or "").strip(),
         "strategic_view": structured.get("strategic_view") if isinstance(structured.get("strategic_view"), dict) else {},
         "asset_class_targets": targets,
+        "current_sleeve_actions": [
+            row
+            for row in (structured.get("current_sleeve_decisions") or structured.get("current_sleeve_actions") or [])[:24]
+            if isinstance(row, dict)
+        ],
+        "unmapped_current_asset_classes": [
+            row
+            for row in (structured.get("unmapped_current_asset_classes") or [])[:16]
+            if isinstance(row, dict)
+        ],
         "implementation_notes": [
             str(item).strip()
             for item in (structured.get("implementation_notes") or [])[:8]
@@ -3369,6 +3860,7 @@ async def _run_portfolio_memo_synthesis(
     *,
     query: str,
     mode: str,
+    snapshot: Dict[str, Any],
     evidence_brief: Dict[str, Any],
     asset_class_vocabulary: List[Dict[str, Any]],
     lanes: List[Dict[str, Any]],
@@ -3396,6 +3888,11 @@ async def _run_portfolio_memo_synthesis(
 
     synthesis_model = DEFAULT_SYNTHESIS_MODEL or _chairman_model_for_mode(mode)
     asset_class_mapping_guidance = _build_asset_class_mapping_guidance(asset_class_vocabulary)
+    portfolio_context = _build_portfolio_context_packet(
+        snapshot=snapshot,
+        asset_class_vocabulary=asset_class_vocabulary,
+    )
+    cash_asset_id = _cash_asset_class_id(asset_class_vocabulary)
     prompt = {
         "task": "Synthesize three independent portfolio-positioning memos into one final macro-positioning decision.",
         "rules": [
@@ -3403,6 +3900,13 @@ async def _run_portfolio_memo_synthesis(
             "Use the shared evidence brief as the source of truth.",
             "Do not mechanically average target ranges.",
             "Prefer allocations that are supported by evidence and appear across multiple lanes, but keep a superior minority view if it better matches the evidence.",
+            "Treat blind macro-prior lanes as only one input; the final answer must be portfolio-aware.",
+            "Every current_asset_classes row with nonzero current_pct must be judged in current_sleeve_actions or included in asset_class_targets.",
+            "Do not treat candidate_new_asset_classes as current exposure; label them as new-sleeve proposals if selected.",
+            "Use exposure_baskets to prevent contradictory decisions inside the same regime exposure.",
+            "If recommending physical_gold or physical_silver, explicitly decide how existing gold_miners or silver_miners should be handled.",
+            "If recommending copper_miners while reducing or ignoring lithium_miners or rare_earths_critical_minerals, explain the critical-materials basket logic.",
+            "If Q3/stagflation or Q4/deflation is a live risk, explicitly account for staples, healthcare, insurance, cash, fixed income, and precious metals.",
             "Preserve meaningful disagreement in portfolio_memo_ensemble_consensus.major_disagreements.",
             "Use only the provided asset-class vocabulary.",
             "Every asset_class value must exactly match one asset_class from available_asset_class_vocabulary.",
@@ -3411,7 +3915,7 @@ async def _run_portfolio_memo_synthesis(
             "Do not recommend individual securities.",
             "Do not emit placeholder 0-0-0 target rows.",
             "The output should be a final macro_positioning object, not a review essay.",
-            "If strategic_view.cash_target_pct is above zero, include a CASH target row when CASH is available in the asset-class vocabulary.",
+            f"If strategic_view.cash_target_pct is above zero, include a {cash_asset_id} target row when {cash_asset_id} is available in the asset-class vocabulary.",
             "Do not use EQUITY as a broad residual bucket when more specific supported sleeves are available.",
             "Keep strategic_view notes focused on investable implementation implications, not quadrant label exposition. Do not write notes like 'Q1 is rejected' unless it directly changes allocation.",
             "Use evidence_brief.asset_class_coverage to detect material omissions across memo lanes.",
@@ -3451,6 +3955,16 @@ async def _run_portfolio_memo_synthesis(
                     "rationale": "string"
                 }
             ],
+            "current_sleeve_actions": [
+                {
+                    "asset_class": "string",
+                    "display_name": "string",
+                    "current_pct": "number",
+                    "action": "ADD | HOLD | TRIM | EXIT | REVIEW | WATCH",
+                    "related_or_substitute_exposure": "string",
+                    "rationale": "string"
+                }
+            ],
             "implementation_notes": ["string"],
             "monitoring_triggers": [
                 {
@@ -3475,6 +3989,7 @@ async def _run_portfolio_memo_synthesis(
         "evidence_brief": evidence_brief,
         "available_asset_class_vocabulary": asset_class_vocabulary,
         "asset_class_mapping_guidance": asset_class_mapping_guidance,
+        "portfolio_context": portfolio_context,
         "memo_lanes": [_summarize_portfolio_memo_lane(lane) for lane in valid_lanes],
     }
     response = await query_model(
@@ -3570,6 +4085,7 @@ async def _run_portfolio_memo_ensemble(
     macro_positioning, consensus = await _run_portfolio_memo_synthesis(
         query=query,
         mode=mode,
+        snapshot=snapshot,
         evidence_brief=evidence_brief,
         asset_class_vocabulary=asset_class_vocabulary,
         lanes=lanes,
