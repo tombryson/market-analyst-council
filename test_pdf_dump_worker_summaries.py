@@ -1926,6 +1926,7 @@ def _normalize_summary_object(
     lane_meta = _compute_relevance_lanes(title_for_lanes, text_for_lanes)
     noise_meta = _compute_noise_profile(title_for_lanes, text_for_lanes)
     issuer_alignment = _detect_issuer_alignment(doc)
+    issuer_status = str(issuer_alignment.get("status", "unclear")).strip().lower()
     document_ref = dict(doc.get("document_ref", {}) or {})
     retrieval_meta = dict(document_ref.get("retrieval_meta", {}) or {})
     retrieval_ps = bool(retrieval_meta.get("price_sensitive_marker", False))
@@ -2098,7 +2099,6 @@ def _normalize_summary_object(
         catalysts_auto = _normalize_list("catalysts_next_12m")
         risks_auto = _normalize_list("risks_headwinds")
 
-    issuer_status = str(issuer_alignment.get("status", "unclear")).strip().lower()
     if issuer_status == "mismatch":
         adjusted_score = min(adjusted_score, 12)
         adjusted_tier = "ignore"
