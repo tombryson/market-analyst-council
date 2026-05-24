@@ -5,7 +5,9 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 import json
+import math
 import re
+import statistics
 from typing import Any, Dict, Optional, Tuple, List
 from urllib.parse import urlparse
 
@@ -75,6 +77,7 @@ COMMODITY_FIELD_RANGES: Dict[str, Tuple[float, float]] = {
     "ndpr_oxide_price_aud_kg": (1.0, 2_000.0),
 }
 COMMODITY_FIELDS = tuple(COMMODITY_FIELD_RANGES.keys())
+PRICE_ACTION_WEEKLY_POINTS = 52
 
 COMMODITY_FALLBACK_CONFIG: Dict[str, Dict[str, Any]] = {
     "uranium": {
@@ -449,6 +452,191 @@ def _sanitize_normalized_facts(normalized_facts: Dict[str, Any]) -> Dict[str, An
     return out
 
 
+def _round_price_action_value(value: Any, digits: int = 4) -> Optional[float]:
+    parsed = _to_float(value)
+    if parsed is None or not math.isfinite(parsed):
+        return None
+    return round(parsed, digits)
+
+
+def _pct_change(current: Optional[float], base: Optional[float]) -> Optional[float]:
+    if current is None or base is None or base <= 0:
+        return None
+    return round(((current / base) - 1.0) * 100.0, 2)
+
+
+def _extract_weekly_price_points_from_history(
+    history: Any,
+    *,
+    max_points: int = PRICE_ACTION_WEEKLY_POINTS,
+) -> List[Dict[str, Any]]:
+    """
+    Convert a yfinance history DataFrame into bounded weekly close points.
+
+    Prefer adjusted close when present; otherwise use close. Kept intentionally
+    duck-typed so tests do not need pandas as a direct dependency.
+    """
+    if history is None:
+        return []
+    try:
+        if getattr(history, "empty", False):
+            return []
+    except Exception:
+        pass
+
+    points: List[Dict[str, Any]] = []
+    try:
+        series = None
+        for column in ("Adj Close", "Close"):
+            try:
+                candidate = history.get(column)
+            except Exception:
+                candidate = None
+            if candidate is None:
+                continue
+            try:
+                candidate = candidate.dropna()
+            except Exception:
+                pass
+            try:
+                if len(candidate) > 0:
+                    series = candidate
+                    break
+            except Exception:
+                continue
+        if series is None:
+            return []
+
+        items = series.items() if hasattr(series, "items") else enumerate(series)
+        for date_value, close_value in items:
+            close = _round_price_action_value(close_value)
+            if close is None or close <= 0:
+                continue
+            try:
+                if hasattr(date_value, "date"):
+                    date_text = date_value.date().isoformat()
+                else:
+                    date_text = str(date_value)[:10]
+            except Exception:
+                date_text = str(date_value)[:10]
+            if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_text):
+                continue
+            points.append({"date": date_text, "close": close})
+    except Exception:
+        return []
+
+    return points[-max(1, int(max_points)) :]
+
+
+def _max_drawdown_pct(points: List[Dict[str, Any]]) -> Optional[float]:
+    peak: Optional[float] = None
+    max_drawdown = 0.0
+    for point in points:
+        close = _to_float(point.get("close"))
+        if close is None or close <= 0:
+            continue
+        if peak is None or close > peak:
+            peak = close
+            continue
+        drawdown = ((close / peak) - 1.0) * 100.0
+        if drawdown < max_drawdown:
+            max_drawdown = drawdown
+    return round(max_drawdown, 2) if peak is not None else None
+
+
+def _annualized_volatility_pct(points: List[Dict[str, Any]], weeks: int = 13) -> Optional[float]:
+    cleaned = [_to_float(point.get("close")) for point in points]
+    closes = [value for value in cleaned if value is not None and value > 0]
+    if len(closes) < 3:
+        return None
+    window = closes[-max(3, int(weeks) + 1) :]
+    returns: List[float] = []
+    for idx in range(1, len(window)):
+        prev = window[idx - 1]
+        cur = window[idx]
+        if prev > 0:
+            returns.append((cur / prev) - 1.0)
+    if len(returns) < 2:
+        return None
+    return round(statistics.stdev(returns) * math.sqrt(52.0) * 100.0, 2)
+
+
+def _build_price_action_packet(
+    *,
+    weekly_points: List[Dict[str, Any]],
+    current_price: Optional[float],
+    source_url: str,
+    as_of_utc: Optional[str] = None,
+) -> Dict[str, Any]:
+    points = [
+        {
+            "date": str(point.get("date", "")).strip(),
+            "close": _round_price_action_value(point.get("close")),
+        }
+        for point in list(weekly_points or [])
+        if str(point.get("date", "")).strip()
+        and _round_price_action_value(point.get("close")) is not None
+    ]
+    points = points[-PRICE_ACTION_WEEKLY_POINTS:]
+    if not points:
+        return {}
+
+    latest_close = _to_float(points[-1].get("close"))
+    reference_price = _to_float(current_price) or latest_close
+    valid_points = [point for point in points if _to_float(point.get("close")) is not None]
+    if not valid_points:
+        return {}
+    high_point = max(valid_points, key=lambda point: float(point.get("close") or 0.0))
+    low_point = min(valid_points, key=lambda point: float(point.get("close") or 0.0))
+
+    def _return_for_weeks(weeks: int) -> Optional[float]:
+        if reference_price is None or len(points) <= weeks:
+            return None
+        base = _to_float(points[-1 - weeks].get("close"))
+        return _pct_change(reference_price, base)
+
+    return {
+        "source": "yfinance",
+        "source_url": source_url,
+        "sample": "weekly_adjusted_close",
+        "period_weeks": PRICE_ACTION_WEEKLY_POINTS,
+        "points_available": len(points),
+        "history_status": "ok" if len(points) >= PRICE_ACTION_WEEKLY_POINTS else "partial_history",
+        "as_of_utc": as_of_utc or datetime.now(timezone.utc).isoformat(),
+        "latest_week": {
+            "date": points[-1]["date"],
+            "close": _round_price_action_value(latest_close),
+        },
+        "current_price": _round_price_action_value(reference_price),
+        "week_52_high": {
+            "date": str(high_point.get("date", "")),
+            "price": _round_price_action_value(high_point.get("close")),
+        },
+        "week_52_low": {
+            "date": str(low_point.get("date", "")),
+            "price": _round_price_action_value(low_point.get("close")),
+        },
+        "current_vs_52w_high_pct": _pct_change(reference_price, _to_float(high_point.get("close"))),
+        "current_vs_52w_low_pct": _pct_change(reference_price, _to_float(low_point.get("close"))),
+        "return_4w_pct": _return_for_weeks(4),
+        "return_13w_pct": _return_for_weeks(13),
+        "return_26w_pct": _return_for_weeks(26),
+        "return_52w_pct": (
+            _pct_change(reference_price, _to_float(points[0].get("close")))
+            if len(points) >= 2
+            else None
+        ),
+        "max_drawdown_52w_pct": _max_drawdown_pct(points),
+        "volatility_13w_annualized_pct": _annualized_volatility_pct(points, weeks=13),
+        "weekly_closes": points,
+        "interpretation_note": (
+            "Use price action as market-context only; do not infer causes of moves "
+            "without dated source evidence. If history_status is partial_history, "
+            "treat unavailable older history as a data limitation, not a flat prior."
+        ),
+    }
+
+
 def _select_better(
     bucket: Dict[str, Tuple[float, float, str]],
     key: str,
@@ -646,6 +834,21 @@ async def _gather_yfinance_facts(
         except Exception as exc:
             notes.append(f"yfinance history parse failed: {type(exc).__name__}: {exc}")
 
+        weekly_points: List[Dict[str, Any]] = []
+        weekly_history = await _run_thread_call(
+            "weekly_history",
+            lambda: ticker.history(period="1y", interval="1wk", auto_adjust=False),
+            min(call_timeout, 10.0),
+            notes,
+        )
+        try:
+            weekly_points = _extract_weekly_price_points_from_history(
+                weekly_history,
+                max_points=PRICE_ACTION_WEEKLY_POINTS,
+            )
+        except Exception as exc:
+            notes.append(f"yfinance weekly history parse failed: {type(exc).__name__}: {exc}")
+
         # Avoid the heavy .info call unless core fields are still missing.
         has_fast_market_cap = _pick_numeric(fast_info, "marketCap") is not None
         has_fast_shares = _pick_numeric(fast_info, "shares", "sharesOutstanding") is not None
@@ -740,6 +943,7 @@ async def _gather_yfinance_facts(
             "fast_info": fast_info,
             "info": info,
             "history_close": history_close,
+            "weekly_price_points": weekly_points,
             "commodity_profile": commodity_profile,
             "commodity_values": commodity_values,
             "notes": notes,
@@ -764,6 +968,7 @@ async def _gather_yfinance_facts(
     recovered_error = ""
     payload: Dict[str, Any] = {}
     last_notes: List[str] = []
+    has_yfinance_payload_data = False
     max_attempts = 3
     for attempt in range(1, max_attempts + 1):
         try:
@@ -783,6 +988,7 @@ async def _gather_yfinance_facts(
             or history_close_attempt is not None
         )
         if has_any_payload_data:
+            has_yfinance_payload_data = True
             if recovered_error:
                 last_notes = list(last_notes) + [f"yfinance transient retry recovered after: {recovered_error}"]
             fetch_error = ""
@@ -795,7 +1001,7 @@ async def _gather_yfinance_facts(
             continue
         break
 
-    if fetch_error and not payload:
+    if fetch_error and not has_yfinance_payload_data:
         return {
             "normalized_facts": {},
             "source_urls": [quote_page_url],
@@ -807,6 +1013,7 @@ async def _gather_yfinance_facts(
     info = payload.get("info") or {}
     history_close = _to_float(payload.get("history_close"))
     commodity_values_raw = payload.get("commodity_values") or {}
+    weekly_price_points = list(payload.get("weekly_price_points") or [])
     commodity_values = {
         key: _to_float(value)
         for key, value in commodity_values_raw.items()
@@ -837,6 +1044,11 @@ async def _gather_yfinance_facts(
         commodity_values=commodity_values,
     )
     normalized_facts = _sanitize_normalized_facts(normalized_facts)
+    price_action = _build_price_action_packet(
+        weekly_points=weekly_price_points,
+        current_price=normalized_facts.get("current_price"),
+        source_url=quote_page_url,
+    )
 
     notes = list(last_notes)
     if fetch_error:
@@ -844,6 +1056,7 @@ async def _gather_yfinance_facts(
 
     return {
         "normalized_facts": normalized_facts,
+        "price_action": price_action,
         "source_urls": [quote_page_url],
         "notes": notes,
         "error": "",
@@ -1006,6 +1219,7 @@ async def gather_market_facts_prepass(
         commodity_values={},
     )
     source_urls: List[str] = [quote_page_url]
+    price_action: Dict[str, Any] = {}
 
     yfinance_result = await _gather_yfinance_facts(
         parsed,
@@ -1013,6 +1227,8 @@ async def gather_market_facts_prepass(
         commodity_profile=commodity_profile,
     )
     yfinance_facts = yfinance_result.get("normalized_facts", {}) or {}
+    if isinstance(yfinance_result.get("price_action"), dict):
+        price_action = dict(yfinance_result.get("price_action") or {})
     yfinance_sources = yfinance_result.get("source_urls", []) or []
     yfinance_notes = yfinance_result.get("notes", []) or []
     yfinance_error = str(yfinance_result.get("error") or "").strip()
@@ -1115,6 +1331,7 @@ async def gather_market_facts_prepass(
         "as_of_utc": as_of,
         "source_urls": source_urls,
         "normalized_facts": normalized_facts,
+        "price_action": price_action,
         "providers_attempted": ["yfinance", "tavily_fallback"],
     }
 
@@ -1138,10 +1355,14 @@ def minimal_market_facts_payload(
         currency,
         commodity_profile,
         commodity price fields (template-conditional)
+      },
+      "price_action": {
+        52-week weekly adjusted closes plus compact momentum/drawdown features
       }
     }
     """
     normalized = (market_facts or {}).get("normalized_facts", {}) or {}
+    price_action = (market_facts or {}).get("price_action", {}) or {}
     minimal: Dict[str, Any] = {
         "current_price": normalized.get("current_price"),
         "market_cap": normalized.get("market_cap"),
@@ -1157,9 +1378,10 @@ def minimal_market_facts_payload(
         value = normalized.get(key)
         if value is not None:
             minimal[key] = value
-    return {
-        "normalized_facts": minimal
-    }
+    payload: Dict[str, Any] = {"normalized_facts": minimal}
+    if isinstance(price_action, dict) and price_action.get("weekly_closes"):
+        payload["price_action"] = price_action
+    return payload
 
 
 def format_market_facts_query_prefix(
@@ -1173,7 +1395,8 @@ def format_market_facts_query_prefix(
         and normalized.get("shares_outstanding") is not None
     )
     has_commodity_prices = any(normalized.get(key) is not None for key in COMMODITY_FIELDS)
-    if not has_core_market_facts and not has_commodity_prices:
+    has_price_action = bool((payload.get("price_action") or {}).get("weekly_closes"))
+    if not has_core_market_facts and not has_commodity_prices and not has_price_action:
         return ""
     return json.dumps(payload, indent=2)
 
