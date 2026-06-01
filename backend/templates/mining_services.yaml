@@ -1,0 +1,408 @@
+id: mining_services
+name: Mining Services
+description: Investment analysis for contract mining, drilling, blasting, mining equipment, maintenance, mine-site services, and mining EPCM companies
+category: industrials
+version: '1.0'
+author: LLM Council
+company_types:
+- mining_services
+template_behavior:
+  commodity_profile: none
+  supplementary_sector_label: mining services sector
+  cashflow_schema:
+    mode: auto
+    min_reporting_periods: 3
+    require_operating_cashflow: true
+    detection_max_sources: 32
+  stage1_research_lanes:
+  - 'Run a dedicated sector lane (mining services): capture 2-4 recent sources on mining capex, exploration drilling, production activity, contract mining demand, equipment utilisation, labour availability, and commodity-exposed customer budgets; tie each point to scenario assumptions.'
+  - 'Run a customer-cycle lane: identify the company''s key commodity and customer exposures, contract renewals, project starts/stops, tender pipeline, order book, pricing, margin, and working-capital risk.'
+  stage3_scoring_factors:
+    quality:
+    - Revenue Visibility
+    - Contract Quality
+    - Utilisation and Execution
+    - Cash Conversion
+    - Balance Sheet
+    - Customer and Commodity Diversification
+    value:
+    - Normalized Earnings vs Market Cap
+    - EV/EBITDA vs Cycle and Peers
+    - FCF Yield
+    - Fleet/Asset Replacement Value
+    - Strategic Value
+auto_detect_keywords:
+- mining services
+- mine services
+- contract mining
+- mining contractor
+- drilling services
+- mineral drilling
+- blast hole
+- blasting services
+- explosives
+- mining equipment
+- equipment hire
+- mining fleet
+- mine-site services
+- mine site services
+- mining maintenance
+- mining epcm
+- mining camp
+inputs:
+- ticker
+- company_name
+- market_data
+- pdf_documents
+output_schema:
+  type: object
+  required_fields:
+  - analysis_type
+  - ticker
+  - company_name
+  - quality_score
+  - value_score
+  - price_targets
+  - investment_recommendation
+  structure:
+    analysis_type: mining_services
+    ticker: string
+    company_name: string
+    analysis_date: ISO-8601
+    market_data:
+      current_price: float
+      market_cap_m: float
+      shares_outstanding_m: float
+      enterprise_value_m: float
+      currency: string
+    quality_score:
+      total: float (0-100)
+      breakdown: object
+    value_score:
+      total: float (0-100)
+      breakdown: object
+    price_targets:
+      current_price: float
+      scenario_targets: object
+      scenario_probabilities: object
+      prob_weighted_target_12m: float
+      prob_weighted_target_24m: float
+    development_timeline: array
+    monitoring_watchlist: object
+    thesis_map: object
+    management_competition_assessment: object
+    verification_required_fields: array
+    investment_recommendation:
+      rating: BUY/HOLD/SELL
+      conviction: HIGH/MEDIUM/LOW
+      summary: string
+verification_schema:
+  fact_digest:
+    sections:
+      timelines_deadlines:
+        keywords:
+        - timeline
+        - guidance
+        - target
+        - milestone
+        - q1
+        - q2
+        - q3
+        - q4
+        - h1
+        - h2
+        - fy
+        - contract start
+        - mobilisation
+        - demobilisation
+        - tender
+        - renewal
+      financing_deals:
+        keywords:
+        - facility
+        - debt
+        - refinance
+        - placement
+        - covenant
+        - liquidity
+        - lease
+        - hire purchase
+        - equipment finance
+        - capex
+        - dividend
+        - buyback
+      project_economics:
+        keywords:
+        - revenue
+        - ebitda
+        - ebit
+        - margin
+        - cash flow
+        - free cash flow
+        - utilisation
+        - utilization
+        - order book
+        - backlog
+        - tender pipeline
+        - contract margin
+        - day rate
+        - fleet
+        - rig count
+        - equipment hire
+        - maintenance revenue
+        - working capital
+        - debtor days
+        - claims
+      market_share_structure:
+        keywords:
+        - market cap
+        - enterprise value
+        - shares
+        - valuation
+        - multiple
+        - market share
+        - competitor
+        - customer concentration
+        - commodity exposure
+      management_governance:
+        keywords:
+        - management
+        - board
+        - ceo
+        - cfo
+        - governance
+        - insider
+        - capital allocation
+        - safety
+        - lost time injury
+        - lti
+        - trifr
+      operational_objectives:
+        keywords:
+        - contract win
+        - extension
+        - renewal
+        - mobilisation
+        - utilisation
+        - fleet growth
+        - rig count
+        - metres drilled
+        - volume
+        - throughput
+        - productivity
+        - efficiency
+        - margin expansion
+      risks_constraints:
+        keywords:
+        - risk
+        - headwind
+        - contract loss
+        - customer deferral
+        - commodity downturn
+        - labour shortage
+        - cost inflation
+        - safety incident
+        - equipment downtime
+        - working capital
+        - bad debt
+        - fixed price
+        - claims
+        - delay
+        - counterparty
+      catalysts_tailwinds:
+        keywords:
+        - tailwind
+        - catalyst
+        - contract award
+        - contract extension
+        - tender win
+        - utilisation recovery
+        - exploration recovery
+        - production growth
+        - mine expansion
+        - margin expansion
+        - asset sale
+        - strategic
+    timeline_terms:
+    - contract award
+    - tender
+    - mobilisation
+    - renewal
+    - backlog
+    - order book
+    - guidance
+    - rig count
+    - q1
+    - q2
+    - q3
+    - q4
+    - h1
+    - h2
+    - fy
+    timeline_focus_terms:
+    - contract
+    - utilisation
+    - margin
+    - order book
+    - working capital
+    - customer budget
+    conflict:
+      field: guidance_or_contract_window
+      terms:
+      - guidance
+      - contract award
+      - contract renewal
+      - mobilisation
+      - backlog
+      - utilisation
+      - margin
+      max_shift_quarters: 2
+      resolution_rule: prefer newest dated primary-source guidance or contract announcement
+  compliance:
+    section_markers:
+      quality_score:
+        markers:
+        - quality score
+        - quality_score
+        critical: true
+      value_score:
+        markers:
+        - value score
+        - value_score
+        critical: true
+      price_targets:
+        markers:
+        - 12-month
+        - 24-month
+        - price target
+        - price_targets
+        - probability-weighted
+        - scenario probabilities
+        critical: true
+      development_timeline:
+        markers:
+        - development timeline
+        - timeline
+        - milestone
+        - development_timeline
+        critical: true
+rubric: |
+  Run an investment analysis on [Company Name] using this mining services rubric. Use this template for contract miners, drillers, blasting/explosives suppliers, mining equipment hire, mine-site services, maintenance, camps, logistics, and EPCM/service providers to the mining sector. Do not analyse these businesses as miners unless they own the resource, reserve, mine, or commodity production economics themselves.
+
+  The centre of the analysis is not resource tonnes or commodity ownership. It is service earnings quality: contract duration, customer budgets, utilisation, pricing, margins, working capital, fleet intensity, safety, and exposure to mining capex/opex cycles.
+
+  First classify the business:
+  * Contract mining: value driven by contract duration, mobilisation, fleet intensity, cost pass-through, customer concentration, margin discipline, and renewal risk.
+  * Drilling services: value driven by rig utilisation, metres drilled, day rates, exploration/development budgets, labour availability, safety, and fleet productivity.
+  * Blasting/explosives/mining consumables: value driven by mine production volumes, pricing formulas, ammonium nitrate/input costs, reliability, safety, and regulatory constraints.
+  * Equipment hire and maintenance: value driven by fleet age, utilisation, rental rates, residual value, maintenance intensity, and customer mine activity.
+  * Mining EPCM / engineering services: value driven by project pipeline, billable utilisation, skill availability, tender wins, change orders, and execution risk.
+  * Hybrid provider: separate each earnings stream rather than applying one blended multiple.
+
+  Use that classification to decide valuation emphasis:
+  * Asset-light service models: EV/EBIT, FCF yield, and organic growth adjusted for utilisation and labour margins.
+  * Fleet-heavy models: EV/EBITDA and FCF after maintenance capex, with explicit fleet replacement-cycle and residual-value checks.
+  * Contract mining: normalized EBIT/FCF with explicit adjustment for mobilisation costs, contract assets/liabilities, claims, and working capital.
+  * Consumables/explosives: cycle-normalized margins, pricing spread, input-cost pass-through, capacity/reliability, and safety/regulatory risk.
+  * Do not give premium value to backlog unless margin quality, counterparty quality, and cash conversion are visible.
+
+  Include:
+  * 12-month and 24-month price targets with bull/base/bear scenarios.
+  * Quality and Value scores out of 100 using the formulas and scoring tables below.
+  * Operating summary and timeline to material contract, utilisation, guidance, balance-sheet, customer-budget, or strategic milestones.
+  * Monitoring watchlist and thesis map with conditions the scenario router can evaluate later.
+  * Investment recommendation (BUY/HOLD/SELL), conviction (HIGH/MEDIUM/LOW), and one-paragraph justification.
+  * Verification queue for missing contract, utilisation, margin, cash-flow, capex, or customer concentration data.
+
+  Step 1: Business Model and Earnings-Quality Workup
+  * Establish the current revenue, EBITDA/EBIT, cash-flow, net debt/cash, order book/backlog, and guidance baseline from primary evidence.
+  * Separate recurring contract revenue, transactional project work, consumables, equipment rental, maintenance, and one-off earnings streams.
+  * Identify the 3-5 variables that actually move valuation for this company.
+  * Distinguish reported growth from organic volume, price/rate, utilisation, M&A, FX, commodity customer budgets, working-capital timing, and accounting noise.
+  * Map key customer and commodity exposures. State whether earnings are tied mostly to exploration capex, development capex, sustaining mine opex, production volumes, or mine expansions.
+  * Build a timeline to the next events that can change the thesis: contract awards/renewals, mobilisation, demobilisation, guidance updates, margin recovery, capex cycle, customer project approvals, covenant milestones, or strategic transactions.
+
+  Sector-specific operating metrics to capture where relevant:
+  * Order book/backlog, contract tenor, renewal dates, tender pipeline, customer concentration, commodity exposure, margin by segment.
+  * Utilisation, rig/fleet count, metres drilled, day rates/rental rates, mobilisation status, maintenance capex, fleet age, downtime.
+  * Safety metrics, labour availability, subcontractor exposure, cost pass-through, fuel/steel/AN/input costs, claims/change orders, debtor days, working capital.
+  * Net debt/cash, lease liabilities, equipment finance, covenant headroom, dividend/buyback policy, and acquisition appetite.
+
+  Sector-specific caution points:
+  * Do not treat mining-services revenue as direct commodity exposure. Service companies can benefit from mining activity while still suffering margin pressure, labour shortages, bad debt, or customer deferrals.
+  * Do not treat backlog as value unless margin, counterparty quality, and cash conversion are credible.
+  * Do not penalise the absence of JORC resource data for a pure service company. Resource data matters only through customer budget and project activity exposure.
+  * Do not ignore working capital. Mining-services earnings often look healthy before receivables, mobilisation costs, inventory, contract assets, and capex absorb cash.
+  * Separate maintenance capex from growth capex for fleet-heavy companies.
+
+  Step 2: Valuation Workup
+  * State the primary valuation anchor and why it is appropriate.
+  * Cross-check with at least one secondary method.
+  * Normalize earnings or cash flow where cycle position, one-offs, commodity budgets, rates, labour costs, or contract timing distort the current period.
+  * Explain whether EBITDA, earnings, FCF, backlog, fleet value, or replacement value overstates or understates owner earnings.
+  * Do not let peer multiples override company-specific evidence on utilisation, contract quality, leverage, cash conversion, safety, customer concentration, governance, or cycle exposure.
+
+  Step 3: Quality Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Quality factor weightings:
+  * Revenue Visibility: 20%
+  * Contract Quality: 20%
+  * Utilisation and Execution: 15%
+  * Cash Conversion: 15%
+  * Balance Sheet: 15%
+  * Customer and Commodity Diversification: 15%
+
+  Quality scoring formula:
+  * Quality Score = sum(weighted factor scores), 0-100.
+
+  Quality grading bands:
+  * 85-100: top-tier service business with durable contracts, strong utilisation, cash-backed earnings, resilient balance sheet, and diversified customers.
+  * 70-84: good business with clear strengths and manageable cycle/execution risks.
+  * 50-69: mixed quality; attractive demand offset by utilisation, margin, working-capital, leverage, customer, or disclosure risks.
+  * Below 50: weak economics, poor cash conversion, high leverage, customer concentration, safety/execution issues, or weak evidence.
+
+  Step 4: Value Score (0-100)
+  Score the company explicitly across these factors. Show raw score, weighting, weighted contribution, and a short evidence-based reason for each.
+
+  Value factor weightings:
+  * Normalized Earnings vs Market Cap: 30%
+  * EV/EBITDA vs Cycle and Peers: 20%
+  * FCF Yield: 20%
+  * Fleet/Asset Replacement Value: 15%
+  * Strategic Value: 15%
+
+  Value scoring formula:
+  * Value Score = sum(weighted factor scores), 0-100.
+
+  Value grading bands:
+  * 85-100: materially undervalued relative to normalized earnings, cash generation, asset value, and risk.
+  * 70-84: undervalued with clear upside and manageable cycle/execution risks.
+  * 50-69: roughly fair value or upside offset by risk.
+  * Below 50: expensive, weakly supported by fundamentals, or dependent on unsupported cycle/margin assumptions.
+
+  Step 5: Scenario Framework and Price Targets
+  Provide bull, base, and bear cases with:
+  * 12M target and 24M target.
+  * Probability for each scenario.
+  * Short description of what operationally changes.
+  * Current positioning (bull-leaning, base-leaning, mixed, bear-leaning).
+  * Explicit conditions that must hold.
+  * Explicit failure conditions.
+
+  Scenario design rules:
+  * Bull/base/bear must differ by utilisation, contract wins/losses, margins, cash conversion, customer budget cycle, balance sheet, and valuation evidence, not only by exit multiple.
+  * Tie each scenario to measurable trigger conditions the scenario router can later monitor.
+  * State which assumptions are known, estimated, or disputed.
+
+  Cross-check requirements before final output:
+  * Ensure scenario targets reconcile to current share count, enterprise value, net debt/cash, lease liabilities, and currency.
+  * Ensure valuation does not double-count cash, debt, leases, fleet value, capex, acquisition synergies, or one-off earnings.
+  * Ensure missing data is handled as a verification item, not as a silent assumption.
+
+copy_paste_rubric: |
+  Run an investment analysis on [Company Name] using the Mining Services LLM Council template.
+
+  Use this for contract mining, mineral drilling, blasting/explosives, mining equipment hire, maintenance, mine-site services, camps/logistics, and mining EPCM. Do not treat the company as a miner unless it owns the resource or production economics.
+
+  Focus on service earnings quality: contract duration, customer budgets, utilisation, pricing, margins, working capital, fleet intensity, safety, and mining capex/opex exposure. Include bull/base/bear 12M and 24M price targets, Quality Score, Value Score, thesis map, timeline, monitoring watchlist, and verification queue.

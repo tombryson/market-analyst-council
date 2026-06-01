@@ -22,6 +22,7 @@ ResolverFn = Callable[[AnnouncementEvent], Union[AnnouncementPacket, Awaitable[A
 ReaderFn = Callable[[AnnouncementPacket], Union[AnnouncementFacts, Awaitable[AnnouncementFacts]]]
 RunSelectorFn = Callable[[str, str], Union[BaselineRunPacket, Awaitable[BaselineRunPacket]]]
 MarketFactsResolverFn = Callable[[AnnouncementFacts, BaselineRunPacket], Union[Dict[str, Any], Awaitable[Dict[str, Any]]]]
+AnnouncementInterpreterFn = Callable[[AnnouncementFacts, BaselineRunPacket], Union[AnnouncementFacts, Awaitable[AnnouncementFacts]]]
 ComparatorFn = Callable[[AnnouncementFacts, BaselineRunPacket], Union[ComparisonReport, Awaitable[ComparisonReport]]]
 ScribeFn = Callable[[ScenarioRouterDecision], Union[Dict[str, Any], Awaitable[Dict[str, Any]]]]
 
@@ -38,6 +39,7 @@ class ScenarioRouterDependencies:
     document_reader: ReaderFn
     run_selector: RunSelectorFn
     thesis_comparator: ComparatorFn
+    announcement_interpreter: Optional[AnnouncementInterpreterFn] = None
     market_facts_resolver: Optional[MarketFactsResolverFn] = None
     lab_scribe: Optional[ScribeFn] = None
     action_judge: Optional[ActionJudge] = None
@@ -75,6 +77,13 @@ class ScenarioRouterService:
                         "run_id": str(getattr(result, "run_id", "") or ""),
                         "template_id": str(getattr(result, "template_id", "") or ""),
                     }
+                elif stage_name == "announcement_interpreter":
+                    meta = {
+                        "announcement_class": str(getattr(result, "announcement_class", "") or ""),
+                        "materiality": str(getattr(result, "materiality", "") or ""),
+                        "trajectory_effect": str(getattr(result, "trajectory_effect", "") or ""),
+                        "classification_confidence": float(getattr(result, "classification_confidence", 0.0) or 0.0),
+                    }
                 elif stage_name == "market_facts_resolver":
                     normalized = result.get("normalized_facts") if isinstance(result, dict) else {}
                     meta = {
@@ -85,6 +94,7 @@ class ScenarioRouterService:
                     meta = {
                         "current_path": str(getattr(result, "current_path", "") or ""),
                         "impact_level": str(getattr(result, "impact_level", "") or ""),
+                        "thesis_match_confidence": float(getattr(result, "thesis_match_confidence", 0.0) or 0.0),
                     }
                 elif stage_name == "action_judge":
                     meta = {
@@ -110,6 +120,10 @@ class ScenarioRouterService:
         packet = await run_stage("source_resolver", self._deps.source_resolver, event)
         facts = await run_stage("document_reader", self._deps.document_reader, packet)
         baseline_run = await run_stage("run_selector", self._deps.run_selector, event.ticker, event.exchange)
+        if self._deps.announcement_interpreter is not None:
+            interpreted = await run_stage("announcement_interpreter", self._deps.announcement_interpreter, facts, baseline_run)
+            if isinstance(interpreted, AnnouncementFacts):
+                facts = interpreted
         if self._deps.market_facts_resolver is not None:
             market_facts = await run_stage("market_facts_resolver", self._deps.market_facts_resolver, facts, baseline_run)
             if isinstance(market_facts, dict):

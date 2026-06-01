@@ -33,6 +33,7 @@ from .council import (
     apply_stage2_revision_deltas,
     stage3_synthesize_final,
     calculate_aggregate_rankings,
+    compact_stage2_rankings_for_telemetry,
     _is_openrouter_compatible_model,
 )
 from .search import (
@@ -43,6 +44,7 @@ from .search import (
     extract_ticker_from_query,
 )
 from .pdf_processor import save_attachment, process_pdf_attachment, format_pdf_context_for_prompt
+from .timeline_normalization import normalize_timeline_rows as _standardize_timeline_rows
 from .config import (
     ENABLE_RESEARCH_SERVICE,
     COUNCIL_EXECUTION_MODE,
@@ -67,6 +69,19 @@ from .market_facts import (
     gather_market_facts_prepass,
     format_market_facts_query_prefix,
     prepend_market_facts_to_query,
+)
+from .prepass_cache import (
+    delta_lookback_days_from_cache,
+    load_cached_prepass_rows,
+    merge_prepass_source_rows,
+    prepass_cache_enabled,
+    prepass_cache_max_age_days,
+    prepass_delta_enabled,
+    prepass_delta_max_sources,
+    prepass_delta_target_non_price_sensitive,
+    prepass_delta_target_price_sensitive,
+    resolve_prepass_cache_root,
+    save_cached_prepass_rows,
 )
 from .delta_monitor import (
     get_latest_delta,
@@ -164,6 +179,7 @@ _ANALYSIS_STAGE_RANGES: Dict[str, Tuple[int, int]] = {
 
 
 def _build_scenario_router_service():
+    from .scenario_router.announcement_interpreter import AnnouncementInterpreter
     from .scenario_router.document_reader import DocumentReader
     from .scenario_router.lab_scribe import LabScribe
     from .scenario_router.market_facts_resolver import ScenarioMarketFactsResolver
@@ -180,6 +196,7 @@ def _build_scenario_router_service():
             source_resolver=SourceResolver().resolve,
             document_reader=DocumentReader().read,
             run_selector=LatestRunSelector(limit=25).select_latest,
+            announcement_interpreter=AnnouncementInterpreter().interpret,
             market_facts_resolver=ScenarioMarketFactsResolver().resolve,
             thesis_comparator=ThesisComparator().compare,
             lab_scribe=LabScribe().persist,
@@ -744,6 +761,42 @@ def _extract_stage3_result_from_artifact(payload: Dict[str, Any]) -> Optional[Di
         }
 
     return None
+
+
+def _analysis_job_output_error(output_path: Path, request_payload: Optional[Dict[str, Any]]) -> str:
+    """Return a user-facing error if a completed subprocess artifact is not usable."""
+    if not output_path.exists() or not output_path.is_file():
+        return "analysis subprocess did not produce output artifact"
+
+    if str((request_payload or {}).get("job_type") or "").strip().lower() == "portfolio_positioning":
+        return ""
+
+    try:
+        payload = json.loads(output_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return f"analysis subprocess produced unreadable output artifact: {exc}"
+
+    structured = _extract_stage3_structured_from_artifact(payload)
+    if isinstance(structured, dict) and structured:
+        return ""
+
+    stage3_result = _extract_stage3_result_from_artifact(payload) or {}
+    if not stage3_result:
+        primary = payload.get("stage3_result_primary")
+        if isinstance(primary, dict):
+            stage3_result = primary
+        else:
+            fallback = payload.get("stage3_result")
+            stage3_result = fallback if isinstance(fallback, dict) else {}
+
+    parse_error = str(stage3_result.get("parse_error") or "").strip()
+    model = str(stage3_result.get("model") or payload.get("stage3_primary_model") or "").strip()
+    detail = "Stage 3 did not produce structured data"
+    if model:
+        detail += f" (model={model})"
+    if parse_error:
+        detail += f": {parse_error}"
+    return detail
 
 
 def _is_portfolio_positioning_artifact(
@@ -1383,12 +1436,22 @@ def _load_analysis_jobs_from_disk() -> Dict[str, Dict[str, Any]]:
         output_path = Path(str(payload.get("output_path") or ""))
         if status in {"queued", "running"}:
             if output_path.exists():
-                payload["status"] = "succeeded"
-                payload["run_id"] = str(payload.get("run_id") or output_path.name)
                 payload["finished_at"] = str(payload.get("finished_at") or now_iso)
-                payload["stage"] = str(payload.get("stage") or "complete")
-                payload["stage_message"] = str(payload.get("stage_message") or "Recovered completed run")
-                payload["progress_pct"] = int(payload.get("progress_pct") or 100)
+                output_error = _analysis_job_output_error(
+                    output_path,
+                    payload.get("request") if isinstance(payload.get("request"), dict) else {},
+                )
+                if output_error:
+                    payload["status"] = "failed"
+                    payload["error"] = output_error
+                    payload["stage"] = "failed"
+                    payload["stage_message"] = "Recovered failed run"
+                else:
+                    payload["status"] = "succeeded"
+                    payload["run_id"] = str(payload.get("run_id") or output_path.name)
+                    payload["stage"] = str(payload.get("stage") or "complete")
+                    payload["stage_message"] = str(payload.get("stage_message") or "Recovered completed run")
+                    payload["progress_pct"] = int(payload.get("progress_pct") or 100)
             else:
                 payload["status"] = "failed"
                 payload["finished_at"] = str(payload.get("finished_at") or now_iso)
@@ -1399,6 +1462,18 @@ def _load_analysis_jobs_from_disk() -> Dict[str, Dict[str, Any]]:
                 payload["stage"] = str(payload.get("stage") or "failed")
                 payload["stage_message"] = str(payload.get("stage_message") or "Interrupted during restart")
             _persist_job_record(payload)
+        elif status == "succeeded":
+            output_error = _analysis_job_output_error(
+                output_path,
+                payload.get("request") if isinstance(payload.get("request"), dict) else {},
+            )
+            if output_error:
+                payload["status"] = "failed"
+                payload["error"] = output_error
+                payload["stage"] = "failed"
+                payload["stage_message"] = "Output artifact is not renderable"
+                payload["finished_at"] = str(payload.get("finished_at") or now_iso)
+                _persist_job_record(payload)
 
         payload.setdefault("stage", "queued")
         payload.setdefault("stage_message", "")
@@ -1688,41 +1763,31 @@ async def _run_subprocess_capture(
     return int(proc.returncode or 0), stdout_text, stderr_text
 
 
-async def _prepare_stage1_authoritative_prepass_bundle(
+async def _run_authoritative_prepass_bundle_subprocess(
     *,
     ticker: str,
     query_hint: str,
     exchange: str,
-    exchange_retrieval_params: Optional[Dict[str, Any]] = None,
-    company_name: Optional[str] = None,
+    exchange_retrieval_params: Optional[Dict[str, Any]],
+    company_name: Optional[str],
+    output_suffix: str,
+    target_price_sensitive: int,
+    target_non_price_sensitive: int,
+    max_sources: int,
+    lookback_days: int,
+    strategy: str,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    if not str(ticker or "").strip():
-        raise RuntimeError("ticker_required_for_authoritative_prepass")
-
     PREPASS_OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
     output_dir = (
         PREPASS_OUTPUTS_DIR
-        / f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{_sanitize_ticker_for_dir(ticker)}_api_prepass"
+        / f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{_sanitize_ticker_for_dir(ticker)}_{output_suffix}"
     )
 
     query_seed = str(company_name or "").strip() or str(query_hint or "").strip() or str(ticker or "").strip()
     query_seed = re.sub(r"\s+", " ", query_seed).strip()[:120]
     retrieval_query = f"Latest material filings, announcements, and investor updates for {query_seed}"
 
-    retrieval_params = dict(exchange_retrieval_params or {})
-    target_price_sensitive = int(retrieval_params.get("target_price_sensitive_default", 10) or 10)
-    target_non_price_sensitive = int(
-        retrieval_params.get("target_non_price_sensitive_default", 10) or 10
-    )
-    if (target_price_sensitive + target_non_price_sensitive) < 20:
-        target_non_price_sensitive = max(
-            target_non_price_sensitive,
-            20 - max(0, target_price_sensitive),
-        )
-    top_default = max(1, target_price_sensitive + target_non_price_sensitive)
-    max_sources_default = int(retrieval_params.get("max_sources_default", 0) or 0)
-    lookback_days_default = int(retrieval_params.get("lookback_days_default", 0) or 0)
-
+    top_default = max(1, int(target_price_sensitive) + int(target_non_price_sensitive))
     cmd = [
         sys.executable,
         str(PROJECT_ROOT / "test_perplexity_pdf_dump.py"),
@@ -1743,10 +1808,10 @@ async def _prepare_stage1_authoritative_prepass_bundle(
     ]
     if str(company_name or "").strip():
         cmd.extend(["--company-name", str(company_name).strip()])
-    if max_sources_default > 0:
-        cmd.extend(["--max-sources", str(max_sources_default)])
-    if lookback_days_default > 0:
-        cmd.extend(["--lookback-days", str(lookback_days_default)])
+    if max_sources > 0:
+        cmd.extend(["--max-sources", str(max_sources)])
+    if lookback_days > 0:
+        cmd.extend(["--lookback-days", str(lookback_days)])
     if str(exchange or "").strip():
         cmd.extend(["--exchange", str(exchange).strip().lower()])
 
@@ -1781,13 +1846,13 @@ async def _prepare_stage1_authoritative_prepass_bundle(
         raise RuntimeError(f"authoritative_prepass_bundle_missing:{bundle_path}")
 
     rows, meta = _build_stage1_prepass_source_rows_from_bundle(bundle_path)
-    meta["strategy"] = "authoritative_prepass_bundle"
+    meta["strategy"] = strategy
     meta["output_dir"] = str(output_dir)
     meta["prepass_top"] = top_default
     meta["prepass_target_price_sensitive"] = target_price_sensitive
     meta["prepass_target_non_price_sensitive"] = target_non_price_sensitive
-    meta["prepass_max_sources"] = max_sources_default
-    meta["prepass_lookback_days"] = lookback_days_default
+    meta["prepass_max_sources"] = max_sources
+    meta["prepass_lookback_days"] = lookback_days
     meta["prepass_retrieved_sources"] = _manifest_count(
         manifest.get("retrieved_sources", 0)
     )
@@ -1804,6 +1869,129 @@ async def _prepare_stage1_authoritative_prepass_bundle(
         manifest.get("selected_primary_candidates", 0)
     )
     meta["prepass_written_files"] = _manifest_count(manifest.get("written_files", 0))
+    meta["exchange_retrieval_params"] = dict(exchange_retrieval_params or {})
+    return rows, meta
+
+
+async def _prepare_stage1_authoritative_prepass_bundle(
+    *,
+    ticker: str,
+    query_hint: str,
+    exchange: str,
+    exchange_retrieval_params: Optional[Dict[str, Any]] = None,
+    company_name: Optional[str] = None,
+    template_id: str = "",
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    if not str(ticker or "").strip():
+        raise RuntimeError("ticker_required_for_authoritative_prepass")
+
+    retrieval_params = dict(exchange_retrieval_params or {})
+    target_price_sensitive = int(retrieval_params.get("target_price_sensitive_default", 10) or 10)
+    target_non_price_sensitive = int(
+        retrieval_params.get("target_non_price_sensitive_default", 10) or 10
+    )
+    if (target_price_sensitive + target_non_price_sensitive) < 20:
+        target_non_price_sensitive = max(
+            target_non_price_sensitive,
+            20 - max(0, target_price_sensitive),
+        )
+    max_sources_default = int(retrieval_params.get("max_sources_default", 0) or 0)
+    lookback_days_default = int(retrieval_params.get("lookback_days_default", 0) or 0)
+
+    cache_root = resolve_prepass_cache_root(PREPASS_OUTPUTS_DIR)
+    if prepass_cache_enabled():
+        cached_rows, cache_meta = load_cached_prepass_rows(
+            cache_root=cache_root,
+            ticker=ticker,
+            exchange=exchange,
+            template_id=template_id,
+            max_age_days=prepass_cache_max_age_days(),
+        )
+        if cached_rows:
+            try:
+                delta_rows: List[Dict[str, Any]] = []
+                delta_meta: Dict[str, Any] = {"strategy": "prepass_cache_delta_skipped"}
+                if prepass_delta_enabled():
+                    delta_lookback_days = delta_lookback_days_from_cache(cache_meta)
+                    delta_rows, delta_meta = await _run_authoritative_prepass_bundle_subprocess(
+                        ticker=ticker,
+                        query_hint=query_hint,
+                        exchange=exchange,
+                        exchange_retrieval_params=exchange_retrieval_params,
+                        company_name=company_name,
+                        output_suffix="api_delta",
+                        target_price_sensitive=prepass_delta_target_price_sensitive(),
+                        target_non_price_sensitive=prepass_delta_target_non_price_sensitive(),
+                        max_sources=prepass_delta_max_sources(),
+                        lookback_days=delta_lookback_days,
+                        strategy="built_delta_bundle",
+                    )
+                merged_rows, merge_meta = merge_prepass_source_rows(
+                    cached_rows=cached_rows,
+                    delta_rows=delta_rows,
+                    max_rows=max(24, len(cached_rows), len(delta_rows)),
+                )
+                save_meta = save_cached_prepass_rows(
+                    cache_root=cache_root,
+                    ticker=ticker,
+                    exchange=exchange,
+                    template_id=template_id,
+                    company_name=str(company_name or ""),
+                    source_rows=merged_rows,
+                    source_meta={
+                        "strategy": "reused_cached_prepass_with_delta",
+                        "prepass_top": len(merged_rows),
+                        "prepass_lookback_days": cache_meta.get("prepass_lookback_days"),
+                        "bundle_path": delta_meta.get("bundle_path") or cache_meta.get("bundle_path"),
+                        "output_dir": delta_meta.get("output_dir") or "",
+                    },
+                    preserve_created_at=True,
+                )
+                return merged_rows, {
+                    "strategy": "reused_cached_prepass_with_delta",
+                    "cache": cache_meta,
+                    "delta": delta_meta,
+                    "merge": merge_meta,
+                    "cache_save": save_meta,
+                    "bundle_path": str(cache_meta.get("cache_path") or ""),
+                    "rows_built": len(merged_rows),
+                    "prepass_top": len(merged_rows),
+                    "prepass_target_price_sensitive": prepass_delta_target_price_sensitive(),
+                    "prepass_target_non_price_sensitive": prepass_delta_target_non_price_sensitive(),
+                    "prepass_max_sources": prepass_delta_max_sources(),
+                    "prepass_lookback_days": delta_meta.get(
+                        "prepass_lookback_days",
+                        delta_lookback_days_from_cache(cache_meta),
+                    ),
+                }
+            except Exception:
+                # Cache reuse is an optimisation. Fall through to the full
+                # authoritative prepass if the delta pass cannot be built.
+                pass
+
+    rows, meta = await _run_authoritative_prepass_bundle_subprocess(
+        ticker=ticker,
+        query_hint=query_hint,
+        exchange=exchange,
+        exchange_retrieval_params=exchange_retrieval_params,
+        company_name=company_name,
+        output_suffix="api_prepass",
+        target_price_sensitive=target_price_sensitive,
+        target_non_price_sensitive=target_non_price_sensitive,
+        max_sources=max_sources_default,
+        lookback_days=lookback_days_default,
+        strategy="authoritative_prepass_bundle",
+    )
+    if prepass_cache_enabled() and rows:
+        meta["cache_save"] = save_cached_prepass_rows(
+            cache_root=cache_root,
+            ticker=ticker,
+            exchange=exchange,
+            template_id=template_id,
+            company_name=str(company_name or ""),
+            source_rows=rows,
+            source_meta=meta,
+        )
     return rows, meta
 
 
@@ -2019,7 +2207,12 @@ async def _run_analysis_job(
         await asyncio.gather(stdout_task, stderr_task)
         returncode = int(process.returncode or 0)
 
-        status = "succeeded" if returncode == 0 and output_path.exists() else "failed"
+        output_error = (
+            _analysis_job_output_error(output_path, request_payload)
+            if returncode == 0
+            else ""
+        )
+        status = "succeeded" if returncode == 0 and not output_error else "failed"
         current_progress = 0
         async with ANALYSIS_JOBS_LOCK:
             current_job = ANALYSIS_JOBS.get(str(job_id))
@@ -2051,7 +2244,7 @@ async def _run_analysis_job(
             fields["error"] = (
                 f"analysis subprocess failed (returncode={returncode})"
                 if returncode != 0
-                else "analysis subprocess did not produce output artifact"
+                else output_error
             )
         await _set_job_fields(job_id, **fields)
     except Exception as exc:
@@ -2383,86 +2576,61 @@ def _infer_current_price_from_artifact(payload: Dict[str, Any]) -> Optional[floa
     return round(float(median_val), 6)
 
 
+def _backfill_stage2_ranking_telemetry(
+    structured: Dict[str, Any],
+    payload: Dict[str, Any],
+) -> None:
+    """Expose compact full Stage 2 rankings for existing and new Gantt artifacts."""
+    if not isinstance(structured, dict) or not isinstance(payload, dict):
+        return
+    stage2_results = payload.get("stage2_results")
+    label_to_model = payload.get("label_to_model")
+    if not isinstance(stage2_results, list) or not isinstance(label_to_model, dict):
+        metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+        if not isinstance(stage2_results, list):
+            stage2_results = metadata.get("stage2_results")
+        if not isinstance(label_to_model, dict):
+            label_to_model = metadata.get("label_to_model")
+    if not isinstance(stage2_results, list):
+        return
+    if not isinstance(label_to_model, dict):
+        stage1_results = payload.get("stage1_results_for_stage3")
+        if not isinstance(stage1_results, list):
+            stage1_results = payload.get("stage1_results")
+        if isinstance(stage1_results, list):
+            label_to_model = {
+                f"Response {chr(65 + idx)}": str(row.get("model") or "").strip()
+                for idx, row in enumerate(stage1_results)
+                if isinstance(row, dict) and str(row.get("model") or "").strip()
+            }
+        else:
+            label_to_model = {}
+
+    council_meta = structured.get("council_metadata")
+    if not isinstance(council_meta, dict):
+        council_meta = {}
+        structured["council_metadata"] = council_meta
+
+    aggregate = payload.get("stage2_aggregate_rankings")
+    if not isinstance(aggregate, list):
+        aggregate = calculate_aggregate_rankings(stage2_results, label_to_model)
+    if aggregate and not isinstance(council_meta.get("stage2_aggregate_rankings"), list):
+        council_meta["stage2_aggregate_rankings"] = aggregate
+
+    if not isinstance(council_meta.get("stage2_judge_rankings"), list):
+        council_meta["stage2_judge_rankings"] = compact_stage2_rankings_for_telemetry(
+            stage2_results,
+            label_to_model,
+        )
+
+
 def _normalize_timeline_rows_for_api(raw_timeline: Any) -> List[Dict[str, Any]]:
     """
     Normalize timeline rows for UI consumers.
     Accepts either structured objects or plain strings like:
     "Q1-Q2 2026: Initial Drawdown on US$25M Facility"
     """
-    if not isinstance(raw_timeline, list):
-        return []
-
-    out: List[Dict[str, Any]] = []
-    period_pattern = re.compile(
-        r"\b(Q[1-4](?:\s*[-/]\s*Q[1-4])?\s*20\d{2}|H[12]\s*20\d{2}|20\d{2})\b",
-        re.IGNORECASE,
-    )
-    for idx, item in enumerate(raw_timeline):
-        if isinstance(item, dict):
-            milestone = str(
-                item.get("milestone")
-                or item.get("event")
-                or item.get("name")
-                or item.get("goal")
-                or item.get("title")
-                or ""
-            ).strip()
-            target_period = str(
-                item.get("target_period")
-                or item.get("targetPeriod")
-                or item.get("period")
-                or item.get("when")
-                or item.get("date")
-                or ""
-            ).strip()
-            status = str(item.get("status") or item.get("current_status") or item.get("state") or "unspecified").strip()
-            confidence = item.get("confidence_pct")
-            if confidence is None:
-                confidence = item.get("certainty_pct")
-            out.append(
-                {
-                    "milestone": milestone or f"Milestone {idx + 1}",
-                    "target_period": target_period,
-                    "status": status or "unspecified",
-                    "confidence_pct": confidence,
-                    "primary_risk": str(item.get("primary_risk") or item.get("risk") or "").strip(),
-                }
-            )
-            continue
-
-        if isinstance(item, str):
-            text = item.strip()
-            if not text:
-                continue
-            milestone = text
-            target_period = ""
-
-            colon_split = re.match(r"^([^:]{2,40}):\s*(.+)$", text)
-            if colon_split:
-                lhs = str(colon_split.group(1) or "").strip()
-                rhs = str(colon_split.group(2) or "").strip()
-                if lhs and period_pattern.search(lhs):
-                    target_period = lhs
-                    milestone = rhs or text
-
-            if not target_period:
-                period_match = period_pattern.search(text)
-                if period_match:
-                    target_period = str(period_match.group(1) or "").strip()
-                    stripped = re.sub(r"^[:\-\s]+", "", text.replace(period_match.group(0), "")).strip()
-                    milestone = stripped or text
-
-            out.append(
-                {
-                    "milestone": milestone or f"Milestone {idx + 1}",
-                    "target_period": target_period,
-                    "status": "unspecified",
-                    "confidence_pct": None,
-                    "primary_risk": "",
-                }
-            )
-            continue
-
+    out = _standardize_timeline_rows(raw_timeline)
     return _cap_previous_timeline_rows(out, max_previous=1)
 
 
@@ -2936,6 +3104,15 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         and str(item.get("matched_via") or "").strip() != "market_facts"
         and str(item.get("label") or item.get("condition_id") or "").strip()
     ][:8]
+    triggered_verification = [
+        str(item.get("label") or item.get("condition_id") or "").strip()
+        for item in condition_evaluations
+        if isinstance(item, dict)
+        and str(item.get("status") or "").strip() == "matched"
+        and str(item.get("group") or "").strip() == "verification"
+        and str(item.get("matched_via") or "").strip() != "market_facts"
+        and str(item.get("label") or item.get("condition_id") or "").strip()
+    ][:8]
     market_context_conditions = [
         {
             "label": str(item.get("label") or item.get("condition_id") or "").strip(),
@@ -2987,6 +3164,22 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         and str(item.get("matched_via") or "").strip() != "market_facts"
         and str(item.get("label") or item.get("condition_id") or "").strip()
     ][:8]
+    triggered_verification_details = [
+        {
+            "label": str(item.get("label") or item.get("condition_id") or "").strip(),
+            "scenario": str(item.get("scenario") or "").strip(),
+            "group": str(item.get("group") or "").strip(),
+            "reason": str(item.get("reason") or "").strip(),
+            "matched_via": str(item.get("matched_via") or "").strip(),
+            "confidence": item.get("confidence"),
+        }
+        for item in condition_evaluations
+        if isinstance(item, dict)
+        and str(item.get("status") or "").strip() == "matched"
+        and str(item.get("group") or "").strip() == "verification"
+        and str(item.get("matched_via") or "").strip() != "market_facts"
+        and str(item.get("label") or item.get("condition_id") or "").strip()
+    ][:8]
     key_findings = [
         {
             "type": str(item.get("type") or "").strip(),
@@ -3018,9 +3211,11 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
     if should_project_market_only_watch:
         suppress_stale_market_only_reroute = should_project_market_only_watch(
             matched_conditions_count=len(matched_conditions),
-            triggered_watchlist_count=len(triggered_watchlist),
+            triggered_watchlist_count=len(triggered_watchlist) + len(triggered_verification),
             market_conditions_count=len(market_context_conditions),
             raw_action=raw_action,
+            materiality=str(comparison.get("materiality") or facts.get("materiality") or "").strip(),
+            trajectory_state=str(comparison.get("trajectory_state") or "").strip(),
         )
     display_projection = (
         market_only_watch_projection(
@@ -3034,6 +3229,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
     display_current_path = str(display_projection.get("current_path") or raw_current_path).strip()
     display_action = str(display_projection.get("action") or raw_action).strip()
     display_impact = str(display_projection.get("impact_level") or raw_impact).strip()
+    display_trajectory_state = str(display_projection.get("trajectory_state") or comparison.get("trajectory_state") or "").strip()
     return {
         "current_path": display_current_path,
         "baseline_path": raw_baseline_path,
@@ -3045,6 +3241,27 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         "path_confidence": comparison.get("path_confidence"),
         "run_validity": str(display_projection.get("run_validity") or comparison.get("run_validity") or "").strip(),
         "impact_level": display_impact,
+        "announcement_class": str(comparison.get("announcement_class") or facts.get("announcement_class") or "").strip(),
+        "materiality": str(comparison.get("materiality") or facts.get("materiality") or "").strip(),
+        "trajectory_state": display_trajectory_state,
+        "trajectory_effect": str(display_projection.get("trajectory_effect") or comparison.get("trajectory_effect") or facts.get("trajectory_effect") or "").strip(),
+        "price_time_effect": str(display_projection.get("price_time_effect") or comparison.get("price_time_effect") or facts.get("price_time_effect") or "").strip(),
+        "semantic_summary": str(comparison.get("semantic_summary") or facts.get("semantic_summary") or "").strip(),
+        "filing_summary": str(comparison.get("filing_summary") or facts.get("filing_summary") or "").strip(),
+        "parser_confidence": comparison.get("parser_confidence", facts.get("semantic_confidence")),
+        "source_confidence": comparison.get("source_confidence", facts.get("source_confidence")),
+        "extraction_confidence": comparison.get("extraction_confidence", facts.get("extraction_confidence")),
+        "classification_confidence": comparison.get("classification_confidence", facts.get("classification_confidence", facts.get("semantic_confidence"))),
+        "thesis_match_confidence": comparison.get("thesis_match_confidence", facts.get("thesis_match_confidence")),
+        "classification_reason": str(comparison.get("classification_reason") or facts.get("classification_reason") or "").strip(),
+        "confidence_breakdown": (
+            comparison.get("confidence_breakdown")
+            if isinstance(comparison.get("confidence_breakdown"), dict)
+            else facts.get("confidence_breakdown") if isinstance(facts.get("confidence_breakdown"), dict) else {}
+        ),
+        "domain_profile": str(facts.get("domain_profile") or "").strip(),
+        "parser_warnings": [str(item or "").strip() for item in (facts.get("parser_warnings") or []) if str(item or "").strip()][:8],
+        "classification_basis": [str(item or "").strip() for item in (facts.get("classification_basis") or []) if str(item or "").strip()][:8],
         "action": display_action,
         "action_confidence": action.get("confidence"),
         "reason": str(display_projection.get("reason") or action.get("reason") or "").strip(),
@@ -3055,6 +3272,8 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         "matched_condition_details": matched_condition_details,
         "triggered_watchlist": triggered_watchlist,
         "triggered_watchlist_details": triggered_watchlist_details,
+        "triggered_verification": triggered_verification,
+        "triggered_verification_details": triggered_verification_details,
         "market_context_conditions": market_context_conditions,
         "announcement_condition_checks": (
             router_condition_details(
@@ -3077,6 +3296,23 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
             )
             if router_condition_details
             else triggered_watchlist_details
+        ),
+        "verification_condition_checks": (
+            router_condition_details(
+                condition_evaluations,
+                groups={"verification"},
+                statuses={"matched", "not_matched", "contradicted", "unclear"},
+                exclude_market=True,
+                limit=30,
+            )
+            if router_condition_details
+            else triggered_verification_details
+        ),
+        "triggered_verification_count": len(triggered_verification),
+        "trajectory_projection": (
+            comparison.get("trajectory_projection")
+            if isinstance(comparison.get("trajectory_projection"), dict)
+            else {}
         ),
         "thesis_snapshot": router_thesis_snapshot(router_state.get("baseline_run")) if router_thesis_snapshot else {},
         "key_findings": key_findings,
@@ -3471,6 +3707,7 @@ async def get_gantt_run(run_id: str):
             status_code=400,
             detail="Portfolio positioning artifacts must be loaded via /api/portfolio-positioning-runs/{run_id}",
         )
+    _backfill_stage2_ranking_telemetry(structured, payload)
 
     # Backfill current share price for charting if Stage 3/jsonifier omitted it.
     market_data = structured.get("market_data")
@@ -3635,6 +3872,28 @@ async def get_scenario_router_evaluations():
 
     observer = ScenarioRouterObservability()
     return observer.run_evaluation_suite()
+
+
+@app.post("/api/announcement-router/mock-evaluate")
+@app.post("/api/scenario-router/mock-evaluate")
+async def post_scenario_router_mock_evaluate(payload: Dict[str, Any]):
+    """Run mock announcement(s) against supplied mock thesis map(s).
+
+    This is deterministic and non-persistent: no source fetch, no LLM call, no
+    artifact write. It is intended for thesis-by-thesis router regression tests
+    and manual QA.
+    """
+    from .scenario_router.mock_harness import run_mock_router_case, run_mock_router_cases
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Payload must be a JSON object")
+    cases = payload.get("cases")
+    try:
+        if isinstance(cases, list):
+            return run_mock_router_cases([case for case in cases if isinstance(case, dict)])
+        return run_mock_router_case(payload)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Mock router evaluation failed: {exc}") from exc
 
 
 @app.get("/api/gantt-runs/{run_id}/delta-check/latest")
@@ -4698,6 +4957,7 @@ async def send_message_stream(
                         exchange=selected_exchange or "",
                         exchange_retrieval_params=exchange_retrieval_params,
                         company_name=selected_company_name,
+                        template_id=selected_template_id or "",
                     )
                 except Exception as prepass_exc:
                     msg = (
@@ -4855,6 +5115,7 @@ async def send_message_stream(
                     stage1_results_for_stage3,
                     stage2_results,
                     label_to_model,
+                    source_evidence_pack=emulated_metadata,
                 )
                 yield (
                     "data: "
@@ -4890,6 +5151,16 @@ async def send_message_stream(
             # Stage 3: Synthesize final answer (with optional structured analysis)
             yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
             _persist_assistant_patch({"loading": {"stage3": True}})
+            stage3_evidence_pack = (search_results or {}).get("evidence_pack")
+            if isinstance(stage3_evidence_pack, dict) and isinstance(emulated_metadata, dict):
+                stage3_evidence_pack = {
+                    **stage3_evidence_pack,
+                    "stage1_emulated_metadata": emulated_metadata,
+                    "per_model_research_runs": emulated_metadata.get("per_model_research_runs", []),
+                }
+            elif isinstance(emulated_metadata, dict) and emulated_metadata:
+                stage3_evidence_pack = emulated_metadata
+
             stage3_result = await stage3_synthesize_final(
                 enhanced_context,
                 stage1_results_for_stage3,
@@ -4902,7 +5173,7 @@ async def send_message_stream(
                 exchange=selected_exchange,
                 chairman_model=stage3_chairman_model,
                 market_facts=market_facts,
-                evidence_pack=(search_results or {}).get("evidence_pack"),
+                evidence_pack=stage3_evidence_pack,
                 stage2_reconciliation=stage2_reconciliation,
             )
             yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"

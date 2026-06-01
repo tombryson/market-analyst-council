@@ -12,12 +12,19 @@ from .models import AnnouncementFacts, AnnouncementPacket, EvidenceRef
 TOPIC_KEYWORDS: Dict[str, Tuple[str, ...]] = {
     "financing": ("funding", "facility", "debt", "loan", "placement", "capital raise", "liquidity"),
     "permitting": ("permit", "approval", "licence", "license", "regulator", "environmental", "heritage"),
+    "regulatory": ("regulator", "regulatory", "approval", "licence", "license", "compliance", "investigation"),
     "timeline": ("timeline", "delay", "accelerat", "ahead of schedule", "on track", "milestone"),
     "resource": ("resource", "reserve", "jorc", "ore reserve", "mineral resource"),
     "production": ("production", "throughput", "first gold", "ramp-up", "ramp up", "processing"),
-    "guidance": ("guidance", "forecast", "outlook", "aisc", "cost guidance"),
-    "operations": ("operations", "plant", "mine", "mill", "contractor", "site"),
+    "guidance": ("guidance", "forecast", "outlook", "aisc", "cost guidance", "revenue guidance", "earnings guidance"),
+    "operations": ("operations", "plant", "mine", "mill", "contractor", "site", "facility", "service", "platform", "launch"),
+    "commercial": ("contract", "agreement", "customer", "client", "partner", "distribution", "order", "purchase order"),
+    "customer": ("customer", "client", "subscriber", "user", "account", "churn", "retention"),
+    "product": ("product", "launch", "release", "trial", "platform", "software", "service", "device"),
+    "technology": ("technology", "software", "platform", "patent", "clinical", "data", "cyber", "ai"),
+    "legal": ("litigation", "claim", "proceeding", "settlement", "court", "dispute", "breach"),
     "management": ("director", "ceo", "cfo", "chair", "management", "executive"),
+    "governance": ("board", "director", "chair", "resignation", "appointment", "governance", "audit"),
     "m_and_a": ("acquisition", "merger", "scheme", "takeover", "farm-in", "farm in", "joint venture"),
 }
 
@@ -37,7 +44,9 @@ FACT_SIGNAL_RE = re.compile(
     r"\b("
     r"resource|reserve|jorc|production|produced|guidance|cash|funding|facility|permit|approval|"
     r"drill|intercept|grade|ounce|koz|moz|boe|bbl|revenue|cost|aisc|capex|quarter|completed|increased|"
-    r"commenced|achieved|acquisition|placement|raise|debt|milestone|commissioning|timeline|schedule|on track"
+    r"commenced|achieved|acquisition|placement|raise|debt|milestone|commissioning|timeline|schedule|on track|"
+    r"contract|agreement|customer|client|subscriber|user|launch|platform|software|trial|regulatory|"
+    r"litigation|settlement|court|director|board|ceo|cfo|patent|clinical"
     r")\b|[0-9]",
     flags=re.IGNORECASE,
 )
@@ -50,7 +59,6 @@ class DocumentReader:
     async def read(self, packet: AnnouncementPacket) -> AnnouncementFacts:
         full_text, evidence_excerpts = await self._read_text(packet)
         extracted_facts = self._extract_facts(full_text)
-        material_topics = self._infer_material_topics(full_text, extracted_facts)
         summary = self._build_summary(full_text, extracted_facts)
         evidence = [
             EvidenceRef(
@@ -61,6 +69,14 @@ class DocumentReader:
             )
             for excerpt in evidence_excerpts[:3]
         ]
+        parse_quality = {
+            "decoded_chars": len(full_text or ""),
+            "fact_count": len(extracted_facts),
+            "evidence_excerpt_count": len(evidence),
+            "reader": "document_reader_raw",
+        }
+        source_confidence = self._source_confidence(packet)
+        extraction_confidence = self._extraction_confidence(parse_quality)
         return AnnouncementFacts(
             event_id=packet.event_id,
             ticker=packet.ticker,
@@ -68,9 +84,22 @@ class DocumentReader:
             title=packet.title,
             summary=summary,
             extracted_facts=extracted_facts,
-            material_topics=material_topics,
+            material_topics=[],
             evidence=evidence,
             raw_text_excerpt=full_text[:1800],
+            parse_quality=parse_quality,
+            source_confidence=source_confidence,
+            extraction_confidence=extraction_confidence,
+            confidence_breakdown={
+                "source_confidence": source_confidence,
+                "extraction_confidence": extraction_confidence,
+                "source": {
+                    "source_type": packet.source_type,
+                    "source_url_resolved": bool(str(packet.source_url or "").strip()),
+                    "document_path_resolved": bool(str(packet.document_path or "").strip()),
+                },
+                "extraction": parse_quality,
+            },
         )
 
     async def _read_text(self, packet: AnnouncementPacket) -> Tuple[str, List[str]]:
@@ -168,6 +197,13 @@ class DocumentReader:
 
     @staticmethod
     def _infer_material_topics(text: str, facts: List[str]) -> List[str]:
+        """Legacy topic hinting retained for compatibility tests.
+
+        The live router no longer uses this as the primary classifier. Parsed
+        filing text is interpreted after the baseline run is loaded by
+        AnnouncementInterpreter, where company context and sector adapters are
+        available.
+        """
         haystack = "\n".join(facts) or str(text or "")[:2500]
         low = haystack.lower()
         topics: List[str] = []
@@ -185,6 +221,39 @@ class DocumentReader:
         return snippet[:500]
 
     @staticmethod
+    def _source_confidence(packet: AnnouncementPacket) -> float:
+        source_type = str(packet.source_type or "").strip().lower()
+        has_url = bool(str(packet.source_url or "").strip())
+        has_path = bool(str(packet.document_path or "").strip())
+        if source_type == "exchange_filing" and has_url:
+            return 1.0
+        if has_url:
+            return 0.88
+        if has_path:
+            return 0.78
+        if str(packet.body_text or "").strip():
+            return 0.55
+        return 0.1
+
+    @staticmethod
+    def _extraction_confidence(parse_quality: Dict[str, int]) -> float:
+        decoded = int(parse_quality.get("decoded_chars") or 0)
+        facts = int(parse_quality.get("fact_count") or 0)
+        excerpts = int(parse_quality.get("evidence_excerpt_count") or 0)
+        if decoded >= 4000:
+            base = 0.92
+        elif decoded >= 1200:
+            base = 0.84
+        elif decoded >= 400:
+            base = 0.7
+        elif decoded > 0:
+            base = 0.45
+        else:
+            base = 0.1
+        bonus = min(0.06, facts * 0.01) + min(0.04, excerpts * 0.01)
+        return round(min(0.98, base + bonus), 3)
+
+    @staticmethod
     def _is_boilerplate_line(line: str) -> bool:
         low = str(line or "").strip().lower()
         if not low:
@@ -200,9 +269,16 @@ class DocumentReader:
         strong_keywords = {
             "financing": {"funding", "debt", "loan", "placement", "capital raise"},
             "permitting": {"permit", "approval", "licence", "license"},
+            "regulatory": {"regulatory", "regulator", "compliance", "investigation"},
             "resource": {"mineral resource", "ore reserve", "jorc", "reserve"},
             "production": {"production", "throughput", "first gold", "ramp-up", "ramp up"},
-            "guidance": {"guidance", "aisc", "cost guidance"},
+            "guidance": {"guidance", "aisc", "cost guidance", "revenue guidance", "earnings guidance"},
+            "commercial": {"contract", "agreement", "customer", "client", "purchase order"},
+            "customer": {"customer", "client", "subscriber", "user", "churn"},
+            "product": {"product", "launch", "release", "trial", "platform"},
+            "technology": {"technology", "software", "platform", "patent", "clinical"},
+            "legal": {"litigation", "claim", "settlement", "court", "dispute"},
+            "governance": {"board", "director", "resignation", "appointment"},
             "m_and_a": {"acquisition", "merger", "takeover", "joint venture"},
         }
         return keyword in strong_keywords.get(topic, set()) and DocumentReader._keyword_in_text(keyword, haystack)

@@ -6,6 +6,8 @@ Runs:
 3) Stage 3 structured synthesis using financial_quality_mvp template
 """
 
+from __future__ import annotations
+
 import argparse
 import asyncio
 import json
@@ -23,6 +25,19 @@ from backend.prepass_utils import (
     normalize_retrieval_query_seed as _normalize_retrieval_query_seed,
 )
 from backend.prepass_utils import tail_text as _tail_text
+from backend.prepass_cache import (
+    delta_lookback_days_from_cache,
+    load_cached_prepass_rows,
+    merge_prepass_source_rows,
+    prepass_cache_enabled,
+    prepass_cache_max_age_days,
+    prepass_delta_enabled,
+    prepass_delta_max_sources,
+    prepass_delta_target_non_price_sensitive,
+    prepass_delta_target_price_sensitive,
+    resolve_prepass_cache_root,
+    save_cached_prepass_rows,
+)
 
 
 def _progress(message: str) -> None:
@@ -58,6 +73,24 @@ def _sanitize_ticker_for_dir(ticker: str) -> str:
     text = str(ticker or "").strip().lower()
     text = re.sub(r"[^a-z0-9]+", "_", text)
     return text.strip("_") or "unknown"
+
+
+def _build_stage1_source_evidence_pack(
+    search_results: Optional[Dict[str, Any]],
+    metadata: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Merge Stage 1 second-pass packets into the evidence pack for later stages."""
+    base_pack: Dict[str, Any] = {}
+    if isinstance(search_results, dict) and isinstance(search_results.get("evidence_pack"), dict):
+        base_pack = dict(search_results.get("evidence_pack") or {})
+
+    stage1_metadata = metadata if isinstance(metadata, dict) else {}
+    if stage1_metadata:
+        base_pack["stage1_emulated_metadata"] = stage1_metadata
+        base_pack["per_model_research_runs"] = list(
+            stage1_metadata.get("per_model_research_runs", []) or []
+        )
+    return base_pack
 
 
 SUPPLEMENTARY_CONTEXT_MAX_CHARS = 12000
@@ -332,35 +365,31 @@ def _prepass_output_root(repo_root: Path) -> Path:
     return root
 
 
-def _prepare_primary_injection_bundle(
+def _run_primary_prepass_bundle(
     *,
     repo_root: Path,
     ticker: str,
     company_name: str,
     query_hint: str,
     exchange: str,
-    exchange_retrieval_params: Optional[Dict[str, Any]] = None,
-    reuse_recent_bundle: bool = False,
+    exchange_retrieval_params: Optional[Dict[str, Any]],
+    output_suffix: str,
+    target_price_sensitive: int,
+    target_non_price_sensitive: int,
+    max_sources: int,
+    lookback_days: int,
+    strategy: str,
+    progress_label: str,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    if reuse_recent_bundle:
-        recent_bundle = _find_recent_bundle_path(
-            repo_root=repo_root,
-            ticker=ticker,
-            max_age_hours=24,
-        )
-        if recent_bundle is not None:
-            rows, meta = _build_source_rows_from_injection_bundle(recent_bundle)
-            meta["strategy"] = "reused_recent_bundle"
-            return rows, meta
-
     uv = shutil.which("uv")
     if not uv:
         raise RuntimeError(
             "Required bundle prepass needs `uv`, but it was not found in PATH."
         )
+
     output_dir = (
         _prepass_output_root(repo_root)
-        / f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{_sanitize_ticker_for_dir(ticker)}_auto"
+        / f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{_sanitize_ticker_for_dir(ticker)}_{output_suffix}"
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     query_seed = _normalize_retrieval_query_seed(
@@ -371,24 +400,7 @@ def _prepare_primary_injection_bundle(
     retrieval_query = (
         f"Latest material filings, announcements, and investor updates for {query_seed}"
     )
-    retrieval_params = dict(exchange_retrieval_params or {})
-    normalized_exchange = str(exchange or "").strip().lower()
-    target_price_sensitive = int(retrieval_params.get("target_price_sensitive_default", 10) or 10)
-    target_non_price_sensitive = int(
-        retrieval_params.get("target_non_price_sensitive_default", 10) or 10
-    )
-    if (target_price_sensitive + target_non_price_sensitive) < 20:
-        target_non_price_sensitive = max(
-            target_non_price_sensitive,
-            20 - max(0, target_price_sensitive),
-        )
-    # Canadian exchanges require a wider filing net due weaker broad-search coverage.
-    if normalized_exchange in {"tsx", "tsxv", "cse"}:
-        target_price_sensitive = max(target_price_sensitive, 15)
-        target_non_price_sensitive = max(target_non_price_sensitive, 15)
-    top_default = max(1, target_price_sensitive + target_non_price_sensitive)
-    max_sources_default = int(retrieval_params.get("max_sources_default", 0) or 0)
-    lookback_days_default = int(retrieval_params.get("lookback_days_default", 0) or 0)
+    top_default = max(1, int(target_price_sensitive) + int(target_non_price_sensitive))
 
     cmd = [
         uv,
@@ -410,13 +422,14 @@ def _prepare_primary_injection_bundle(
         "--target-non-price-sensitive",
         str(target_non_price_sensitive),
     ]
-    if max_sources_default > 0:
-        cmd.extend(["--max-sources", str(max_sources_default)])
-    if lookback_days_default > 0:
-        cmd.extend(["--lookback-days", str(lookback_days_default)])
+    if max_sources > 0:
+        cmd.extend(["--max-sources", str(max_sources)])
+    if lookback_days > 0:
+        cmd.extend(["--lookback-days", str(lookback_days)])
     if str(exchange or "").strip():
         cmd.extend(["--exchange", str(exchange).strip().lower()])
-    _progress("Primary injection prepass start (pdf dump + worker summaries)")
+
+    _progress(progress_label)
     proc = subprocess.run(
         cmd,
         cwd=str(repo_root),
@@ -435,6 +448,7 @@ def _prepare_primary_injection_bundle(
             f"stderr_tail={_tail_text(stderr)} "
             f"stdout_tail={_tail_text(stdout)}"
         )
+
     manifest_path = output_dir / "manifest.json"
     if not manifest_path.exists():
         raise RuntimeError(
@@ -455,14 +469,15 @@ def _prepare_primary_injection_bundle(
         raise RuntimeError(
             f"Primary injection prepass completed but injection bundle missing: {bundle_path}"
         )
+
     rows, meta = _build_source_rows_from_injection_bundle(bundle_path)
-    meta["strategy"] = "built_fresh_bundle"
+    meta["strategy"] = strategy
     meta["output_dir"] = str(output_dir)
     meta["prepass_top"] = top_default
     meta["prepass_target_price_sensitive"] = target_price_sensitive
     meta["prepass_target_non_price_sensitive"] = target_non_price_sensitive
-    meta["prepass_max_sources"] = max_sources_default
-    meta["prepass_lookback_days"] = lookback_days_default
+    meta["prepass_max_sources"] = max_sources
+    meta["prepass_lookback_days"] = lookback_days
     meta["prepass_retrieved_sources"] = _manifest_count(
         manifest.get("retrieved_sources", 0)
     )
@@ -479,6 +494,154 @@ def _prepare_primary_injection_bundle(
         manifest.get("selected_primary_candidates", 0)
     )
     meta["prepass_written_files"] = _manifest_count(manifest.get("written_files", 0))
+    meta["exchange_retrieval_params"] = dict(exchange_retrieval_params or {})
+    return rows, meta
+
+
+def _prepare_primary_injection_bundle(
+    *,
+    repo_root: Path,
+    ticker: str,
+    company_name: str,
+    query_hint: str,
+    exchange: str,
+    exchange_retrieval_params: Optional[Dict[str, Any]] = None,
+    reuse_recent_bundle: bool = False,
+    template_id: str = "",
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    if reuse_recent_bundle:
+        recent_bundle = _find_recent_bundle_path(
+            repo_root=repo_root,
+            ticker=ticker,
+            max_age_hours=24,
+        )
+        if recent_bundle is not None:
+            rows, meta = _build_source_rows_from_injection_bundle(recent_bundle)
+            meta["strategy"] = "reused_recent_bundle"
+            return rows, meta
+
+    retrieval_params = dict(exchange_retrieval_params or {})
+    normalized_exchange = str(exchange or "").strip().lower()
+    target_price_sensitive = int(retrieval_params.get("target_price_sensitive_default", 10) or 10)
+    target_non_price_sensitive = int(
+        retrieval_params.get("target_non_price_sensitive_default", 10) or 10
+    )
+    if (target_price_sensitive + target_non_price_sensitive) < 20:
+        target_non_price_sensitive = max(
+            target_non_price_sensitive,
+            20 - max(0, target_price_sensitive),
+        )
+    # Canadian exchanges require a wider filing net due weaker broad-search coverage.
+    if normalized_exchange in {"tsx", "tsxv", "cse"}:
+        target_price_sensitive = max(target_price_sensitive, 15)
+        target_non_price_sensitive = max(target_non_price_sensitive, 15)
+    max_sources_default = int(retrieval_params.get("max_sources_default", 0) or 0)
+    lookback_days_default = int(retrieval_params.get("lookback_days_default", 0) or 0)
+
+    prepass_root = _prepass_output_root(repo_root)
+    cache_root = resolve_prepass_cache_root(prepass_root)
+    if prepass_cache_enabled():
+        cached_rows, cache_meta = load_cached_prepass_rows(
+            cache_root=cache_root,
+            ticker=ticker,
+            exchange=exchange,
+            template_id=template_id,
+            max_age_days=prepass_cache_max_age_days(),
+        )
+        if cached_rows:
+            try:
+                delta_rows: List[Dict[str, Any]] = []
+                delta_meta: Dict[str, Any] = {"strategy": "prepass_cache_delta_skipped"}
+                if prepass_delta_enabled():
+                    delta_lookback_days = delta_lookback_days_from_cache(cache_meta)
+                    delta_rows, delta_meta = _run_primary_prepass_bundle(
+                        repo_root=repo_root,
+                        ticker=ticker,
+                        company_name=company_name,
+                        query_hint=query_hint,
+                        exchange=exchange,
+                        exchange_retrieval_params=exchange_retrieval_params,
+                        output_suffix="delta",
+                        target_price_sensitive=prepass_delta_target_price_sensitive(),
+                        target_non_price_sensitive=prepass_delta_target_non_price_sensitive(),
+                        max_sources=prepass_delta_max_sources(),
+                        lookback_days=delta_lookback_days,
+                        strategy="built_delta_bundle",
+                        progress_label=(
+                            "Primary injection prepass cache hit; running recent delta "
+                            f"(lookback_days={delta_lookback_days})"
+                        ),
+                    )
+                merged_rows, merge_meta = merge_prepass_source_rows(
+                    cached_rows=cached_rows,
+                    delta_rows=delta_rows,
+                    max_rows=max(24, len(cached_rows), len(delta_rows)),
+                )
+                save_meta = save_cached_prepass_rows(
+                    cache_root=cache_root,
+                    ticker=ticker,
+                    exchange=exchange,
+                    template_id=template_id,
+                    company_name=company_name,
+                    source_rows=merged_rows,
+                    source_meta={
+                        "strategy": "reused_cached_prepass_with_delta",
+                        "prepass_top": len(merged_rows),
+                        "prepass_lookback_days": cache_meta.get("prepass_lookback_days"),
+                        "bundle_path": delta_meta.get("bundle_path") or cache_meta.get("bundle_path"),
+                        "output_dir": delta_meta.get("output_dir") or "",
+                    },
+                    preserve_created_at=True,
+                )
+                meta = {
+                    "strategy": "reused_cached_prepass_with_delta",
+                    "cache": cache_meta,
+                    "delta": delta_meta,
+                    "merge": merge_meta,
+                    "cache_save": save_meta,
+                    "bundle_path": str(cache_meta.get("cache_path") or ""),
+                    "rows_built": len(merged_rows),
+                    "prepass_top": len(merged_rows),
+                    "prepass_target_price_sensitive": prepass_delta_target_price_sensitive(),
+                    "prepass_target_non_price_sensitive": prepass_delta_target_non_price_sensitive(),
+                    "prepass_max_sources": prepass_delta_max_sources(),
+                    "prepass_lookback_days": delta_meta.get(
+                        "prepass_lookback_days",
+                        delta_lookback_days_from_cache(cache_meta),
+                    ),
+                }
+                return merged_rows, meta
+            except Exception as exc:
+                _progress(
+                    "Primary injection prepass cache reuse failed; falling back to fresh bundle: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+
+    rows, meta = _run_primary_prepass_bundle(
+        repo_root=repo_root,
+        ticker=ticker,
+        company_name=company_name,
+        query_hint=query_hint,
+        exchange=exchange,
+        exchange_retrieval_params=exchange_retrieval_params,
+        output_suffix="auto",
+        target_price_sensitive=target_price_sensitive,
+        target_non_price_sensitive=target_non_price_sensitive,
+        max_sources=max_sources_default,
+        lookback_days=lookback_days_default,
+        strategy="built_fresh_bundle",
+        progress_label="Primary injection prepass start (pdf dump + worker summaries)",
+    )
+    if prepass_cache_enabled() and rows:
+        meta["cache_save"] = save_cached_prepass_rows(
+            cache_root=cache_root,
+            ticker=ticker,
+            exchange=exchange,
+            template_id=template_id,
+            company_name=company_name,
+            source_rows=rows,
+            source_meta=meta,
+        )
     return rows, meta
 
 
@@ -1148,6 +1311,11 @@ def _build_stage1_model_audit(
             recommendation = "watch"
         else:
             recommendation = "keep"
+        audit_status = {
+            "keep": "trusted",
+            "watch": "qualified",
+            "remove": "excluded",
+        }.get(recommendation, "qualified")
 
         audits.append(
             {
@@ -1179,11 +1347,68 @@ def _build_stage1_model_audit(
                 "citation_gate_passed": citation_gate_passed,
                 "second_pass_error": second_pass_error,
                 "second_pass_warning": second_pass_warning,
+                "audit_status": audit_status,
                 "recommendation": recommendation,
                 "reasons": reasons,
             }
         )
     return audits
+
+
+def _apply_stage1_model_audit_gate(
+    stage1_results: List[Dict[str, Any]],
+    stage1_model_audit: List[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    by_model = {str(row.get("model") or ""): row for row in stage1_model_audit or []}
+    accepted: List[Dict[str, Any]] = []
+    excluded: List[Dict[str, Any]] = []
+    qualified: List[str] = []
+    trusted: List[str] = []
+
+    for result in stage1_results or []:
+        model = str(result.get("model") or "").strip()
+        audit = by_model.get(model) or {}
+        status = str(audit.get("audit_status") or "").strip().lower()
+        if not status:
+            legacy = str(audit.get("recommendation") or "watch").strip().lower()
+            status = {"keep": "trusted", "watch": "qualified", "remove": "excluded"}.get(legacy, "qualified")
+        reasons = [str(item or "").strip() for item in (audit.get("reasons") or []) if str(item or "").strip()]
+
+        if status == "excluded":
+            excluded.append({"model": model, "reasons": reasons[:8]})
+            continue
+
+        cloned = dict(result)
+        provider_metadata = dict(cloned.get("provider_metadata") or {})
+        provider_metadata["stage1_model_audit_status"] = status
+        provider_metadata["stage1_model_audit_reasons"] = reasons[:8]
+        cloned["provider_metadata"] = provider_metadata
+        cloned["audit_status"] = status
+        if status == "qualified":
+            qualified.append(model)
+            note = (
+                "\n\n[MODEL_AUDIT_STATUS]\n"
+                "This Stage 1 response is QUALIFIED by automated conformance checks. "
+                "Use it as lower-confidence evidence unless its claims are independently source-aligned."
+            )
+            if reasons:
+                note += "\nAudit reasons: " + " | ".join(reasons[:6])
+            cloned["response"] = f"{str(cloned.get('response') or '').rstrip()}{note}\n"
+        else:
+            trusted.append(model)
+        accepted.append(cloned)
+
+    return accepted, {
+        "enabled": True,
+        "input_count": len(stage1_results or []),
+        "accepted_count": len(accepted),
+        "trusted_count": len(trusted),
+        "qualified_count": len(qualified),
+        "excluded_count": len(excluded),
+        "trusted_models": trusted,
+        "qualified_models": qualified,
+        "excluded_models": excluded,
+    }
 
 
 def _print_stage1_model_audit(stage1_model_audit: List[Dict[str, Any]]) -> None:
@@ -1192,13 +1417,13 @@ def _print_stage1_model_audit(stage1_model_audit: List[Dict[str, Any]]) -> None:
     if not stage1_model_audit:
         print("No model audit rows available.")
         return
-    keep = sum(1 for row in stage1_model_audit if row.get("recommendation") == "keep")
-    watch = sum(1 for row in stage1_model_audit if row.get("recommendation") == "watch")
-    remove = sum(1 for row in stage1_model_audit if row.get("recommendation") == "remove")
-    print(f"Recommendations summary: keep={keep} watch={watch} remove={remove}")
+    trusted = sum(1 for row in stage1_model_audit if row.get("audit_status") == "trusted")
+    qualified = sum(1 for row in stage1_model_audit if row.get("audit_status") == "qualified")
+    excluded = sum(1 for row in stage1_model_audit if row.get("audit_status") == "excluded")
+    print(f"Audit summary: trusted={trusted} qualified={qualified} excluded={excluded}")
     for row in stage1_model_audit:
         print(
-            f"[{(row.get('recommendation') or 'watch').upper()}] {row.get('model')} "
+            f"[{(row.get('audit_status') or 'qualified').upper()}] {row.get('model')} "
             f"(provider={row.get('analysis_provider')}, type={row.get('response_type')})"
         )
         print(
@@ -1581,6 +1806,28 @@ def _write_stage_checkpoint(
     return checkpoint_path
 
 
+def _stage3_has_structured_data(stage3_result: Optional[Dict[str, Any]]) -> bool:
+    if not isinstance(stage3_result, dict):
+        return False
+    structured = stage3_result.get("structured_data")
+    return isinstance(structured, dict) and bool(structured)
+
+
+def _stage3_failure_summary(stage3_result: Optional[Dict[str, Any]]) -> str:
+    if not isinstance(stage3_result, dict):
+        return "Stage 3 chairman did not return a result object"
+    model = str(stage3_result.get("model") or "unknown").strip() or "unknown"
+    parse_error = str(stage3_result.get("parse_error") or "").strip()
+    response = str(stage3_result.get("response") or "").strip()
+    details = [f"Stage 3 chairman failed to produce structured_data (model={model})"]
+    if parse_error:
+        details.append(f"parse_error={parse_error}")
+    if response:
+        preview = response[:240].replace("\n", " ")
+        details.append(f"response_preview={preview}")
+    return "; ".join(details)
+
+
 def _build_stage3_comparison(
     primary: Dict[str, Any],
     secondary: Dict[str, Any] | None,
@@ -1745,6 +1992,10 @@ def _prepass_audit_summary(meta: Dict[str, Any] | None) -> Dict[str, Any]:
         "kept_for_injection": payload.get("kept_for_injection"),
         "prepass_retrieved_sources": payload.get("prepass_retrieved_sources"),
         "prepass_selected_primary_candidates": payload.get("prepass_selected_primary_candidates"),
+        "cache": payload.get("cache") or {},
+        "delta": payload.get("delta") or {},
+        "merge": payload.get("merge") or {},
+        "cache_save": payload.get("cache_save") or {},
         "selection_counts": payload.get("selection_counts") or {},
     }
 
@@ -1976,6 +2227,7 @@ async def _run(args: argparse.Namespace) -> None:
             exchange=str(selected_exchange or args.exchange or ""),
             exchange_retrieval_params=loader.get_exchange_retrieval_params(selected_exchange),
             reuse_recent_bundle=bool(args.reuse_recent_bundle),
+            template_id=str(selected_template_id or ""),
         )
         if not injection_bundle_rows:
             raise RuntimeError(
@@ -2090,14 +2342,41 @@ async def _run(args: argparse.Namespace) -> None:
         print("\nStage 1-only test complete.")
         return
 
+    stage1_results_for_council, stage1_audit_gate_summary = _apply_stage1_model_audit_gate(
+        stage1_results,
+        stage1_model_audit,
+    )
+    print(
+        "\nStage 1 audit gate: "
+        f"accepted={stage1_audit_gate_summary.get('accepted_count', 0)} "
+        f"trusted={stage1_audit_gate_summary.get('trusted_count', 0)} "
+        f"qualified={stage1_audit_gate_summary.get('qualified_count', 0)} "
+        f"excluded={stage1_audit_gate_summary.get('excluded_count', 0)}"
+    )
+    if stage1_audit_gate_summary.get("excluded_models"):
+        excluded_names = [
+            str(item.get("model") or "").strip()
+            for item in (stage1_audit_gate_summary.get("excluded_models") or [])
+            if str(item.get("model") or "").strip()
+        ]
+        if excluded_names:
+            print("Excluded from Stage 2/3: " + ", ".join(excluded_names))
+    if not stage1_results_for_council:
+        print("\nNo Stage 1 responses passed the audit gate. Stopping before council ranking.")
+        return
+
     search_results = metadata.get("aggregated_search_results", {})
+    stage1_source_evidence_pack = _build_stage1_source_evidence_pack(
+        search_results,
+        metadata,
+    )
     enhanced_context = build_enhanced_context(
         effective_query,
         search_results,
         [],
         market_facts=market_facts,
     )
-    ranking_models = [item.get("model") for item in stage1_results if item.get("model")]
+    ranking_models = [item.get("model") for item in stage1_results_for_council if item.get("model")]
     primary_chairman_model = (
         CHAIRMAN_MODEL
         if CHAIRMAN_MODEL in ranking_models
@@ -2109,7 +2388,7 @@ async def _run(args: argparse.Namespace) -> None:
     stage2_start = perf_counter()
     stage2_results, label_to_model = await stage2_collect_rankings(
         enhanced_context,
-        stage1_results,
+        stage1_results_for_council,
         ranking_models=ranking_models,
     )
     aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
@@ -2123,7 +2402,9 @@ async def _run(args: argparse.Namespace) -> None:
             "selection": selection,
             "input_audit": checkpoint_input_audit,
             "stage1_results": stage1_results,
+            "stage1_results_for_council": stage1_results_for_council,
             "stage1_model_audit": stage1_model_audit,
+            "stage1_audit_gate_summary": stage1_audit_gate_summary,
             "metadata": metadata,
             "stage2_results": stage2_results,
             "stage2_aggregate_rankings": aggregate_rankings,
@@ -2141,19 +2422,19 @@ async def _run(args: argparse.Namespace) -> None:
     )
     stage2_revision_results: List[Dict[str, Any]] = []
     stage2_revision_summary: Dict[str, Any] = {"enabled": False}
-    stage1_results_for_stage3 = stage1_results
+    stage1_results_for_stage3 = stage1_results_for_council
     if revision_enabled:
         _progress("Stage 2.5 revision pass start")
         stage2_revision_start = perf_counter()
         stage2_revision_results, stage2_revision_summary = await stage2_collect_revision_deltas(
             enhanced_context,
-            stage1_results,
+            stage1_results_for_council,
             stage2_results,
             label_to_model,
             revision_models=ranking_models,
         )
         stage1_results_for_stage3, apply_summary = apply_stage2_revision_deltas(
-            stage1_results,
+            stage1_results_for_council,
             stage2_revision_results,
         )
         stage2_revision_summary["apply"] = apply_summary
@@ -2171,7 +2452,9 @@ async def _run(args: argparse.Namespace) -> None:
             "input_audit": checkpoint_input_audit,
             "stage1_results": stage1_results,
             "stage1_results_for_stage3": stage1_results_for_stage3,
+            "stage1_results_for_council": stage1_results_for_council,
             "stage1_model_audit": stage1_model_audit,
+            "stage1_audit_gate_summary": stage1_audit_gate_summary,
             "metadata": metadata,
             "stage2_results": stage2_results,
             "stage2_revision_results": stage2_revision_results,
@@ -2198,6 +2481,7 @@ async def _run(args: argparse.Namespace) -> None:
             stage1_results_for_stage3,
             stage2_results,
             label_to_model,
+            source_evidence_pack=stage1_source_evidence_pack,
         )
         _progress(
             "Stage 2.5 discrepancy review done in "
@@ -2219,7 +2503,7 @@ async def _run(args: argparse.Namespace) -> None:
         exchange=selected_exchange,
         chairman_model=primary_chairman_model,
         market_facts=market_facts,
-        evidence_pack=search_results.get("evidence_pack", {}),
+        evidence_pack=stage1_source_evidence_pack,
         stage2_reconciliation=stage2_reconciliation,
     )
     stage3_primary_elapsed = perf_counter() - stage3_primary_start
@@ -2233,6 +2517,9 @@ async def _run(args: argparse.Namespace) -> None:
             "selection": selection,
             "input_audit": checkpoint_input_audit,
             "stage1_results_for_stage3": stage1_results_for_stage3,
+            "stage1_results_for_council": stage1_results_for_council,
+            "stage1_model_audit": stage1_model_audit,
+            "stage1_audit_gate_summary": stage1_audit_gate_summary,
             "stage2_results": stage2_results,
             "stage2_aggregate_rankings": aggregate_rankings,
             "stage2_revision_results": stage2_revision_results,
@@ -2268,7 +2555,7 @@ async def _run(args: argparse.Namespace) -> None:
             exchange=selected_exchange,
             chairman_model=secondary_chairman_model,
             market_facts=market_facts,
-            evidence_pack=search_results.get("evidence_pack", {}),
+            evidence_pack=stage1_source_evidence_pack,
             stage2_reconciliation=stage2_reconciliation,
         )
         stage3_secondary_elapsed = perf_counter() - stage3_secondary_start
@@ -2288,6 +2575,15 @@ async def _run(args: argparse.Namespace) -> None:
         print(f"[warn] Stage 3 comparison print failed: {exc}")
 
     stage3_result = stage3_result_primary
+    if (
+        not _stage3_has_structured_data(stage3_result)
+        and _stage3_has_structured_data(stage3_result_secondary)
+    ):
+        print("[warn] Stage 3 primary returned no structured_data; using secondary chairman output.")
+        stage3_result = stage3_result_secondary
+
+    if not _stage3_has_structured_data(stage3_result):
+        raise RuntimeError(_stage3_failure_summary(stage3_result_primary))
 
     if args.dump_json:
         stage3_memo_files = _write_stage3_memo_files(
@@ -2308,7 +2604,9 @@ async def _run(args: argparse.Namespace) -> None:
             },
             "stage1_results": stage1_results,
             "stage1_results_for_stage3": stage1_results_for_stage3,
+            "stage1_results_for_council": stage1_results_for_council,
             "stage1_model_audit": stage1_model_audit,
+            "stage1_audit_gate_summary": stage1_audit_gate_summary,
             "stage2_results": stage2_results,
             "stage2_aggregate_rankings": aggregate_rankings,
             "stage2_revision_results": stage2_revision_results,

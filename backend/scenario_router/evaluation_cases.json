@@ -118,5 +118,83 @@
       "action": "rerun_stage1",
       "impact_level": "medium"
     }
+  },
+  {
+    "case_id": "mock_thesis_bull_permit_hit",
+    "category": "thesis_by_thesis",
+    "template_family": "rare_earths_critical_minerals",
+    "label": "Custom thesis map: permit approval should hit only the bull required condition",
+    "ticker": "ASX:MOCK",
+    "baseline_path": "base",
+    "title": "Mining Permit Approval Received",
+    "summary": "The regulator granted the mining permit approval ahead of schedule.",
+    "extracted_facts": [
+      "Mining permit approval was granted ahead of schedule.",
+      "The company said approvals unlock the next phase of drilling and development."
+    ],
+    "thesis_map": {
+      "bull": {
+        "required_conditions": [
+          {
+            "condition_id": "bull_permit_approval",
+            "condition": "Mining permit approval received ahead of schedule",
+            "evidence_hooks": ["permit approval was granted ahead of schedule"]
+          }
+        ]
+      },
+      "base": {
+        "required_conditions": [
+          {
+            "condition_id": "base_waiting_for_permits",
+            "condition": "Permits remain pending",
+            "evidence_hooks": ["permits remain pending"]
+          }
+        ]
+      },
+      "bear": {
+        "failure_conditions": [
+          {
+            "condition_id": "bear_permit_rejected",
+            "condition": "Permit rejected or withdrawn",
+            "evidence_hooks": ["permit was rejected"]
+          }
+        ]
+      }
+    },
+    "expected": {
+      "current_path": "bull",
+      "action": "rerun_stage1",
+      "impact_level": "medium",
+      "scenario_hits": {
+        "bull": {"required": ["bull_permit_approval"]},
+        "base": {"required": []},
+        "bear": {"failure": []}
+      },
+      "condition_statuses": {
+        "bull_permit_approval": "matched",
+        "base_waiting_for_permits": "not_matched",
+        "bear_permit_rejected": "not_matched"
+      }
+    }
+  },
+  {
+    "case_id": "mock_capital_management_buyback",
+    "category": "administrative_capital_management",
+    "template_family": "energy_oil_gas",
+    "label": "Buy-back update should classify without becoming urgent or unknown",
+    "ticker": "ASX:BRK",
+    "baseline_path": "base",
+    "title": "Update - Notification of buy-back - BRK",
+    "summary": "The company lodged an update to its on-market share buy-back notification.",
+    "extracted_facts": [
+      "The update relates to an on-market share buy-back notification under the capital management program."
+    ],
+    "expected": {
+      "announcement_class": "capital_management",
+      "trajectory_state": "no_thesis_change",
+      "action": "annotate_run",
+      "impact_level": "low",
+      "confidence_min": {"classification_confidence": 0.7}
+    }
   }
 ]

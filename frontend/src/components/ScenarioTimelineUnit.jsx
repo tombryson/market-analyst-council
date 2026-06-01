@@ -34,6 +34,15 @@ function statusTone(status) {
   return 'base';
 }
 
+function statusLabel(status) {
+  const s = String(status || '').trim().toLowerCase();
+  if (s === 'at_risk' || s === 'at risk') return 'At risk';
+  if (s === 'achieved' || s === 'completed' || s === 'complete') return 'Achieved';
+  if (s === 'current' || s === 'in_progress' || s === 'in progress') return 'In progress';
+  if (s === 'planned') return 'Planned';
+  return s ? s.replace(/_/g, ' ') : 'n/a';
+}
+
 export default function ScenarioTimelineUnit({ data, currency, timelineBars, orientation = 'vertical' }) {
   const { width, height, margin } = CHART_METRICS;
   const plotW = width - margin.left - margin.right;
@@ -220,8 +229,9 @@ export default function ScenarioTimelineUnit({ data, currency, timelineBars, ori
               <div className="timeline-meta">
                 <div className="timeline-name">{row.milestone}</div>
                 <div className="timeline-sub">
-                  {row.target_period || 'TBD'} · {row.status || 'n/a'}
+                  {row.target_period || 'TBD'} · {statusLabel(row.status)}
                 </div>
+                {row.primary_risk && <div className="timeline-note">{row.primary_risk}</div>}
               </div>
               <div className="timeline-track">
                 <svg

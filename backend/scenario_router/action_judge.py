@@ -18,6 +18,7 @@ class ActionJudge:
         current_path = str(report.current_path or "unknown").lower()
         path_transition = str(report.path_transition or "").strip().lower()
         run_validity = str(report.run_validity or "watch").lower()
+        trajectory_state = str(getattr(report, "trajectory_state", "") or "").strip().lower()
         conflict_count = len(report.conflicts_with_run or [])
         finding_count = len(report.key_findings or [])
         affected_domains = [str(item or "").strip().lower() for item in (report.affected_domains or []) if str(item or "").strip()]
@@ -25,8 +26,34 @@ class ActionJudge:
             str(item or "").strip().lower() for item in (report.material_change_types or []) if str(item or "").strip()
         }
 
-        full_rerun_domains = {"financing", "permitting", "resource", "production", "guidance", "capital_structure", "m_and_a"}
-        stage1_rerun_domains = {"timeline", "operations", "management"}
+        full_rerun_domains = {
+            "financing",
+            "permitting",
+            "regulatory",
+            "resource",
+            "production",
+            "guidance",
+            "capital_structure",
+            "m_and_a",
+            "legal",
+            "asset_project",
+            "clinical_regulatory",
+            "credit_risk",
+        }
+        stage1_rerun_domains = {
+            "timeline",
+            "operations",
+            "management",
+            "governance",
+            "commercial",
+            "customer",
+            "commercial_customer",
+            "product",
+            "technology",
+            "product_technology",
+            "drilling_exploration",
+            "real_estate_portfolio",
+        }
         critical_domain_hit = bool(material_change_types & full_rerun_domains) or bool(set(affected_domains) & full_rerun_domains)
         stage1_domain_hit = bool(material_change_types & stage1_rerun_domains) or bool(set(affected_domains) & stage1_rerun_domains)
         scenario_break = (
@@ -59,6 +86,35 @@ class ActionJudge:
                     "Escalate to human review with the announcement packet and latest run side by side.",
                 ],
                 tags=["critical", "scenario_router"],
+            )
+
+        if trajectory_state == "material_unmapped":
+            return ActionDecision(
+                action="annotate_run",
+                confidence=0.84,
+                reason=(
+                    "Material filing was identified, but it did not match a saved thesis-map or watchlist condition. "
+                    "Treat this as a thesis-map coverage gap, not as an immaterial filing."
+                ),
+                should_trigger_workflow=False,
+                run_reuse_ok=True,
+                follow_up_steps=[
+                    "Attach the filing to the thesis trajectory log.",
+                    "Review whether the saved thesis map needs a new driver or condition.",
+                    "Only refresh council evidence after the thesis-map gap is resolved.",
+                ],
+                tags=["material_unmapped", "thesis_map_gap"],
+            )
+
+        if trajectory_state == "needs_classification":
+            return ActionDecision(
+                action="annotate_run",
+                confidence=0.72,
+                reason="Filing could not be confidently classified against the saved company context.",
+                should_trigger_workflow=False,
+                run_reuse_ok=True,
+                follow_up_steps=["Review the filing classification before deciding whether the thesis trajectory changed."],
+                tags=["needs_classification"],
             )
 
         if (
@@ -136,6 +192,19 @@ class ActionJudge:
                 run_reuse_ok=True,
                 follow_up_steps=["Attach the announcement note to the run and keep the current thesis active."],
                 tags=["annotation"],
+            )
+
+        if trajectory_state == "no_thesis_change" and (
+            "capital_management" in material_change_types or "capital_management" in affected_domains
+        ):
+            return ActionDecision(
+                action="annotate_run",
+                confidence=0.76,
+                reason="Capital-management filing was classified and recorded, but no saved thesis condition changed.",
+                should_trigger_workflow=False,
+                run_reuse_ok=True,
+                follow_up_steps=["Attach the capital-management update to the trajectory log without changing the saved thesis path."],
+                tags=["capital_management", "no_thesis_change"],
             )
 
         if finding_count == 0:

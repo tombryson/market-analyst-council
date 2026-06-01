@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
+import ScenarioTimelineUnit from './ScenarioTimelineUnit';
 import './GanttIntelligenceLab.css';
 
 function navigateTo(pathname) {
@@ -34,6 +35,28 @@ function fmtNum(value, digits = 2) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 'n/a';
   return n.toFixed(digits);
+}
+
+function fmtPrice(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 'n/a';
+  if (Math.abs(n) >= 10) return n.toFixed(2);
+  if (Math.abs(n) >= 1) return n.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+  return n.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+function numericOrNull(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeCurrencyCode(value) {
+  const code = String(value || '').trim().toUpperCase();
+  if (['AUD', 'A$', 'AU$'].includes(code)) return 'AUD';
+  if (['USD', 'US$'].includes(code)) return 'USD';
+  if (['GBP', 'GBX', 'GBP_PENCE', 'PENCE'].includes(code)) return code;
+  return code || 'AUD';
 }
 
 function fmtMs(value) {
@@ -73,18 +96,94 @@ function labelScenarioPath(value) {
   return 'Not assessed';
 }
 
+function labelScenarioPathShort(value) {
+  return labelScenarioPath(value).replace(' scenario', '');
+}
+
 function labelScenarioAction(value) {
   const action = String(value || '').trim().toLowerCase();
   const labels = {
-    ignore: 'No action',
-    watch: 'Watch only',
-    annotate_run: 'Attach note to run',
-    run_delta_only: 'Run delta check',
-    rerun_stage1: 'Refresh evidence only',
-    full_rerun: 'Full rerun recommended',
-    urgent_human_review: 'Urgent human review',
+    ignore: 'No workflow action',
+    watch: 'Monitor only',
+    annotate_run: 'Add note',
+    run_delta_only: 'Update section',
+    rerun_stage1: 'Refresh evidence',
+    full_rerun: 'Rebuild run',
+    urgent_human_review: 'Needs you now',
   };
   return labels[action] || (action ? titleizeKey(action) : 'Not assessed');
+}
+
+function labelProjectionRerunSignal(value) {
+  const signal = String(value || '').trim().toLowerCase();
+  const labels = {
+    rebuild_analysis: 'Rebuild analysis',
+    refresh_evidence: 'Refresh evidence',
+    review_thesis_map: 'Review thesis map',
+    annotate_evidence: 'Annotate evidence',
+    none: 'No rerun signal',
+  };
+  return labels[signal] || (signal ? titleizeKey(signal) : 'No rerun signal');
+}
+
+function labelMarketPath(value) {
+  const path = String(value || '').trim().toLowerCase();
+  if (path === 'bull') return 'Closest to bull';
+  if (path === 'base') return 'Closest to base';
+  if (path === 'bear') return 'Closest to bear';
+  if (path.startsWith('above_')) return `Above ${labelScenarioPathShort(path.replace('above_', ''))}`;
+  if (path.startsWith('below_')) return `Below ${labelScenarioPathShort(path.replace('below_', ''))}`;
+  return 'Market path unknown';
+}
+
+function monthOffsetFromProjectionTiming(value) {
+  const text = String(value || '').trim().toUpperCase();
+  if (!text) return null;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const quarter = text.match(/\bQ([1-4])\s*(20\d{2})\b/);
+  if (quarter) {
+    const q = Number(quarter[1]);
+    const y = Number(quarter[2]);
+    const targetMonth = (q - 1) * 3;
+    return Math.max(0, Math.min(24, (y - year) * 12 + (targetMonth - month)));
+  }
+  const half = text.match(/\bH([12])\s*(20\d{2})\b/);
+  if (half) {
+    const h = Number(half[1]);
+    const y = Number(half[2]);
+    const targetMonth = h === 1 ? 2 : 8;
+    return Math.max(0, Math.min(24, (y - year) * 12 + (targetMonth - month)));
+  }
+  const yearOnly = text.match(/\b(20\d{2})\b/);
+  if (yearOnly) {
+    const y = Number(yearOnly[1]);
+    return Math.max(0, Math.min(24, (y - year) * 12 + (6 - month)));
+  }
+  return null;
+}
+
+function routerTrajectoryState(router) {
+  return String(router?.trajectory_state || '').trim().toLowerCase();
+}
+
+function labelTrajectoryState(value) {
+  const state = String(value || '').trim().toLowerCase();
+  const labels = {
+    thesis_strengthened: 'Thesis strengthened',
+    thesis_weakened: 'Thesis weakened',
+    timeline_accelerated: 'Timeline accelerated',
+    timeline_delayed: 'Timeline delayed',
+    risk_reduced: 'Risk reduced',
+    risk_increased: 'Risk increased',
+    material_unmapped: 'Material, unmapped',
+    market_backdrop_only: 'Market backdrop only',
+    administrative_filing: 'Administrative filing',
+    no_thesis_change: 'No thesis change',
+    needs_classification: 'Needs classification',
+  };
+  return labels[state] || (state ? titleizeKey(state) : 'Not assessed');
 }
 
 function labelScenarioTransition(value) {
@@ -101,13 +200,6 @@ function scenarioTone(name) {
   return 'base';
 }
 
-function topCountEntries(counts, limit = 4) {
-  return Object.entries(counts || {})
-    .filter(([, value]) => Number(value) > 0)
-    .sort((a, b) => Number(b[1]) - Number(a[1]))
-    .slice(0, limit);
-}
-
 function hasRouterDecision(router) {
   return Boolean(
     router &&
@@ -121,6 +213,10 @@ function routerDetailItems(router, detailKey, fallbackKey) {
   if (Array.isArray(details) && details.length) return details;
   const fallback = router?.[fallbackKey];
   return Array.isArray(fallback) ? fallback : [];
+}
+
+function routerVerificationItems(router) {
+  return routerDetailItems(router, 'triggered_verification_details', 'triggered_verification');
 }
 
 function routerItemLabel(item) {
@@ -154,68 +250,197 @@ function routerTitle(router) {
   return String(router?.announcement_title || router?.title || 'Untitled announcement').trim();
 }
 
+function routerFilingSummary(router) {
+  const summary = String(router?.filing_summary || '').trim();
+  if (summary) return summary;
+  const semantic = String(router?.semantic_summary || '').trim();
+  if (semantic) return semantic;
+  return '';
+}
+
 function routerReason(router) {
   return String(router?.reason || router?.action_reason || '').trim();
 }
 
-function explainRouterDecision(router) {
-  if (!hasRouterDecision(router)) return '';
-  const action = String(router.action || '').trim().toLowerCase();
-  const transition = String(router.path_transition || '').trim();
-  const matchedCount = routerDetailItems(router, 'matched_condition_details', 'matched_conditions').length;
-  const watchCount = routerDetailItems(router, 'triggered_watchlist_details', 'triggered_watchlist').length;
-  const marketCount = Array.isArray(router.market_context_conditions)
-    ? router.market_context_conditions.length
-    : Object.keys(router.market_facts_used || {}).length;
+function routerActionKey(router) {
+  return String(router?.action || '').trim().toLowerCase();
+}
 
-  if (!matchedCount && !watchCount && marketCount) {
-    return 'No announcement-based thesis condition matched. The prior lab leaning below is the saved view from before this filing, not a fresh recommendation from this announcement.';
+function routerTopicSummary(router) {
+  const domains = Array.isArray(router?.affected_domains) ? router.affected_domains : [];
+  const labels = domains
+    .map((item) => titleizeKey(item))
+    .filter(Boolean);
+  if (!labels.length) return 'Unclassified';
+  return labels.slice(0, 3).join(', ');
+}
+
+function routerMateriality(router) {
+  const materiality = String(router?.materiality || '').trim().toLowerCase();
+  if (materiality) return materiality;
+  const impact = String(router?.impact_level || '').trim().toLowerCase();
+  if (['none', 'low', 'medium', 'high', 'critical'].includes(impact)) return impact;
+  return '';
+}
+
+function routerMaterialityLabel(router) {
+  const materiality = routerMateriality(router);
+  if (!materiality) return 'Not assessed';
+  if (materiality === 'none') return 'None';
+  return `${titleizeKey(materiality)} materiality`;
+}
+
+function routerDriverLabel(router) {
+  const klass = String(router?.announcement_class || '').trim();
+  if (['needs_classification', 'unknown', 'unclassified'].includes(klass.toLowerCase())) return 'Unclassified';
+  if (klass) return titleizeKey(klass);
+  return routerTopicSummary(router);
+}
+
+function routerVerdictCopy(router) {
+  const state = routerTrajectoryState(router);
+  const directHits = routerDirectHitCount(router);
+  const transition = String(router?.path_transition || '').trim();
+  const labels = {
+    thesis_strengthened: 'The filing improves the saved thesis path. Check the mapped conditions and evidence before updating the run narrative.',
+    thesis_weakened: 'The filing weakens the saved thesis path. This deserves human review before the thesis stays unchanged.',
+    timeline_accelerated: 'The filing pulls the expected path forward. The timing assumptions in the saved thesis may need updating.',
+    timeline_delayed: 'The filing pushes the expected path out. The saved timeline should be reviewed before this is dismissed.',
+    risk_reduced: 'The filing reduces a tracked risk in the saved thesis map.',
+    risk_increased: 'The filing increases a tracked risk in the saved thesis map.',
+    material_unmapped: 'This looks material, but no saved thesis condition covers it. Treat it as a thesis-map gap until reviewed.',
+    market_backdrop_only: 'No filing-led thesis movement was found. Market context was checked separately and is not the announcement verdict.',
+    administrative_filing: 'Administrative filing. Recorded for completeness; no direct thesis or price/time change detected.',
+    no_thesis_change: 'Checked against the saved thesis map. No direct change to the thesis path was detected.',
+    needs_classification: 'The filing was captured, but the router could not confidently classify its thesis impact.',
+  };
+  if (labels[state]) return labels[state];
+  if (transition) return `Moved saved thesis view: ${labelScenarioTransition(transition)}.`;
+  if (directHits) {
+    return `Matched ${directHits} saved thesis, watchlist, or verification item${directHits === 1 ? '' : 's'}.`;
   }
-  if (!matchedCount && !watchCount && action === 'ignore') {
-    return 'The filing was resolved to a primary source and did not change the prior lab leaning.';
-  }
-  if (transition) {
-    return `The filing maps to ${labelScenarioTransition(transition)}. ${labelScenarioAction(action)}.`;
-  }
-  if (matchedCount || watchCount) {
-    return `The filing hit ${matchedCount + watchCount} monitored condition(s), but did not move the prior lab leaning.`;
-  }
+  if (router?.semantic_summary) return String(router.semantic_summary);
+  if (router?.price_time_effect) return String(router.price_time_effect);
   return routerReason(router);
 }
 
 function routerOutcomeLabel(router) {
   if (!hasRouterDecision(router)) return 'Not assessed';
+  const state = routerTrajectoryState(router);
+  if (state) return labelTrajectoryState(state);
   const transition = String(router.path_transition || '').trim();
   const matched = Number(router.matched_conditions_count || 0);
   const watched = Number(router.triggered_watchlist_count || 0);
-  const action = String(router.action || '').trim().toLowerCase();
+  const verified = Number(router.triggered_verification_count || routerVerificationItems(router).length || 0);
+  const action = routerActionKey(router);
   if (transition) return labelScenarioTransition(transition);
-  if (matched || watched) return `${matched + watched} thesis condition${matched + watched === 1 ? '' : 's'} hit`;
+  if (matched || watched || verified) return `${matched + watched + verified} evidence check${matched + watched + verified === 1 ? '' : 's'} matched`;
   if (action === 'ignore') return 'No thesis impact';
-  if (action === 'watch') return 'Watch only';
+  if (action === 'watch') return 'Watch';
   return labelScenarioAction(action);
+}
+
+function routerActionBucket(router) {
+  const state = routerTrajectoryState(router);
+  if (['needs_classification', 'material_unmapped', 'thesis_weakened', 'timeline_delayed', 'risk_increased'].includes(state)) return 'attention';
+  if (routerVerificationItems(router).length) return 'attention';
+  if (['thesis_strengthened', 'timeline_accelerated', 'risk_reduced'].includes(state)) return 'trajectory';
+  if (state === 'market_backdrop_only' || state === 'no_thesis_change') return 'no_change';
+  if (state === 'administrative_filing') return 'administrative';
+  return 'all';
+}
+
+function routerDirectHitCount(router) {
+  return routerDetailItems(router, 'matched_condition_details', 'matched_conditions').length +
+    routerDetailItems(router, 'triggered_watchlist_details', 'triggered_watchlist').length +
+    routerVerificationItems(router).length;
+}
+
+function routerConflictCount(router) {
+  return Array.isArray(router?.conflicts_with_run) ? router.conflicts_with_run.length : 0;
+}
+
+function routerPriorityTone(router) {
+  const state = routerTrajectoryState(router);
+  const action = routerActionKey(router);
+  const status = String(router?.status || '').trim().toLowerCase();
+  if (['thesis_weakened', 'timeline_delayed', 'risk_increased'].includes(state)) return 'urgent';
+  if (['needs_classification', 'material_unmapped'].includes(state)) return 'warn';
+  if (['thesis_strengthened', 'timeline_accelerated', 'risk_reduced'].includes(state)) return 'positive';
+  if (['market_backdrop_only', 'no_thesis_change', 'administrative_filing'].includes(state)) return 'neutral';
+  if (status === 'error' || action === 'urgent_human_review' || action === 'full_rerun') return 'urgent';
+  if (action === 'rerun_stage1' || action === 'run_delta_only' || routerConflictCount(router)) return 'alarm';
+  if (routerDirectHitCount(router) || action === 'annotate_run') return 'warn';
+  if (action === 'watch') return 'info';
+  return 'neutral';
+}
+
+function routerPriorityRank(router) {
+  const ranks = { urgent: 0, alarm: 1, warn: 2, positive: 3, info: 4, neutral: 5 };
+  return ranks[routerPriorityTone(router)] ?? 4;
+}
+
+function routerNeedsAttention(router) {
+  const state = routerTrajectoryState(router);
+  const action = routerActionKey(router);
+  return Boolean(
+    ['needs_classification', 'material_unmapped', 'thesis_weakened', 'timeline_delayed', 'risk_increased'].includes(state) ||
+    ['urgent_human_review', 'full_rerun', 'rerun_stage1', 'run_delta_only', 'annotate_run', 'watch'].includes(action) ||
+    routerDirectHitCount(router) ||
+    routerConflictCount(router) ||
+    String(router?.status || '').trim().toLowerCase() === 'error'
+  );
+}
+
+function routerEvidenceState(router) {
+  const state = routerTrajectoryState(router);
+  if (routerConflictCount(router)) return 'Saved thesis conflict';
+  if (routerDetailItems(router, 'matched_condition_details', 'matched_conditions').length) return 'Thesis condition matched';
+  if (routerDetailItems(router, 'triggered_watchlist_details', 'triggered_watchlist').length) return 'Watchlist condition matched';
+  if (routerVerificationItems(router).length) return 'Verification item matched';
+  if (state === 'needs_classification') return 'Classification unresolved';
+  if (state === 'market_backdrop_only') return 'Market backdrop only';
+  if (Array.isArray(router?.market_context_conditions) && router.market_context_conditions.length) return 'Market checked';
+  if (!router?.source_url && String(router?.source_type || '').toLowerCase() !== 'exchange_filing') return 'Source not resolved';
+  return 'No condition match';
+}
+
+function routerPresentation(router) {
+  const tone = routerPriorityTone(router);
+  const action = routerActionKey(router);
+  return {
+    tone,
+    action,
+    bucket: routerActionBucket(router),
+    trajectoryState: routerTrajectoryState(router),
+    trajectoryLabel: labelTrajectoryState(routerTrajectoryState(router)),
+    actionLabel: labelScenarioAction(action),
+    outcomeLabel: routerOutcomeLabel(router),
+    evidenceLabel: routerEvidenceState(router),
+    needsAttention: routerNeedsAttention(router),
+  };
 }
 
 function pathExplanation(router) {
   const path = String(router?.baseline_path || router?.current_path || '').trim();
   if (!path) return '';
-  return `${labelScenarioPath(path)} is the saved leaning from the latest lab run before this announcement. The router only changes it when the filing hits mapped bull/base/bear conditions.`;
+  return `${labelScenarioPath(path)} is the saved view from the latest lab run before this announcement. The router only changes it when the filing matches mapped bull/base/bear conditions.`;
 }
 
 function conditionTone(status, group = '') {
   const normalized = String(status || '').trim().toLowerCase();
   const normalizedGroup = String(group || '').trim().toLowerCase();
-  if (normalized === 'matched' && ['failure', 'red_flag'].includes(normalizedGroup)) return 'bear';
-  if (normalized === 'matched') return 'bull';
-  if (normalized === 'contradicted') return 'bear';
-  if (normalized === 'unclear') return 'base';
+  if (normalized === 'matched' && ['failure', 'red_flag'].includes(normalizedGroup)) return 'contradict';
+  if (normalized === 'matched') return 'confirm';
+  if (normalized === 'contradicted') return 'contradict';
+  if (normalized === 'unclear') return 'unclear';
   return 'muted';
 }
 
 function conditionStatusLabel(status) {
   const normalized = String(status || '').trim().toLowerCase();
-  if (normalized === 'not_matched') return 'Not hit';
-  if (normalized === 'matched') return 'Hit';
+  if (normalized === 'not_matched') return 'Not matched';
+  if (normalized === 'matched') return 'Matched';
   if (normalized === 'contradicted') return 'Contradicted';
   if (normalized === 'unclear') return 'Unclear';
   return normalized ? titleizeKey(normalized) : 'Monitor';
@@ -246,12 +471,66 @@ function compactStatusSummary(items, empty = 'none checked') {
   const counts = countStatuses(items);
   if (!counts.total) return empty;
   const parts = [
-    counts.matched && `${counts.matched} hit`,
+    counts.matched && `${counts.matched} matched`,
     counts.contradicted && `${counts.contradicted} contradicted`,
     counts.unclear && `${counts.unclear} unclear`,
-    counts.not_matched && `${counts.not_matched} not hit`,
+    counts.not_matched && `${counts.not_matched} not matched`,
   ].filter(Boolean);
   return parts.length ? parts.join(' | ') : `${counts.total} checked`;
+}
+
+function auditTrailSummary(announcementChecks, watchlistChecks, verificationChecks, marketConditions) {
+  return [
+    `Announcement: ${compactStatusSummary(announcementChecks)}`,
+    `Watchlist: ${compactStatusSummary(watchlistChecks, 'none checked')}`,
+    `Verification: ${compactStatusSummary(verificationChecks, 'none checked')}`,
+    `Market: ${compactStatusSummary(marketConditions, 'none checked')}`,
+  ].join(' | ');
+}
+
+function routerWhyHeadline(router, directHits = 0) {
+  const state = routerTrajectoryState(router);
+  if (directHits) return 'Mapped evidence was found';
+  if (state === 'needs_classification') return 'Classification is unresolved';
+  if (state === 'material_unmapped') return 'Material filing is not covered by the thesis map';
+  if (state === 'administrative_filing') return 'Procedural filing with no mapped thesis impact';
+  if (state === 'market_backdrop_only') return 'Market context only';
+  if (state === 'no_thesis_change') return 'No mapped thesis condition changed';
+  if (['thesis_weakened', 'timeline_delayed', 'risk_increased'].includes(state)) return 'Saved thesis path is under pressure';
+  if (['thesis_strengthened', 'timeline_accelerated', 'risk_reduced'].includes(state)) return 'Saved thesis path improved';
+  return 'Router basis';
+}
+
+function routerWhyCopy(router, directHits = 0) {
+  const state = routerTrajectoryState(router);
+  const announcementChecks = Array.isArray(router?.announcement_condition_checks) ? router.announcement_condition_checks : [];
+  const watchlistChecks = Array.isArray(router?.watchlist_condition_checks) ? router.watchlist_condition_checks : [];
+  const verificationChecks = Array.isArray(router?.verification_condition_checks) ? router.verification_condition_checks : [];
+  const marketConditions = Array.isArray(router?.market_context_conditions) ? router.market_context_conditions : [];
+  const marketCount = marketConditions.length || Object.keys(router?.market_facts_used || {}).length;
+
+  if (directHits) {
+    return `The filing matched ${directHits} saved thesis, watchlist, or verification item${directHits === 1 ? '' : 's'}. Review the evidence rows below before changing the saved run.`;
+  }
+  if (state === 'needs_classification') {
+    return router?.classification_reason || 'The filing was captured, but the classifier could not map it to a known filing type or saved thesis driver. It should be labelled by a human rather than treated as urgent thesis damage.';
+  }
+  if (state === 'material_unmapped') {
+    return 'The filing appears material, but none of the saved thesis conditions matched it. That points to a thesis-map gap, not a clean no-impact result.';
+  }
+  if (state === 'administrative_filing') {
+    return 'The filing was classified as procedural or administrative, and no saved thesis or watchlist condition matched it.';
+  }
+  if (state === 'market_backdrop_only' || (marketCount && !directHits)) {
+    return 'The announcement itself did not match a saved thesis condition. Market facts were checked as backdrop only and are not the filing verdict.';
+  }
+  if (state === 'no_thesis_change') {
+    return 'The filing was checked against the saved announcement and watchlist conditions; none changed the saved thesis path.';
+  }
+  if (announcementChecks.length || watchlistChecks.length) {
+    return `Checked ${announcementChecks.length} announcement condition${announcementChecks.length === 1 ? '' : 's'}, ${watchlistChecks.length} watchlist condition${watchlistChecks.length === 1 ? '' : 's'}, and ${verificationChecks.length} verification item${verificationChecks.length === 1 ? '' : 's'} without a mapped thesis change.`;
+  }
+  return routerReason(router) || 'No additional router basis was recorded for this filing.';
 }
 
 function scenarioHitSummary(items) {
@@ -284,11 +563,6 @@ function conditionMetaText(item) {
     item?.source_to_monitor,
   ];
   return parts.filter(Boolean).join(' | ');
-}
-
-function metricLabel(value, fallback = 'n/a') {
-  const text = String(value || '').trim();
-  return text || fallback;
 }
 
 function DetailRow({ label, value, tone = '' }) {
@@ -361,7 +635,7 @@ function ConditionChecks({ title = '', items }) {
   );
 }
 
-function ConditionSummary({ announcementChecks, watchlistChecks, marketConditions }) {
+function ConditionSummary({ announcementChecks, watchlistChecks, verificationChecks, marketConditions }) {
   const scenarioRows = scenarioHitSummary(announcementChecks);
   return (
     <div className="announcement-router-condition-summary">
@@ -370,7 +644,7 @@ function ConditionSummary({ announcementChecks, watchlistChecks, marketCondition
           <CompactStat
             key={row.name}
             label={row.label}
-            value={`${row.hits}/${row.total || 0} hit`}
+            value={`${row.hits}/${row.total || 0} matched`}
             tone={row.name}
           />
         ))}
@@ -378,6 +652,7 @@ function ConditionSummary({ announcementChecks, watchlistChecks, marketCondition
       <div className="announcement-router-compact-grid">
         <CompactStat label="Announcement checks" value={compactStatusSummary(announcementChecks)} />
         <CompactStat label="Watchlist checks" value={compactStatusSummary(watchlistChecks)} />
+        <CompactStat label="Verification checks" value={compactStatusSummary(verificationChecks)} />
         <CompactStat label="Market backdrop" value={compactStatusSummary(marketConditions, 'not checked')} />
       </div>
     </div>
@@ -522,17 +797,389 @@ function PipelineTrace({ router }) {
   );
 }
 
+function RouterSection({ title, count = '', children, muted = false }) {
+  if (!children) return null;
+  return (
+    <section className={`announcement-router-section ${muted ? 'is-muted' : ''}`}>
+      <h4>
+        <span>{title}</span>
+        {count && <em>{count}</em>}
+      </h4>
+      {children}
+    </section>
+  );
+}
+
+function splitScenarioTransition(value) {
+  const transition = String(value || '').trim().toLowerCase();
+  if (!transition.includes('->')) return null;
+  const [from, to] = transition.split('->').map((part) => part.trim()).filter(Boolean);
+  if (!from || !to) return null;
+  return { from, to };
+}
+
+function PathTransition({ router }) {
+  const transition = splitScenarioTransition(router?.path_transition);
+  const baseline = transition?.from || String(router?.baseline_path || router?.current_path || '').trim().toLowerCase();
+  const current = transition?.to || String(router?.current_path || router?.baseline_path || '').trim().toLowerCase();
+  const changed = Boolean(transition && transition.from !== transition.to);
+  return (
+    <div className="announcement-router-path-bar">
+      <span className="announcement-router-path-label">Saved thesis path</span>
+      <div className="announcement-router-path-stack" aria-label="Saved thesis path">
+        {['bull', 'base', 'bear'].map((name) => (
+          <span
+            key={name}
+            className={`announcement-router-path-pill tone-${name} ${baseline === name ? 'is-on' : ''}`}
+          >
+            {labelScenarioPath(name).replace(' scenario', '')}
+          </span>
+        ))}
+      </div>
+      <span className="announcement-router-path-arrow">{changed ? 'moves to' : 'stays at'}</span>
+      <span className={`announcement-router-path-pill tone-${scenarioTone(current)} is-current`}>
+        {labelScenarioPath(current)}
+      </span>
+    </div>
+  );
+}
+
+function projectionScenarioData(projection) {
+  const target12 = projection?.target_12m && typeof projection.target_12m === 'object' ? projection.target_12m : {};
+  const target24 = projection?.target_24m && typeof projection.target_24m === 'object' ? projection.target_24m : {};
+  const current = numericOrNull(projection?.current_price);
+  const value12 = (name) => {
+    const direct = numericOrNull(target12[name]);
+    if (direct != null) return direct;
+    const terminal = numericOrNull(target24[name]);
+    if (terminal != null && current != null) return current + ((terminal - current) * 0.5);
+    return terminal;
+  };
+  const weighted24 = numericOrNull(projection?.prob_weighted_target_24m);
+  return {
+    current: current ?? 0,
+    targets12: {
+      bear: value12('bear') ?? 0,
+      base: value12('base') ?? 0,
+      bull: value12('bull') ?? 0,
+    },
+    targets24: {
+      bear: numericOrNull(target24.bear) ?? value12('bear') ?? 0,
+      base: numericOrNull(target24.base) ?? value12('base') ?? 0,
+      bull: numericOrNull(target24.bull) ?? value12('bull') ?? 0,
+    },
+    weighted12: current != null && weighted24 != null ? current + ((weighted24 - current) * 0.5) : (weighted24 ?? 0),
+    weighted24: weighted24 ?? 0,
+  };
+}
+
+function projectionTimelineBars(projection) {
+  const rows = Array.isArray(projection?.timeline_rows) ? projection.timeline_rows : [];
+  return rows
+    .map((row) => {
+      const milestone = String(row?.title || row?.milestone || '').trim();
+      if (!milestone) return null;
+      const targetPeriod = String(row?.timing || row?.target_period || '').trim();
+      return {
+        milestone,
+        target_period: targetPeriod,
+        status: String(row?.status || '').trim(),
+        primary_risk: String(row?.primary_risk || row?.risk || '').trim(),
+        offset: monthOffsetFromProjectionTiming(targetPeriod),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function MarketPathProjection({ router }) {
+  const projection = router?.trajectory_projection && typeof router.trajectory_projection === 'object'
+    ? router.trajectory_projection
+    : {};
+  const chartData = projectionScenarioData(projection);
+  const timelineBars = projectionTimelineBars(projection);
+  const currentPrice = numericOrNull(projection?.current_price);
+  const weighted = numericOrNull(projection?.prob_weighted_target_24m);
+  const hasChart = [
+    chartData.current,
+    ...Object.values(chartData.targets12 || {}),
+    ...Object.values(chartData.targets24 || {}),
+  ].some((value) => Number.isFinite(value) && Number(value) > 0);
+  if (!hasChart && !projection?.rerun_signal && !timelineBars.length) return null;
+
+  const elapsed = Number(projection?.elapsed_days);
+  const elapsedCopy = Number.isFinite(elapsed)
+    ? `Day ${Math.round(elapsed)} of the saved 24M path`
+    : 'Saved 24M path';
+  const marketPath = String(projection?.market_implied_path_24m || '').trim().toLowerCase();
+  const currency = normalizeCurrencyCode(projection?.currency);
+
+  return (
+    <section className="announcement-router-projection">
+      <div className="announcement-router-projection-head">
+        <div>
+          <span>24M Market Path</span>
+          <strong>{labelMarketPath(marketPath)}</strong>
+        </div>
+        <div>
+          <span>Rerun signal</span>
+          <strong>{labelProjectionRerunSignal(projection?.rerun_signal)}</strong>
+        </div>
+      </div>
+      {hasChart && (
+        <ScenarioTimelineUnit
+          data={chartData}
+          currency={currency}
+          timelineBars={timelineBars}
+          orientation="vertical"
+        />
+      )}
+      <div className="announcement-router-projection-meta">
+        <span>{elapsedCopy}</span>
+        {currentPrice != null && <span>Current market {fmtPrice(currentPrice)}</span>}
+        {weighted != null && <span>Probability-weighted 24M target {fmtPrice(weighted)}</span>}
+        {projection?.rerun_reason && <span>{projection.rerun_reason}</span>}
+      </div>
+    </section>
+  );
+}
+
+function EvidenceRows({ title = '', items, market = false }) {
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) return null;
+  return (
+    <div className="announcement-router-evidence-list">
+      {title && <h5>{title}</h5>}
+      {rows.map((item, idx) => (
+        <div key={`${title || 'evidence'}-${idx}`} className={`announcement-router-evidence-row tone-${conditionTone(item?.status, item?.group)}`}>
+          <span className="announcement-router-evidence-side">{item?.scenario ? labelScenarioPath(item.scenario).replace(' scenario', '') : titleizeKey(item?.group || item?.kind || 'Condition')}</span>
+          <span className={`announcement-router-evidence-verdict tone-${conditionTone(item?.status, item?.group)}`}>
+            {conditionStatusLabel(item?.status)}
+          </span>
+          <div>
+            <strong>{routerItemLabel(item)}</strong>
+            {(market ? formatRouterMarketCondition(item) : routerItemMeta(item)) && (
+              <em>{market ? formatRouterMarketCondition(item) : routerItemMeta(item)}</em>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MarketFactsGrid({ facts }) {
+  const entries = Object.entries(facts || {});
+  if (!entries.length) return null;
+  return (
+    <div className="announcement-router-market-grid">
+      {entries.map(([key, value]) => (
+        <div key={`market-${key}`} className="announcement-router-market-tile">
+          <span>{titleizeKey(key)}</span>
+          <strong>{typeof value === 'number' ? fmtNum(value, value >= 100 ? 0 : 2) : String(value)}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ConfidenceBreakdown({ router }) {
+  const breakdown = router?.confidence_breakdown && typeof router.confidence_breakdown === 'object'
+    ? router.confidence_breakdown
+    : {};
+  const rows = [
+    {
+      label: 'Source',
+      value: router?.source_confidence ?? breakdown.source_confidence,
+      detail: router?.source_url ? 'Official source resolved' : 'Source resolution limited',
+    },
+    {
+      label: 'Text extraction',
+      value: router?.extraction_confidence ?? breakdown.extraction_confidence,
+      detail: breakdown?.parse_quality?.decoded_chars
+        ? `${breakdown.parse_quality.decoded_chars} chars decoded`
+        : 'Extraction quality unavailable',
+    },
+    {
+      label: 'Classification',
+      value: router?.classification_confidence ?? router?.parser_confidence ?? breakdown.classification_confidence,
+      detail: router?.classification_reason || breakdown.classification_reason || 'Classification basis unavailable',
+    },
+    {
+      label: 'Thesis match',
+      value: router?.thesis_match_confidence ?? breakdown.thesis_match_confidence,
+      detail: breakdown?.thesis_match
+        ? `${breakdown.thesis_match.direct_matches || 0} direct match${breakdown.thesis_match.direct_matches === 1 ? '' : 'es'}`
+        : 'No thesis-match detail recorded',
+    },
+  ];
+  return (
+    <div className="announcement-router-confidence-grid">
+      {rows.map((row) => (
+        <div key={row.label} className="announcement-router-confidence-card">
+          <span>{row.label}</span>
+          <strong>{row.value != null && row.value !== '' ? fmtPct(row.value) : 'n/a'}</strong>
+          <em>{row.detail}</em>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RouterKpiStrip({ filters, activeFilter, onSelect }) {
+  return (
+    <div className="announcement-router-kpi-strip" role="tablist" aria-label="Filing queue filters">
+      {filters.map((item) => (
+        <button
+          type="button"
+          key={item.key}
+          className={`announcement-router-kpi-card ${activeFilter === item.key ? 'is-active' : ''}`}
+          data-tone={item.tone}
+          onClick={() => onSelect(item.key)}
+        >
+          <span className="announcement-router-kpi-head">
+            <i />
+            <span>{item.label}</span>
+          </span>
+          <strong>{item.count}</strong>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function routerEventDate(row) {
+  return parseIsoDateOrNull(row?.saved_at_utc) || parseIsoDateOrNull(row?.received_at_utc);
+}
+
+function RouterTimeline({ events, selectedEventId, onSelect }) {
+  const rows = Array.isArray(events) ? events : [];
+  const datedRows = rows
+    .map((row) => ({ row, date: routerEventDate(row) }))
+    .filter((item) => item.date);
+  if (!datedRows.length) return null;
+
+  const now = Math.max(...datedRows.map((item) => item.date.getTime()));
+  const start = now - 30 * 24 * 60 * 60 * 1000;
+  const byTicker = new Map();
+  datedRows.forEach((item) => {
+    const ticker = String(item.row?.ticker || 'n/a').trim() || 'n/a';
+    if (!byTicker.has(ticker)) byTicker.set(ticker, []);
+    byTicker.get(ticker).push(item);
+  });
+  const lanes = [...byTicker.entries()]
+    .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+    .slice(0, 6);
+  const range = Math.max(1, now - start);
+
+  return (
+    <section className="announcement-router-timeline" aria-label="Announcement timeline">
+      <div className="announcement-router-timeline-head">
+        <strong>Last 30 days</strong>
+        <span>Click a marker to inspect the filing</span>
+      </div>
+      <div className="announcement-router-timeline-lanes">
+        {lanes.map(([ticker, items]) => (
+          <div key={`lane-${ticker}`} className="announcement-router-timeline-lane">
+            <span className="announcement-router-timeline-ticker">{ticker}</span>
+            <div className="announcement-router-timeline-track">
+              {items.map(({ row, date }) => {
+                const vm = routerPresentation(row);
+                const pct = Math.max(0, Math.min(100, ((date.getTime() - start) / range) * 100));
+                const selected = selectedEventId && selectedEventId === row.event_id;
+                return (
+                  <button
+                    type="button"
+                    key={`dot-${row.event_id || `${ticker}-${date.toISOString()}`}`}
+                    className={`announcement-router-timeline-dot ${selected ? 'is-selected' : ''}`}
+                    data-tone={vm.tone}
+                    style={{ left: `${pct}%` }}
+                    title={`${ticker}: ${labelScenarioAction(row.action)} - ${routerTitle(row)}`}
+                    onClick={() => onSelect(row.event_id || '')}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function RouterQueue({ events, selectedEventId, onSelect }) {
+  return (
+    <article className="announcement-router-queue">
+      <div className="announcement-router-queue-head">
+        <h4>Filing Queue</h4>
+        <span>{events.length} shown</span>
+      </div>
+      <div className="announcement-router-queue-list">
+        {events.map((row) => {
+          const vm = routerPresentation(row);
+          const selected = selectedEventId
+            ? selectedEventId === row.event_id
+            : events[0]?.event_id === row.event_id;
+          return (
+            <button
+              type="button"
+              className={`announcement-router-queue-row ${selected ? 'is-selected' : ''}`}
+              data-tone={vm.tone}
+              key={row.event_id || `${row.ticker}-${row.saved_at_utc}-${routerTitle(row)}`}
+              onClick={() => onSelect(row.event_id || '')}
+            >
+              <span className="announcement-router-queue-severity" />
+              <span className="announcement-router-queue-glyph" aria-hidden="true" />
+              <span className="announcement-router-queue-body">
+                <span className="announcement-router-queue-topline">
+	                  <strong>{row.ticker || 'n/a'}</strong>
+	                  <b>{vm.trajectoryLabel}</b>
+	                </span>
+	                <span className="announcement-router-queue-title">{routerTitle(row)}</span>
+	                <span className="announcement-router-queue-meta">
+	                  <span>{labelScenarioPathShort(row.baseline_path || row.current_path)}</span>
+	                  <span>{routerMaterialityLabel(row)}</span>
+	                  <span>{routerDriverLabel(row)}</span>
+	                </span>
+              </span>
+              <span className="announcement-router-queue-time">{row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}</span>
+            </button>
+          );
+        })}
+        {!events.length && <div className="watch-empty">No routed announcements in this filter.</div>}
+      </div>
+    </article>
+  );
+}
+
+function eventMatchesQueueFilter(row, filterKey) {
+  const bucket = routerActionBucket(row);
+  if (filterKey === 'attention') return bucket === 'attention';
+  if (filterKey === 'trajectory') return bucket === 'trajectory';
+  if (filterKey === 'no_change') return bucket === 'no_change';
+  if (filterKey === 'administrative') return bucket === 'administrative';
+  return true;
+}
+
 function DecisionPanel({ router, emptyTitle = 'No announcement decision attached', emptyCopy = '' }) {
   const decisionAvailable = hasRouterDecision(router);
   const matchedConditions = routerDetailItems(router, 'matched_condition_details', 'matched_conditions');
   const watchHits = routerDetailItems(router, 'triggered_watchlist_details', 'triggered_watchlist');
+  const verificationHits = routerVerificationItems(router);
   const findings = Array.isArray(router?.key_findings) ? router.key_findings : [];
   const conflicts = Array.isArray(router?.conflicts_with_run) ? router.conflicts_with_run : [];
   const marketConditions = Array.isArray(router?.market_context_conditions) ? router.market_context_conditions : [];
   const announcementChecks = Array.isArray(router?.announcement_condition_checks) ? router.announcement_condition_checks : [];
   const watchlistChecks = Array.isArray(router?.watchlist_condition_checks) ? router.watchlist_condition_checks : [];
+  const verificationChecks = Array.isArray(router?.verification_condition_checks) ? router.verification_condition_checks : [];
   const followUps = Array.isArray(router?.follow_up_steps) ? router.follow_up_steps : [];
-  const directHits = matchedConditions.length + watchHits.length;
+  const directHits = matchedConditions.length + watchHits.length + verificationHits.length;
+  const vm = routerPresentation(router);
+  const classificationConfidence = router?.classification_confidence ?? router?.semantic_confidence ?? router?.parser_confidence;
+  const filingSummary = routerFilingSummary(router);
+  const whyCount = directHits
+    ? `${directHits} mapped condition${directHits === 1 ? '' : 's'}`
+    : 'no mapped condition';
 
   if (!decisionAvailable) {
     return (
@@ -544,102 +1191,145 @@ function DecisionPanel({ router, emptyTitle = 'No announcement decision attached
   }
 
   return (
-    <article className="scenario-router-column announcement-router-decision-panel">
-      <h4>Selected Filing Decision</h4>
+    <article className="scenario-router-column announcement-router-decision-panel" data-tone={vm.tone}>
       <div className="announcement-router-decision-hero">
-        <div>
-          <span>{router?.ticker || 'Selected filing'}</span>
-          <strong>{routerOutcomeLabel(router)}</strong>
-          <em>{routerTitle(router)}</em>
+        <div className="announcement-router-hero-crumbs">
+          <strong>{router?.ticker || 'Selected filing'}</strong>
+          <span>{router?.source_type ? titleizeKey(router.source_type) : 'Unknown source'}</span>
+          <span>{router?.saved_at_utc ? fmtRelativeSince(router.saved_at_utc) : 'n/a'}</span>
         </div>
-        <b className={`announcement-router-action-pill action-${String(router?.action || 'watch').toLowerCase()}`}>
-          {labelScenarioAction(router?.action)}
-        </b>
-      </div>
-      <div className="announcement-router-metric-grid">
-        <DetailRow label="Prior lab leaning" value={labelScenarioPath(router?.baseline_path || router?.current_path)} tone={scenarioTone(router?.baseline_path || router?.current_path)} />
-        <DetailRow label="Materiality" value={router?.impact_level ? titleizeKey(router.impact_level) : 'Not assessed'} />
-        <DetailRow label="Official source" value={router?.source_type ? titleizeKey(router.source_type) : 'Unknown'} />
-        <DetailRow label="Last evaluated" value={router?.saved_at_utc ? fmtRelativeSince(router.saved_at_utc) : 'n/a'} />
-      </div>
-      <div className="scenario-router-detail-note">
-        <strong>Prior lab leaning:</strong> this is the bull/base/bear scenario saved in the lab before the filing was checked. It is not the filing verdict.
-      </div>
-      <div className={`announcement-router-impact-callout ${directHits ? 'has-hit' : 'no-hit'}`}>
-        <strong>{directHits ? `${directHits} announcement thesis hit${directHits === 1 ? '' : 's'}` : 'No announcement-thesis hit'}</strong>
-        <span>{directHits ? 'The filing matched mapped lab conditions below.' : 'The filing did not match the bull/base/bear conditions. Market facts are shown separately as backdrop.'}</span>
-      </div>
-      {explainRouterDecision(router) && <div className="scenario-router-detail-note">{explainRouterDecision(router)}</div>}
-      {routerReason(router) && <div className="scenario-router-detail-note"><strong>Decision reason:</strong> {routerReason(router)}</div>}
-      {router?.source_url && (
-        <div className="scenario-router-detail-note">
-          <strong>Primary source:</strong> <a href={router.source_url} target="_blank" rel="noreferrer">Open filing</a>
-        </div>
-      )}
-      <ConditionSummary
-        announcementChecks={announcementChecks}
-        watchlistChecks={watchlistChecks}
-        marketConditions={marketConditions}
-      />
-      <DetailList title="Matched Thesis Conditions" items={matchedConditions} />
-      <DetailList title="Watchlist Hits" items={watchHits} />
-      <DetailList title="Conflicts With Saved Run" items={conflicts} conflict />
-      <DetailList title="Supporting Findings" items={findings} />
-      {!!announcementChecks.length && (
-        <CollapsibleSection
-          title="Announcement Conditions Checked"
-          summary={compactStatusSummary(announcementChecks)}
-          open={directHits > 0}
-        >
-          <ConditionChecks items={announcementChecks} />
-        </CollapsibleSection>
-      )}
-      {!!watchlistChecks.length && (
-        <CollapsibleSection
-          title="Watchlist Conditions Checked"
-          summary={compactStatusSummary(watchlistChecks)}
-          open={watchHits.length > 0}
-        >
-          <ConditionChecks items={watchlistChecks} />
-        </CollapsibleSection>
-      )}
-      {!!marketConditions.length && (
-        <CollapsibleSection
-          title="Market Conditions Checked"
-          summary={compactStatusSummary(marketConditions)}
-        >
-          <DetailList title="" items={marketConditions} market />
-        </CollapsibleSection>
-      )}
-      {!!Object.keys(router?.market_facts_used || {}).length && (
-        <CollapsibleSection
-          title="Market Facts Used"
-          summary={`${Object.keys(router.market_facts_used || {}).length} value${Object.keys(router.market_facts_used || {}).length === 1 ? '' : 's'}`}
-        >
-          <div className="scenario-router-chip-list">
-            {Object.entries(router.market_facts_used || {}).map(([key, value]) => (
-              <span key={`market-${key}`} className="scenario-router-chip">
-                {titleizeKey(key)} | {typeof value === 'number' ? fmtNum(value, value >= 100 ? 0 : 2) : String(value)}
-              </span>
-            ))}
+        <h1>{routerTitle(router)}</h1>
+        {filingSummary && (
+          <p className="announcement-router-filing-summary">
+            <strong>Filing summary</strong>
+            <span>{filingSummary}</span>
+          </p>
+        )}
+        <div className="announcement-router-verdict-card">
+          <span className="announcement-router-verdict-kicker">Trajectory assessment</span>
+          <strong>{vm.trajectoryLabel}</strong>
+          <p>{routerVerdictCopy(router)}</p>
+          <div className="announcement-router-verdict-grid">
+            <span>
+              <em>Driver</em>
+              <b>{routerDriverLabel(router)}</b>
+            </span>
+            <span>
+              <em>Materiality</em>
+              <b>{routerMaterialityLabel(router)}</b>
+            </span>
+            <span>
+              <em>Evidence</em>
+              <b>{vm.evidenceLabel}</b>
+            </span>
+            <span>
+              <em>System action</em>
+              <b>{vm.actionLabel}</b>
+            </span>
           </div>
-        </CollapsibleSection>
+        </div>
+        <div className="announcement-router-hero-actions">
+          {router?.source_url && (
+            <a className="announcement-router-primary-link" href={router.source_url} target="_blank" rel="noreferrer">Open filing</a>
+          )}
+          <span className="announcement-router-hero-metric">{classificationConfidence != null && classificationConfidence !== '' ? `Classification confidence ${fmtPct(classificationConfidence)}` : 'Classification confidence n/a'}</span>
+          <span className="announcement-router-hero-tag">{router?.source_type ? titleizeKey(router.source_type) : 'Source unresolved'}</span>
+        </div>
+      </div>
+      <PathTransition router={router} />
+      <MarketPathProjection router={router} />
+
+      <RouterSection title="Why This Verdict" count={whyCount}>
+        <div className={`announcement-router-impact-callout ${directHits ? 'has-hit' : 'no-hit'}`}>
+          <strong>{routerWhyHeadline(router, directHits)}</strong>
+          <span>{routerWhyCopy(router, directHits)}</span>
+        </div>
+        <ConfidenceBreakdown router={router} />
+        <EvidenceRows title="Matched Thesis Conditions" items={matchedConditions} />
+        <EvidenceRows title="Watchlist Matches" items={watchHits} />
+        <EvidenceRows title="Verification Matches" items={verificationHits} />
+      </RouterSection>
+
+      {!!(conflicts.length || findings.length) && (
+        <RouterSection title="Conflicts And Findings" count={`${conflicts.length + findings.length} item${conflicts.length + findings.length === 1 ? '' : 's'}`}>
+          <DetailList title="Conflicts With Saved Run" items={conflicts} conflict />
+          <DetailList title="Supporting Findings" items={findings} />
+        </RouterSection>
       )}
-      {!!followUps.length && (
-        <CollapsibleSection title="Next Steps" summary={`${followUps.length} suggested`}>
-          <div className="scenario-router-detail-list">
-            {followUps.map((item, idx) => (
-              <div key={`follow-up-${idx}`} className="scenario-router-detail-item">
-                <strong>{item}</strong>
+
+      <details className="announcement-router-audit-shell">
+        <summary>
+          <strong>Audit trail</strong>
+          <span>{auditTrailSummary(announcementChecks, watchlistChecks, verificationChecks, marketConditions)}</span>
+        </summary>
+        <div className="announcement-router-audit-body">
+          <ConditionSummary
+            announcementChecks={announcementChecks}
+            watchlistChecks={watchlistChecks}
+            verificationChecks={verificationChecks}
+            marketConditions={marketConditions}
+          />
+
+          {!!announcementChecks.length && (
+            <CollapsibleSection
+              title="Announcement Conditions Checked"
+              summary={compactStatusSummary(announcementChecks)}
+              open={directHits > 0}
+            >
+              <EvidenceRows items={announcementChecks} />
+            </CollapsibleSection>
+          )}
+          {!!watchlistChecks.length && (
+            <CollapsibleSection
+              title="Watchlist Conditions Checked"
+              summary={compactStatusSummary(watchlistChecks)}
+              open={watchHits.length > 0}
+            >
+              <ConditionChecks items={watchlistChecks} />
+            </CollapsibleSection>
+          )}
+          {!!verificationChecks.length && (
+            <CollapsibleSection
+              title="Verification Queue Checked"
+              summary={compactStatusSummary(verificationChecks)}
+              open={verificationHits.length > 0}
+            >
+              <ConditionChecks items={verificationChecks} />
+            </CollapsibleSection>
+          )}
+          {!!marketConditions.length && (
+            <CollapsibleSection
+              title="Market Conditions Checked"
+              summary={compactStatusSummary(marketConditions)}
+            >
+              <EvidenceRows items={marketConditions} market />
+            </CollapsibleSection>
+          )}
+          {!!Object.keys(router?.market_facts_used || {}).length && (
+            <CollapsibleSection
+              title="Market Facts Used"
+              summary={`${Object.keys(router.market_facts_used || {}).length} value${Object.keys(router.market_facts_used || {}).length === 1 ? '' : 's'}`}
+            >
+              <MarketFactsGrid facts={router.market_facts_used || {}} />
+            </CollapsibleSection>
+          )}
+          {!!followUps.length && (
+            <CollapsibleSection title="Next Steps" summary={`${followUps.length} suggested`}>
+              <div className="scenario-router-detail-list">
+                {followUps.map((item, idx) => (
+                  <div key={`follow-up-${idx}`} className="scenario-router-detail-item">
+                    <strong>{item}</strong>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </CollapsibleSection>
-      )}
-      <ThesisSnapshot snapshot={router?.thesis_snapshot} router={router} />
-      <details className="announcement-router-trace-details">
-        <summary>Processing trace</summary>
-        <PipelineTrace router={router} />
+            </CollapsibleSection>
+          )}
+          <ThesisSnapshot snapshot={router?.thesis_snapshot} router={router} />
+          <details className="announcement-router-trace-details">
+            <summary>Processing trace</summary>
+            <PipelineTrace router={router} />
+          </details>
+        </div>
       </details>
     </article>
   );
@@ -653,11 +1343,11 @@ export default function AnnouncementRouterMonitor({
   onOpenFullMonitor = null,
 }) {
   const [overview, setOverview] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [tickerFilter, setTickerFilter] = useState('');
-  const [reloadToken, setReloadToken] = useState(0);
   const [selectedEventId, setSelectedEventId] = useState('');
+  const [activeQueueFilter, setActiveQueueFilter] = useState('attention');
 
   const effectiveTicker = useMemo(
     () => String(tickerFilter || selectedTicker || '').trim().toUpperCase(),
@@ -699,12 +1389,38 @@ export default function AnnouncementRouterMonitor({
     return () => {
       cancelled = true;
     };
-  }, [embedded, effectiveTicker, reloadToken]);
+  }, [embedded, effectiveTicker]);
 
-  const recentEvents = Array.isArray(overview?.recent_events) ? overview.recent_events : [];
-  const selectedEvent = recentEvents.find((row) => row?.event_id === selectedEventId) || recentEvents[0] || {};
+  const recentEvents = useMemo(
+    () => (Array.isArray(overview?.recent_events) ? overview.recent_events : []),
+    [overview]
+  );
+  const queueEvents = useMemo(
+    () => [...recentEvents].sort((a, b) => {
+      const priorityDiff = routerPriorityRank(a) - routerPriorityRank(b);
+      if (priorityDiff) return priorityDiff;
+      return (parseIsoDateOrNull(b?.saved_at_utc)?.getTime() || 0) - (parseIsoDateOrNull(a?.saved_at_utc)?.getTime() || 0);
+    }),
+    [recentEvents]
+  );
+	  const queueFilters = useMemo(() => {
+	    const count = (key) => queueEvents.filter((row) => eventMatchesQueueFilter(row, key)).length;
+	    return [
+	      { key: 'attention', label: 'Needs Review', tone: 'warn', count: count('attention') },
+	      { key: 'trajectory', label: 'Thesis Improved', tone: 'positive', count: count('trajectory') },
+	      { key: 'no_change', label: 'No Thesis Change', tone: 'neutral', count: count('no_change') },
+	      { key: 'administrative', label: 'Administrative', tone: 'neutral', count: count('administrative') },
+	      { key: 'all', label: 'All Filings', tone: 'neutral', count: queueEvents.length },
+	    ];
+	  }, [queueEvents]);
+  const filteredEvents = useMemo(
+    () => queueEvents.filter((row) => eventMatchesQueueFilter(row, activeQueueFilter)),
+    [queueEvents, activeQueueFilter]
+  );
+  const selectedEvent = filteredEvents.find((row) => row?.event_id === selectedEventId) ||
+    filteredEvents[0] ||
+    {};
   const selectedRouter = embedded ? (runRouter || {}) : selectedEvent;
-  const statusCounts = topCountEntries(overview?.status_counts, 4);
 
   const openFullMonitor = useCallback(() => {
     if (onOpenFullMonitor) {
@@ -748,9 +1464,9 @@ export default function AnnouncementRouterMonitor({
           <div className="scenario-router-monitor-head">
             <div>
               <h3>Announcement Thesis Router</h3>
-              <p className="scenario-router-monitor-copy">
-                Tracks ticker-coded announcement emails, resolves official filings, checks saved thesis-map conditions, and records the routing decision.
-              </p>
+	              <p className="scenario-router-monitor-copy">
+	                Tracks announcement filings against the saved thesis map and shows how each filing changes the stock's thesis trajectory.
+	              </p>
             </div>
             <div className="scenario-router-monitor-actions">
               <input
@@ -763,75 +1479,44 @@ export default function AnnouncementRouterMonitor({
                   setSelectedEventId('');
                 }}
               />
-              <button
-                type="button"
-                className="gantt-lab-inline-retry"
-                onClick={() => setReloadToken((prev) => prev + 1)}
-                disabled={loading}
-              >
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </button>
               <button type="button" className="gantt-lab-inline-retry" onClick={() => navigateTo('/gantt-lab')}>
                 Open Timeline Lab
               </button>
             </div>
           </div>
 
-          <div className="scenario-router-monitor-grid">
-            <div className="scenario-router-card">
-              <label>Total Routed Events</label>
-              <strong>{overview?.total_events ?? 'n/a'}</strong>
-              <span>{overview?.unique_tickers ?? 'n/a'} tickers tracked</span>
-            </div>
-            <div className="scenario-router-card">
-              <label>Primary Source Coverage</label>
-              <strong>{fmtPct(overview?.official_source_rate_pct)}</strong>
-              <span>official filing resolved</span>
-            </div>
-            <div className="scenario-router-card">
-              <label>Average Processing</label>
-              <strong>{fmtMs(overview?.average_processing_ms)}</strong>
-              <span>email to saved decision</span>
-            </div>
-            <div className="scenario-router-card">
-              <label>Latest Status</label>
-              <strong>{metricLabel(statusCounts[0]?.[0])}</strong>
-              <span>{statusCounts[0]?.[1] || 0} event(s)</span>
-            </div>
-          </div>
-
-          <div className="scenario-router-columns announcement-router-monitor-columns">
-            <DecisionPanel router={selectedRouter} emptyTitle="No routed announcements yet" />
-
-            <article className="scenario-router-column announcement-router-list-column">
-              <div className="announcement-router-list-head">
-                <h4>Routed Announcements</h4>
-                <span>latest {Math.min(recentEvents.length, 10)} shown</span>
+          <div className="announcement-router-console">
+            <aside className="announcement-router-side-rail">
+	              <div className="announcement-router-side-head">
+	                <span>Filing Queue</span>
+                <strong>{filteredEvents.length}</strong>
               </div>
-              <div className="scenario-router-event-list">
-                {recentEvents.slice(0, 10).map((row) => (
-                  <button
-                    type="button"
-                    className={`scenario-router-event ${selectedEvent?.event_id === row.event_id ? 'is-selected' : ''}`}
-                    key={row.event_id || `${row.ticker}-${row.saved_at_utc}`}
-                    onClick={() => setSelectedEventId(row.event_id || '')}
-                  >
-                    <div className="scenario-router-event-top">
-                      <strong>{row.ticker || 'n/a'}</strong>
-                      <span>{row.status || 'ok'}</span>
-                      <span>{routerOutcomeLabel(row)}</span>
-                    </div>
-                    <div className="scenario-router-event-title">{row.title || 'Untitled announcement'}</div>
-                    <div className="scenario-router-event-meta">
-                      Before filing: {labelScenarioPath(row.baseline_path || row.current_path)} | {row.source_type || 'unknown source'} | {fmtMs(row.processing_duration_ms)} | {row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}
-                    </div>
-                    {row.action_reason && <div className="scenario-router-event-reason">{row.action_reason}</div>}
-                    {row.error_reason && <div className="scenario-router-detail-note">{row.error_reason}</div>}
-                  </button>
-                ))}
-                {!recentEvents.length && <div className="watch-empty">No routed announcements yet.</div>}
+              <RouterKpiStrip
+                filters={queueFilters}
+                activeFilter={activeQueueFilter}
+                onSelect={(key) => {
+                  setActiveQueueFilter(key);
+                  setSelectedEventId('');
+                }}
+              />
+            </aside>
+
+            <div className="announcement-router-main-stage">
+              <div className="announcement-router-workspace">
+                <RouterQueue
+                  events={filteredEvents}
+                  selectedEventId={selectedEvent?.event_id || selectedEventId}
+                  onSelect={setSelectedEventId}
+                />
+                <DecisionPanel router={selectedRouter} emptyTitle="No routed announcements yet" />
               </div>
-            </article>
+
+              <RouterTimeline
+                events={queueEvents}
+                selectedEventId={selectedEvent?.event_id || selectedEventId}
+                onSelect={setSelectedEventId}
+              />
+            </div>
           </div>
 
           {error && <div className="run-meta-note run-meta-note-error">Announcement router monitor error: {error}</div>}

@@ -6,12 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List
 
-from .action_judge import ActionJudge
 from .artifact_replay import replay_comparison_from_artifact
 from .display_contract import market_only_watch_projection, should_project_market_only_watch
 from .lab_scribe import SCENARIO_ROUTER_EVENTS_DIR
-from .models import AnnouncementFacts, BaselineRunPacket, EvidenceRef
-from .thesis_comparator import ThesisComparator
+from .mock_harness import run_mock_router_case
 
 EVALUATION_CASES_PATH = Path(__file__).with_name("evaluation_cases.json")
 
@@ -84,30 +82,11 @@ class ScenarioRouterObservability:
 
     def run_evaluation_suite(self) -> Dict[str, Any]:
         cases = self._load_evaluation_cases()
-        comparator = ThesisComparator()
-        judge = ActionJudge()
         results: List[Dict[str, Any]] = []
 
         for case in cases:
-            baseline = _build_baseline_run(case)
-            facts = AnnouncementFacts(
-                event_id=str(case.get("case_id") or ""),
-                ticker=str(case.get("ticker") or ""),
-                company_name="Scenario Router Fixture Co",
-                title=str(case.get("title") or ""),
-                summary=str(case.get("summary") or ""),
-                extracted_facts=[str(item or "") for item in (case.get("extracted_facts") or [])],
-                material_topics=[str(item or "") for item in (case.get("material_topics") or [])],
-                evidence=[EvidenceRef(source_url="https://announcements.asx.com.au/asxpdf/example.pdf")],
-                raw_text_excerpt="\n".join([str(case.get("summary") or "")] + [str(item or "") for item in (case.get("extracted_facts") or [])]),
-            )
-            report = comparator.compare(facts, baseline)
-            action = judge.judge(report)
+            result = run_mock_router_case(case)
             expected = case.get("expected") or {}
-            pass_current_path = str(report.current_path or "") == str(expected.get("current_path") or "")
-            pass_action = str(action.action or "") == str(expected.get("action") or "")
-            pass_impact = str(report.impact_level or "") == str(expected.get("impact_level") or "")
-            passed = pass_current_path and pass_action and pass_impact
 
             results.append(
                 {
@@ -115,12 +94,10 @@ class ScenarioRouterObservability:
                     "category": str(case.get("category") or ""),
                     "label": str(case.get("label") or ""),
                     "expected": expected,
-                    "actual": {
-                        "current_path": report.current_path,
-                        "action": action.action,
-                        "impact_level": report.impact_level,
-                    },
-                    "passed": passed,
+                    "actual": result.get("actual") or {},
+                    "scenario_results": result.get("scenario_results") or {},
+                    "assertions": result.get("assertions") or [],
+                    "passed": bool(result.get("passed")),
                 }
             )
 
@@ -153,6 +130,7 @@ class ScenarioRouterObservability:
     def _summarize_event_payload(payload: Dict[str, Any], *, path: Path) -> Dict[str, Any]:
         event = payload.get("event") if isinstance(payload.get("event"), dict) else {}
         packet = payload.get("announcement_packet") if isinstance(payload.get("announcement_packet"), dict) else {}
+        facts = payload.get("announcement_facts") if isinstance(payload.get("announcement_facts"), dict) else {}
         report, action = replay_comparison_from_artifact(payload)
         baseline_run = payload.get("baseline_run") if isinstance(payload.get("baseline_run"), dict) else {}
         trace = payload.get("processing_trace") if isinstance(payload.get("processing_trace"), list) else []
@@ -173,6 +151,14 @@ class ScenarioRouterObservability:
             and str(item.get("group") or "").strip() in {"red_flag", "confirmatory"}
             and str(item.get("matched_via") or "").strip() != "market_facts"
         )
+        triggered_verification = sum(
+            1
+            for item in evaluations
+            if isinstance(item, dict)
+            and str(item.get("status") or "").strip() == "matched"
+            and str(item.get("group") or "").strip() == "verification"
+            and str(item.get("matched_via") or "").strip() != "market_facts"
+        )
         market_conditions = sum(
             1
             for item in evaluations
@@ -185,9 +171,11 @@ class ScenarioRouterObservability:
         raw_baseline_path = str(report.get("baseline_path") or "").strip()
         suppress_stale_market_only_reroute = should_project_market_only_watch(
             matched_conditions_count=matched_conditions,
-            triggered_watchlist_count=triggered_watchlist,
+            triggered_watchlist_count=triggered_watchlist + triggered_verification,
             market_conditions_count=market_conditions,
             raw_action=raw_action,
+            materiality=str(report.get("materiality") or facts.get("materiality") or "").strip(),
+            trajectory_state=str(report.get("trajectory_state") or "").strip(),
         )
         display_projection = market_only_watch_projection(
             baseline_path=raw_baseline_path,
@@ -205,6 +193,27 @@ class ScenarioRouterObservability:
             "received_at_utc": str(event.get("received_at_utc") or "").strip(),
             "action": str(display_projection.get("action") or raw_action).strip(),
             "impact_level": str(display_projection.get("impact_level") or report.get("impact_level") or "").strip(),
+            "announcement_class": str(report.get("announcement_class") or facts.get("announcement_class") or "").strip(),
+            "materiality": str(report.get("materiality") or facts.get("materiality") or "").strip(),
+            "trajectory_state": str(display_projection.get("trajectory_state") or report.get("trajectory_state") or "").strip(),
+            "trajectory_effect": str(display_projection.get("trajectory_effect") or report.get("trajectory_effect") or facts.get("trajectory_effect") or "").strip(),
+            "price_time_effect": str(display_projection.get("price_time_effect") or report.get("price_time_effect") or facts.get("price_time_effect") or "").strip(),
+            "semantic_summary": str(report.get("semantic_summary") or facts.get("semantic_summary") or "").strip(),
+            "filing_summary": str(report.get("filing_summary") or facts.get("filing_summary") or "").strip(),
+            "parser_confidence": report.get("parser_confidence", facts.get("semantic_confidence")),
+            "source_confidence": report.get("source_confidence", facts.get("source_confidence")),
+            "extraction_confidence": report.get("extraction_confidence", facts.get("extraction_confidence")),
+            "classification_confidence": report.get("classification_confidence", facts.get("classification_confidence", facts.get("semantic_confidence"))),
+            "thesis_match_confidence": report.get("thesis_match_confidence", facts.get("thesis_match_confidence")),
+            "classification_reason": str(report.get("classification_reason") or facts.get("classification_reason") or "").strip(),
+            "confidence_breakdown": (
+                report.get("confidence_breakdown")
+                if isinstance(report.get("confidence_breakdown"), dict)
+                else facts.get("confidence_breakdown") if isinstance(facts.get("confidence_breakdown"), dict) else {}
+            ),
+            "domain_profile": str(facts.get("domain_profile") or "").strip(),
+            "parser_warnings": [str(item or "").strip() for item in (facts.get("parser_warnings") or []) if str(item or "").strip()][:8],
+            "classification_basis": [str(item or "").strip() for item in (facts.get("classification_basis") or []) if str(item or "").strip()][:8],
             "current_path": str(display_projection.get("current_path") or raw_current_path).strip(),
             "baseline_path": raw_baseline_path,
             "path_transition": str(display_projection.get("path_transition") if display_projection else report.get("path_transition") or "").strip(),
@@ -214,9 +223,11 @@ class ScenarioRouterObservability:
             "processing_duration_ms": int(payload.get("processing_duration_ms") or 0),
             "matched_conditions_count": matched_conditions,
             "triggered_watchlist_count": triggered_watchlist,
+            "triggered_verification_count": triggered_verification,
             "market_conditions_count": market_conditions,
             "matched_conditions": _condition_details(evaluations, groups={"required", "failure"}, exclude_market=True),
             "triggered_watchlist": _condition_details(evaluations, groups={"red_flag", "confirmatory"}, exclude_market=True),
+            "triggered_verification": _condition_details(evaluations, groups={"verification"}, exclude_market=True),
             "market_context_conditions": _condition_details(
                 evaluations,
                 matched_via="market_facts",
@@ -236,6 +247,18 @@ class ScenarioRouterObservability:
                 statuses={"matched", "not_matched", "contradicted", "unclear"},
                 exclude_market=True,
                 limit=30,
+            ),
+            "verification_condition_checks": _condition_details(
+                evaluations,
+                groups={"verification"},
+                statuses={"matched", "not_matched", "contradicted", "unclear"},
+                exclude_market=True,
+                limit=30,
+            ),
+            "trajectory_projection": (
+                report.get("trajectory_projection")
+                if isinstance(report.get("trajectory_projection"), dict)
+                else {}
             ),
             "thesis_snapshot": _thesis_snapshot(baseline_run),
             "key_findings": _finding_details(report.get("key_findings")),
@@ -478,88 +501,3 @@ def _finding_details(payload: Any) -> List[Dict[str, Any]]:
         if len(rows) >= 8:
             break
     return rows
-
-
-def _build_baseline_run(case: Dict[str, Any]) -> BaselineRunPacket:
-    baseline_path = str(case.get("baseline_path") or "base").strip().lower() or "base"
-    ticker = str(case.get("ticker") or "ASX:TEST").strip().upper()
-    return BaselineRunPacket(
-        run_id=f"fixture-{case.get('case_id')}",
-        ticker=ticker,
-        exchange=ticker.split(":", 1)[0] if ":" in ticker else "ASX",
-        company_name="Scenario Router Fixture Co",
-        template_id="resources_gold_monometallic",
-        freshness_status="watch",
-        freshness_age_days=2,
-        lab_payload={
-            "structured_data": {
-                "extended_analysis": {
-                    "current_thesis_state": {
-                        "leaning": baseline_path,
-                        "status": "on-track",
-                        "basis": "Fixture baseline state.",
-                    }
-                },
-                "thesis_map": {
-                    "bull": {
-                        "required_conditions": [
-                            {
-                                "condition_id": "bull_permit_fast",
-                                "condition": "Permitting approvals arrive ahead of plan",
-                                "evidence_hooks": ["permit approval ahead of schedule"],
-                                "linked_milestones": ["permit approval"],
-                            },
-                            {
-                                "condition_id": "bull_milestone_fast",
-                                "condition": "Project milestone is achieved ahead of schedule",
-                                "evidence_hooks": ["milestone was achieved ahead of schedule"],
-                                "linked_milestones": ["project milestone"],
-                            },
-                            {
-                                "condition_id": "bull_funding_secure",
-                                "condition": "Funding remains sufficient for planned milestones",
-                                "evidence_hooks": ["funding remains sufficient"],
-                                "linked_milestones": ["funding"],
-                            },
-                        ],
-                        "failure_conditions": [],
-                    },
-                    "base": {
-                        "required_conditions": [
-                            {
-                                "condition_id": "base_funding_secure",
-                                "condition": "Funding remains sufficient for planned milestones",
-                                "evidence_hooks": ["funding remains sufficient"],
-                                "linked_milestones": ["funding"],
-                            }
-                        ],
-                        "failure_conditions": [
-                            {
-                                "condition_id": "base_funding_break",
-                                "condition": "Funding pathway breaks before key milestones",
-                                "evidence_hooks": ["funding shortfall", "capital raise under pressure"],
-                                "linked_milestones": ["funding"],
-                            }
-                        ],
-                    },
-                    "bear": {
-                        "required_conditions": [
-                            {
-                                "condition_id": "bear_delay_and_shortfall",
-                                "condition": "Project delays and funding shortfall emerge",
-                                "evidence_hooks": ["delay", "funding shortfall"],
-                                "linked_milestones": ["project timeline"],
-                            },
-                            {
-                                "condition_id": "bear_permit_withdrawn",
-                                "condition": "Permit approval is withdrawn",
-                                "evidence_hooks": ["permit approval was withdrawn"],
-                                "linked_milestones": ["permit approval"],
-                            },
-                        ],
-                        "failure_conditions": [],
-                    },
-                },
-            }
-        },
-    )

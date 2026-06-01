@@ -38,6 +38,7 @@ ConditionStatus = Literal["matched", "not_matched", "contradicted", "unclear"]
 MaterialChangeType = Literal[
     "financing",
     "permitting",
+    "regulatory",
     "timeline",
     "resource",
     "production",
@@ -46,6 +47,25 @@ MaterialChangeType = Literal[
     "m_and_a",
     "management",
     "operations",
+    "commercial",
+    "customer",
+    "product",
+    "technology",
+    "legal",
+    "governance",
+    "administrative",
+    "asset_project",
+    "balance_sheet",
+    "commercial_customer",
+    "earnings_guidance",
+    "product_technology",
+    "regulatory_legal",
+    "strategy_mna",
+    "drilling_exploration",
+    "clinical_regulatory",
+    "credit_risk",
+    "real_estate_portfolio",
+    "capital_management",
 ]
 
 
@@ -125,6 +145,24 @@ class AnnouncementFacts:
     market_facts: Dict[str, Any] = field(default_factory=dict)
     evidence: List[EvidenceRef] = field(default_factory=list)
     raw_text_excerpt: str = ""
+    parse_quality: Dict[str, Any] = field(default_factory=dict)
+    announcement_class: str = ""
+    materiality: str = ""
+    affected_drivers: List[str] = field(default_factory=list)
+    trajectory_effect: str = ""
+    price_time_effect: str = ""
+    filing_summary: str = ""
+    semantic_summary: str = ""
+    semantic_confidence: float = 0.0
+    source_confidence: float = 0.0
+    extraction_confidence: float = 0.0
+    classification_confidence: float = 0.0
+    thesis_match_confidence: float = 0.0
+    domain_profile: str = ""
+    classification_basis: List[str] = field(default_factory=list)
+    parser_warnings: List[str] = field(default_factory=list)
+    classification_reason: str = ""
+    confidence_breakdown: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         data = asdict(self)
@@ -201,12 +239,28 @@ class ComparisonReport:
     thesis_effect: ThesisEffect = "unknown"
     timeline_effect: TimelineEffect = "unknown"
     capital_effect: CapitalEffect = "unknown"
+    announcement_class: str = ""
+    materiality: str = ""
+    trajectory_state: str = ""
+    trajectory_effect: str = ""
+    price_time_effect: str = ""
+    semantic_summary: str = ""
+    filing_summary: str = ""
+    parser_confidence: float = 0.0
+    source_confidence: float = 0.0
+    extraction_confidence: float = 0.0
+    classification_confidence: float = 0.0
+    thesis_match_confidence: float = 0.0
+    classification_reason: str = ""
+    confidence_breakdown: Dict[str, Any] = field(default_factory=dict)
     affected_domains: List[str] = field(default_factory=list)
     material_change_types: List[MaterialChangeType] = field(default_factory=list)
     condition_evaluations: List[ConditionEvaluation] = field(default_factory=list)
     matched_condition_ids: List[str] = field(default_factory=list)
     triggered_watchlist_ids: List[str] = field(default_factory=list)
+    triggered_verification_ids: List[str] = field(default_factory=list)
     market_facts_used: Dict[str, Any] = field(default_factory=dict)
+    trajectory_projection: Dict[str, Any] = field(default_factory=dict)
     key_findings: List[ComparisonFinding] = field(default_factory=list)
     conflicts_with_run: List[ComparisonFinding] = field(default_factory=list)
     notes: List[str] = field(default_factory=list)

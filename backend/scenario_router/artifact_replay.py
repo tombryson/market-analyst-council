@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, Tuple
 
 from .action_judge import ActionJudge
+from .announcement_interpreter import AnnouncementInterpreter
 from .models import AnnouncementFacts, BaselineRunPacket, EvidenceRef
 from .thesis_comparator import ThesisComparator
 
@@ -28,6 +29,7 @@ def replay_comparison_from_artifact(payload: Dict[str, Any]) -> Tuple[Dict[str, 
     try:
         facts = _coerce_facts(facts_payload)
         baseline = _coerce_baseline(baseline_payload)
+        facts = AnnouncementInterpreter().interpret(facts, baseline)
         report = ThesisComparator().compare(facts, baseline)
         action = ActionJudge().judge(report)
         return report.to_dict(), action.to_dict()
@@ -58,6 +60,24 @@ def _coerce_facts(payload: Dict[str, Any]) -> AnnouncementFacts:
         market_facts=payload.get("market_facts") if isinstance(payload.get("market_facts"), dict) else {},
         evidence=evidence,
         raw_text_excerpt=str(payload.get("raw_text_excerpt") or ""),
+        parse_quality=payload.get("parse_quality") if isinstance(payload.get("parse_quality"), dict) else {},
+        announcement_class=str(payload.get("announcement_class") or ""),
+        materiality=str(payload.get("materiality") or ""),
+        affected_drivers=[str(item or "") for item in (payload.get("affected_drivers") or [])],
+        trajectory_effect=str(payload.get("trajectory_effect") or ""),
+        price_time_effect=str(payload.get("price_time_effect") or ""),
+        filing_summary=str(payload.get("filing_summary") or ""),
+        semantic_summary=str(payload.get("semantic_summary") or ""),
+        semantic_confidence=float(payload.get("semantic_confidence") or 0.0),
+        source_confidence=float(payload.get("source_confidence") or 0.0),
+        extraction_confidence=float(payload.get("extraction_confidence") or 0.0),
+        classification_confidence=float(payload.get("classification_confidence") or payload.get("semantic_confidence") or 0.0),
+        thesis_match_confidence=float(payload.get("thesis_match_confidence") or 0.0),
+        domain_profile=str(payload.get("domain_profile") or ""),
+        classification_basis=[str(item or "") for item in (payload.get("classification_basis") or [])],
+        parser_warnings=[str(item or "") for item in (payload.get("parser_warnings") or [])],
+        classification_reason=str(payload.get("classification_reason") or ""),
+        confidence_breakdown=payload.get("confidence_breakdown") if isinstance(payload.get("confidence_breakdown"), dict) else {},
     )
 
 

@@ -75,6 +75,12 @@ function titleizeKey(key) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function fmtRankMetric(value, digits = 2) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 'n/a';
+  return n.toFixed(digits);
+}
+
 function parseIsoDateOrNull(value) {
   const raw = String(value || '').trim();
   if (!raw) return null;
@@ -657,6 +663,53 @@ function scenarioTone(name) {
   if (k === 'bull') return 'bull';
   if (k === 'bear') return 'bear';
   return 'base';
+}
+
+function normalizeThesisCondition(item, scenario, kind, index) {
+  const kindLabel = kind === 'failure' ? 'Failure' : 'Required';
+  if (typeof item === 'string') {
+    const text = item.trim();
+    if (!text) return null;
+    return {
+      key: `${scenario}-${kind}-${index}-${text.slice(0, 48)}`,
+      chip: kindLabel,
+      chipTone: kind === 'failure' ? 'bear' : scenarioTone(scenario),
+      id: '',
+      text,
+      meta: [],
+    };
+  }
+  if (!item || typeof item !== 'object') return null;
+
+  const text = String(
+    item.condition
+      || item.title
+      || item.text
+      || item.label
+      || item.condition_id
+      || '',
+  ).trim();
+  if (!text) return null;
+
+  const currentStatus = String(item.current_status || item.status || '').trim();
+  const id = String(item.condition_id || item.watch_id || '').trim();
+  const meta = [
+    item.by ? `by ${item.by}` : '',
+    item.trigger_window || item.target_window || item.window || '',
+    item.duration || '',
+    item.source_to_monitor || '',
+  ]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean);
+
+  return {
+    key: id || `${scenario}-${kind}-${index}-${text.slice(0, 48)}`,
+    chip: currentStatus || kindLabel,
+    chipTone: currentStatus ? statusTone(currentStatus) : (kind === 'failure' ? 'bear' : scenarioTone(scenario)),
+    id,
+    text,
+    meta,
+  };
 }
 
 function normalizeProb(v) {
@@ -1394,7 +1447,15 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
     () => normalizeCatalysts(stage3?.extended_analysis?.next_major_catalysts),
     [stage3?.extended_analysis?.next_major_catalysts]
   );
-  const topModels = stage3?.council_metadata?.top_ranked_models || [];
+  const aggregateRankings = Array.isArray(stage3?.council_metadata?.stage2_aggregate_rankings)
+    ? stage3.council_metadata.stage2_aggregate_rankings
+    : [];
+  const judgeRankings = Array.isArray(stage3?.council_metadata?.stage2_judge_rankings)
+    ? stage3.council_metadata.stage2_judge_rankings
+    : [];
+  const legacyTopModels = Array.isArray(stage3?.council_metadata?.top_ranked_models)
+    ? stage3.council_metadata.top_ranked_models
+    : [];
   const norm = stage3?.council_metadata?.normalization || {};
   const detLane = stage3?.council_metadata?.deterministic_finance_lane || {};
   const claimLedger = stage3?.council_metadata?.claim_ledger_counts || {};
@@ -1812,14 +1873,21 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
           </div>
         </section>
 
-        <section className="lab-panel lab-panel-wide">
-          <h3>Thesis Map Condition Engine</h3>
+        <section className="lab-panel lab-panel-wide thesis-map-panel">
+          <div className="panel-title-row">
+            <h3>Thesis Map Condition Engine</h3>
+            <span>Bull / base / bear monitor</span>
+          </div>
           <div className="thesis-grid">
             {['bull', 'base', 'bear'].map((name) => {
               const rawBlock = thesisMap?.[name];
               const block = rawBlock && typeof rawBlock === 'object' && !Array.isArray(rawBlock) ? rawBlock : {};
-              const conditions = Array.isArray(block.required_conditions) ? block.required_conditions : [];
-              const failures = Array.isArray(block.failure_conditions) ? block.failure_conditions : [];
+              const conditions = (Array.isArray(block.required_conditions) ? block.required_conditions : [])
+                .map((condition, idx) => normalizeThesisCondition(condition, name, 'required', idx))
+                .filter(Boolean);
+              const failures = (Array.isArray(block.failure_conditions) ? block.failure_conditions : [])
+                .map((condition, idx) => normalizeThesisCondition(condition, name, 'failure', idx))
+                .filter(Boolean);
               const rawTarget12 = toNumberOrNull(block.target_12m) ?? toNumberOrNull(targets12?.[name]);
               const rawTarget24 = toNumberOrNull(block.target_24m) ?? toNumberOrNull(targets24?.[name]);
               const target12 = rebasePrice(scalePrice(rawTarget12, targetScaleFactor), priceRebaseFactor);
@@ -1855,30 +1923,30 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
                       Logic: required {logicRequired || 'n/a'} · failure {logicFailure || 'n/a'}
                     </div>
                   )}
+                  {conditions.length > 0 && <div className="cond-section-label">Required conditions</div>}
                   <div className="cond-list">
                     {conditions.map((c) => (
-                      <div key={c.condition_id || c.condition} className="cond-item">
+                      <div key={c.key} className="cond-item">
                         <div className="cond-top">
-                          <span className={`chip tone-${statusTone(c.current_status)}`}>{c.current_status || 'unknown'}</span>
-                          <span>{c.condition_id || 'cond'}</span>
+                          <span className={`chip tone-${c.chipTone}`}>{c.chip}</span>
+                          {c.id && <span>{c.id}</span>}
                         </div>
-                        <div className="cond-main">{c.condition}</div>
-                        <div className="cond-sub">
-                          by {c.by || 'n/a'} · {c.trigger_window || 'n/a'} · {c.duration || 'n/a'}
-                        </div>
+                        <div className="cond-main">{c.text}</div>
+                        {c.meta.length > 0 && <div className="cond-sub">{c.meta.join(' · ')}</div>}
                       </div>
                     ))}
                     {!conditions.length && <div className="cond-empty">No required conditions provided.</div>}
                   </div>
+                  {failures.length > 0 && <div className="cond-section-label cond-section-label-failure">Failure conditions</div>}
                   <div className="cond-list">
                     {failures.map((c) => (
-                      <div key={c.condition_id || c.condition} className="cond-item">
+                      <div key={c.key} className="cond-item">
                         <div className="cond-top">
-                          <span className={`chip tone-${statusTone(c.current_status)}`}>{c.current_status || 'unknown'}</span>
-                          <span>{c.condition_id || 'failure'}</span>
+                          <span className={`chip tone-${c.chipTone}`}>{c.chip}</span>
+                          {c.id && <span>{c.id}</span>}
                         </div>
-                        <div className="cond-main">{c.condition}</div>
-                        <div className="cond-sub">Failure condition</div>
+                        <div className="cond-main">{c.text}</div>
+                        {c.meta.length > 0 && <div className="cond-sub">{c.meta.join(' · ')}</div>}
                       </div>
                     ))}
                     {!failures.length && <div className="cond-empty">No failure conditions provided.</div>}
@@ -1889,34 +1957,46 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
           </div>
         </section>
 
-        <section className="lab-panel">
-          <h3>Monitoring Watchlist</h3>
-          <h4>Red Flags</h4>
-          <div className="watch-list">
-            {(watch?.red_flags || []).map((row) => (
-              <div className="watch-item watch-red" key={row.watch_id || row.condition}>
-                <div className="watch-title">{row.condition}</div>
-                <div className="watch-meta">
-                  {row.trigger_window || 'n/a'} · {row.duration || 'n/a'} · sev {String(row.severity || 'n/a').toUpperCase()}
-                </div>
-              </div>
-            ))}
-            {!(watch?.red_flags || []).length && <div className="watch-empty">No red flags.</div>}
+        <section className="lab-panel lab-panel-wide watchlist-panel">
+          <div className="panel-title-row">
+            <h3>Monitoring Watchlist</h3>
+            <span>{(watch?.red_flags || []).length} red flags · {(watch?.confirmatory_signals || []).length} confirmatory</span>
           </div>
-          <h4>Confirmatory Signals</h4>
-          <div className="watch-list">
-            {(watch?.confirmatory_signals || []).map((row) => (
-              <div className="watch-item watch-green" key={row.watch_id || row.condition}>
-                <div className="watch-title">{row.condition}</div>
-                <div className="watch-meta">{row.source_to_monitor || 'n/a'}</div>
+          <div className="watch-columns">
+            <div className="watch-column">
+              <h4>Red Flags</h4>
+              <div className="watch-list">
+                {(watch?.red_flags || []).map((row) => (
+                  <div className="watch-item watch-red" key={row.watch_id || row.condition}>
+                    <div className="watch-title">{row.condition}</div>
+                    <div className="watch-meta">
+                      {row.trigger_window || 'No window'} · {row.duration || 'No duration'} · {String(row.severity || 'n/a').toUpperCase()}
+                    </div>
+                  </div>
+                ))}
+                {!(watch?.red_flags || []).length && <div className="watch-empty">No red flags.</div>}
               </div>
-            ))}
-            {!(watch?.confirmatory_signals || []).length && <div className="watch-empty">No confirmatory signals.</div>}
+            </div>
+            <div className="watch-column">
+              <h4>Confirmatory Signals</h4>
+              <div className="watch-list">
+                {(watch?.confirmatory_signals || []).map((row) => (
+                  <div className="watch-item watch-green" key={row.watch_id || row.condition}>
+                    <div className="watch-title">{row.condition}</div>
+                    <div className="watch-meta">{row.source_to_monitor || 'Company filings and milestone updates'}</div>
+                  </div>
+                ))}
+                {!(watch?.confirmatory_signals || []).length && <div className="watch-empty">No confirmatory signals.</div>}
+              </div>
+            </div>
           </div>
         </section>
 
-        <section className="lab-panel">
-          <h3>Verification Queue</h3>
+        <section className="lab-panel lab-panel-wide verification-panel">
+          <div className="panel-title-row">
+            <h3>Verification Queue</h3>
+            <span>{verification.length} unresolved fields</span>
+          </div>
           <div className="verify-list">
             {verification.map((v) => (
               <div className="verify-item" key={v._k || v.field}>
@@ -1938,14 +2018,50 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
         <section className="lab-panel lab-panel-wide">
           <h3>Council Telemetry + Provenance</h3>
           <div className="telemetry-grid">
-            <div>
-              <h4>Top Ranked Models</h4>
-              <ul>
-                {topModels.map((m) => (
-                  <li key={m}>{m}</li>
-                ))}
-                {!topModels.length && <li>n/a</li>}
-              </ul>
+            <div className="telemetry-wide">
+              <h4>Full Stage 2 Ranking</h4>
+              {aggregateRankings.length ? (
+                <div className="ranking-table">
+                  {aggregateRankings.map((row, idx) => (
+                    <div className="ranking-row" key={`${row.model}-${idx}`}>
+                      <span className="ranking-pos">{idx + 1}</span>
+                      <span className="ranking-model-name">{row.model || 'n/a'}</span>
+                      <span>avg {fmtRankMetric(row.average_rank)}</span>
+                      <span>{row.rankings_count ?? 0} votes</span>
+                      <span>{row.first_place_votes ?? 0} firsts</span>
+                      <span>borda {row.borda_score ?? 'n/a'}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <ul>
+                  {legacyTopModels.map((m) => (
+                    <li key={m}>{m}</li>
+                  ))}
+                  {!legacyTopModels.length && <li>n/a</li>}
+                </ul>
+              )}
+            </div>
+            <div className="telemetry-wide">
+              <h4>Judge Ballots</h4>
+              {judgeRankings.length ? (
+                <div className="judge-ballots">
+                  {judgeRankings.map((ballot, idx) => (
+                    <details key={`${ballot.judge_model || 'judge'}-${idx}`}>
+                      <summary>{ballot.judge_model || 'Unknown judge'}</summary>
+                      <ol>
+                        {(ballot.ranking || []).map((entry) => (
+                          <li key={`${ballot.judge_model}-${entry.rank}-${entry.model || entry.label}`}>
+                            {entry.model || entry.label || 'n/a'}
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  ))}
+                </div>
+              ) : (
+                <div className="cond-empty">No judge ballots available.</div>
+              )}
             </div>
             <div>
               <h4>Normalizer</h4>

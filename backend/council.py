@@ -13,6 +13,7 @@ from time import perf_counter
 from urllib.parse import urljoin, urlparse, parse_qs
 from .openrouter import query_models_parallel, query_model
 from .reasoning import build_reasoning_payload, normalize_reasoning_effort
+from .source_fact_context import build_source_fact_context
 from .config import (
     OPENROUTER_API_KEY,
     COUNCIL_MODELS,
@@ -4245,6 +4246,420 @@ def _compact_prompt_fact_row(item: Dict[str, Any], max_fact_chars: int) -> Dict[
     return out
 
 
+_MANDATORY_FACT_FAMILY_KEYWORDS = {
+    "market_structure": (
+        "market cap",
+        "enterprise value",
+        "shares outstanding",
+        "share price",
+        "cash",
+        "debt",
+    ),
+    "project_economics": (
+        "npv",
+        "irr",
+        "capex",
+        "opex",
+        "aisc",
+        "c1",
+        "payback",
+        "mine life",
+        "pfs",
+        "dfs",
+        "scoping study",
+    ),
+    "resource_reserve": (
+        "resource",
+        "reserve",
+        "jorc",
+        "mineral resource",
+        "ore reserve",
+        "measured",
+        "indicated",
+        "inferred",
+        "probable",
+        "proved",
+        "treo",
+        "mreo",
+        "ppm",
+        "mt @",
+    ),
+    "metallurgy_recovery": (
+        "recovery",
+        "recoveries",
+        "metallurgical",
+        "metallurgy",
+        "leach",
+        "flotation",
+        "mrec",
+        "testwork",
+        "ansto",
+        "flowsheet",
+    ),
+    "funding_balance_sheet": (
+        "funding",
+        "financing",
+        "placement",
+        "cash",
+        "debt",
+        "facility",
+        "loan",
+        "liquidity",
+        "runway",
+        "eca",
+    ),
+    "permitting_regulatory": (
+        "permit",
+        "permitting",
+        "licence",
+        "license",
+        "approval",
+        "regulatory",
+        "environmental",
+        "ministry",
+        "feam",
+        "concession",
+    ),
+    "timeline_milestones": (
+        "timeline",
+        "target",
+        "targeted",
+        "on track",
+        "milestone",
+        "q1",
+        "q2",
+        "q3",
+        "q4",
+        "h1",
+        "h2",
+        "fid",
+        "commissioning",
+        "first production",
+    ),
+    "operations_production": (
+        "production",
+        "throughput",
+        "plant",
+        "commissioning",
+        "operations",
+        "run-rate",
+        "guidance",
+        "volume",
+    ),
+    "offtake_commercial": (
+        "offtake",
+        "customer",
+        "contract",
+        "agreement",
+        "mou",
+        "sales",
+        "qualification",
+    ),
+}
+
+_MANDATORY_FACT_TEMPLATE_FAMILIES = {
+    "rare_earths_critical_minerals": {
+        "project_economics",
+        "resource_reserve",
+        "metallurgy_recovery",
+        "funding_balance_sheet",
+        "permitting_regulatory",
+        "timeline_milestones",
+        "operations_production",
+        "offtake_commercial",
+    },
+    "energy_oil_gas": {
+        "project_economics",
+        "resource_reserve",
+        "funding_balance_sheet",
+        "permitting_regulatory",
+        "timeline_milestones",
+        "operations_production",
+        "offtake_commercial",
+    },
+}
+
+
+def _mandatory_fact_families_for_template(template_id: str) -> List[str]:
+    """Return source-backed fact families that must not be lost for a template."""
+    template = str(template_id or "").strip().lower()
+    families = set(_MANDATORY_FACT_TEMPLATE_FAMILIES.get(template, set()))
+    if not families:
+        if (
+            template.startswith("resources_")
+            or "miner" in template
+            or "mineral" in template
+            or template in {"base_metals", "coal", "iron_ore"}
+        ):
+            families.update(
+                {
+                    "project_economics",
+                    "resource_reserve",
+                    "metallurgy_recovery",
+                    "funding_balance_sheet",
+                    "permitting_regulatory",
+                    "timeline_milestones",
+                    "operations_production",
+                    "offtake_commercial",
+                }
+            )
+        elif template:
+            families.update(
+                {
+                    "market_structure",
+                    "project_economics",
+                    "funding_balance_sheet",
+                    "timeline_milestones",
+                    "operations_production",
+                    "offtake_commercial",
+                }
+            )
+    if not families:
+        families.update(
+            {
+                "market_structure",
+                "project_economics",
+                "funding_balance_sheet",
+                "timeline_milestones",
+            }
+        )
+    ordered = [
+        "market_structure",
+        "project_economics",
+        "resource_reserve",
+        "metallurgy_recovery",
+        "funding_balance_sheet",
+        "permitting_regulatory",
+        "timeline_milestones",
+        "operations_production",
+        "offtake_commercial",
+    ]
+    return [family for family in ordered if family in families]
+
+
+def _classify_mandatory_fact_family(sentence: str) -> str:
+    """Classify a source sentence into the strongest mandatory fact family."""
+    text = str(sentence or "").lower()
+    best_family = ""
+    best_score = 0
+    for family, keywords in _MANDATORY_FACT_FAMILY_KEYWORDS.items():
+        score = sum(1 for token in keywords if token in text)
+        if family == "resource_reserve" and re.search(
+            r"\b\d[\d,]*(?:\.\d+)?\s*(?:mt|moz|ppm|g/t)\b", text
+        ):
+            score += 2
+        if family == "metallurgy_recovery" and re.search(r"\b\d[\d,]*(?:\.\d+)?\s*%", text):
+            score += 2
+        if family == "project_economics" and re.search(r"\b(npv|irr|capex|opex|aisc)\b", text):
+            score += 2
+        if score > best_score:
+            best_score = score
+            best_family = family
+    return best_family
+
+
+def _score_mandatory_fact_candidate(sentence: str, family: str, source: Dict[str, Any]) -> int:
+    """Rank source-backed facts by source quality and template relevance."""
+    text = str(sentence or "")
+    low = text.lower()
+    score = int(_source_authority_rank(str(source.get("url", "")))) * 4
+    score += int(source.get("material_signal_score", 0) or 0)
+    if source.get("asx_price_sensitive"):
+        score += 5
+    if re.search(r"\d", text):
+        score += 4
+    if str(source.get("published_at", "")).startswith("2026-"):
+        score += 3
+    elif str(source.get("published_at", "")).startswith("2025-"):
+        score += 2
+    if family == "resource_reserve":
+        if re.search(r"\b\d[\d,]*(?:\.\d+)?\s*mt\b", low):
+            score += 10
+        if "@" in text or "ppm" in low or "treo" in low or "mreo" in low:
+            score += 8
+        if "jorc" in low or "ore reserve" in low or "mineral resource" in low:
+            score += 6
+    elif family == "metallurgy_recovery":
+        if "recovery" in low or "recoveries" in low:
+            score += 8
+        if "%" in text:
+            score += 6
+        if "metallurg" in low or "ansto" in low or "flowsheet" in low:
+            score += 4
+    elif family == "project_economics":
+        if "npv" in low:
+            score += 8
+        if "irr" in low:
+            score += 6
+        if "capex" in low or "opex" in low or "aisc" in low:
+            score += 4
+    return score
+
+
+def _build_stage1_mandatory_fact_ledger(
+    source_rows: List[Dict[str, Any]],
+    *,
+    template_id: str = "",
+    max_facts_per_family: int = 3,
+    max_total_facts: int = 24,
+) -> Dict[str, Any]:
+    """Build a non-compressible, source-backed fact ledger for Stage 1 prompts."""
+    required_families = _mandatory_fact_families_for_template(template_id)
+    required_set = set(required_families)
+    candidates: List[Tuple[int, str, Dict[str, Any]]] = []
+    seen = set()
+
+    for source in source_rows:
+        if not isinstance(source, dict):
+            continue
+        source_id = str(source.get("source_id", "")).strip() or "S?"
+        for sentence in _extract_source_sentences(str(source.get("excerpt", ""))):
+            family = _classify_mandatory_fact_family(sentence)
+            if not family or family not in required_set:
+                continue
+            clean_fact = _truncate_text_for_prompt(sentence, 420)
+            key = _normalize_fact_key(f"{family}|{source_id}|{clean_fact}")
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            row = {
+                "family": family,
+                "fact": clean_fact,
+                "source_id": source_id,
+                "source_title": _truncate_text_for_prompt(str(source.get("title", "")), 140),
+                "published_at": str(source.get("published_at", "")),
+                "source_url": str(source.get("url", "")),
+                "mandatory": True,
+            }
+            score = _score_mandatory_fact_candidate(clean_fact, family, source)
+            candidates.append((score, family, row))
+
+    candidates.sort(
+        key=lambda item: (
+            item[0],
+            -required_families.index(item[1]) if item[1] in required_families else -999,
+        ),
+        reverse=True,
+    )
+
+    selected: List[Dict[str, Any]] = []
+    per_family: Dict[str, int] = {}
+    for score, family, row in candidates:
+        if len(selected) >= max(1, int(max_total_facts)):
+            break
+        if per_family.get(family, 0) >= max(1, int(max_facts_per_family)):
+            continue
+        per_family[family] = per_family.get(family, 0) + 1
+        selected_row = {
+            "fact_id": f"MF{len(selected) + 1}",
+            "score": int(score),
+            **row,
+        }
+        selected.append(selected_row)
+
+    return {
+        "schema": "stage1_mandatory_source_fact_ledger_v1",
+        "template_id": str(template_id or ""),
+        "required_families": required_families,
+        "facts": selected,
+        "counts": {
+            "source_count": len(source_rows),
+            "fact_count": len(selected),
+            "families_present": len({str(row.get("family", "")) for row in selected}),
+        },
+        "instruction": (
+            "These facts are non-compressible primary/prepass evidence. "
+            "Do not state a ledger fact is absent, unknown, unavailable, or unverified."
+        ),
+    }
+
+
+def _normalize_prompt_coverage_text(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).strip()
+
+
+def _validate_stage1_prompt_mandatory_fact_coverage(
+    prompt: str,
+    ledger: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Verify every mandatory ledger fact survived into the final prompt string."""
+    facts = [
+        row
+        for row in (ledger.get("facts", []) or [])
+        if isinstance(row, dict) and row.get("mandatory", True)
+    ]
+    if not facts:
+        return {"passed": True, "mandatory_fact_count": 0, "missing_fact_ids": []}
+
+    prompt_text = str(prompt or "")
+    normalized_prompt = _normalize_prompt_coverage_text(prompt_text)
+    prompt_numbers = {
+        re.sub(r"[,\s]", "", item).lower()
+        for item in re.findall(r"\d[\d,\s]*(?:\.\d+)?", prompt_text)
+    }
+    stopwords = {
+        "about",
+        "above",
+        "after",
+        "against",
+        "company",
+        "project",
+        "source",
+        "these",
+        "those",
+        "their",
+        "there",
+        "where",
+        "which",
+        "with",
+    }
+    missing: List[Dict[str, Any]] = []
+    for row in facts:
+        fact = str(row.get("fact", "")).strip()
+        if not fact:
+            continue
+        covered = fact in prompt_text
+        if not covered:
+            normalized_fact = _normalize_prompt_coverage_text(fact)
+            covered = bool(normalized_fact and normalized_fact in normalized_prompt)
+        if not covered:
+            fact_numbers = [
+                re.sub(r"[,\s]", "", item).lower()
+                for item in re.findall(r"\d[\d,\s]*(?:\.\d+)?", fact)
+            ]
+            words = [
+                token
+                for token in re.findall(r"[a-z][a-z0-9]{4,}", fact.lower())
+                if token not in stopwords
+            ][:8]
+            number_hits = sum(1 for token in fact_numbers[:5] if token in prompt_numbers)
+            word_hits = sum(1 for token in words if token in normalized_prompt)
+            required_number_hits = min(len(fact_numbers[:5]), 2)
+            required_word_hits = min(max(2, len(words) // 2), len(words))
+            covered = (
+                number_hits >= required_number_hits
+                and word_hits >= required_word_hits
+                and (fact_numbers or words)
+            )
+        if not covered:
+            missing.append(
+                {
+                    "fact_id": str(row.get("fact_id", "")),
+                    "family": str(row.get("family", "")),
+                    "source_id": str(row.get("source_id", "")),
+                    "fact": fact[:240],
+                }
+            )
+
+    return {
+        "passed": not missing,
+        "mandatory_fact_count": len(facts),
+        "covered_fact_count": len(facts) - len(missing),
+        "missing_fact_ids": [str(item.get("fact_id", "")) for item in missing],
+        "missing_facts": missing,
+    }
+
+
 def _build_stage1_prompt_fact_digest(
     fact_digest: Dict[str, Any],
     *,
@@ -5528,6 +5943,7 @@ def _build_stage1_second_pass_prompt(
     user_query: str,
     research_brief: str,
     run: Dict[str, Any],
+    mandatory_fact_ledger_json: str,
     compact_fact_bundle_json: str,
     fact_digest_json: str,
     fact_pack_json: str,
@@ -5561,6 +5977,8 @@ def _build_stage1_second_pass_prompt(
         "8) Investment Verdict\n\n"
         "EVIDENCE AND CITATION RULES:\n"
         "- Base analysis only on injected evidence below.\n"
+        "- Treat MANDATORY_SOURCE_FACT_LEDGER_JSON as non-compressible primary/prepass evidence.\n"
+        "- Do not state any mandatory ledger fact is absent, unknown, unavailable, or unverified.\n"
         "- Every key numeric claim must include at least one [S#] citation.\n"
         "- Mark inferred values with ESTIMATE and one-line rationale.\n"
         "- If evidence conflicts, prefer the newest dated primary source and state conflict."
@@ -5569,6 +5987,11 @@ def _build_stage1_second_pass_prompt(
         requirements = f"{requirements}\n\n{cashflow_schema_contract.strip()}"
 
     evidence_blocks: List[str] = []
+    if mandatory_fact_ledger_json.strip():
+        evidence_blocks.append(
+            "MANDATORY_SOURCE_FACT_LEDGER_JSON:\n"
+            f"```json\n{mandatory_fact_ledger_json.strip()}\n```"
+        )
     if source_key_points_json.strip():
         evidence_blocks.append(
             "SOURCE_KEY_POINTS_JSON:\n"
@@ -6448,6 +6871,10 @@ async def _run_stage1_second_pass_analysis(
         timeline_rows=timeline_rows,
         max_facts_per_category=5,
     )
+    mandatory_fact_ledger = _build_stage1_mandatory_fact_ledger(
+        source_rows,
+        template_id=str(profile.get("template_id", "")),
+    )
     prompt_fact_chars = max(
         100,
         int(PERPLEXITY_STAGE1_SECOND_PASS_DOC_KEYPOINTS_MAX_FACT_CHARS),
@@ -6480,6 +6907,11 @@ async def _run_stage1_second_pass_analysis(
     )
     compact_fact_bundle_json = json.dumps(
         compact_fact_bundle_prompt or compact_fact_bundle,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+    mandatory_fact_ledger_json = json.dumps(
+        mandatory_fact_ledger,
         ensure_ascii=True,
         separators=(",", ":"),
     )
@@ -6557,6 +6989,7 @@ async def _run_stage1_second_pass_analysis(
         user_query=user_query,
         research_brief=research_brief,
         run=run,
+        mandatory_fact_ledger_json=mandatory_fact_ledger_json,
         source_key_points_json=source_key_points_json,
         supplementary_macro_news_json=supplementary_macro_news_json,
         compact_fact_bundle_json=compact_fact_bundle_json,
@@ -6598,6 +7031,7 @@ async def _run_stage1_second_pass_analysis(
             user_query=user_query,
             research_brief=research_brief,
             run=run,
+            mandatory_fact_ledger_json=mandatory_fact_ledger_json,
             source_key_points_json=source_key_points_json,
             supplementary_macro_news_json=supplementary_macro_news_json,
             compact_fact_bundle_json=json.dumps(
@@ -6654,6 +7088,7 @@ async def _run_stage1_second_pass_analysis(
                 user_query=user_query,
                 research_brief=research_brief,
                 run=run,
+                mandatory_fact_ledger_json=mandatory_fact_ledger_json,
                 source_key_points_json=json.dumps(
                     source_key_points_tiny,
                     ensure_ascii=True,
@@ -6683,6 +7118,10 @@ async def _run_stage1_second_pass_analysis(
         prompt_compression_appendix_omitted = True
 
     prompt_chars_after_compression = len(prompt)
+    mandatory_fact_prompt_coverage = _validate_stage1_prompt_mandatory_fact_coverage(
+        prompt,
+        mandatory_fact_ledger,
+    )
     source_rows_preview = [
         {
             "source_id": str(row.get("source_id", "")),
@@ -6736,6 +7175,8 @@ async def _run_stage1_second_pass_analysis(
         "timeline_evidence_count": len(timeline_rows),
         "asx_deterministic_ingestion": asx_deterministic_ingestion_summary,
         "source_key_points_counts": (source_key_points_bundle.get("counts", {}) or {}),
+        "mandatory_fact_ledger_counts": (mandatory_fact_ledger.get("counts", {}) or {}),
+        "mandatory_fact_prompt_coverage": mandatory_fact_prompt_coverage,
         "prompt_compression_enabled": prompt_compression_enabled,
         "prompt_compression_applied": prompt_compression_applied,
         "prompt_compression_appendix_omitted": prompt_compression_appendix_omitted,
@@ -6756,6 +7197,154 @@ async def _run_stage1_second_pass_analysis(
         f"prompt_chars={len(prompt)} "
         f"compressed={prompt_compression_applied}"
     )
+    if not bool(mandatory_fact_prompt_coverage.get("passed", True)):
+        missing_ids = list(mandatory_fact_prompt_coverage.get("missing_fact_ids", []) or [])
+        _progress_log(
+            f"Stage1 mandatory fact coverage failed model={model} "
+            f"missing={missing_ids[:8]}"
+        )
+        return {
+            "success": False,
+            "response": "",
+            "attempts": 0,
+            "error": "mandatory_fact_prompt_coverage_failed",
+            "warning": "mandatory_fact_prompt_coverage_failed",
+            "prompt": prompt,
+            "prompt_chars": len(prompt),
+            "prompt_chars_before_compression": int(prompt_chars_before_compression),
+            "prompt_chars_after_compression": int(prompt_chars_after_compression),
+            "prompt_chars_saved": max(
+                0,
+                int(prompt_chars_before_compression - prompt_chars_after_compression),
+            ),
+            "prompt_target_chars": int(prompt_target_chars),
+            "prompt_compression_enabled": bool(prompt_compression_enabled),
+            "prompt_compression_applied": bool(prompt_compression_applied),
+            "prompt_compression_appendix_omitted": bool(prompt_compression_appendix_omitted),
+            "response_chars": 0,
+            "last_model_finish_reason": "",
+            "last_model_response_id": "",
+            "last_model_usage": {},
+            "last_model_provider": "",
+            "last_model_reasoning_effort": "",
+            "truncation_assessment": {
+                "used": False,
+                "truncated": False,
+                "confidence_pct": 0.0,
+                "reason": "not_called_mandatory_fact_prompt_coverage_failed",
+            },
+            "source_rows": source_rows,
+            "supplementary_macro_news": supplementary_macro_news,
+            "supplementary_macro_news_sources": supplementary_macro_news_sources,
+            "supplementary_macro_news_count": int(
+                supplementary_macro_news.get(
+                    "count",
+                    1 if str(supplementary_macro_news.get("summary_paragraph", "")).strip() else 0,
+                )
+            ),
+            "supplementary_macro_news_profile": str(
+                supplementary_macro_news.get("commodity_profile", "")
+            ),
+            "supplementary_macro_news_reason": str(
+                supplementary_macro_news.get("reason", "")
+            ),
+            "supplementary_macro_news_retrieval_attempted": bool(
+                supplementary_macro_news.get("retrieval_attempted", False)
+            ),
+            "supplementary_macro_news_retrieval_result_count": int(
+                supplementary_macro_news.get("retrieval_result_count", 0)
+            ),
+            "supplementary_macro_news_retrieval_error": str(
+                supplementary_macro_news.get("retrieval_error", "")
+            ),
+            "evidence_source_count": int(fact_pack.get("counts", {}).get("source_count", 0)),
+            "decoded_source_count": int(
+                fact_pack.get("counts", {}).get("decoded_source_count", 0)
+            ),
+            "evidence_total_excerpt_chars": int(
+                sum(len(str(row.get("excerpt", ""))) for row in source_rows)
+            ),
+            "source_key_points_counts": (source_key_points_bundle.get("counts", {}) or {}),
+            "mandatory_fact_ledger": mandatory_fact_ledger,
+            "mandatory_fact_ledger_chars": len(mandatory_fact_ledger_json),
+            "mandatory_fact_prompt_coverage": mandatory_fact_prompt_coverage,
+            "fact_digest_v2": fact_digest,
+            "fact_digest_v2_chars": len(fact_digest_json),
+            "fact_digest_v2_total_facts": int(
+                (fact_digest.get("counts", {}) or {}).get("total_facts", 0)
+            ),
+            "fact_digest_v2_sections_with_facts": int(
+                (fact_digest.get("counts", {}) or {}).get("sections_with_facts", 0)
+            ),
+            "fact_digest_v2_summary_bullets": int(
+                (fact_digest.get("counts", {}) or {}).get("summary_bullets", 0)
+            ),
+            "fact_digest_v2_conflicts": int(
+                (fact_digest.get("counts", {}) or {}).get("conflicts", 0)
+            ),
+            "compact_fact_bundle": compact_fact_bundle,
+            "compact_fact_bundle_chars": len(compact_fact_bundle_json),
+            "compact_fact_bundle_total_facts": int(
+                (compact_fact_bundle.get("counts", {}) or {}).get("total_facts", 0)
+            ),
+            "compact_fact_bundle_categories_with_facts": int(
+                (compact_fact_bundle.get("counts", {}) or {}).get(
+                    "categories_with_facts",
+                    0,
+                )
+            ),
+            "fact_pack": fact_pack,
+            "fact_pack_chars": len(fact_pack_json),
+            "timeline_evidence": timeline_rows,
+            "timeline_digest_chars": len(timeline_digest_block),
+            "timeline_guard_enabled": bool(PERPLEXITY_STAGE1_TIMELINE_GUARD_ENABLED),
+            "timeline_guard_passed": True,
+            "timeline_guard_reason": "not_called_mandatory_fact_prompt_coverage_failed",
+            "timeline_guard_evidence_windows": [],
+            "timeline_guard_response_windows": [],
+            "timeline_guard_shifted_quarters": 0,
+            "verification_profile_template_id": str(profile.get("template_id", "")),
+            "verification_profile_digest_sections": int(
+                len((profile_fact_keywords or {}).keys())
+            ),
+            "verification_profile_compliance_markers": int(
+                len(profile_section_markers or [])
+            ),
+            "verification_profile_critical_sections": int(
+                len(profile_critical_sections or set())
+            ),
+            "cashflow_schema": cashflow_schema_status,
+            "injection_audit": injection_audit,
+            "asx_deterministic_ingestion": asx_deterministic_ingestion_summary,
+            "fact_pack_total_facts": int(fact_pack.get("counts", {}).get("total_facts", 0)),
+            "fact_pack_sections_with_facts": int(
+                fact_pack.get("counts", {}).get("sections_with_facts", 0)
+            ),
+            "citation_gate_enabled": bool(PERPLEXITY_STAGE1_SECOND_PASS_CITATION_GATE_ENABLED),
+            "citation_gate_passed": False,
+            "citation_gate_reason": "mandatory_fact_prompt_coverage_failed",
+            "citation_count": 0,
+            "citation_unique_count": 0,
+            "citation_invalid_source_refs": [],
+            "citation_numeric_lines": 0,
+            "citation_uncited_numeric_lines": 0,
+            "citation_cited_numeric_lines": 0,
+            "citation_numeric_citation_pct": 0.0,
+            "rubric_required": False,
+            "rubric_sections_total": 0,
+            "rubric_sections_covered": 0,
+            "rubric_coverage_pct": 0.0,
+            "rubric_missing_sections": [],
+            "rubric_critical_missing_sections": [],
+            "compliance_score": 0.0,
+            "compliance_rating": "red",
+            "compliance_retry_recommended": False,
+            "compliance_catastrophic_failure": True,
+            "compliance_fail_reasons": ["mandatory_fact_prompt_coverage_failed"],
+            "compliance_warning_reasons": [],
+            "compliance_hard_fail_reasons": ["mandatory_fact_prompt_coverage_failed"],
+            "compliance_soft_fail_reasons": [],
+        }
 
     max_attempts = max(1, int(PERPLEXITY_STAGE1_SECOND_PASS_MAX_ATTEMPTS))
     backoff = max(0.0, float(PERPLEXITY_STAGE1_SECOND_PASS_RETRY_BACKOFF_SECONDS))
@@ -7052,6 +7641,9 @@ async def _run_stage1_second_pass_analysis(
                     sum(len(str(row.get("excerpt", ""))) for row in source_rows)
                 ),
                 "source_key_points_counts": (source_key_points_bundle.get("counts", {}) or {}),
+                "mandatory_fact_ledger": mandatory_fact_ledger,
+                "mandatory_fact_ledger_chars": len(mandatory_fact_ledger_json),
+                "mandatory_fact_prompt_coverage": mandatory_fact_prompt_coverage,
                 "fact_digest_v2": fact_digest,
                 "fact_digest_v2_chars": len(fact_digest_json),
                 "fact_digest_v2_total_facts": int(
@@ -7238,6 +7830,9 @@ async def _run_stage1_second_pass_analysis(
             sum(len(str(row.get("excerpt", ""))) for row in source_rows)
         ),
         "source_key_points_counts": (source_key_points_bundle.get("counts", {}) or {}),
+        "mandatory_fact_ledger": mandatory_fact_ledger,
+        "mandatory_fact_ledger_chars": len(mandatory_fact_ledger_json),
+        "mandatory_fact_prompt_coverage": mandatory_fact_prompt_coverage,
         "fact_digest_v2": fact_digest,
         "fact_digest_v2_chars": len(fact_digest_json),
         "fact_digest_v2_total_facts": int(
@@ -7432,6 +8027,39 @@ async def _apply_stage1_second_pass(
         )
         provider_meta["stage1_second_pass_source_key_points_total_words"] = int(
             source_key_points_counts.get("total_words", 0)
+        )
+    mandatory_fact_ledger = second_pass_result.get("mandatory_fact_ledger", {}) or {}
+    mandatory_fact_counts = (
+        mandatory_fact_ledger.get("counts", {})
+        if isinstance(mandatory_fact_ledger, dict)
+        else {}
+    )
+    provider_meta["stage1_second_pass_mandatory_fact_count"] = int(
+        (mandatory_fact_counts or {}).get("fact_count", 0)
+    )
+    provider_meta["stage1_second_pass_mandatory_fact_families_present"] = int(
+        (mandatory_fact_counts or {}).get("families_present", 0)
+    )
+    provider_meta["stage1_second_pass_mandatory_fact_ledger_chars"] = int(
+        second_pass_result.get("mandatory_fact_ledger_chars", 0)
+    )
+    mandatory_fact_coverage = (
+        second_pass_result.get("mandatory_fact_prompt_coverage", {}) or {}
+    )
+    if isinstance(mandatory_fact_coverage, dict):
+        provider_meta["stage1_second_pass_mandatory_fact_coverage_passed"] = bool(
+            mandatory_fact_coverage.get("passed", True)
+        )
+        provider_meta["stage1_second_pass_mandatory_fact_covered_count"] = int(
+            mandatory_fact_coverage.get("covered_fact_count", 0)
+            or (
+                mandatory_fact_coverage.get("mandatory_fact_count", 0)
+                if mandatory_fact_coverage.get("passed", True)
+                else 0
+            )
+        )
+        provider_meta["stage1_second_pass_mandatory_fact_missing_ids"] = list(
+            mandatory_fact_coverage.get("missing_fact_ids", []) or []
         )
     provider_meta["stage1_second_pass_fact_pack_chars"] = int(
         second_pass_result.get("fact_pack_chars", 0)
@@ -7684,6 +8312,14 @@ async def _apply_stage1_second_pass(
         run["stage1_second_pass_fact_digest_v2"] = second_pass_result["fact_digest_v2"]
     if second_pass_result.get("fact_pack"):
         run["stage1_second_pass_fact_pack"] = second_pass_result["fact_pack"]
+    if second_pass_result.get("mandatory_fact_ledger"):
+        run["stage1_second_pass_mandatory_fact_ledger"] = (
+            second_pass_result.get("mandatory_fact_ledger") or {}
+        )
+    if second_pass_result.get("mandatory_fact_prompt_coverage"):
+        run["stage1_second_pass_mandatory_fact_prompt_coverage"] = (
+            second_pass_result.get("mandatory_fact_prompt_coverage") or {}
+        )
     if isinstance(cashflow_schema_meta, dict) and cashflow_schema_meta:
         run["stage1_second_pass_cashflow_schema"] = cashflow_schema_meta
     if "compact_fact_bundle" in second_pass_result:
@@ -9745,6 +10381,28 @@ def _ranking_entries_from_labels(
     return entries
 
 
+def compact_stage2_rankings_for_telemetry(
+    stage2_results: List[Dict[str, Any]],
+    label_to_model: Dict[str, str],
+) -> List[Dict[str, Any]]:
+    """Return compact per-judge Stage 2 ballots without full prose evaluations."""
+    ballots: List[Dict[str, Any]] = []
+    for result in stage2_results or []:
+        if not isinstance(result, dict):
+            continue
+        labels = _ranking_labels_from_result(result)
+        entries = _ranking_entries_from_labels(labels, label_to_model)
+        ballots.append(
+            {
+                "judge_model": str(result.get("model") or "").strip(),
+                "ranking": entries,
+                "top_choice_model": entries[0].get("model") if entries else None,
+                "ranked_count": len(entries),
+            }
+        )
+    return ballots
+
+
 def _build_stage2_revision_prompt(
     *,
     enhanced_context: str,
@@ -10224,6 +10882,28 @@ Return JSON only with this schema:
 """
 
 
+def _source_evidence_pack_from_stage1_results(
+    stage1_results: Optional[List[Dict[str, Any]]],
+    evidence_pack: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Ensure downstream stages can render Stage 1 second-pass source packets."""
+    merged: Dict[str, Any] = dict(evidence_pack or {}) if isinstance(evidence_pack, dict) else {}
+    has_stage1_runs = bool(merged.get("per_model_research_runs"))
+    nested_metadata = merged.get("stage1_emulated_metadata") or merged.get("stage1_metadata")
+    if isinstance(nested_metadata, dict) and nested_metadata.get("per_model_research_runs"):
+        has_stage1_runs = True
+    if not has_stage1_runs and stage1_results:
+        merged["per_model_research_runs"] = [
+            {
+                "model": str(result.get("model") or ""),
+                "result": result,
+            }
+            for result in stage1_results
+            if isinstance(result, dict)
+        ]
+    return merged
+
+
 async def stage2_collect_reconciliation(
     enhanced_context: str,
     stage1_results: List[Dict[str, Any]],
@@ -10231,6 +10911,7 @@ async def stage2_collect_reconciliation(
     label_to_model: Dict[str, str],
     reconciliation_model: Optional[str] = None,
     enabled: Optional[bool] = None,
+    source_evidence_pack: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Single cheap discrepancy pass before Stage 3 synthesis."""
     should_run = bool(STAGE2_RECONCILIATION_ENABLED) if enabled is None else bool(enabled)
@@ -10291,8 +10972,21 @@ async def stage2_collect_reconciliation(
     else:
         ranking_lines.append("(no parseable aggregate ranking)")
 
+    source_pack = _source_evidence_pack_from_stage1_results(
+        stage1_results,
+        source_evidence_pack,
+    )
+    source_fact_context = build_source_fact_context(
+        source_pack,
+        max_chars=max(0, int(STAGE2_RECONCILIATION_MAX_SOURCE_CHARS) // 2),
+    )
+    source_parts = [
+        part
+        for part in (source_fact_context, enhanced_context)
+        if str(part or "").strip()
+    ]
     source_context = _clip_for_reconciliation(
-        enhanced_context,
+        "\n\n".join(source_parts),
         int(STAGE2_RECONCILIATION_MAX_SOURCE_CHARS),
         "TRUNCATED SOURCE/PREPASS CONTEXT",
     )
@@ -10308,6 +11002,7 @@ async def stage2_collect_reconciliation(
     _progress_log(
         "Stage2.5 reconciliation start: "
         f"model={selected_model}, responses={len(ordered_models)}, "
+        f"source_fact_chars={len(source_fact_context)}, "
         f"prompt_chars={len(prompt)}, timeout={timeout:.1f}s"
     )
     response = await query_model(
@@ -10329,6 +11024,7 @@ async def stage2_collect_reconciliation(
             "status": "parse_failed" if raw_text else "model_failed",
             "model": selected_model,
             "selected_models": ordered_models,
+            "source_fact_context_chars": len(source_fact_context),
             "prompt_chars": len(prompt),
             "response_chars": len(raw_text or ""),
             "parse_error": parse_error or "empty_response",
@@ -10345,6 +11041,7 @@ async def stage2_collect_reconciliation(
         "accepted": True,
         "model": selected_model,
         "selected_models": ordered_models,
+        "source_fact_context_chars": len(source_fact_context),
         "prompt_chars": len(prompt),
         "response_chars": len(raw_text or ""),
         "issue_count": int(issue_count),
@@ -10393,6 +11090,10 @@ async def stage3_synthesize_final(
     """
     # Check if we should use structured investment analysis
     selected_chairman_model = chairman_model or CHAIRMAN_MODEL
+    stage_source_evidence_pack = _source_evidence_pack_from_stage1_results(
+        stage1_results,
+        evidence_pack,
+    )
 
     if use_structured_analysis and template_id and label_to_model:
         from .investment_synthesis import synthesize_structured_analysis
@@ -10407,7 +11108,7 @@ async def stage3_synthesize_final(
             exchange=exchange,
             chairman_model=selected_chairman_model,
             market_facts=market_facts,
-            evidence_pack=evidence_pack,
+            evidence_pack=stage_source_evidence_pack,
             stage2_reconciliation=stage2_reconciliation,
         )
 

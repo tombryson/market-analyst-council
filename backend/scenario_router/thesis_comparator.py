@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from .models import (
@@ -31,16 +32,24 @@ NEGATIVE_TOKENS = {
     "breached",
 }
 DOMAIN_KEYWORDS = {
-    "financing": {"funding", "facility", "debt", "loan", "placement", "capital", "liquidity", "covenant"},
+    "financing": {"funding", "facility", "debt", "loan", "placement", "capital raise", "equity raise", "liquidity", "covenant"},
     "permitting": {"permit", "approval", "license", "licence", "heritage", "environmental", "regulator"},
+    "regulatory": {"regulator", "regulatory", "approval", "compliance", "investigation", "licence", "license"},
     "timeline": {"timeline", "milestone", "delay", "delayed", "ahead of schedule", "on track", "mid-2027", "2028"},
     "resource": {"resource", "reserve", "jorc", "ore reserve", "mineral resource"},
     "production": {"production", "throughput", "first gold", "ramp-up", "ramp up", "processing", "run-rate", "run rate", "kozpa"},
-    "guidance": {"guidance", "forecast", "outlook", "aisc", "cost guidance", "cash margin"},
+    "guidance": {"guidance", "forecast", "outlook", "aisc", "cost guidance", "cash margin", "revenue guidance", "earnings guidance"},
     "capital_structure": {"shares", "dilution", "placement", "capital structure", "escrow", "equity raise"},
+    "capital_management": {"buyback", "buy-back", "buy back", "share repurchase", "return of capital", "dividend", "capital management"},
     "m_and_a": {"acquisition", "scheme", "takeover", "merger", "joint venture", "farm-in", "farm in"},
-    "management": {"director", "ceo", "cfo", "chair", "management", "executive"},
-    "operations": {"operations", "plant", "mill", "mine", "contractor", "site", "power", "grid", "load shedding"},
+    "management": {"director", "ceo", "cfo", "chair", "executive", "resignation", "appointment"},
+    "governance": {"board", "director", "chair", "resignation", "appointment", "governance", "audit"},
+    "operations": {"operations", "plant", "mill", "mine", "contractor", "site", "power", "grid", "load shedding", "facility", "service", "platform"},
+    "commercial": {"contract", "agreement", "customer", "client", "partner", "distribution", "order", "purchase order"},
+    "customer": {"customer", "client", "subscriber", "user", "account", "churn", "retention"},
+    "product": {"product", "launch", "release", "trial", "platform", "software", "service", "device"},
+    "technology": {"technology", "software", "platform", "patent", "clinical", "data", "cyber", "ai"},
+    "legal": {"litigation", "claim", "proceeding", "settlement", "court", "dispute", "breach"},
 }
 MARKET_RULE_RE = re.compile(
     r"\b(?P<asset>gold|silver|copper|lithium|uranium|brent|wti|henry hub|henry_hub|natural gas)\b"
@@ -86,6 +95,7 @@ class ThesisComparator:
         thesis_map = structured.get("thesis_map") if isinstance(structured.get("thesis_map"), dict) else {}
         current_state = (structured.get("extended_analysis") or {}).get("current_thesis_state") if isinstance(structured.get("extended_analysis"), dict) else {}
         watchlist = structured.get("monitoring_watchlist") if isinstance(structured.get("monitoring_watchlist"), dict) else {}
+        verification_queue = structured.get("verification_queue") if isinstance(structured.get("verification_queue"), list) else []
         baseline_path = self._normalize_path((current_state or {}).get("leaning"))
 
         context_haystack = self._build_haystack(facts)
@@ -101,6 +111,7 @@ class ThesisComparator:
 
         evaluations.extend(self._evaluate_watchlist(watchlist.get("red_flags") or [], "red_flag", evidence_haystack, market_facts, evidence))
         evaluations.extend(self._evaluate_watchlist(watchlist.get("confirmatory_signals") or [], "confirmatory", evidence_haystack, market_facts, evidence))
+        evaluations.extend(self._evaluate_verification_queue(verification_queue, evidence_haystack, market_facts, evidence))
 
         matched_evals = [item for item in evaluations if item.status == "matched"]
         announcement_matched_evals = [
@@ -116,6 +127,12 @@ class ThesisComparator:
             for item in announcement_matched_evals
             if item.group in {"red_flag", "confirmatory"} and item.condition_id
         ]
+        triggered_verification_ids = [
+            item.condition_id
+            for item in announcement_matched_evals
+            if item.group == "verification" and item.condition_id
+        ]
+        thesis_match_confidence = self._thesis_match_confidence(evaluations, announcement_matched_evals, facts)
 
         bull_required = self._matched_count(announcement_matched_evals, scenario="bull", group="required")
         base_required = self._matched_count(announcement_matched_evals, scenario="base", group="required")
@@ -124,6 +141,7 @@ class ThesisComparator:
         base_failure = self._matched_count(announcement_matched_evals, scenario="base", group="failure")
         red_flag_hits = self._matched_count(announcement_matched_evals, group="red_flag")
         confirmatory_hits = self._matched_count(announcement_matched_evals, group="confirmatory")
+        verification_hits = self._matched_count(announcement_matched_evals, group="verification")
 
         positive = self._contains_any(evidence_haystack, POSITIVE_TOKENS)
         negative = self._contains_any(evidence_haystack, NEGATIVE_TOKENS)
@@ -146,13 +164,64 @@ class ThesisComparator:
         )
         path_transition = f"{baseline_path}->{current_path}" if baseline_path and current_path and baseline_path != current_path else ""
 
+        semantic_materiality = str(facts.materiality or "").strip().lower()
+        announcement_class = str(facts.announcement_class or "").strip().lower()
+        trajectory_effect = str(facts.trajectory_effect or "").strip().lower()
         key_findings, conflicts = self._build_findings(announcement_matched_evals)
         material_change_types = list(sorted(affected_domains))
-        impact_level = self._impact_level(affected_domains, current_path, baseline_path, conflicts, red_flag_hits, confirmatory_hits)
-        thesis_effect = self._thesis_effect(baseline_path, current_path, conflicts, confirmatory_hits, red_flag_hits, positive, negative)
+        impact_level = self._impact_level(
+            affected_domains,
+            current_path,
+            baseline_path,
+            conflicts,
+            red_flag_hits,
+            confirmatory_hits,
+            verification_hits,
+            semantic_materiality=semantic_materiality,
+        )
+        unmapped_material = self._is_unmapped_material_filing(
+            semantic_materiality=semantic_materiality,
+            announcement_class=announcement_class,
+            direct_match_count=len(announcement_matched_evals),
+        )
+        if unmapped_material:
+            key_findings.insert(
+                0,
+                ComparisonFinding(
+                    type="unmapped_material_filing",
+                    summary=(
+                        "Material announcement did not match a saved thesis-map or watchlist condition; "
+                        "review thesis-map coverage before treating it as immaterial."
+                    ),
+                    severity=impact_level if impact_level in {"low", "medium", "high", "critical"} else "medium",
+                    evidence=evidence,
+                ),
+            )
+        thesis_effect = self._thesis_effect(
+            baseline_path,
+            current_path,
+            conflicts,
+            confirmatory_hits,
+            red_flag_hits,
+            positive,
+            negative,
+            trajectory_effect=trajectory_effect,
+        )
         timeline_effect = self._timeline_effect(affected_domains, positive, negative, evaluations)
         capital_effect = self._capital_effect(affected_domains, positive, negative, evaluations)
         run_validity = self._run_validity(impact_level, current_path, baseline_path, conflicts, red_flag_hits)
+        trajectory_state = self._trajectory_state(
+            announcement_class=announcement_class,
+            semantic_materiality=semantic_materiality,
+            trajectory_effect=trajectory_effect,
+            thesis_effect=thesis_effect,
+            timeline_effect=timeline_effect,
+            direct_match_count=len(announcement_matched_evals),
+            market_match_count=self._matched_count([item for item in matched_evals if str(item.matched_via or '').strip() == "market_facts"]),
+            conflicts=conflicts,
+            path_transition=path_transition,
+            verification_match_count=verification_hits,
+        )
 
         used_market_fields = {
             item.market_field: market_facts.get(item.market_field)
@@ -165,8 +234,23 @@ class ThesisComparator:
             f"announcement_bear_required_matches={bear_required}",
             f"announcement_red_flag_hits={red_flag_hits}",
             f"announcement_confirmatory_hits={confirmatory_hits}",
+            f"announcement_verification_hits={verification_hits}",
             f"market_condition_matches={self._matched_count([item for item in matched_evals if str(item.matched_via or '').strip() == 'market_facts'])}",
+            f"announcement_class={announcement_class or 'unknown'}",
+            f"materiality={semantic_materiality or 'unknown'}",
+            f"trajectory_state={trajectory_state or 'unknown'}",
         ]
+        trajectory_projection = self._trajectory_projection(
+            structured=structured,
+            baseline_run=baseline_run,
+            facts=facts,
+            baseline_path=baseline_path,
+            current_path=current_path,
+            impact_level=impact_level,
+            trajectory_state=trajectory_state,
+            direct_match_count=len(announcement_matched_evals),
+            verification_match_count=verification_hits,
+        )
 
         return ComparisonReport(
             ticker=facts.ticker,
@@ -181,12 +265,28 @@ class ThesisComparator:
             thesis_effect=thesis_effect,
             timeline_effect=timeline_effect,
             capital_effect=capital_effect,
+            announcement_class=announcement_class,
+            materiality=semantic_materiality,
+            trajectory_state=trajectory_state,
+            trajectory_effect=trajectory_effect,
+            price_time_effect=str(facts.price_time_effect or "").strip(),
+            semantic_summary=str(facts.semantic_summary or "").strip(),
+            filing_summary=str(facts.filing_summary or "").strip(),
+            parser_confidence=float(facts.classification_confidence or facts.semantic_confidence or 0.0),
+            source_confidence=float(facts.source_confidence or 0.0),
+            extraction_confidence=float(facts.extraction_confidence or 0.0),
+            classification_confidence=float(facts.classification_confidence or facts.semantic_confidence or 0.0),
+            thesis_match_confidence=thesis_match_confidence,
+            classification_reason=str(facts.classification_reason or "").strip(),
+            confidence_breakdown=self._confidence_breakdown(facts, thesis_match_confidence, evaluations, announcement_matched_evals),
             affected_domains=material_change_types,
             material_change_types=material_change_types,
             condition_evaluations=evaluations,
             matched_condition_ids=matched_condition_ids,
             triggered_watchlist_ids=triggered_watchlist_ids,
+            triggered_verification_ids=triggered_verification_ids,
             market_facts_used=used_market_fields,
+            trajectory_projection=trajectory_projection,
             key_findings=key_findings,
             conflicts_with_run=conflicts,
             notes=notes,
@@ -270,6 +370,47 @@ class ThesisComparator:
                 "linked_milestones": item.get("linked_milestones") or [],
             }
             evaluations.append(self._evaluate_item(payload, "", group, haystack, market_facts, evidence))
+        return evaluations
+
+    def _evaluate_verification_queue(
+        self,
+        items: Iterable[Any],
+        haystack: str,
+        market_facts: Dict[str, Any],
+        evidence: EvidenceRef,
+    ) -> List[ConditionEvaluation]:
+        evaluations: List[ConditionEvaluation] = []
+        for idx, item in enumerate(items or []):
+            if isinstance(item, str):
+                item = {
+                    "verification_id": f"verification_{idx}",
+                    "field": str(item or "").strip(),
+                    "reason": str(item or "").strip(),
+                }
+            if not isinstance(item, dict):
+                continue
+            field = str(item.get("field") or item.get("field_path") or item.get("title") or "").strip()
+            reason = str(item.get("reason") or item.get("condition") or "").strip()
+            required_source = str(item.get("required_source") or item.get("source_to_monitor") or "").strip()
+            label = " | ".join(part for part in [field, reason, required_source] if part)
+            if not label:
+                continue
+            condition_id = str(
+                item.get("verification_id")
+                or item.get("condition_id")
+                or item.get("field_path")
+                or f"verification_{idx}"
+            ).strip()
+            hooks = list(item.get("evidence_hooks") or item.get("source_terms") or [])
+            hooks.extend(part for part in [field, reason, required_source] if part)
+            payload = {
+                "condition_id": condition_id,
+                "condition": label,
+                "evidence_hooks": hooks,
+                "severity": str(item.get("priority") or item.get("severity") or "medium").strip().lower(),
+                "linked_milestones": item.get("linked_milestones") or [],
+            }
+            evaluations.append(self._evaluate_item(payload, "", "verification", haystack, market_facts, evidence))
         return evaluations
 
     def _evaluate_item(
@@ -520,6 +661,14 @@ class ThesisComparator:
         ).lower()
         haystack = f"{fact_text}\n{labels}"
         domains: Set[str] = set()
+        semantic_drivers = [
+            str(item or "").strip().lower()
+            for item in list(facts.affected_drivers or []) + list(facts.material_topics or [])
+            if str(item or "").strip()
+        ]
+        if str(facts.announcement_class or "").strip().lower() == "administrative" and str(facts.materiality or "").strip().lower() in {"", "none"}:
+            return {"administrative"}
+        domains.update(driver for driver in semantic_drivers if driver not in {"administrative", "needs_classification"})
         for domain, keywords in DOMAIN_KEYWORDS.items():
             if any(ThesisComparator._keyword_in_text(keyword, haystack) for keyword in keywords):
                 domains.add(domain)
@@ -607,16 +756,30 @@ class ThesisComparator:
         conflicts: List[ComparisonFinding],
         red_flag_hits: int,
         confirmatory_hits: int,
+        verification_hits: int = 0,
+        *,
+        semantic_materiality: str = "",
     ) -> str:
+        materiality = str(semantic_materiality or "").strip().lower()
+        if materiality in {"", "none"} and affected_domains <= {"administrative"}:
+            return "none"
+        if materiality == "critical":
+            return "critical"
         if current_path == "bear" and baseline_path in {"bull", "base"}:
             return "high"
         if conflicts or red_flag_hits > 0:
+            return "high"
+        if materiality == "high":
             return "high"
         if current_path == "bull" and baseline_path in {"base", "bear"}:
             return "medium"
         if confirmatory_hits > 0:
             return "medium"
-        if affected_domains & {"timeline", "operations", "management"}:
+        if verification_hits > 0 and materiality in {"medium", "high", "critical"}:
+            return "medium"
+        if materiality == "medium":
+            return "medium"
+        if affected_domains & {"timeline", "operations", "management", "asset_project", "commercial_customer", "drilling_exploration", "clinical_regulatory"}:
             return "medium"
         if affected_domains:
             return "low"
@@ -631,18 +794,83 @@ class ThesisComparator:
         red_flag_hits: int,
         positive: bool,
         negative: bool,
+        *,
+        trajectory_effect: str = "",
     ) -> str:
+        effect = str(trajectory_effect or "").strip().lower()
         if current_path == "bear" and baseline_path in {"bull", "base"}:
             return "undermines"
         if conflicts or red_flag_hits > 0:
             return "undermines"
+        if effect in {"weakens", "delays"}:
+            return "undermines" if effect == "weakens" else "delays"
         if current_path == "bull" and baseline_path in {"base", "bear"}:
             return "accelerates"
+        if effect in {"strengthens", "risk_reduced"}:
+            return "confirms"
         if confirmatory_hits > 0 or positive:
             return "confirms"
         if negative:
             return "partially_confirms"
         return "no_change"
+
+    @staticmethod
+    def _is_unmapped_material_filing(
+        *,
+        semantic_materiality: str,
+        announcement_class: str,
+        direct_match_count: int,
+    ) -> bool:
+        if int(direct_match_count or 0) > 0:
+            return False
+        if str(announcement_class or "").strip().lower() in {"administrative", "market_backdrop"}:
+            return False
+        return str(semantic_materiality or "").strip().lower() in {"medium", "high", "critical"}
+
+    @staticmethod
+    def _trajectory_state(
+        *,
+        announcement_class: str,
+        semantic_materiality: str,
+        trajectory_effect: str,
+        thesis_effect: str,
+        timeline_effect: str,
+        direct_match_count: int,
+        market_match_count: int,
+        conflicts: List[ComparisonFinding],
+        path_transition: str,
+        verification_match_count: int = 0,
+    ) -> str:
+        announcement = str(announcement_class or "").strip().lower()
+        materiality = str(semantic_materiality or "").strip().lower()
+        effect = str(trajectory_effect or "").strip().lower()
+        thesis = str(thesis_effect or "").strip().lower()
+        timeline = str(timeline_effect or "").strip().lower()
+        if announcement == "administrative" and materiality in {"", "none", "low"} and direct_match_count <= 0:
+            return "administrative_filing"
+        if direct_match_count <= 0 and announcement == "needs_classification":
+            return "needs_classification"
+        if ThesisComparator._is_unmapped_material_filing(
+            semantic_materiality=materiality,
+            announcement_class=announcement,
+            direct_match_count=direct_match_count,
+        ):
+            return "material_unmapped"
+        if direct_match_count <= 0 and materiality in {"", "none", "low"} and announcement not in {"needs_classification"}:
+            return "no_thesis_change"
+        if direct_match_count <= 0 and market_match_count > 0:
+            return "market_backdrop_only"
+        if conflicts or thesis in {"undermines", "invalidates"}:
+            return "thesis_weakened"
+        if timeline == "delayed" or effect == "delays":
+            return "timeline_delayed"
+        if timeline == "accelerated" or effect == "accelerates":
+            return "timeline_accelerated"
+        if thesis in {"confirms", "accelerates"} or effect in {"strengthens", "risk_reduced"} or path_transition:
+            return "thesis_strengthened"
+        if verification_match_count > 0:
+            return "no_thesis_change"
+        return "no_thesis_change"
 
     @staticmethod
     def _timeline_effect(domains: Set[str], positive: bool, negative: bool, evaluations: List[ConditionEvaluation]) -> str:
@@ -658,7 +886,7 @@ class ThesisComparator:
 
     @staticmethod
     def _capital_effect(domains: Set[str], positive: bool, negative: bool, evaluations: List[ConditionEvaluation]) -> str:
-        if "financing" not in domains and "capital_structure" not in domains:
+        if "financing" not in domains and "capital_structure" not in domains and "capital_management" not in domains:
             return "unknown"
         if any(item.group in {"failure", "red_flag"} and item.status == "matched" for item in evaluations):
             return "worsens"
@@ -666,6 +894,8 @@ class ThesisComparator:
             return "improves"
         if negative:
             return "worsens"
+        if domains <= {"capital_management"}:
+            return "no_change"
         return "material_change"
 
     @staticmethod
@@ -699,3 +929,318 @@ class ThesisComparator:
             return 0.0
         strongest = max(bull_required, base_required, bear_required + red_flag_hits)
         return round(float(strongest / total), 3)
+
+    @staticmethod
+    def _thesis_match_confidence(
+        evaluations: List[ConditionEvaluation],
+        announcement_matched_evals: List[ConditionEvaluation],
+        facts: AnnouncementFacts,
+    ) -> float:
+        relevant = [
+            item
+            for item in evaluations
+            if item.group in {"required", "failure", "red_flag", "confirmatory", "verification"}
+            and str(item.matched_via or "").strip() != "market_facts"
+        ]
+        if announcement_matched_evals:
+            strongest = max(float(item.confidence or 0.0) for item in announcement_matched_evals)
+            return round(min(0.96, strongest + min(0.12, 0.03 * (len(announcement_matched_evals) - 1))), 3)
+        if not relevant:
+            return 0.0
+        if str(facts.announcement_class or "").strip().lower() == "needs_classification":
+            return 0.22
+        return 0.4
+
+    @staticmethod
+    def _confidence_breakdown(
+        facts: AnnouncementFacts,
+        thesis_match_confidence: float,
+        evaluations: List[ConditionEvaluation],
+        announcement_matched_evals: List[ConditionEvaluation],
+    ) -> Dict[str, Any]:
+        payload = dict(facts.confidence_breakdown or {}) if isinstance(facts.confidence_breakdown, dict) else {}
+        payload["source_confidence"] = round(float(facts.source_confidence or payload.get("source_confidence") or 0.0), 3)
+        payload["extraction_confidence"] = round(float(facts.extraction_confidence or payload.get("extraction_confidence") or 0.0), 3)
+        payload["classification_confidence"] = round(
+            float(facts.classification_confidence or facts.semantic_confidence or payload.get("classification_confidence") or 0.0),
+            3,
+        )
+        payload["thesis_match_confidence"] = round(float(thesis_match_confidence or 0.0), 3)
+        payload["thesis_match"] = {
+            "direct_matches": len(announcement_matched_evals),
+            "announcement_conditions_checked": len(
+                [
+                    item
+                    for item in evaluations
+                    if item.group in {"required", "failure"}
+                    and str(item.matched_via or "").strip() != "market_facts"
+                ]
+            ),
+            "watchlist_conditions_checked": len(
+                [
+                    item
+                    for item in evaluations
+                    if item.group in {"red_flag", "confirmatory"}
+                    and str(item.matched_via or "").strip() != "market_facts"
+                ]
+            ),
+            "verification_conditions_checked": len(
+                [
+                    item
+                    for item in evaluations
+                    if item.group == "verification"
+                    and str(item.matched_via or "").strip() != "market_facts"
+                ]
+            ),
+        }
+        return payload
+
+    def _trajectory_projection(
+        self,
+        *,
+        structured: Dict[str, Any],
+        baseline_run: BaselineRunPacket,
+        facts: AnnouncementFacts,
+        baseline_path: str,
+        current_path: str,
+        impact_level: str,
+        trajectory_state: str,
+        direct_match_count: int,
+        verification_match_count: int,
+    ) -> Dict[str, Any]:
+        price_targets = structured.get("price_targets") if isinstance(structured.get("price_targets"), dict) else {}
+        market_data = structured.get("market_data") if isinstance(structured.get("market_data"), dict) else {}
+        market_data_provenance = (
+            structured.get("market_data_provenance")
+            if isinstance(structured.get("market_data_provenance"), dict)
+            else {}
+        )
+        market_facts = structured.get("market_facts") if isinstance(structured.get("market_facts"), dict) else {}
+        normalized_market = market_facts.get("normalized_facts") if isinstance(market_facts.get("normalized_facts"), dict) else {}
+        scenario_targets = price_targets.get("scenario_targets") if isinstance(price_targets.get("scenario_targets"), dict) else {}
+        scenario_probabilities = (
+            price_targets.get("scenario_probabilities")
+            if isinstance(price_targets.get("scenario_probabilities"), dict)
+            else {}
+        )
+        targets_24m_raw = scenario_targets.get("24m") if isinstance(scenario_targets.get("24m"), dict) else {}
+        probs_24m_raw = scenario_probabilities.get("24m") if isinstance(scenario_probabilities.get("24m"), dict) else {}
+        base_24m = self._to_float(targets_24m_raw.get("base"))
+        if base_24m is None:
+            base_24m = self._to_float(price_targets.get("target_24m"))
+        targets_24m = {
+            "bear": self._to_float(targets_24m_raw.get("bear")),
+            "base": base_24m,
+            "bull": self._to_float(targets_24m_raw.get("bull")),
+        }
+        targets_12m_raw = scenario_targets.get("12m") if isinstance(scenario_targets.get("12m"), dict) else {}
+        base_12m = self._to_float(targets_12m_raw.get("base"))
+        if base_12m is None:
+            base_12m = self._to_float(price_targets.get("target_12m"))
+        targets_12m = {
+            "bear": self._to_float(targets_12m_raw.get("bear")),
+            "base": base_12m,
+            "bull": self._to_float(targets_12m_raw.get("bull")),
+        }
+        probabilities_24m = {
+            "bear": self._to_float(probs_24m_raw.get("bear")),
+            "base": self._to_float(probs_24m_raw.get("base")),
+            "bull": self._to_float(probs_24m_raw.get("bull")),
+        }
+        current_price = self._to_float(market_data.get("current_price"))
+        if current_price is None:
+            current_price = self._to_float(price_targets.get("current_price"))
+        prob_weighted_24m = self._to_float(price_targets.get("prob_weighted_target_24m"))
+        if prob_weighted_24m is None:
+            prob_weighted_24m = self._weighted_target(targets_24m, probabilities_24m)
+
+        baseline_started_at = self._baseline_started_at(baseline_run)
+        as_of = self._as_of_datetime(facts) or datetime.now(timezone.utc)
+        elapsed_days = None
+        elapsed_pct = None
+        if baseline_started_at is not None:
+            elapsed_days = max(0, (as_of.date() - baseline_started_at.date()).days)
+            elapsed_pct = round(min(100.0, (elapsed_days / 730.0) * 100.0), 1)
+
+        market_path = self._market_implied_path(current_price, targets_24m)
+        rerun_signal, rerun_reason = self._projection_rerun_signal(
+            impact_level=impact_level,
+            trajectory_state=trajectory_state,
+            baseline_path=baseline_path,
+            current_path=current_path,
+            direct_match_count=direct_match_count,
+            verification_match_count=verification_match_count,
+        )
+
+        available = bool(current_price is not None and any(value is not None for value in targets_24m.values()))
+        return {
+            "available": available,
+            "currency": str(
+                market_data_provenance.get("prepass_currency")
+                or market_data.get("currency")
+                or normalized_market.get("currency")
+                or "AUD"
+            ).strip().upper(),
+            "as_of_utc": self._iso(as_of),
+            "baseline_started_at_utc": self._iso(baseline_started_at),
+            "elapsed_days": elapsed_days,
+            "elapsed_pct_24m": elapsed_pct,
+            "horizon_months": 24,
+            "current_price": current_price,
+            "target_12m": targets_12m,
+            "target_24m": targets_24m,
+            "probability_24m": probabilities_24m,
+            "prob_weighted_target_24m": prob_weighted_24m,
+            "market_implied_path_24m": market_path,
+            "saved_path": baseline_path,
+            "router_path": current_path,
+            "path_transition": f"{baseline_path}->{current_path}" if baseline_path and current_path and baseline_path != current_path else "",
+            "timeline_rows": self._projection_timeline_rows(structured, baseline_run),
+            "rerun_signal": rerun_signal,
+            "rerun_reason": rerun_reason,
+        }
+
+    @staticmethod
+    def _to_float(value: Any) -> Optional[float]:
+        if value is None or value == "":
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        text = str(value).strip()
+        if not text or text.lower() in {"n/a", "na", "none", "null"}:
+            return None
+        text = re.sub(r"[^0-9.\-]", "", text)
+        try:
+            return float(text)
+        except Exception:
+            return None
+
+    @classmethod
+    def _weighted_target(cls, targets: Dict[str, Optional[float]], probabilities: Dict[str, Optional[float]]) -> Optional[float]:
+        rows = [
+            (targets.get(name), probabilities.get(name))
+            for name in ("bear", "base", "bull")
+            if targets.get(name) is not None and probabilities.get(name) is not None
+        ]
+        total_prob = sum(float(prob or 0.0) for _, prob in rows)
+        if not rows or total_prob <= 0:
+            return None
+        scale = 100.0 if total_prob > 1.5 else 1.0
+        return round(sum(float(target) * (float(prob) / scale) for target, prob in rows), 4)
+
+    @staticmethod
+    def _parse_datetime(value: Any) -> Optional[datetime]:
+        text = str(value or "").strip()
+        if not text:
+            return None
+        if re.fullmatch(r"\d{8}_\d{6}", text):
+            text = f"{text[:4]}-{text[4:6]}-{text[6:8]}T{text[9:11]}:{text[11:13]}:{text[13:15]}Z"
+        match = re.search(r"(\d{8}_\d{6})", text)
+        if match:
+            return ThesisComparator._parse_datetime(match.group(1))
+        try:
+            normalized = text.replace("Z", "+00:00")
+            parsed = datetime.fromisoformat(normalized)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc)
+        except Exception:
+            return None
+
+    @classmethod
+    def _baseline_started_at(cls, baseline_run: BaselineRunPacket) -> Optional[datetime]:
+        summary = baseline_run.summary_fields if isinstance(baseline_run.summary_fields, dict) else {}
+        lab = baseline_run.lab_payload if isinstance(baseline_run.lab_payload, dict) else {}
+        for value in (
+            lab.get("created_at"),
+            lab.get("updated_at"),
+            summary.get("analysis_date"),
+            summary.get("created_at"),
+            summary.get("updated_at"),
+            baseline_run.run_id,
+        ):
+            parsed = cls._parse_datetime(value)
+            if parsed is not None:
+                return parsed
+        return None
+
+    @classmethod
+    def _as_of_datetime(cls, facts: AnnouncementFacts) -> Optional[datetime]:
+        for item in facts.evidence or []:
+            parsed = cls._parse_datetime(getattr(item, "source_date_utc", ""))
+            if parsed is not None:
+                return parsed
+        return None
+
+    @staticmethod
+    def _iso(value: Optional[datetime]) -> str:
+        if value is None:
+            return ""
+        return value.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+    @classmethod
+    def _market_implied_path(cls, current_price: Optional[float], targets: Dict[str, Optional[float]]) -> str:
+        if current_price is None:
+            return "unknown"
+        rows = [
+            (name, float(value))
+            for name, value in targets.items()
+            if name in {"bear", "base", "bull"} and value is not None
+        ]
+        if not rows:
+            return "unknown"
+        rows.sort(key=lambda item: item[1])
+        if len(rows) >= 2:
+            low_name, low_value = rows[0]
+            high_name, high_value = rows[-1]
+            if current_price < low_value:
+                return f"below_{low_name}"
+            if current_price > high_value:
+                return f"above_{high_name}"
+        closest = min(rows, key=lambda item: abs(item[1] - float(current_price)))
+        return closest[0]
+
+    @staticmethod
+    def _projection_rerun_signal(
+        *,
+        impact_level: str,
+        trajectory_state: str,
+        baseline_path: str,
+        current_path: str,
+        direct_match_count: int,
+        verification_match_count: int,
+    ) -> Tuple[str, str]:
+        impact = str(impact_level or "").strip().lower()
+        state = str(trajectory_state or "").strip().lower()
+        if impact in {"critical", "high"} or state in {"thesis_weakened", "timeline_delayed", "risk_increased"}:
+            return "rebuild_analysis", "The filing changes or threatens the saved thesis path."
+        if baseline_path and current_path and baseline_path != current_path:
+            return "refresh_evidence", "The router path differs from the saved run path."
+        if state == "material_unmapped":
+            return "review_thesis_map", "The filing looks material but no saved thesis condition covers it."
+        if verification_match_count > 0:
+            return "annotate_evidence", "A verification queue item was touched and should be surfaced in the run evidence."
+        if direct_match_count > 0:
+            return "annotate_evidence", "The filing matched saved evidence checks without forcing a rebuild."
+        return "none", "No thesis-path update was detected."
+
+    @staticmethod
+    def _projection_timeline_rows(structured: Dict[str, Any], baseline_run: BaselineRunPacket) -> List[Dict[str, Any]]:
+        rows = structured.get("development_timeline")
+        if not isinstance(rows, list):
+            rows = baseline_run.timeline_rows if isinstance(baseline_run.timeline_rows, list) else []
+        out: List[Dict[str, Any]] = []
+        for item in rows[:8]:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or item.get("milestone") or item.get("event") or item.get("label") or "").strip()
+            if not title:
+                continue
+            out.append(
+                {
+                    "title": title,
+                    "timing": str(item.get("timing") or item.get("date") or item.get("period") or "").strip(),
+                    "status": str(item.get("status") or "").strip(),
+                }
+            )
+        return out

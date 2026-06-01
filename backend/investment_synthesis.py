@@ -10,6 +10,8 @@ from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 
 from .market_facts import minimal_market_facts_payload
+from .source_fact_context import build_source_fact_context
+from .timeline_normalization import normalize_timeline_rows as _standardize_timeline_rows
 
 
 RESOURCES_RUBRIC = """
@@ -578,9 +580,21 @@ def _build_stage3_source_fact_guardrails(
     enhanced_context: str,
     *,
     template_id: str,
+    evidence_pack: Optional[Dict[str, Any]] = None,
     max_chars: int = 4500,
 ) -> str:
     """Extract compact primary-source facts that Stage 3 must not contradict."""
+    rendered_fact_packet = build_source_fact_context(
+        evidence_pack,
+        max_source_rows=12,
+        max_excerpt_rows=4,
+        max_sections=8,
+        max_facts_per_section=5,
+        max_chars=max_chars,
+    )
+    if rendered_fact_packet:
+        return rendered_fact_packet
+
     if str(template_id or "").strip() != "energy_oil_gas":
         return ""
 
@@ -727,8 +741,8 @@ CRITICAL REQUIREMENTS:
 10. Preserve dissent and uncertainty. Do not smooth over real disagreements.
 11. Keep the output analytical, concise, and non-promotional.
 12. Use the top-ranked numeric cluster as the default starting point for base-case targets. If you land materially away from that cluster, explain why briefly in <dissenting_views> and <investment_verdict>.
-13. Do not list a field as a data gap when the primary-source fact guardrails already disclose it. For hedging, distinguish "partial hedge coverage with residual commodity exposure" from "unhedged" or "hedging unknown".
-14. Do not set a bull/base trigger below the latest disclosed production baseline. If current production already exceeds a candidate threshold, restate the trigger as an incremental uplift or a higher total production threshold.
+13. Do not list a field as a data gap when the primary-source fact guardrails already disclose it. This applies across sectors: resources/reserves, permits, financing, production, clinical milestones, contracts, ownership, guidance, and other template-specific facts.
+14. Do not set a bull/base trigger below the latest disclosed source baseline. If the latest source packet already satisfies a candidate threshold, restate the trigger as an incremental uplift or a higher threshold.
 
 OUTPUT FORMAT:
 Return plain text only using the following XML tags exactly once each:
@@ -2224,7 +2238,7 @@ def _inject_stage3_audit_context(
         }
 
 
-def _apply_energy_source_fact_guardrails(
+def _apply_source_fact_guardrails(
     structured_data: Dict[str, Any],
     source_fact_guardrails: str,
 ) -> None:
@@ -2240,7 +2254,7 @@ def _apply_energy_source_fact_guardrails(
         metadata = {}
         structured_data["council_metadata"] = metadata
     metadata["source_fact_guardrails"] = {
-        "kind": "energy_oil_gas_primary_source_guardrails",
+        "kind": "primary_source_fact_packet",
         "has_explicit_hedging_facts": "hedging facts present in source packet" in guardrails.lower(),
         "has_explicit_production_baseline": "production baseline facts present in source packet" in guardrails.lower(),
         "excerpt": guardrails[:2500],
@@ -2332,6 +2346,114 @@ def _dedupe_text_list(values: Any, limit: int = 6) -> List[str]:
     return out
 
 
+_THESIS_EMBEDDED_LABEL_PATTERNS: List[Tuple[str, str]] = [
+    ("target_12m", r"(?:target[_\s-]*12m|12m\s+target)"),
+    ("target_24m", r"(?:target[_\s-]*24m|24m\s+target)"),
+    ("probability_24m_pct", r"(?:probability[_\s-]*24m|24m\s+probability|probability)"),
+    ("required_conditions", r"required\s+conditions?"),
+    ("failure_conditions", r"(?:failure|break)\s+conditions?"),
+    ("current_positioning", r"current\s+positioning"),
+    ("why_current_positioning", r"why\s+current\s+positioning"),
+]
+
+
+def _thesis_embedded_label_matches(text: Any) -> List[Tuple[int, int, str]]:
+    source = str(text or "")
+    matches: List[Tuple[int, int, str]] = []
+    for key, pattern in _THESIS_EMBEDDED_LABEL_PATTERNS:
+        for match in re.finditer(rf"(?i)\b{pattern}\b\s*[:=]\s*", source):
+            matches.append((match.start(), match.end(), key))
+    matches.sort(key=lambda row: row[0])
+    deduped: List[Tuple[int, int, str]] = []
+    for row in matches:
+        if deduped and row[0] < deduped[-1][1]:
+            continue
+        deduped.append(row)
+    return deduped
+
+
+def _thesis_text_looks_packed(value: Any) -> bool:
+    text = _strip_list_prefix(value)
+    if not text:
+        return False
+    labels = _thesis_embedded_label_matches(text)
+    if len(labels) >= 2:
+        return True
+    if len(text) > 260 and labels:
+        return True
+    return False
+
+
+def _to_float_from_text(value: Any) -> Optional[float]:
+    direct = _to_float(value)
+    if direct is not None:
+        return direct
+    text = str(value or "")
+    match = re.search(r"-?\d+(?:\.\d+)?", text.replace(",", ""))
+    if not match:
+        return None
+    return _to_float(match.group(0))
+
+
+def _extract_embedded_thesis_fields(value: Any) -> Dict[str, Any]:
+    text = _strip_list_prefix(value)
+    if not text:
+        return {}
+    labels = _thesis_embedded_label_matches(text)
+    if not labels:
+        return {}
+
+    out: Dict[str, Any] = {}
+    summary = text[: labels[0][0]].strip(" .;:-")
+    if summary:
+        out["summary"] = summary
+
+    for idx, (start, end, key) in enumerate(labels):
+        next_start = labels[idx + 1][0] if idx + 1 < len(labels) else len(text)
+        segment = text[end:next_start].strip(" .;:-")
+        if not segment:
+            continue
+        if key in {"target_12m", "target_24m", "probability_24m_pct"}:
+            parsed = _to_float_from_text(segment)
+            if parsed is not None:
+                out[key] = parsed
+            continue
+        if key in {"required_conditions", "failure_conditions"}:
+            out.setdefault(key, []).extend(_split_inline_items(segment))
+            continue
+        if key == "current_positioning":
+            normalized = _normalize_current_positioning_value(segment)
+            out[key] = normalized or segment
+            basis = _derive_positioning_basis(segment)
+            if basis and not out.get("why_current_positioning"):
+                out["why_current_positioning"] = basis
+            continue
+        out[key] = segment
+    return out
+
+
+def _merge_embedded_thesis_fields(
+    *values: Any,
+) -> Dict[str, Any]:
+    merged: Dict[str, Any] = {}
+    for value in values:
+        extracted = _extract_embedded_thesis_fields(value)
+        if not extracted:
+            continue
+        for key, extracted_value in extracted.items():
+            if key in {"required_conditions", "failure_conditions"}:
+                existing = merged.setdefault(key, [])
+                if isinstance(existing, list):
+                    existing.extend(extracted_value if isinstance(extracted_value, list) else [extracted_value])
+                continue
+            if merged.get(key) in (None, "", [], {}):
+                merged[key] = extracted_value
+    for key in ("required_conditions", "failure_conditions"):
+        if isinstance(merged.get(key), list):
+            merged[key] = _dedupe_text_list(merged.get(key), limit=6)
+    return merged
+
+
 def _normalize_current_positioning_value(value: Any) -> str:
     text = str(value or "").strip().lower()
     if not text:
@@ -2408,7 +2530,12 @@ def _positioning_basis_looks_polluted(value: Any) -> bool:
         text,
     ):
         return True
-    if text in {"toward positioning.", "to bull-leaning.", "to base-leaning."}:
+    if text.lower() in {
+        "mixed toward positioning.",
+        "toward positioning.",
+        "to bull-leaning.",
+        "to base-leaning.",
+    }:
         return True
     return False
 
@@ -2465,7 +2592,7 @@ def _normalize_condition_entries(
             condition = _strip_list_prefix(
                 raw.get("condition") or raw.get("text") or raw.get("condition_id") or ""
             )
-            if not condition:
+            if not condition or _thesis_text_looks_packed(condition):
                 continue
             item = dict(raw)
             item["condition"] = condition
@@ -2483,7 +2610,7 @@ def _normalize_condition_entries(
             item.setdefault("current_status", "monitor")
         else:
             condition = _strip_list_prefix(raw)
-            if not condition:
+            if not condition or _thesis_text_looks_packed(condition):
                 continue
             item = _make_condition_item(condition, scenario=scenario, prefix=prefix, idx=idx)
         key = re.sub(r"\W+", "", str(item.get("condition") or "").lower())
@@ -4442,7 +4569,7 @@ def _ensure_structured_fields_for_template(
                             ),
                         }
                     )
-            structured_data["development_timeline"] = normalized_timeline
+            structured_data["development_timeline"] = _standardize_timeline_rows(normalized_timeline)
         else:
             structured_data["development_timeline"] = []
         if not isinstance(structured_data.get("current_development_stage"), str):
@@ -4537,6 +4664,9 @@ def _ensure_structured_fields_for_template(
 
         # Limit retrospective milestones to one reference item; keep focus on forward timeline.
         if isinstance(structured_data.get("development_timeline"), list):
+            structured_data["development_timeline"] = _standardize_timeline_rows(
+                structured_data.get("development_timeline") or []
+            )
             structured_data["development_timeline"] = _cap_previous_timeline_rows(
                 structured_data.get("development_timeline") or [],
                 max_previous=1,
@@ -4646,6 +4776,24 @@ def _ensure_structured_fields_for_template(
                 if isinstance(extracted_thesis_blocks, dict)
                 else {}
             )
+            embedded_sources: List[Any] = [
+                block.get("summary") if isinstance(block, dict) else "",
+                (extracted_block or {}).get("summary") if isinstance(extracted_block, dict) else "",
+                extracted_thesis.get(scenario) if isinstance(extracted_thesis, dict) else "",
+            ]
+            for source_key in ("required_conditions", "failure_conditions"):
+                for source_list in (
+                    block.get(source_key) if isinstance(block, dict) else [],
+                    (extracted_block or {}).get(source_key) if isinstance(extracted_block, dict) else [],
+                ):
+                    if not isinstance(source_list, list):
+                        continue
+                    for raw_item in source_list:
+                        if isinstance(raw_item, dict):
+                            embedded_sources.append(raw_item.get("condition") or raw_item.get("text") or "")
+                        else:
+                            embedded_sources.append(raw_item)
+            embedded_fields = _merge_embedded_thesis_fields(*embedded_sources)
             if isinstance(extracted_block, dict):
                 for key in (
                     "summary",
@@ -4659,10 +4807,14 @@ def _ensure_structured_fields_for_template(
                         block[key] = extracted_block.get(key)
 
             summary = str(block.get("summary") or "").strip()
+            if _thesis_text_looks_packed(summary) and embedded_fields.get("summary"):
+                summary = str(embedded_fields.get("summary") or "").strip()
             if not summary:
                 summary = str((extracted_block or {}).get("summary") or "").strip()
             if not summary:
                 summary = str(extracted_thesis.get(scenario) or "").strip()
+            if _thesis_text_looks_packed(summary) and embedded_fields.get("summary"):
+                summary = str(embedded_fields.get("summary") or "").strip()
             if not summary:
                 driver_fallback = []
                 for horizon in ("24m", "12m"):
@@ -4674,18 +4826,35 @@ def _ensure_structured_fields_for_template(
             block["summary"] = summary
 
             if _to_float(block.get("target_12m")) is None:
-                block["target_12m"] = _to_float((scenario_targets.get("12m") or {}).get(scenario))
+                block["target_12m"] = (
+                    _to_float(embedded_fields.get("target_12m"))
+                    if _to_float(embedded_fields.get("target_12m")) is not None
+                    else _to_float((scenario_targets.get("12m") or {}).get(scenario))
+                )
             if _to_float(block.get("target_24m")) is None:
-                block["target_24m"] = _to_float((scenario_targets.get("24m") or {}).get(scenario))
+                block["target_24m"] = (
+                    _to_float(embedded_fields.get("target_24m"))
+                    if _to_float(embedded_fields.get("target_24m")) is not None
+                    else _to_float((scenario_targets.get("24m") or {}).get(scenario))
+                )
 
             prob_24m = _to_float((scenario_probabilities.get("24m") or {}).get(scenario))
             existing_prob_24m_pct = _to_float(block.get("probability_24m_pct"))
             existing_prob_pct = _to_float(block.get("probability_pct"))
+            embedded_prob_pct = _to_float(embedded_fields.get("probability_24m_pct"))
             if existing_prob_24m_pct is not None and existing_prob_24m_pct <= 1.0:
                 existing_prob_24m_pct = round(existing_prob_24m_pct * 100.0, 2)
                 block["probability_24m_pct"] = existing_prob_24m_pct
             if existing_prob_pct is not None and existing_prob_pct <= 1.0:
                 existing_prob_pct = round(existing_prob_pct * 100.0, 2)
+                block["probability_pct"] = existing_prob_pct
+            if existing_prob_24m_pct is None and embedded_prob_pct is not None:
+                existing_prob_24m_pct = embedded_prob_pct * 100.0 if embedded_prob_pct <= 1.0 else embedded_prob_pct
+                existing_prob_24m_pct = round(existing_prob_24m_pct, 2)
+                block["probability_24m_pct"] = existing_prob_24m_pct
+            if existing_prob_pct is None and embedded_prob_pct is not None:
+                existing_prob_pct = embedded_prob_pct * 100.0 if embedded_prob_pct <= 1.0 else embedded_prob_pct
+                existing_prob_pct = round(existing_prob_pct, 2)
                 block["probability_pct"] = existing_prob_pct
             if existing_prob_24m_pct is None and prob_24m is not None:
                 existing_prob_24m_pct = round(prob_24m * 100.0, 2)
@@ -4709,6 +4878,13 @@ def _ensure_structured_fields_for_template(
                 prefix="required",
                 limit=5,
             )
+            if not required_conditions and embedded_fields.get("required_conditions"):
+                required_conditions = _coerce_condition_list(
+                    embedded_fields.get("required_conditions") or [],
+                    scenario=scenario,
+                    prefix="required",
+                    limit=5,
+                )
             if not required_conditions and isinstance(extracted_block, dict):
                 required_conditions = _coerce_condition_list(
                     extracted_block.get("required_conditions") or [],
@@ -4768,6 +4944,13 @@ def _ensure_structured_fields_for_template(
                 prefix="failure",
                 limit=4,
             )
+            if not failure_conditions and embedded_fields.get("failure_conditions"):
+                failure_conditions = _coerce_condition_list(
+                    embedded_fields.get("failure_conditions") or [],
+                    scenario=scenario,
+                    prefix="failure",
+                    limit=4,
+                )
             if not failure_conditions and isinstance(extracted_block, dict):
                 failure_conditions = _coerce_condition_list(
                     extracted_block.get("failure_conditions") or [],
@@ -4775,7 +4958,14 @@ def _ensure_structured_fields_for_template(
                     prefix="failure",
                     limit=4,
                 )
-            if not failure_conditions and scenario == "bear":
+            if not failure_conditions and extracted_red_flags:
+                failure_conditions = _coerce_condition_list(
+                    extracted_red_flags,
+                    scenario=scenario,
+                    prefix="failure",
+                    limit=4,
+                )
+            if not failure_conditions and verdict.get("failure_conditions"):
                 failure_conditions = _coerce_condition_list(
                     verdict.get("failure_conditions") or [],
                     scenario=scenario,
@@ -4804,6 +4994,14 @@ def _ensure_structured_fields_for_template(
             )
             if normalized_block_positioning:
                 block["current_positioning"] = normalized_block_positioning
+            if embedded_fields.get("current_positioning") and (
+                not block["current_positioning"] or block["current_positioning"] == "mixed"
+            ):
+                embedded_positioning = _normalize_current_positioning_value(
+                    embedded_fields.get("current_positioning")
+                )
+                if embedded_positioning:
+                    block["current_positioning"] = embedded_positioning
             if not block["current_positioning"] and (extracted_block or {}).get(
                 "current_positioning"
             ):
@@ -4819,6 +5017,13 @@ def _ensure_structured_fields_for_template(
             ):
                 block["why_current_positioning"] = str(
                     (extracted_block or {}).get("why_current_positioning") or ""
+                ).strip()
+            if embedded_fields.get("why_current_positioning") and (
+                not block["why_current_positioning"]
+                or _positioning_basis_looks_polluted(block.get("why_current_positioning"))
+            ):
+                block["why_current_positioning"] = str(
+                    embedded_fields.get("why_current_positioning") or ""
                 ).strip()
             if not block["why_current_positioning"] and verdict.get(
                 "why_current_positioning"
@@ -5153,6 +5358,7 @@ async def synthesize_structured_analysis(
     source_fact_guardrails = _build_stage3_source_fact_guardrails(
         enhanced_context,
         template_id=template_id,
+        evidence_pack=evidence_pack,
     )
     reconciliation_context = _stage2_reconciliation_prompt_block(stage2_reconciliation)
     output_style = str(CHAIRMAN_OUTPUT_STYLE or "text_xml").strip().lower()
@@ -5194,7 +5400,7 @@ CHAIRMAN OPERATING RULES:
 7. Use the top-ranked numeric cluster as the default starting point for base-case targets. If you land materially away from it, explain why briefly in dissent-oriented fields.
 8. Do not list a field as a data gap when the primary-source fact guardrails already disclose it.
 9. For hedging, distinguish partial hedge coverage with residual commodity exposure from "unhedged" or "hedging unknown".
-10. Do not set a bull/base trigger below the latest disclosed production baseline. If current production already exceeds a candidate threshold, restate the trigger as an incremental uplift or a higher total production threshold.
+10. Do not set a bull/base trigger below the latest disclosed source baseline. If the latest source packet already satisfies a candidate threshold, restate the trigger as an incremental uplift or a higher threshold.
 
 CRITICAL REQUIREMENTS:
 1. Use the council responses as the primary evidence source and weight higher-ranked responses more heavily, except where the Stage 2.5 discrepancy review identifies a source-evidence contradiction or topic-specific override.
@@ -5357,10 +5563,14 @@ Begin your JSON output now:"""
                 structured_data["company"] = resolved_company_name
             structured_data["council_metadata"]["resolved_company_name"] = resolved_company_name
 
-        # Add top-ranked models
-        from .council import calculate_aggregate_rankings
+        # Add full Stage 2 ranking telemetry.
+        from .council import calculate_aggregate_rankings, compact_stage2_rankings_for_telemetry
         aggregate = calculate_aggregate_rankings(stage2_results, label_to_model)
         if aggregate:
+            structured_data["council_metadata"]["stage2_aggregate_rankings"] = aggregate
+            structured_data["council_metadata"]["stage2_judge_rankings"] = (
+                compact_stage2_rankings_for_telemetry(stage2_results, label_to_model)
+            )
             structured_data["council_metadata"]["top_ranked_models"] = [
                 f"{r['model']} (avg rank: {r['average_rank']:.2f})"
                 for r in aggregate[:3]
@@ -5388,7 +5598,7 @@ Begin your JSON output now:"""
             template_id,
             chairman_text=response_text,
         )
-        _apply_energy_source_fact_guardrails(structured_data, source_fact_guardrails)
+        _apply_source_fact_guardrails(structured_data, source_fact_guardrails)
         _inject_stage3_audit_context(structured_data, market_facts, template_contract)
         structured_data["council_metadata"]["normalization"] = normalization_meta
         structured_data["template_id"] = str(template_contract.get("id", "") or template_id or "")
