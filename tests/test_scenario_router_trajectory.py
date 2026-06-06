@@ -1,8 +1,10 @@
 import unittest
 
+from backend.main import _build_integration_packet
 from backend.scenario_router.action_judge import ActionJudge
 from backend.scenario_router.announcement_interpreter import AnnouncementInterpreter
 from backend.scenario_router.models import AnnouncementFacts, BaselineRunPacket, EvidenceRef
+from backend.scenario_router.run_selector import LatestRunSelector
 from backend.scenario_router.thesis_comparator import ThesisComparator
 
 
@@ -169,6 +171,73 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         self.assertEqual(projection["target_24m"]["bull"], 2.4)
         self.assertAlmostEqual(projection["prob_weighted_target_24m"], 1.63)
         self.assertEqual(projection["timeline_rows"][0]["title"], "PFS delivery")
+
+    def test_projection_preserves_target_period_and_imports_catalysts(self):
+        run = baseline(leaning="base")
+        run.timeline_rows = [
+            {"milestone": "DFS Targeted Completion", "target_period": "Q2 2026", "status": "planned"}
+        ]
+        run.catalyst_rows = [
+            {"title": "Projected First Commercial Production", "target_period": "2028", "status": "planned"}
+        ]
+
+        rows = ThesisComparator._projection_timeline_rows({}, run)
+
+        self.assertEqual(rows[0]["title"], "DFS Targeted Completion")
+        self.assertEqual(rows[0]["timing"], "Q2 2026")
+        self.assertEqual(rows[0]["target_period"], "Q2 2026")
+        self.assertEqual(rows[1]["title"], "Projected First Commercial Production")
+        self.assertEqual(rows[1]["timing"], "2028")
+        self.assertEqual(rows[1]["source"], "next_major_catalysts")
+
+    def test_projection_falls_back_to_lab_payload_catalysts(self):
+        run = baseline(leaning="base")
+        structured = run.lab_payload["structured_data"]
+        structured["extended_analysis"]["next_major_catalysts"] = ["Q4 2026: Target Final Investment Decision"]
+
+        rows = ThesisComparator._projection_timeline_rows(structured, run)
+
+        self.assertEqual(rows[0]["title"], "Target Final Investment Decision")
+        self.assertEqual(rows[0]["timing"], "Q4 2026")
+
+    def test_latest_run_selector_carries_council_timeline_and_catalysts(self):
+        packet = {
+            "run_id": "quality_job_asx_vmm.json",
+            "summary_fields": {"ticker": "ASX:VMM"},
+            "lab_payload": {},
+            "timeline_rows": [
+                {"milestone": "Preliminary Licence Granted", "target_period": "Q4 2025", "status": "planned"}
+            ],
+            "catalyst_rows": [
+                {"title": "Target Final Investment Decision", "target_period": "2H 2026", "status": "planned"}
+            ],
+        }
+
+        run = LatestRunSelector()._coerce_report_packet(packet)
+
+        self.assertEqual(run.timeline_rows[0]["target_period"], "Q4 2025")
+        self.assertEqual(run.catalyst_rows[0]["target_period"], "2H 2026")
+
+    def test_integration_packet_exports_timeline_and_catalysts(self):
+        packet = _build_integration_packet(
+            run_id="quality_job_asx_vmm.json",
+            run_payload={
+                "structured_data": {
+                    "ticker": "ASX:VMM",
+                    "development_timeline": [
+                        {"milestone": "Preliminary Licence Granted", "target_period": "Q4 2025", "status": "planned"}
+                    ],
+                    "extended_analysis": {
+                        "next_major_catalysts": [
+                            {"title": "Target Final Investment Decision", "target_period": "2H 2026", "status": "planned"}
+                        ]
+                    },
+                }
+            },
+        )
+
+        self.assertEqual(packet["timeline_rows"][0]["target_period"], "Q4 2025")
+        self.assertEqual(packet["catalyst_rows"][0]["target_period"], "2H 2026")
 
     def test_verification_queue_is_checked_as_router_evidence(self):
         announcement = facts(

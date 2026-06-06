@@ -4578,6 +4578,24 @@ def _normalize_prompt_coverage_text(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).strip()
 
 
+_PROMPT_UNICODE_ESCAPE_RE = re.compile(
+    r"\\u([0-9a-fA-F]{4})|\\U([0-9a-fA-F]{8})"
+)
+
+
+def _decode_prompt_unicode_escapes(text: str) -> str:
+    """Decode JSON-style unicode escapes for prompt coverage checks only."""
+
+    def _replace(match: re.Match[str]) -> str:
+        codepoint = match.group(1) or match.group(2)
+        try:
+            return chr(int(codepoint, 16))
+        except (TypeError, ValueError):
+            return match.group(0)
+
+    return _PROMPT_UNICODE_ESCAPE_RE.sub(_replace, str(text or ""))
+
+
 def _validate_stage1_prompt_mandatory_fact_coverage(
     prompt: str,
     ledger: Dict[str, Any],
@@ -4591,7 +4609,13 @@ def _validate_stage1_prompt_mandatory_fact_coverage(
     if not facts:
         return {"passed": True, "mandatory_fact_count": 0, "missing_fact_ids": []}
 
-    prompt_text = str(prompt or "")
+    raw_prompt_text = str(prompt or "")
+    decoded_prompt_text = _decode_prompt_unicode_escapes(raw_prompt_text)
+    prompt_text = (
+        raw_prompt_text
+        if decoded_prompt_text == raw_prompt_text
+        else f"{raw_prompt_text}\n{decoded_prompt_text}"
+    )
     normalized_prompt = _normalize_prompt_coverage_text(prompt_text)
     prompt_numbers = {
         re.sub(r"[,\s]", "", item).lower()
@@ -4615,7 +4639,7 @@ def _validate_stage1_prompt_mandatory_fact_coverage(
     }
     missing: List[Dict[str, Any]] = []
     for row in facts:
-        fact = str(row.get("fact", "")).strip()
+        fact = _decode_prompt_unicode_escapes(str(row.get("fact", ""))).strip()
         if not fact:
             continue
         covered = fact in prompt_text
@@ -6912,7 +6936,7 @@ async def _run_stage1_second_pass_analysis(
     )
     mandatory_fact_ledger_json = json.dumps(
         mandatory_fact_ledger,
-        ensure_ascii=True,
+        ensure_ascii=False,
         separators=(",", ":"),
     )
     timeline_digest_block = _build_stage1_timeline_digest_block(timeline_rows)

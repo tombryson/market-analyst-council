@@ -2634,6 +2634,47 @@ def _normalize_timeline_rows_for_api(raw_timeline: Any) -> List[Dict[str, Any]]:
     return _cap_previous_timeline_rows(out, max_previous=1)
 
 
+def _normalize_catalyst_rows_for_api(raw_catalysts: Any) -> List[Dict[str, Any]]:
+    rows = _cap_previous_catalyst_rows(raw_catalysts if isinstance(raw_catalysts, list) else [], max_previous=1)
+    out: List[Dict[str, Any]] = []
+    for item in rows:
+        if isinstance(item, dict):
+            title = str(
+                item.get("title")
+                or item.get("name")
+                or item.get("milestone")
+                or item.get("catalyst")
+                or item.get("event")
+                or ""
+            ).strip()
+            target_period = str(
+                item.get("target_period")
+                or item.get("targetPeriod")
+                or item.get("period")
+                or item.get("when")
+                or item.get("date")
+                or ""
+            ).strip()
+            status = str(item.get("status") or item.get("current_status") or item.get("state") or "").strip()
+        elif isinstance(item, str):
+            title = item.strip()
+            target_period = _extract_period_from_text(title)
+            status = ""
+        else:
+            continue
+
+        if not title:
+            continue
+        out.append(
+            {
+                "title": title,
+                "target_period": target_period,
+                "status": status,
+            }
+        )
+    return out[:8]
+
+
 def _timeline_period_to_quarter_index(period: Any) -> Optional[int]:
     text = str(period or "").strip().upper()
     if not text:
@@ -3368,6 +3409,8 @@ def _build_integration_packet(
         else {}
     )
     timeline_rows = _normalize_timeline_rows_for_api(structured.get("development_timeline"))
+    extended_analysis = structured.get("extended_analysis") if isinstance(structured.get("extended_analysis"), dict) else {}
+    catalyst_rows = _normalize_catalyst_rows_for_api(extended_analysis.get("next_major_catalysts"))
     summary_fields = _build_summary_fields(structured, freshness)
     summary_fields.update(
         {
@@ -3395,6 +3438,7 @@ def _build_integration_packet(
             "chairman_memo_markdown": run_payload.get("chairman_memo_markdown") or "",
         },
         "timeline_rows": timeline_rows,
+        "catalyst_rows": catalyst_rows,
         "scenario_router": scenario_router,
         "memos": {
             "analyst_memo_markdown": run_payload.get("analyst_memo_markdown") or "",

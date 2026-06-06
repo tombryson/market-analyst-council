@@ -175,6 +175,10 @@ def build_mock_baseline_run(case: Dict[str, Any]) -> BaselineRunPacket:
         if isinstance(case.get("development_timeline"), list)
         else structured.get("development_timeline") if isinstance(structured.get("development_timeline"), list) else []
     )
+    extended_analysis = structured.get("extended_analysis") if isinstance(structured.get("extended_analysis"), dict) else {}
+    catalyst_rows = case.get("catalyst_rows") if isinstance(case.get("catalyst_rows"), list) else []
+    if not catalyst_rows and isinstance(extended_analysis.get("next_major_catalysts"), list):
+        catalyst_rows = extended_analysis.get("next_major_catalysts") or []
     summary_fields = case.get("summary_fields") if isinstance(case.get("summary_fields"), dict) else {}
     summary_fields = {
         **summary_fields,
@@ -190,7 +194,8 @@ def build_mock_baseline_run(case: Dict[str, Any]) -> BaselineRunPacket:
                     "leaning": baseline_path,
                     "status": str(case.get("baseline_status") or "on-track").strip(),
                     "basis": str(case.get("baseline_basis") or "Mock baseline state.").strip(),
-                }
+                },
+                "next_major_catalysts": catalyst_rows,
             },
             "thesis_map": thesis_map,
             "monitoring_watchlist": watchlist,
@@ -211,6 +216,7 @@ def build_mock_baseline_run(case: Dict[str, Any]) -> BaselineRunPacket:
         summary_fields=summary_fields,
         lab_payload=lab_payload,
         timeline_rows=development_timeline,
+        catalyst_rows=catalyst_rows,
     )
 
 

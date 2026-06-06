@@ -57,6 +57,7 @@ class LatestRunSelector:
             summary_fields=dict(summary_fields),
             lab_payload=dict(lab_payload),
             timeline_rows=list(packet.get("timeline_rows") or []),
+            catalyst_rows=list(packet.get("catalyst_rows") or []),
             memos=dict(packet.get("memos") or {}),
         )
 

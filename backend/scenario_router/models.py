@@ -182,6 +182,7 @@ class BaselineRunPacket:
     summary_fields: Dict[str, Any] = field(default_factory=dict)
     lab_payload: Dict[str, Any] = field(default_factory=dict)
     timeline_rows: List[Dict[str, Any]] = field(default_factory=list)
+    catalyst_rows: List[Any] = field(default_factory=list)
     memos: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:

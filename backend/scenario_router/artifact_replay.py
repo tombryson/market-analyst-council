@@ -93,5 +93,6 @@ def _coerce_baseline(payload: Dict[str, Any]) -> BaselineRunPacket:
         summary_fields=payload.get("summary_fields") if isinstance(payload.get("summary_fields"), dict) else {},
         lab_payload=payload.get("lab_payload") if isinstance(payload.get("lab_payload"), dict) else {},
         timeline_rows=payload.get("timeline_rows") if isinstance(payload.get("timeline_rows"), list) else [],
+        catalyst_rows=payload.get("catalyst_rows") if isinstance(payload.get("catalyst_rows"), list) else [],
         memos=payload.get("memos") if isinstance(payload.get("memos"), dict) else {},
     )

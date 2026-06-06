@@ -1788,6 +1788,26 @@ def _dump_json_atomic(path: Path, payload: Dict[str, Any]) -> None:
     tmp_path.replace(path)
 
 
+def _write_failure_artifact(
+    dump_json_path: Optional[str],
+    *,
+    failure_stage: str,
+    failure_reason: str,
+    payload: Dict[str, Any],
+) -> Optional[Path]:
+    """Write a canonical failed run artifact before surfacing a hard error."""
+    if not dump_json_path:
+        return None
+    artifact = dict(payload)
+    artifact["status"] = "failed"
+    artifact["failure_stage"] = failure_stage
+    artifact["failure_reason"] = failure_reason
+    path = Path(dump_json_path).expanduser().resolve()
+    _dump_json_atomic(path, artifact)
+    print(f"\nSaved failed JSON output to: {path}")
+    return path
+
+
 def _write_stage_checkpoint(
     *,
     dump_json_path: Optional[str],
@@ -2320,8 +2340,24 @@ async def _run(args: argparse.Namespace) -> None:
         print(f"Saved checkpoint to: {stage1_checkpoint}")
 
     if not stage1_results:
-        print("\nNo Stage 1 responses generated. Stopping.")
-        return
+        failure_path = _write_failure_artifact(
+            args.dump_json,
+            failure_stage="stage1",
+            failure_reason="no_stage1_responses_generated",
+            payload={
+                "effective_query": effective_query,
+                "stage1_query_sent": stage1_effective_query,
+                "input_audit": checkpoint_input_audit,
+                "stage1_results": stage1_results,
+                "stage1_model_audit": stage1_model_audit,
+                "stage2_results": [],
+                "stage3_result": {},
+                "metadata": metadata,
+                "selection": selection,
+            },
+        )
+        suffix = f"; wrote failure artifact to {failure_path}" if failure_path else ""
+        raise RuntimeError(f"No Stage 1 responses generated{suffix}")
 
     if args.stage1_only:
         if args.dump_json:
@@ -2362,8 +2398,26 @@ async def _run(args: argparse.Namespace) -> None:
         if excluded_names:
             print("Excluded from Stage 2/3: " + ", ".join(excluded_names))
     if not stage1_results_for_council:
-        print("\nNo Stage 1 responses passed the audit gate. Stopping before council ranking.")
-        return
+        failure_path = _write_failure_artifact(
+            args.dump_json,
+            failure_stage="stage1_audit_gate",
+            failure_reason="no_stage1_responses_passed_audit_gate",
+            payload={
+                "effective_query": effective_query,
+                "stage1_query_sent": stage1_effective_query,
+                "input_audit": checkpoint_input_audit,
+                "stage1_results": stage1_results,
+                "stage1_results_for_council": stage1_results_for_council,
+                "stage1_model_audit": stage1_model_audit,
+                "stage1_audit_gate_summary": stage1_audit_gate_summary,
+                "stage2_results": [],
+                "stage3_result": {},
+                "metadata": metadata,
+                "selection": selection,
+            },
+        )
+        suffix = f"; wrote failure artifact to {failure_path}" if failure_path else ""
+        raise RuntimeError(f"No Stage 1 responses passed the audit gate{suffix}")
 
     search_results = metadata.get("aggregated_search_results", {})
     stage1_source_evidence_pack = _build_stage1_source_evidence_pack(

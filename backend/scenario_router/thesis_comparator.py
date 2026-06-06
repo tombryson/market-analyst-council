@@ -1229,18 +1229,91 @@ class ThesisComparator:
         rows = structured.get("development_timeline")
         if not isinstance(rows, list):
             rows = baseline_run.timeline_rows if isinstance(baseline_run.timeline_rows, list) else []
+        catalyst_rows = baseline_run.catalyst_rows if isinstance(baseline_run.catalyst_rows, list) else []
+        if not catalyst_rows:
+            extended = structured.get("extended_analysis") if isinstance(structured.get("extended_analysis"), dict) else {}
+            raw_catalysts = extended.get("next_major_catalysts") if isinstance(extended, dict) else []
+            catalyst_rows = raw_catalysts if isinstance(raw_catalysts, list) else []
+
         out: List[Dict[str, Any]] = []
-        for item in rows[:8]:
-            if not isinstance(item, dict):
-                continue
-            title = str(item.get("title") or item.get("milestone") or item.get("event") or item.get("label") or "").strip()
-            if not title:
-                continue
-            out.append(
-                {
-                    "title": title,
-                    "timing": str(item.get("timing") or item.get("date") or item.get("period") or "").strip(),
-                    "status": str(item.get("status") or "").strip(),
-                }
-            )
+        seen: Set[Tuple[str, str]] = set()
+        for source, source_rows in (("development_timeline", rows), ("next_major_catalysts", catalyst_rows)):
+            for item in source_rows:
+                row = ThesisComparator._projection_row_from_item(item, source=source)
+                if not row:
+                    continue
+                key = (row["title"].lower(), str(row.get("target_period") or "").lower())
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(row)
+                if len(out) >= 8:
+                    return out
         return out
+
+    @staticmethod
+    def _projection_row_from_item(item: Any, *, source: str) -> Optional[Dict[str, Any]]:
+        if isinstance(item, dict):
+            title = str(
+                item.get("title")
+                or item.get("milestone")
+                or item.get("event")
+                or item.get("label")
+                or item.get("name")
+                or item.get("catalyst")
+                or ""
+            ).strip()
+            timing = str(
+                item.get("target_period")
+                or item.get("targetPeriod")
+                or item.get("timing")
+                or item.get("date")
+                or item.get("period")
+                or item.get("when")
+                or ""
+            ).strip()
+            status = str(item.get("status") or item.get("current_status") or item.get("state") or "").strip()
+            primary_risk = str(item.get("primary_risk") or item.get("risk") or "").strip()
+        elif isinstance(item, str):
+            title = item.strip()
+            timing = ThesisComparator._period_from_text(title)
+            status = ""
+            primary_risk = ""
+        else:
+            return None
+
+        if not title:
+            return None
+        timing = str(timing or "").strip()
+        title = ThesisComparator._strip_leading_period(title, timing)
+        row: Dict[str, Any] = {
+            "title": title,
+            "timing": timing,
+            "target_period": timing,
+            "status": status,
+            "source": source,
+        }
+        if primary_risk:
+            row["primary_risk"] = primary_risk
+        return row
+
+    @staticmethod
+    def _period_from_text(text: str) -> str:
+        match = re.search(
+            r"\b(Q[1-4](?:\s*[-/]\s*Q[1-4])?\s*20\d{2}|(?:H[12]|[12]H)\s*20\d{2}|[A-Z][a-z]{2,8}\s+20\d{2}|20\d{2})\b",
+            str(text or ""),
+            flags=re.IGNORECASE,
+        )
+        return str(match.group(1) or "").strip() if match else ""
+
+    @staticmethod
+    def _strip_leading_period(text: str, period: str) -> str:
+        if not period:
+            return str(text or "").strip()
+        cleaned = re.sub(
+            rf"^\s*{re.escape(period)}\s*[:\-–—]\s*",
+            "",
+            str(text or "").strip(),
+            flags=re.IGNORECASE,
+        ).strip()
+        return cleaned or str(text or "").strip()
