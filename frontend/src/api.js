@@ -365,6 +365,23 @@ export const api = {
     return this.getAnnouncementRouterEvaluations();
   },
 
+  async updateAnnouncementRouterReview(eventId, payload = {}) {
+    const { response, body } = await fetchJsonWithRetry(
+      `${API_BASE}/api/announcement-router/reviews/${encodeURIComponent(eventId)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload || {}),
+      },
+      { retries: 1, timeoutMs: 20000 }
+    );
+    if (!response.ok) {
+      const detail = errorDetailFromPayload(body);
+      throw new Error(detail ? `Failed to update router review: ${detail}` : 'Failed to update router review');
+    }
+    return body;
+  },
+
   /**
    * Run (or fetch cached) delta-check for one run.
    */

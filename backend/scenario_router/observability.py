@@ -7,9 +7,14 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .artifact_replay import replay_comparison_from_artifact
-from .display_contract import market_only_watch_projection, should_project_market_only_watch
+from .display_contract import (
+    build_router_display_contract,
+    market_only_watch_projection,
+    should_project_market_only_watch,
+)
 from .lab_scribe import SCENARIO_ROUTER_EVENTS_DIR
 from .mock_harness import run_mock_router_case
+from .review_store import apply_review_overlay, load_review
 
 EVALUATION_CASES_PATH = Path(__file__).with_name("evaluation_cases.json")
 
@@ -29,6 +34,7 @@ class ScenarioRouterObservability:
             row = self._summarize_event_payload(payload, path=path)
             if self._is_skipped_status(row.get("status")):
                 continue
+            row = apply_review_overlay(row, load_review(str(row.get("event_id") or "")))
             if wanted and str(row.get("ticker") or "").strip().upper() != wanted:
                 continue
             rows.append(row)
@@ -182,6 +188,25 @@ class ScenarioRouterObservability:
             current_path=raw_current_path,
             raw_impact=str(report.get("impact_level") or "").strip(),
         ) if suppress_stale_market_only_reroute else {}
+        display_action = str(display_projection.get("action") or raw_action).strip()
+        display_report = {
+            **report,
+            "trajectory_state": str(display_projection.get("trajectory_state") or report.get("trajectory_state") or "").strip(),
+            "impact_level": str(display_projection.get("impact_level") or report.get("impact_level") or "").strip(),
+            "status": str(payload.get("status") or "ok").strip() or "ok",
+        }
+        display_decision = {
+            **action,
+            "action": display_action,
+            "reason": str(display_projection.get("reason") or action.get("reason") or "").strip(),
+        }
+        display_contract = build_router_display_contract(
+            display_report,
+            display_decision,
+            matched_conditions_count=matched_conditions,
+            triggered_watchlist_count=triggered_watchlist,
+            triggered_verification_count=triggered_verification,
+        )
 
         return {
             "status": str(payload.get("status") or "ok").strip() or "ok",
@@ -191,7 +216,7 @@ class ScenarioRouterObservability:
             "company_name": str(packet.get("company_name") or "").strip(),
             "saved_at_utc": str(payload.get("saved_at_utc") or "").strip(),
             "received_at_utc": str(event.get("received_at_utc") or "").strip(),
-            "action": str(display_projection.get("action") or raw_action).strip(),
+            "action": display_action,
             "impact_level": str(display_projection.get("impact_level") or report.get("impact_level") or "").strip(),
             "announcement_class": str(report.get("announcement_class") or facts.get("announcement_class") or "").strip(),
             "materiality": str(report.get("materiality") or facts.get("materiality") or "").strip(),
@@ -291,6 +316,7 @@ class ScenarioRouterObservability:
             "thesis_effect": str(display_projection.get("thesis_effect") or report.get("thesis_effect") or "").strip(),
             "run_validity": str(display_projection.get("run_validity") or report.get("run_validity") or "").strip(),
             "display_adjustment": str(display_projection.get("display_adjustment") or "").strip(),
+            "display": display_contract,
             "market_facts_used": report.get("market_facts_used") if isinstance(report.get("market_facts_used"), dict) else {},
             "error_reason": str(((payload.get("error") or {}) if isinstance(payload.get("error"), dict) else {}).get("reason") or "").strip(),
             "processing_trace": trace,

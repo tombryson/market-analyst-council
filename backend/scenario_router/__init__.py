@@ -3,6 +3,13 @@
 from .action_judge import ActionJudge
 from .announcement_interpreter import AnnouncementInterpreter
 from .document_reader import DocumentReader
+from .display_contract import build_router_display_contract
+from .fixture_suite import (
+    ScenarioRouterFixtureError,
+    compile_router_fixture_suite,
+    load_router_fixture_suite,
+    run_router_fixture_suite,
+)
 from .inbox_sentinel import InboxSentinel
 from .lab_scribe import LabScribe
 from .market_facts_resolver import ScenarioMarketFactsResolver
@@ -46,6 +53,8 @@ __all__ = [
     "ConditionEvaluation",
     "DocumentReader",
     "EvidenceRef",
+    "build_router_display_contract",
+    "ScenarioRouterFixtureError",
     "ScenarioRouterDecision",
     "StageTrace",
     "InboxSentinel",
@@ -61,4 +70,7 @@ __all__ = [
     "ScenarioRouterService",
     "SourceResolver",
     "ThesisComparator",
+    "compile_router_fixture_suite",
+    "load_router_fixture_suite",
+    "run_router_fixture_suite",
 ]

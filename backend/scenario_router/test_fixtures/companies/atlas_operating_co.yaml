@@ -1,0 +1,170 @@
+company:
+  id: atlas_operating_co
+  ticker: TEST:ATLAS
+  name: Atlas Operating Co
+  template_id: general_equity
+  sector: Industrials
+  industry: Field services software and regulated operations
+
+current_thesis:
+  path: base
+  status: on-track
+  basis: >
+    Base case assumes regulatory approval arrives around Q3 2026, the anchor
+    customer renews on ordinary terms, financing remains available, and the
+    new platform launch proceeds without changing FY2027 guidance.
+
+market_data:
+  current_price: 1.0
+  currency: AUD
+
+price_targets:
+  current_price: 1.0
+  scenario_targets:
+    12m:
+      bear: 0.72
+      base: 1.12
+      bull: 1.55
+    24m:
+      bear: 0.62
+      base: 1.35
+      bull: 2.05
+  scenario_probabilities:
+    24m:
+      bear: 20
+      base: 55
+      bull: 25
+
+timeline:
+  - milestone: Zone A regulatory approval
+    target_period: Q3 2026
+    status: planned
+  - milestone: Anchor customer renewal
+    target_period: Q4 2026
+    status: planned
+  - milestone: Debt facility renewal
+    target_period: Q4 2026
+    status: planned
+  - milestone: AtlasOne platform launch
+    target_period: H1 2027
+    status: planned
+
+catalysts:
+  - id: zone_a_regulatory_approval
+    title: Zone A regulatory approval
+    target_period: Q3 2026
+    driver: regulatory_legal
+    status: planned
+    bull:
+      required:
+        - id: bull_zone_a_approval_ahead
+          condition: Regulator grants Zone A approval ahead of schedule
+          evidence_hooks:
+            - regulator granted Zone A approval ahead of schedule
+            - approval notice published by regulator
+    base:
+      required:
+        - id: base_zone_a_approval_pending
+          condition: Zone A approval remains under review with no schedule change
+          evidence_hooks:
+            - Zone A approval remains under review with no schedule change
+    bear:
+      required:
+        - id: bear_zone_a_approval_delayed
+          condition: Zone A approval delayed beyond Q4 2026 or rejected
+          evidence_hooks:
+            - Zone A approval delayed beyond Q4 2026
+            - regulator rejected Zone A approval
+
+  - id: anchor_customer_renewal
+    title: Anchor customer renewal
+    target_period: Q4 2026
+    driver: commercial_customer
+    status: planned
+    bull:
+      required:
+        - id: bull_anchor_customer_expands
+          condition: Anchor customer renews and expands contract value
+          evidence_hooks:
+            - anchor customer renewed and expanded contract value
+    base:
+      required:
+        - id: base_anchor_customer_ordinary_renewal
+          condition: Anchor customer renews on ordinary terms
+          evidence_hooks:
+            - anchor customer renewed on ordinary terms
+    bear:
+      required:
+        - id: bear_anchor_customer_terminated
+          condition: Anchor customer contract terminated or materially reduced
+          evidence_hooks:
+            - anchor customer contract terminated
+            - anchor customer materially reduced contract scope
+
+  - id: debt_facility_renewal
+    title: Debt facility renewal
+    target_period: Q4 2026
+    driver: capital_financing
+    status: planned
+    bull:
+      required:
+        - id: bull_facility_secured_early
+          condition: Debt facility secured early with expanded headroom
+          evidence_hooks:
+            - debt facility secured early with expanded headroom
+    base:
+      required:
+        - id: base_facility_available
+          condition: Debt facility remains available on existing terms
+          evidence_hooks:
+            - debt facility remains available on existing terms
+    bear:
+      required:
+        - id: bear_facility_withdrawn
+          condition: Lenders withdraw facility or impose liquidity restrictions
+          evidence_hooks:
+            - lenders withdrew the debt facility
+            - liquidity restrictions imposed by lenders
+
+  - id: atlasone_platform_launch
+    title: AtlasOne platform launch
+    target_period: H1 2027
+    driver: product_technology
+    status: planned
+    bull:
+      required:
+        - id: bull_platform_launch_accelerated
+          condition: AtlasOne platform launches ahead of schedule with customer adoption
+          evidence_hooks:
+            - AtlasOne platform launched ahead of schedule with customer adoption
+    base:
+      required:
+        - id: base_platform_launch_on_track
+          condition: AtlasOne platform launch remains on track
+          evidence_hooks:
+            - AtlasOne platform launch remains on track
+    bear:
+      required:
+        - id: bear_platform_launch_delayed
+          condition: AtlasOne platform launch delayed by at least two quarters
+          evidence_hooks:
+            - AtlasOne platform launch delayed by at least two quarters
+
+watchlist:
+  red_flags:
+    - watch_id: watch_anchor_customer_termination
+      condition: Anchor customer contract terminated
+      evidence_hooks:
+        - anchor customer contract terminated
+  confirmatory_signals:
+    - watch_id: watch_retention_above_95
+      condition: Recurring revenue retention remains above 95 percent
+      evidence_hooks:
+        - recurring revenue retention remains above 95 percent
+
+verification_queue:
+  - verification_id: verify_zone_a_approval_source
+    field: Regulatory approval source document
+    reason: Approval claims should be tied to the regulator notice or official filing.
+    evidence_hooks:
+      - approval notice published by regulator

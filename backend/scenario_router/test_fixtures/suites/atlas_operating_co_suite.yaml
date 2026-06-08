@@ -1,0 +1,259 @@
+id: atlas_operating_co_suite
+description: >
+  Backwards-designed scenario-router suite for a general operating company.
+  The saved company thesis defines catalysts first; announcements are generated
+  afterwards to tick bull, bear, base, administrative, and unmapped paths.
+company_fixture: atlas_operating_co.yaml
+
+announcements:
+  - id: bull_regulatory_approval_ahead
+    label: Approval ahead of schedule should move Base to Bull
+    title: Regulator Grants Zone A Approval Ahead Of Schedule
+    summary: Atlas confirms the regulator granted Zone A approval ahead of schedule.
+    body_text: >
+      Atlas Operating Co confirms the regulator granted Zone A approval ahead of
+      schedule. The company said the approval notice published by regulator
+      unlocks the next phase of field deployment and reduces execution risk.
+    extracted_facts:
+      - regulator granted Zone A approval ahead of schedule
+      - approval notice published by regulator
+    evidence_quotes:
+      - regulator granted Zone A approval ahead of schedule
+      - approval notice published by regulator
+    expected:
+      current_path: bull
+      trajectory_state: timeline_accelerated
+      action: rerun_stage1
+      impact_level: medium
+      user_bucket: needs_review
+      matched_condition_ids:
+        - bull_zone_a_approval_ahead
+      triggered_verification_ids:
+        - verify_zone_a_approval_source
+      condition_statuses:
+        bull_zone_a_approval_ahead: matched
+        base_zone_a_approval_pending: not_matched
+        bear_zone_a_approval_delayed: not_matched
+
+  - id: bear_regulatory_delay
+    label: Approval delay should move Base to Bear
+    title: Zone A Approval Timeline Extended
+    summary: Atlas says Zone A approval has been delayed beyond Q4 2026.
+    body_text: >
+      Atlas Operating Co confirms Zone A approval delayed beyond Q4 2026 after
+      the regulator requested additional consultation. Management said the
+      delay pushes the deployment schedule out by at least two quarters.
+    extracted_facts:
+      - Zone A approval delayed beyond Q4 2026
+      - The delay pushes the deployment schedule out by at least two quarters
+    evidence_quotes:
+      - Zone A approval delayed beyond Q4 2026
+    expected:
+      current_path: bear
+      trajectory_state: thesis_weakened
+      action: full_rerun
+      impact_level: high
+      user_bucket: needs_review
+      matched_condition_ids:
+        - bear_zone_a_approval_delayed
+      condition_statuses:
+        bull_zone_a_approval_ahead: not_matched
+        bear_zone_a_approval_delayed: matched
+
+  - id: base_regulatory_pending
+    label: Approval pending with no schedule change should stay Base
+    title: Zone A Approval Review Continues
+    summary: Atlas says Zone A approval remains under review with no schedule change.
+    body_text: >
+      Atlas Operating Co says Zone A approval remains under review with no
+      schedule change. Management confirmed the approval timetable remains
+      aligned with the Q3 2026 base-case milestone.
+    extracted_facts:
+      - Zone A approval remains under review with no schedule change
+      - The approval timetable remains aligned with the Q3 2026 base-case milestone
+    evidence_quotes:
+      - Zone A approval remains under review with no schedule change
+    expected:
+      current_path: base
+      trajectory_state: no_thesis_change
+      action: run_delta_only
+      impact_level: medium
+      user_bucket: no_thesis_change
+      matched_condition_ids:
+        - base_zone_a_approval_pending
+      condition_statuses:
+        base_zone_a_approval_pending: matched
+        bull_zone_a_approval_ahead: not_matched
+        bear_zone_a_approval_delayed: not_matched
+
+  - id: administrative_appendix
+    label: Administrative filing should be recorded but ignored
+    title: Appendix 2A - Application For Quotation Of Securities
+    summary: Atlas lodged a routine application for quotation of securities.
+    body_text: >
+      Atlas Operating Co lodged an Appendix 2A application for quotation of
+      securities. No operating, customer, financing, product, guidance, or
+      regulatory milestone update was provided.
+    extracted_facts:
+      - Routine application for quotation of securities
+    evidence_quotes:
+      - Routine application for quotation of securities
+    expected:
+      announcement_class: administrative
+      current_path: base
+      trajectory_state: administrative_filing
+      action: ignore
+      impact_level: none
+      user_bucket: administrative
+
+  - id: material_unmapped_acquisition
+    label: Material acquisition outside saved thesis map should flag a map gap
+    title: Atlas Acquires Regional Dispatch Network
+    summary: Atlas acquired a regional dispatch network not covered by the saved thesis map.
+    body_text: >
+      Atlas Operating Co signed a binding acquisition agreement for a regional
+      dispatch network. The transaction adds new customer routes and operating
+      sites but is not tied to Zone A approval, the anchor customer renewal, the
+      debt facility, or the AtlasOne platform launch.
+    extracted_facts:
+      - Atlas signed a binding acquisition agreement for a regional dispatch network
+      - The acquisition adds new customer routes and operating sites
+    evidence_quotes:
+      - Atlas signed a binding acquisition agreement for a regional dispatch network
+    expected:
+      announcement_class: strategy_mna
+      current_path: base
+      trajectory_state: material_unmapped
+      action: annotate_run
+      impact_level: medium
+      user_bucket: needs_review
+      matched_condition_ids: []
+
+  - id: bear_anchor_customer_terminated
+    label: Customer termination should trigger watchlist and Bear path
+    title: Anchor Customer Contract Terminated
+    summary: Atlas confirms its anchor customer contract terminated.
+    body_text: >
+      Atlas Operating Co confirms the anchor customer contract terminated after
+      failed renewal discussions. Management said contracted volume is now under
+      review because the termination materially reduces customer demand.
+    extracted_facts:
+      - anchor customer contract terminated
+      - contracted volume is now under review
+    evidence_quotes:
+      - anchor customer contract terminated
+    expected:
+      current_path: bear
+      trajectory_state: thesis_weakened
+      action: full_rerun
+      impact_level: high
+      user_bucket: needs_review
+      matched_condition_ids:
+        - bear_anchor_customer_terminated
+      triggered_watchlist_ids:
+        - watch_anchor_customer_termination
+
+  - id: false_positive_approval_not_granted
+    label: Negated approval language must not tick the bull approval catalyst
+    title: Zone A Approval Not Yet Granted
+    summary: Atlas says the regulator has not granted Zone A approval ahead of schedule.
+    body_text: >
+      Atlas Operating Co says the regulator has not granted Zone A approval
+      ahead of schedule. Zone A approval remains under review with no schedule
+      change, and management continues to target the Q3 2026 base-case milestone.
+    extracted_facts:
+      - regulator has not granted Zone A approval ahead of schedule
+      - Zone A approval remains under review with no schedule change
+    evidence_quotes:
+      - regulator has not granted Zone A approval ahead of schedule
+      - Zone A approval remains under review with no schedule change
+    expected:
+      current_path: base
+      trajectory_state: no_thesis_change
+      action: run_delta_only
+      impact_level: medium
+      user_bucket: no_thesis_change
+      matched_condition_ids:
+        - base_zone_a_approval_pending
+      condition_statuses:
+        bull_zone_a_approval_ahead: not_matched
+        base_zone_a_approval_pending: matched
+
+  - id: false_positive_facility_not_expanded
+    label: Assessing funding options must not tick secured early headroom
+    title: Debt Facility Update
+    summary: Atlas says its debt facility remains available but no expanded facility has been secured.
+    body_text: >
+      Atlas Operating Co says the debt facility remains available on existing
+      terms. Management is assessing funding options but has not secured early
+      expanded headroom under the facility.
+    extracted_facts:
+      - debt facility remains available on existing terms
+      - management has not secured early expanded headroom under the facility
+    evidence_quotes:
+      - debt facility remains available on existing terms
+      - management has not secured early expanded headroom under the facility
+    expected:
+      current_path: base
+      trajectory_state: no_thesis_change
+      action: run_delta_only
+      impact_level: medium
+      user_bucket: no_thesis_change
+      matched_condition_ids:
+        - base_facility_available
+      condition_statuses:
+        bull_facility_secured_early: not_matched
+        base_facility_available: matched
+
+  - id: false_positive_customer_expansion_not_signed
+    label: Negotiating an expansion must not tick expanded customer renewal
+    title: Anchor Customer Negotiations Continue
+    summary: Atlas says the anchor customer has not renewed and expanded contract value.
+    body_text: >
+      Atlas Operating Co says the anchor customer has not renewed and expanded
+      contract value. Negotiations continue and no binding renewal has been
+      signed, but the customer remains active under the current agreement.
+    extracted_facts:
+      - anchor customer has not renewed and expanded contract value
+      - no binding renewal has been signed
+    evidence_quotes:
+      - anchor customer has not renewed and expanded contract value
+    expected:
+      current_path: base
+      trajectory_state: material_unmapped
+      action: annotate_run
+      impact_level: medium
+      user_bucket: needs_review
+      matched_condition_ids: []
+      condition_statuses:
+        bull_anchor_customer_expands: not_matched
+        base_anchor_customer_ordinary_renewal: not_matched
+        bear_anchor_customer_terminated: not_matched
+
+  - id: mixed_approval_granted_with_cost_pressure
+    label: Mixed good and bad news should preserve the approval hit but keep review pressure visible
+    title: Zone A Approval Granted With Deployment Cost Increase
+    summary: Atlas received approval but disclosed higher deployment costs.
+    body_text: >
+      Atlas Operating Co confirms the regulator granted Zone A approval ahead of
+      schedule and the approval notice published by regulator has been lodged.
+      The company also disclosed a material deployment cost increase and said
+      the FY2027 margin outlook is under review.
+    extracted_facts:
+      - regulator granted Zone A approval ahead of schedule
+      - approval notice published by regulator
+      - material deployment cost increase disclosed
+      - FY2027 margin outlook is under review
+    evidence_quotes:
+      - regulator granted Zone A approval ahead of schedule
+      - material deployment cost increase disclosed
+    expected:
+      current_path: bull
+      trajectory_state: timeline_accelerated
+      action: rerun_stage1
+      impact_level: medium
+      user_bucket: needs_review
+      matched_condition_ids:
+        - bull_zone_a_approval_ahead
+      triggered_verification_ids:
+        - verify_zone_a_approval_source

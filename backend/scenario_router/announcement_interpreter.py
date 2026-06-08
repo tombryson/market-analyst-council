@@ -143,6 +143,28 @@ EVENT_CLASS_RULES: Dict[str, Tuple[str, ...]] = {
     ),
 }
 
+DRIVER_LABELS = {
+    "administrative": "administrative filings",
+    "asset_project": "project delivery",
+    "capital_financing": "funding",
+    "capital_management": "capital management",
+    "clinical_regulatory": "clinical and regulatory progress",
+    "commercial_customer": "commercial agreements",
+    "development_timeline": "delivery timeline",
+    "drilling_exploration": "exploration results",
+    "earnings_guidance": "guidance",
+    "governance_management": "governance",
+    "legal": "legal matters",
+    "market_backdrop": "market backdrop",
+    "operations": "operations",
+    "permitting": "permitting",
+    "product_technology": "product or technology progress",
+    "production_operations": "production",
+    "regulatory_legal": "regulatory or legal matters",
+    "resource": "resource or reserve data",
+    "strategy_mna": "strategy or M&A",
+}
+
 
 DOMAIN_PROFILE_RULES: Dict[str, Dict[str, Tuple[str, ...]]] = {
     "resources": {
@@ -312,6 +334,21 @@ POSITIVE_TRAJECTORY_TERMS = (
     "increased",
     "signed",
     "awarded",
+)
+POSITIVE_TRAJECTORY_ACTION_TERMS = (
+    "approved",
+    "approval",
+    "secured",
+    "completed",
+    "achieved",
+    "accelerated",
+    "expanded",
+    "increased",
+    "signed",
+    "awarded",
+    "granted",
+    "renewed",
+    "launched",
 )
 NEGATIVE_TRAJECTORY_TERMS = (
     "delay",
@@ -539,13 +576,13 @@ class AnnouncementInterpreter:
             return "administrative"
         if event_class == "capital_management" and materiality in {"none", "low"}:
             return "no_clear_change"
-        positive = any(_term_in_text(term, text) for term in POSITIVE_TRAJECTORY_TERMS)
+        positive = _has_directional_term(text, POSITIVE_TRAJECTORY_TERMS, positive=True)
         negative = any(_term_in_text(term, text) for term in NEGATIVE_TRAJECTORY_TERMS)
         if negative and any(_term_in_text(term, text) for term in ("delay", "delayed", "schedule", "timeline")):
             return "delays"
         if negative:
             return "weakens"
-        if positive and any(_term_in_text(term, text) for term in ("approved", "secured", "completed", "achieved", "risk")):
+        if positive and _has_directional_term(text, ("approved", "secured", "completed", "achieved", "risk"), positive=True):
             return "risk_reduced"
         if positive:
             return "strengthens"
@@ -555,7 +592,7 @@ class AnnouncementInterpreter:
 
     @staticmethod
     def _price_time_effect(effect: str, materiality: str, drivers: Sequence[str]) -> str:
-        driver_text = ", ".join(driver.replace("_", " ") for driver in drivers[:2]) or "company trajectory"
+        driver_text = AnnouncementInterpreter._driver_phrase(drivers[:2]) or "company trajectory"
         if effect == "delays":
             return f"Likely pushes the price/time path out by delaying {driver_text}."
         if effect == "weakens":
@@ -576,23 +613,54 @@ class AnnouncementInterpreter:
         title = _clean_sentence(facts.title or "")
         fact = _clean_sentence((facts.extracted_facts or [""])[0] if facts.extracted_facts else "")
         source_text = title or fact or "the announcement"
-        class_label = event_class.replace("_", " ")
         if event_class == "capital_management":
             return f"{ticker} filed a buy-back or capital-management update: {source_text}."
         if event_class == "administrative":
             return f"{ticker} filed a procedural market announcement: {source_text}."
         if event_class == "needs_classification":
             return f"{ticker} filed an announcement that the router could not classify from the extracted text: {source_text}."
-        driver_text = ", ".join(driver.replace("_", " ") for driver in drivers[:2])
+        driver_text = AnnouncementInterpreter._driver_phrase(drivers[:2])
         if driver_text:
-            return f"{ticker} filed a {class_label} update touching {driver_text}: {source_text}."
-        return f"{ticker} filed a {class_label} update: {source_text}."
+            return f"{ticker} filed an update about {driver_text}: {source_text}."
+        return f"{ticker} filed an update: {source_text}."
 
     @staticmethod
     def _summary(facts: AnnouncementFacts, event_class: str, drivers: Sequence[str], effect: str) -> str:
-        title = str(facts.title or "Announcement").strip()
-        driver_text = ", ".join(driver.replace("_", " ") for driver in drivers[:3]) or "unmapped driver"
-        return f"{title} classified as {event_class.replace('_', ' ')}; effect: {effect.replace('_', ' ')}; drivers: {driver_text}."
+        title = _clean_sentence(facts.title or "The announcement")
+        driver_text = AnnouncementInterpreter._driver_phrase(drivers[:2]) or AnnouncementInterpreter._driver_label(event_class)
+        if event_class == "capital_management":
+            return f"The filing is a capital-management update about {title}; no operating thesis change is implied on its own."
+        if event_class == "administrative":
+            return f"The filing is procedural: {title}."
+        if event_class == "needs_classification":
+            return f"The filing was read, but the extracted text was not specific enough to classify its thesis effect: {title}."
+        if effect == "delays":
+            return f"The filing points to a possible delay in {driver_text}: {title}."
+        if effect == "weakens":
+            return f"The filing appears to weaken {driver_text}: {title}."
+        if effect in {"strengthens", "risk_reduced"}:
+            return f"The filing appears to support {driver_text}: {title}."
+        if effect == "material_update":
+            return f"The filing is a material update about {driver_text}: {title}. Direction depends on the saved thesis conditions and evidence."
+        return f"The filing updates {driver_text}: {title}. No direct thesis direction was identified."
+
+    @staticmethod
+    def _driver_label(value: str) -> str:
+        key = str(value or "").strip().lower()
+        return DRIVER_LABELS.get(key) or key.replace("_", " ") or "company trajectory"
+
+    @staticmethod
+    def _driver_phrase(drivers: Sequence[str]) -> str:
+        labels = []
+        for driver in drivers:
+            label = AnnouncementInterpreter._driver_label(str(driver or ""))
+            if label and label not in labels:
+                labels.append(label)
+        if not labels:
+            return ""
+        if len(labels) == 1:
+            return labels[0]
+        return f"{', '.join(labels[:-1])} and {labels[-1]}"
 
     @staticmethod
     def _classification_reason(*, event_class: str, forced_class: str, basis: Sequence[str], profile: str) -> str:
@@ -774,6 +842,43 @@ def _term_in_text(term: str, text: str) -> bool:
     if " " in value:
         return value in normalized_text or value.replace(" ", "") in normalized_text.replace(" ", "")
     return re.search(rf"\b{re.escape(value)}\b", normalized_text) is not None
+
+
+def _has_directional_term(text: str, terms: Sequence[str], *, positive: bool = False) -> bool:
+    for sentence in _sentences_for_matching(text):
+        if positive and _negates_positive_action(sentence):
+            continue
+        if any(_term_in_text(term, sentence) for term in terms):
+            return True
+    return False
+
+
+def _sentences_for_matching(text: str) -> List[str]:
+    return [
+        sentence.strip().lower()
+        for sentence in re.split(r"(?<=[.!?])\s+|\n+", str(text or ""))
+        if sentence.strip()
+    ]
+
+
+def _negates_positive_action(sentence: str) -> bool:
+    return any(_negates_term(sentence, term) for term in POSITIVE_TRAJECTORY_ACTION_TERMS)
+
+
+def _negates_term(sentence: str, term: str) -> bool:
+    escaped = re.escape(str(term or "").strip().lower())
+    if not escaped:
+        return False
+    return bool(
+        re.search(
+            rf"\b(?:has|have|had|is|was|were|does|did|do|management)?\s*not\s+(?:yet\s+)?(?:been\s+)?(?:[a-z0-9]+\s+){{0,4}}{escaped}\b",
+            sentence,
+        )
+        or re.search(
+            rf"\bno\s+(?:binding\s+)?(?:[a-z0-9]+\s+){{0,4}}{escaped}\b",
+            sentence,
+        )
+    )
 
 
 def _normalize_match_text(value: str) -> str:

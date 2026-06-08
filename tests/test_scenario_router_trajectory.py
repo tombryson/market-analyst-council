@@ -75,6 +75,24 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         self.assertNotIn("resource", interpreted.affected_drivers)
         self.assertEqual(interpreted.materiality, "medium")
 
+    def test_interpreter_summary_does_not_expose_classifier_internals(self):
+        announcement = facts(
+            "VMM Signs Strategic Offtake/Tech Partnership LoI with Solvay",
+            "The company signed a strategic offtake and technology partnership letter of intent with Solvay for its project development pathway.",
+        )
+
+        interpreted = AnnouncementInterpreter().interpret(
+            announcement,
+            baseline(template_id="rare_earths_critical_minerals"),
+        )
+
+        summary = interpreted.semantic_summary.lower()
+        self.assertIn("filing", summary)
+        self.assertIn("solvay", summary)
+        self.assertNotIn("classified as", summary)
+        self.assertNotIn("; effect:", summary)
+        self.assertNotIn("; drivers:", summary)
+
     def test_administrative_filing_stays_administrative_not_watch(self):
         announcement = facts(
             "Cleansing Notice",

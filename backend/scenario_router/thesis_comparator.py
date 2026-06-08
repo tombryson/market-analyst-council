@@ -15,6 +15,20 @@ from .models import (
 )
 
 POSITIVE_TOKENS = {"approved", "secured", "completed", "achieved", "on track", "ahead", "accelerated", "funded", "signed"}
+POSITIVE_ACTION_TOKENS = {
+    "approved",
+    "approval",
+    "secured",
+    "completed",
+    "achieved",
+    "accelerated",
+    "funded",
+    "signed",
+    "granted",
+    "renewed",
+    "expanded",
+    "launched",
+}
 NEGATIVE_TOKENS = {
     "delay",
     "delayed",
@@ -633,17 +647,62 @@ class ThesisComparator:
         low = str(phrase or "").strip().lower()
         if not low:
             return False
-        if low in haystack:
-            return True
+        sentences = ThesisComparator._sentences_for_matching(haystack)
+        phrase_terms = ThesisComparator._phrase_terms(low)
+        for sentence in sentences:
+            if low in sentence and not ThesisComparator._negates_phrase(sentence, phrase_terms):
+                return True
         if not allow_token_fallback:
             return False
-        terms = [term for term in re.split(r"[^a-z0-9]+", low) if len(term) >= 5]
+        terms = [term for term in phrase_terms if len(term) >= 5]
         if len(terms) < 3:
             return False
-        # Loose token matching is only a fallback for explicit evidence hooks.
-        # Requiring all meaningful terms avoids matching conditions on generic
-        # words like "gold", "quarter", "resource", or dates.
-        return all(term in haystack for term in terms)
+        for sentence in sentences:
+            # Loose token matching is only a fallback for explicit evidence hooks.
+            # Requiring all meaningful terms avoids matching conditions on generic
+            # words like "gold", "quarter", "resource", or dates.
+            if all(term in sentence for term in terms) and not ThesisComparator._negates_phrase(sentence, terms):
+                return True
+        return False
+
+    @staticmethod
+    def _sentences_for_matching(text: str) -> List[str]:
+        return [
+            sentence.strip().lower()
+            for sentence in re.split(r"(?<=[.!?])\s+|\n+", str(text or ""))
+            if sentence.strip()
+        ]
+
+    @staticmethod
+    def _phrase_terms(text: str) -> List[str]:
+        return [term for term in re.split(r"[^a-z0-9]+", str(text or "").lower()) if len(term) >= 3]
+
+    @staticmethod
+    def _negates_phrase(sentence: str, phrase_terms: List[str]) -> bool:
+        terms = {term for term in phrase_terms if term}
+        action_terms = terms & POSITIVE_ACTION_TOKENS
+        if not action_terms:
+            return False
+        for term in action_terms:
+            if ThesisComparator._negates_term(sentence, term):
+                return True
+        return False
+
+    @staticmethod
+    def _negates_term(sentence: str, term: str) -> bool:
+        escaped = re.escape(str(term or "").strip().lower())
+        if not escaped:
+            return False
+        return bool(
+            re.search(
+                rf"\b(?:has|have|had|is|was|were|does|did|do|management)?\s*not\s+(?:yet\s+)?(?:been\s+)?(?:[a-z0-9]+\s+){{0,4}}{escaped}\b",
+                sentence,
+            )
+            or re.search(
+                rf"\bno\s+(?:binding\s+)?(?:[a-z0-9]+\s+){{0,4}}{escaped}\b",
+                sentence,
+            )
+        )
 
     @staticmethod
     def _condition_label(item: Dict[str, Any]) -> str:
@@ -651,7 +710,17 @@ class ThesisComparator:
 
     @staticmethod
     def _contains_any(haystack: str, tokens: Set[str]) -> bool:
-        return any(token in haystack for token in tokens)
+        positive_set = tokens == POSITIVE_TOKENS
+        for sentence in ThesisComparator._sentences_for_matching(haystack):
+            if positive_set and ThesisComparator._negates_positive_action(sentence):
+                continue
+            if any(token in sentence for token in tokens):
+                return True
+        return False
+
+    @staticmethod
+    def _negates_positive_action(sentence: str) -> bool:
+        return any(ThesisComparator._negates_term(sentence, term) for term in POSITIVE_ACTION_TOKENS)
 
     @staticmethod
     def _infer_domains(facts: AnnouncementFacts, matched_evaluations: List[ConditionEvaluation]) -> Set[str]:

@@ -126,6 +126,7 @@ class ActionJudge:
             or (critical_domain_hit and current_path == "bear")
             or (
                 critical_domain_hit
+                and trajectory_state != "no_thesis_change"
                 and not positive_scenario_shift
                 and impact in {"medium", "high"}
                 and thesis not in {"confirms", "accelerates"}
@@ -149,10 +150,13 @@ class ActionJudge:
             )
 
         if (
-            capital in {"material_change", "worsens"}
-            or timeline == "delayed"
-            or scenario_drift
-            or (stage1_domain_hit and impact in {"medium", "high"})
+            trajectory_state != "no_thesis_change"
+            and (
+                capital in {"material_change", "worsens"}
+                or timeline == "delayed"
+                or scenario_drift
+                or (stage1_domain_hit and impact in {"medium", "high"})
+            )
         ):
             return ActionDecision(
                 action="rerun_stage1",

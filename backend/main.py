@@ -3085,6 +3085,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
     if not isinstance(router_state, dict) or not router_state:
         return {}
 
+    build_router_display_contract = None
     market_only_watch_projection = None
     should_project_market_only_watch = None
     router_condition_details = None
@@ -3092,6 +3093,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
     try:
         from .scenario_router.artifact_replay import replay_comparison_from_artifact
         from .scenario_router.display_contract import (
+            build_router_display_contract,
             market_only_watch_projection,
             should_project_market_only_watch,
         )
@@ -3271,6 +3273,26 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
     display_action = str(display_projection.get("action") or raw_action).strip()
     display_impact = str(display_projection.get("impact_level") or raw_impact).strip()
     display_trajectory_state = str(display_projection.get("trajectory_state") or comparison.get("trajectory_state") or "").strip()
+    display_contract = (
+        build_router_display_contract(
+            {
+                **comparison,
+                "trajectory_state": display_trajectory_state,
+                "impact_level": display_impact,
+                "status": str(router_state.get("status") or "ok").strip() or "ok",
+            },
+            {
+                **action,
+                "action": display_action,
+                "reason": str(display_projection.get("reason") or action.get("reason") or "").strip(),
+            },
+            matched_conditions_count=len(matched_conditions),
+            triggered_watchlist_count=len(triggered_watchlist),
+            triggered_verification_count=len(triggered_verification),
+        )
+        if build_router_display_contract
+        else {}
+    )
     return {
         "current_path": display_current_path,
         "baseline_path": raw_baseline_path,
@@ -3391,6 +3413,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
             if str(item or "").strip()
         ][:5],
         "display_adjustment": str(display_projection.get("display_adjustment") or "").strip(),
+        "display": display_contract,
         "received_at_utc": str(event.get("received_at_utc") or "").strip(),
         "saved_at_utc": str(router_state.get("saved_at_utc") or "").strip(),
     }
@@ -3907,6 +3930,28 @@ async def list_scenario_router_events(limit: int = 50, ticker: str = ""):
     return {
         "events": observer.list_recent_events(limit=max(1, min(int(limit or 50), 500)), ticker=str(ticker or "").strip()),
     }
+
+
+@app.post("/api/announcement-router/reviews/{event_id}")
+@app.post("/api/scenario-router/reviews/{event_id}")
+async def post_scenario_router_review(event_id: str, payload: Dict[str, Any]):
+    from .scenario_router.review_store import save_review
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Payload must be a JSON object")
+    try:
+        review = save_review(
+            event_id,
+            status=str(payload.get("review_status") or payload.get("status") or "").strip(),
+            note=str(payload.get("review_note") or payload.get("note") or "").strip(),
+            actor=str(payload.get("reviewed_by") or payload.get("actor") or "analyst").strip() or "analyst",
+            escalation_reason=str(payload.get("escalation_reason") or "").strip(),
+            next_action=str(payload.get("next_action") or "").strip(),
+            owner=str(payload.get("review_owner") or payload.get("owner") or "").strip(),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"status": "ok", "review": review}
 
 
 @app.get("/api/announcement-router/evaluations")

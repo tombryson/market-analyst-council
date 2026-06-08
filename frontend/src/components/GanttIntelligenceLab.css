@@ -1775,7 +1775,7 @@
   border-bottom: 1px solid var(--router-rule);
   margin-bottom: 0;
   display: block;
-  padding: 20px 24px 18px;
+  padding: 18px 24px 16px;
   position: relative;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.018) 0%, transparent 62%);
 }
@@ -1785,8 +1785,8 @@
   position: absolute;
   left: 0;
   top: 0;
-  bottom: 0;
-  width: 3px;
+  right: 0;
+  height: 2px;
   background: var(--router-rule-3);
 }
 
@@ -1837,11 +1837,11 @@
 .announcement-router-decision-hero h1 {
   margin: 0;
   color: var(--router-text);
-  font-size: clamp(22px, 1.9vw, 28px);
+  font-size: 26px;
   font-weight: 720;
   line-height: 1.14;
   letter-spacing: 0;
-  max-width: 42ch;
+  max-width: 48ch;
 }
 
 .announcement-router-decision-hero p {
@@ -1853,28 +1853,11 @@
 }
 
 .announcement-router-decision-hero .announcement-router-filing-summary {
-  margin-top: 12px;
-  display: grid;
-  gap: 4px;
-  max-width: 76ch;
+  margin-top: 10px;
+  max-width: 72ch;
   color: var(--router-text-2);
-}
-
-.announcement-router-decision-hero .announcement-router-filing-summary strong {
-  color: var(--router-text-3);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.announcement-router-decision-hero .announcement-router-filing-summary span {
-  color: var(--router-text-2);
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.45;
-  letter-spacing: 0;
-  text-transform: none;
 }
 
 .announcement-router-decision-hero .announcement-router-decision-status-row {
@@ -1890,65 +1873,48 @@
   font-size: 12px;
 }
 
-.announcement-router-decision-hero .announcement-router-verdict-card {
-  border: 1px solid var(--router-rule);
-  border-left: 3px solid var(--router-rule-3);
-  border-radius: 6px;
-  padding: 12px 14px;
-  margin-top: 14px;
-  background: rgba(32, 35, 41, 0.68);
+.announcement-router-decision-summary {
   display: grid;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--router-rule);
 }
 
-.announcement-router-decision-hero .announcement-router-verdict-card span,
-.announcement-router-decision-hero .announcement-router-verdict-card em,
-.announcement-router-decision-hero .announcement-router-verdict-card b {
-  text-transform: none;
-  letter-spacing: 0;
+.announcement-router-decision-verdict {
+  display: grid;
+  gap: 5px;
 }
 
-.announcement-router-decision-panel[data-tone="urgent"] .announcement-router-verdict-card,
-.announcement-router-decision-panel[data-tone="alarm"] .announcement-router-verdict-card {
-  border-left-color: var(--router-alert);
-  background: rgba(var(--router-alert-rgb), 0.08);
-}
-
-.announcement-router-decision-panel[data-tone="warn"] .announcement-router-verdict-card {
-  border-left-color: var(--router-warn);
-  background: rgba(var(--router-warn-rgb), 0.08);
-}
-
-.announcement-router-decision-panel[data-tone="info"] .announcement-router-verdict-card {
-  border-left-color: var(--router-accent);
-  background: rgba(var(--router-accent-rgb), 0.08);
-}
-
-.announcement-router-decision-panel[data-tone="positive"] .announcement-router-verdict-card {
-  border-left-color: var(--router-confirm);
-  background: rgba(var(--router-confirm-rgb), 0.08);
-}
-
-.announcement-router-verdict-kicker {
+.announcement-router-decision-verdict span {
   color: var(--router-text-3);
   font-size: 11px;
   font-weight: 700;
 }
 
-.announcement-router-verdict-card > strong {
+.announcement-router-decision-verdict strong {
   color: var(--router-text);
-  font-size: 18px;
-  line-height: 1.16;
+  font-size: 20px;
+  line-height: 1.18;
+}
+
+.announcement-router-decision-verdict p {
+  color: var(--router-text-2);
+  font-size: 14px;
+  line-height: 1.42;
 }
 
 .announcement-router-decision-hero .announcement-router-verdict-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
   overflow: hidden;
   border: 1px solid var(--router-rule);
   border-radius: 5px;
   background: var(--router-rule);
+  margin-top: 14px;
 }
 
 .announcement-router-verdict-grid span {
@@ -1969,9 +1935,7 @@
   color: var(--router-text);
   font-size: 12px;
   line-height: 1.25;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
 }
 
 .announcement-router-action-pill {
@@ -2003,7 +1967,181 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 14px;
+  margin-top: 12px;
+}
+
+.announcement-router-review-workflow {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--router-rule);
+}
+
+.announcement-router-review-state {
+  display: grid;
+  gap: 4px;
+  max-width: 74ch;
+}
+
+.announcement-router-review-state span {
+  color: var(--router-text-3);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.announcement-router-review-state strong {
+  color: var(--router-text);
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.announcement-router-review-state em,
+.announcement-router-review-state p {
+  margin: 0;
+  color: var(--router-text-2);
+  font-size: 12.5px;
+  font-style: normal;
+  line-height: 1.38;
+}
+
+.announcement-router-decision-hero .announcement-router-review-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 0;
+}
+
+.announcement-router-decision-hero .announcement-router-review-actions button {
+  flex: 0 0 auto;
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--router-rule-2);
+  border-radius: 5px;
+  padding: 7px 11px;
+  background: transparent;
+  color: var(--router-text-2);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.announcement-router-decision-hero .announcement-router-review-actions button:hover:not(:disabled) {
+  border-color: var(--router-rule-3);
+  background: var(--router-bg-2);
+  color: var(--router-text);
+}
+
+.announcement-router-decision-hero .announcement-router-review-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.announcement-router-decision-hero .announcement-router-review-actions .announcement-router-review-primary {
+  border-color: rgba(var(--router-confirm-rgb), 0.46);
+  background: var(--router-confirm-soft);
+  color: #cfe6d8;
+}
+
+.announcement-router-follow-up-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  margin-top: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(var(--router-warn-rgb), 0.34);
+  border-radius: 6px;
+  background: rgba(var(--router-warn-rgb), 0.055);
+}
+
+.announcement-router-follow-up-card > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.announcement-router-follow-up-card > div:first-child span,
+.announcement-router-follow-up-fields label span {
+  color: var(--router-text-3);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.announcement-router-follow-up-card > div:first-child strong {
+  color: var(--router-text);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.announcement-router-follow-up-card > div:first-child em {
+  color: var(--router-text-2);
+  font-size: 12.5px;
+  font-style: normal;
+  line-height: 1.38;
+}
+
+.announcement-router-follow-up-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.announcement-router-follow-up-route {
+  display: inline-grid;
+  justify-self: end;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid rgba(var(--router-warn-rgb), 0.24);
+  border-radius: 5px;
+  background: rgba(11, 14, 18, 0.56);
+}
+
+.announcement-router-follow-up-route span {
+  color: var(--router-text-3);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.announcement-router-follow-up-route strong {
+  color: var(--router-text);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.announcement-router-follow-up-fields label {
+  display: grid;
+  gap: 5px;
+}
+
+.announcement-router-follow-up-fields label.is-wide {
+  grid-column: 1 / -1;
+}
+
+.announcement-router-follow-up-fields textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--router-rule-2);
+  border-radius: 5px;
+  background: rgba(11, 14, 18, 0.78);
+  color: var(--router-text);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.35;
+  padding: 7px 9px;
+}
+
+.announcement-router-follow-up-fields textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+.announcement-router-follow-up-fields textarea:focus {
+  outline: 2px solid rgba(var(--router-accent-rgb), 0.28);
+  outline-offset: 1px;
+  border-color: rgba(var(--router-accent-rgb), 0.54);
 }
 
 .announcement-router-hero-actions a,
@@ -3560,8 +3698,12 @@ details pre {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .announcement-router-verdict-grid {
+  .announcement-router-decision-hero .announcement-router-verdict-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .announcement-router-decision-summary {
+    grid-template-columns: 1fr;
   }
 
   .stats-hover-reveal {
@@ -3639,7 +3781,42 @@ details pre {
   }
 
   .announcement-router-decision-hero {
-    flex-direction: column;
+    padding: 16px 18px;
+  }
+
+  .announcement-router-decision-summary {
+    gap: 12px;
+    margin-top: 14px;
+    padding-top: 12px;
+  }
+
+  .announcement-router-decision-verdict strong {
+    font-size: 18px;
+  }
+
+  .announcement-router-decision-hero .announcement-router-review-actions {
+    align-items: stretch;
+  }
+
+  .announcement-router-decision-hero .announcement-router-review-actions button {
+    flex: 1 1 120px;
+    width: 100%;
+  }
+
+  .announcement-router-decision-hero .announcement-router-review-actions .announcement-router-review-primary {
+    flex-basis: 100%;
+  }
+
+  .announcement-router-follow-up-card {
+    grid-template-columns: 1fr;
+  }
+
+  .announcement-router-follow-up-route {
+    justify-self: start;
+  }
+
+  .announcement-router-follow-up-fields {
+    grid-template-columns: 1fr;
   }
 
   .announcement-router-kpi-strip {
@@ -3679,7 +3856,7 @@ details pre {
     width: 100%;
   }
 
-  .announcement-router-verdict-grid {
+  .announcement-router-decision-hero .announcement-router-verdict-grid {
     grid-template-columns: 1fr;
   }
 

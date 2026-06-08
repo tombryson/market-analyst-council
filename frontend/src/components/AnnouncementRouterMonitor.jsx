@@ -23,6 +23,33 @@ function titleizeKey(key) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+const ROUTER_DRIVER_LABELS = {
+  administrative: 'Administrative',
+  asset_project: 'Project delivery',
+  capital_financing: 'Funding',
+  capital_management: 'Capital management',
+  clinical_regulatory: 'Clinical / regulatory',
+  commercial_customer: 'Commercial agreement',
+  development_timeline: 'Timeline',
+  drilling_exploration: 'Exploration results',
+  earnings_guidance: 'Guidance',
+  governance_management: 'Governance',
+  legal: 'Legal',
+  market_backdrop: 'Market backdrop',
+  operations: 'Operations',
+  permitting: 'Permitting',
+  production_operations: 'Production',
+  regulatory_legal: 'Regulatory / legal',
+  resource: 'Resource / reserve',
+  strategy_mna: 'Strategy / M&A',
+};
+
+function labelRouterDriver(value) {
+  const key = String(value || '').trim().toLowerCase();
+  if (!key) return '';
+  return ROUTER_DRIVER_LABELS[key] || titleizeKey(key);
+}
+
 function fmtPct(value) {
   if (value == null || value === '') return 'n/a';
   const n = Number(value);
@@ -109,7 +136,7 @@ function labelScenarioAction(value) {
     run_delta_only: 'Update section',
     rerun_stage1: 'Refresh evidence',
     full_rerun: 'Rebuild run',
-    urgent_human_review: 'Needs you now',
+    urgent_human_review: 'Urgent thesis review',
   };
   return labels[action] || (action ? titleizeKey(action) : 'Not assessed');
 }
@@ -124,6 +151,142 @@ function labelProjectionRerunSignal(value) {
     none: 'No rerun signal',
   };
   return labels[signal] || (signal ? titleizeKey(signal) : 'No rerun signal');
+}
+
+const FOLLOW_UP_RECOMMENDATIONS = [
+  {
+    key: 'thesis_map_gap',
+    label: 'Add missing thesis condition',
+    helper: 'Add a catalyst or condition for this filing so future announcements are checked against the thesis map.',
+  },
+  {
+    key: 'router_misclassified',
+    label: 'Check router classification',
+    helper: 'The filing type, materiality, or trajectory label looks wrong.',
+  },
+  {
+    key: 'timeline_changed',
+    label: 'Review timeline assumptions',
+    helper: 'The announcement changes expected catalyst timing, delivery path, or project schedule.',
+  },
+  {
+    key: 'valuation_changed',
+    label: 'Review valuation assumptions',
+    helper: 'The announcement changes economics, contract value, funding, production, margin, or target assumptions.',
+  },
+  {
+    key: 'contradicts_saved_thesis',
+    label: 'Review thesis conflict',
+    helper: 'The announcement conflicts with a saved bull/base/bear assumption or failure condition.',
+  },
+  {
+    key: 'needs_evidence_refresh',
+    label: 'Refresh evidence pack',
+    helper: 'The filing should be added to the evidence pack before the saved run is trusted.',
+  },
+  {
+    key: 'needs_full_rerun',
+    label: 'Rebuild council analysis',
+    helper: 'The saved analysis may be stale enough that the council should rebuild the thesis.',
+  },
+  {
+    key: 'source_verification',
+    label: 'Verify source and extraction',
+    helper: 'The source, extracted filing facts, or classification confidence needs checking.',
+  },
+];
+
+const FOLLOW_UP_NEXT_ACTIONS = {
+  router_misclassified: 'label_filing',
+  thesis_map_gap: 'update_thesis_map',
+  timeline_changed: 'refresh_evidence',
+  valuation_changed: 'refresh_evidence',
+  contradicts_saved_thesis: 'rebuild_analysis',
+  needs_evidence_refresh: 'refresh_evidence',
+  needs_full_rerun: 'rebuild_analysis',
+  source_verification: 'verify_source',
+  other: 'add_note',
+};
+
+const NEXT_ACTION_LABELS = {
+  add_note: 'Add note',
+  update_thesis_map: 'Update thesis map',
+  refresh_evidence: 'Refresh evidence',
+  rebuild_analysis: 'Rebuild analysis',
+  verify_source: 'Verify source',
+  label_filing: 'Label filing',
+  none: 'No system action',
+};
+
+function defaultFollowUpReason(router) {
+  const displayReason = String(routerDisplay(router)?.review_reason || '').trim().toLowerCase();
+  if (displayReason === 'thesis_map_gap') return 'thesis_map_gap';
+  if (displayReason === 'classification_unresolved') return 'router_misclassified';
+  if (displayReason === 'negative_trajectory') {
+    const state = routerTrajectoryState(router);
+    if (state === 'timeline_delayed') return 'timeline_changed';
+    if (state === 'thesis_weakened') return 'contradicts_saved_thesis';
+    return 'needs_evidence_refresh';
+  }
+  if (displayReason === 'verification_hit') return 'source_verification';
+  const state = routerTrajectoryState(router);
+  if (state === 'material_unmapped') return 'thesis_map_gap';
+  if (state === 'needs_classification') return 'router_misclassified';
+  if (state === 'timeline_delayed' || state === 'timeline_accelerated') return 'timeline_changed';
+  if (state === 'thesis_weakened') return 'contradicts_saved_thesis';
+  return 'needs_evidence_refresh';
+}
+
+function nextActionForFollowUpReason(reason) {
+  const key = String(reason || '').trim().toLowerCase();
+  return FOLLOW_UP_NEXT_ACTIONS[key] || 'add_note';
+}
+
+function recommendedFollowUp(router) {
+  const reason = defaultFollowUpReason(router);
+  const option = FOLLOW_UP_RECOMMENDATIONS.find((item) => item.key === reason) || FOLLOW_UP_RECOMMENDATIONS[0];
+  const nextAction = nextActionForFollowUpReason(reason);
+  return {
+    reason,
+    label: option.label,
+    helper: option.helper,
+    nextAction,
+    nextActionLabel: NEXT_ACTION_LABELS[nextAction] || titleizeKey(nextAction),
+  };
+}
+
+function followUpButtonLabel(followUp) {
+  const action = String(followUp?.nextAction || '').trim().toLowerCase();
+  if (action === 'update_thesis_map') return 'Send to thesis-map queue';
+  if (action === 'refresh_evidence') return 'Send to evidence refresh queue';
+  if (action === 'rebuild_analysis') return 'Queue council rebuild';
+  if (action === 'verify_source') return 'Send to source check queue';
+  if (action === 'label_filing') return 'Send to classification queue';
+  if (action === 'add_note') return 'Add note to run';
+  return 'Queue next step';
+}
+
+function defaultReviewNote(router, status) {
+  const title = routerTitle(router);
+  const trajectory = routerOutcomeLabel(router);
+  if (status === 'reviewed') return `Reviewed ${title}. Router verdict accepted: ${trajectory}.`;
+  if (status === 'dismissed') return `Dismissed ${title} as not requiring thesis work.`;
+  return '';
+}
+
+function reviewStateSubtext(vm) {
+  if (vm.reviewStatus === 'escalated') {
+    return [
+      vm.reviewReasonLabel || 'Queued for review',
+      vm.nextActionLabel && `Next: ${vm.nextActionLabel}`,
+    ].filter(Boolean).join(' | ');
+  }
+  if (vm.reviewStatus === 'reviewed') return 'Analyst accepted the router verdict and cleared this filing from the active queue.';
+  if (vm.reviewStatus === 'dismissed') return 'Analyst dismissed this filing as not requiring thesis work.';
+  if (vm.reviewStatus === 'open') return 'The router cannot safely clear this filing. Decide whether the saved thesis map, evidence pack, or classification needs work.';
+  if (vm.reviewStatus === 'tracking') return 'The filing supports the saved path. Track it against the run before changing the narrative.';
+  if (vm.reviewStatus === 'auto_cleared') return 'No active analyst decision is required for this filing.';
+  return 'No manual case action recorded.';
 }
 
 function labelMarketPath(value) {
@@ -177,7 +340,7 @@ function labelTrajectoryState(value) {
     timeline_delayed: 'Timeline delayed',
     risk_reduced: 'Risk reduced',
     risk_increased: 'Risk increased',
-    material_unmapped: 'Material, unmapped',
+    material_unmapped: 'Material filing outside thesis map',
     market_backdrop_only: 'Market backdrop only',
     administrative_filing: 'Administrative filing',
     no_thesis_change: 'No thesis change',
@@ -252,10 +415,28 @@ function routerTitle(router) {
 
 function routerFilingSummary(router) {
   const summary = String(router?.filing_summary || '').trim();
-  if (summary) return summary;
+  if (summary && !isBoilerplateFilingSummary(summary, router) && !isMachineRouterSummary(summary)) return summary;
   const semantic = String(router?.semantic_summary || '').trim();
-  if (semantic) return semantic;
+  if (semantic && !isBoilerplateFilingSummary(semantic, router) && !isMachineRouterSummary(semantic)) return semantic;
   return '';
+}
+
+function isMachineRouterSummary(value) {
+  const text = String(value || '').trim().toLowerCase();
+  return Boolean(
+    text.includes(' classified as ') ||
+    text.includes('; effect:') ||
+    text.includes('; drivers:')
+  );
+}
+
+function isBoilerplateFilingSummary(value, router) {
+  const text = String(value || '').trim().toLowerCase();
+  const title = routerTitle(router).toLowerCase();
+  const ticker = String(router?.ticker || '').trim().toLowerCase();
+  if (!text) return false;
+  if (ticker && text.startsWith(`${ticker} filed`) && title && text.includes(title)) return true;
+  return text.includes('filed a ') && text.includes(' update touching ') && title && text.endsWith(`${title}.`);
 }
 
 function routerReason(router) {
@@ -269,7 +450,7 @@ function routerActionKey(router) {
 function routerTopicSummary(router) {
   const domains = Array.isArray(router?.affected_domains) ? router.affected_domains : [];
   const labels = domains
-    .map((item) => titleizeKey(item))
+    .map((item) => labelRouterDriver(item))
     .filter(Boolean);
   if (!labels.length) return 'Unclassified';
   return labels.slice(0, 3).join(', ');
@@ -293,11 +474,52 @@ function routerMaterialityLabel(router) {
 function routerDriverLabel(router) {
   const klass = String(router?.announcement_class || '').trim();
   if (['needs_classification', 'unknown', 'unclassified'].includes(klass.toLowerCase())) return 'Unclassified';
-  if (klass) return titleizeKey(klass);
+  if (klass) return labelRouterDriver(klass);
   return routerTopicSummary(router);
 }
 
+function routerDisplay(router) {
+  return router?.display && typeof router.display === 'object' ? router.display : {};
+}
+
+function reviewLabelFromStatus(status) {
+  const key = String(status || '').trim().toLowerCase();
+  if (key === 'reviewed') return 'Reviewed';
+  if (key === 'dismissed') return 'Dismissed';
+  if (key === 'escalated') return 'Queued for review';
+  if (key === 'open') return 'Needs thesis decision';
+  return '';
+}
+
+function applyReviewOverlayToEvent(row, review) {
+  if (!row || !review || row.event_id !== review.event_id) return row;
+  const status = String(review.review_status || '').trim().toLowerCase();
+  const label = reviewLabelFromStatus(status);
+  const currentDisplay = routerDisplay(row);
+  const currentTone = String(currentDisplay.tone || '').trim();
+  return {
+    ...row,
+    review_overlay: review,
+    display: {
+      ...currentDisplay,
+      queue_bucket: status === 'escalated' ? 'open_review' : status ? 'cleared' : currentDisplay.queue_bucket,
+      queue_label: status === 'escalated' ? 'Needs thesis decision' : status ? 'Cleared' : currentDisplay.queue_label,
+      review_status: status || currentDisplay.review_status,
+      review_label: label || currentDisplay.review_label,
+      review_reason: review.escalation_reason || currentDisplay.review_reason,
+      review_reason_label: review.escalation_reason_label || currentDisplay.review_reason_label,
+      review_owner: review.review_owner || currentDisplay.review_owner,
+      next_action: review.next_action || currentDisplay.next_action,
+      next_action_label: review.next_action_label || currentDisplay.next_action_label,
+      is_user_action_required: status === 'escalated' ? true : status === 'open',
+      tone: status === 'escalated' ? (currentTone && currentTone !== 'neutral' ? currentTone : 'warn') : status ? 'neutral' : currentDisplay.tone,
+    },
+  };
+}
+
 function routerVerdictCopy(router) {
+  const display = routerDisplay(router);
+  if (display.primary_reason) return String(display.primary_reason);
   const state = routerTrajectoryState(router);
   const directHits = routerDirectHitCount(router);
   const transition = String(router?.path_transition || '').trim();
@@ -319,13 +541,15 @@ function routerVerdictCopy(router) {
   if (directHits) {
     return `Matched ${directHits} saved thesis, watchlist, or verification item${directHits === 1 ? '' : 's'}.`;
   }
-  if (router?.semantic_summary) return String(router.semantic_summary);
+  if (router?.semantic_summary && !isMachineRouterSummary(router.semantic_summary)) return String(router.semantic_summary);
   if (router?.price_time_effect) return String(router.price_time_effect);
   return routerReason(router);
 }
 
 function routerOutcomeLabel(router) {
   if (!hasRouterDecision(router)) return 'Not assessed';
+  const display = routerDisplay(router);
+  if (display.trajectory_label) return String(display.trajectory_label);
   const state = routerTrajectoryState(router);
   if (state) return labelTrajectoryState(state);
   const transition = String(router.path_transition || '').trim();
@@ -341,11 +565,13 @@ function routerOutcomeLabel(router) {
 }
 
 function routerActionBucket(router) {
+  const displayBucket = String(routerDisplay(router)?.queue_bucket || '').trim();
+  if (displayBucket) return displayBucket;
   const state = routerTrajectoryState(router);
-  if (['needs_classification', 'material_unmapped', 'thesis_weakened', 'timeline_delayed', 'risk_increased'].includes(state)) return 'attention';
-  if (routerVerificationItems(router).length) return 'attention';
-  if (['thesis_strengthened', 'timeline_accelerated', 'risk_reduced'].includes(state)) return 'trajectory';
-  if (state === 'market_backdrop_only' || state === 'no_thesis_change') return 'no_change';
+  if (['needs_classification', 'material_unmapped', 'thesis_weakened', 'timeline_delayed', 'risk_increased'].includes(state)) return 'open_review';
+  if (routerVerificationItems(router).length) return 'open_review';
+  if (['thesis_strengthened', 'timeline_accelerated', 'risk_reduced'].includes(state)) return 'positive_movement';
+  if (state === 'market_backdrop_only' || state === 'no_thesis_change') return 'cleared';
   if (state === 'administrative_filing') return 'administrative';
   return 'all';
 }
@@ -361,6 +587,8 @@ function routerConflictCount(router) {
 }
 
 function routerPriorityTone(router) {
+  const displayTone = String(routerDisplay(router)?.tone || '').trim();
+  if (displayTone) return displayTone;
   const state = routerTrajectoryState(router);
   const action = routerActionKey(router);
   const status = String(router?.status || '').trim().toLowerCase();
@@ -408,16 +636,27 @@ function routerEvidenceState(router) {
 function routerPresentation(router) {
   const tone = routerPriorityTone(router);
   const action = routerActionKey(router);
+  const display = routerDisplay(router);
+  const reviewOverlay = router?.review_overlay && typeof router.review_overlay === 'object' ? router.review_overlay : {};
+  const trajectoryLabel = display.trajectory_label || routerOutcomeLabel(router);
   return {
     tone,
     action,
     bucket: routerActionBucket(router),
     trajectoryState: routerTrajectoryState(router),
-    trajectoryLabel: labelTrajectoryState(routerTrajectoryState(router)),
-    actionLabel: labelScenarioAction(action),
-    outcomeLabel: routerOutcomeLabel(router),
+    trajectoryLabel,
+    reviewLabel: display.review_label || (routerActionBucket(router) === 'open_review' ? 'Needs thesis decision' : 'Auto-cleared'),
+    reviewStatus: display.review_status || '',
+    reviewReasonLabel: display.review_reason_label || reviewOverlay.escalation_reason_label || '',
+    reviewNote: reviewOverlay.review_note || '',
+    queueLabel: display.queue_label || titleizeKey(routerActionBucket(router)),
+    nextActionLabel: display.next_action_label || reviewOverlay.next_action_label || '',
+    nextAction: display.next_action || reviewOverlay.next_action || '',
+    actionLabel: display.system_action_label || labelScenarioAction(action),
+    outcomeLabel: trajectoryLabel,
     evidenceLabel: routerEvidenceState(router),
-    needsAttention: routerNeedsAttention(router),
+    primaryReason: display.primary_reason || routerVerdictCopy(router),
+    needsAttention: Boolean(display.is_user_action_required) || routerNeedsAttention(router),
   };
 }
 
@@ -519,7 +758,7 @@ function routerWhyCopy(router, directHits = 0) {
     return 'The filing appears material, but none of the saved thesis conditions matched it. That points to a thesis-map gap, not a clean no-impact result.';
   }
   if (state === 'administrative_filing') {
-    return 'The filing was classified as procedural or administrative, and no saved thesis or watchlist condition matched it.';
+    return 'The filing is procedural or administrative, and no saved thesis or watchlist condition matched it.';
   }
   if (state === 'market_backdrop_only' || (marketCount && !directHits)) {
     return 'The announcement itself did not match a saved thesis condition. Market facts were checked as backdrop only and are not the filing verdict.';
@@ -983,6 +1222,105 @@ function MarketFactsGrid({ facts }) {
   );
 }
 
+function ReviewWorkflow({ router, onReviewAction, reviewBusy = '' }) {
+  const [isAddingNote, setIsAddingNote] = useState(false);
+  const [note, setNote] = useState('');
+  const vm = routerPresentation(router);
+  const followUp = recommendedFollowUp(router);
+
+  if (!onReviewAction || !router?.event_id) return null;
+
+  const submitSimple = (status) => {
+    onReviewAction(router, status, {
+      review_note: defaultReviewNote(router, status),
+      next_action: status === 'reviewed' || status === 'dismissed' ? 'none' : '',
+      review_owner: 'analyst',
+    });
+  };
+
+  const submitFollowUp = () => {
+    onReviewAction(router, 'escalated', {
+      escalation_reason: followUp.reason,
+      next_action: followUp.nextAction,
+      review_note: note.trim() || `${followUp.label}: ${routerTitle(router)}`,
+      review_owner: 'analyst',
+    });
+    setIsAddingNote(false);
+  };
+
+  return (
+    <div className="announcement-router-review-workflow">
+      <div className="announcement-router-follow-up-card">
+        <div>
+          <span>Router recommendation</span>
+          <strong>{followUp.label}</strong>
+          <em>{followUp.helper}</em>
+        </div>
+        <div className="announcement-router-follow-up-route">
+          <span>Next system step</span>
+          <strong>{followUp.nextActionLabel}</strong>
+        </div>
+      </div>
+
+      {!!vm.reviewNote && (
+        <div className="announcement-router-review-state">
+          <span>{vm.reviewLabel}</span>
+          <em>{reviewStateSubtext(vm)}</em>
+          <p>{vm.reviewNote}</p>
+        </div>
+      )}
+
+      {isAddingNote && (
+        <div className="announcement-router-follow-up-card">
+          <div className="announcement-router-follow-up-fields">
+            <label className="is-wide">
+              <span>Analyst note</span>
+              <textarea
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                placeholder="Optional context for the next review step"
+                rows={3}
+              />
+            </label>
+          </div>
+        </div>
+      )}
+
+      <div className="announcement-router-review-actions" aria-label="Review actions">
+        <button
+          type="button"
+          className="announcement-router-review-primary"
+          disabled={Boolean(reviewBusy)}
+          onClick={submitFollowUp}
+        >
+          {reviewBusy === 'escalated' ? 'Sending...' : followUpButtonLabel(followUp)}
+        </button>
+        <button
+          type="button"
+          disabled={Boolean(reviewBusy)}
+          onClick={() => submitSimple('reviewed')}
+        >
+          {reviewBusy === 'reviewed' ? 'Saving...' : 'Mark reviewed'}
+        </button>
+        <button
+          type="button"
+          disabled={Boolean(reviewBusy)}
+          onClick={() => submitSimple('dismissed')}
+        >
+          {reviewBusy === 'dismissed' ? 'Saving...' : 'Clear as no change'}
+        </button>
+        <button
+          type="button"
+          disabled={Boolean(reviewBusy)}
+          onClick={() => setIsAddingNote((value) => !value)}
+        >
+          {isAddingNote ? 'Hide note' : 'Add note'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ConfidenceBreakdown({ router }) {
   const breakdown = router?.confidence_breakdown && typeof router.confidence_breakdown === 'object'
     ? router.confidence_breakdown
@@ -1111,7 +1449,7 @@ function RouterQueue({ events, selectedEventId, onSelect }) {
   return (
     <article className="announcement-router-queue">
       <div className="announcement-router-queue-head">
-        <h4>Filing Queue</h4>
+        <h4>Thesis Decision Queue</h4>
         <span>{events.length} shown</span>
       </div>
       <div className="announcement-router-queue-list">
@@ -1137,10 +1475,13 @@ function RouterQueue({ events, selectedEventId, onSelect }) {
 	                </span>
 	                <span className="announcement-router-queue-title">{routerTitle(row)}</span>
 	                <span className="announcement-router-queue-meta">
-	                  <span>{labelScenarioPathShort(row.baseline_path || row.current_path)}</span>
-	                  <span>{routerMaterialityLabel(row)}</span>
-	                  <span>{routerDriverLabel(row)}</span>
-	                </span>
+		                  <span>{labelScenarioPathShort(row.baseline_path || row.current_path)}</span>
+		                  <span>{routerMaterialityLabel(row)}</span>
+		                  <span>{routerDriverLabel(row)}</span>
+		                  {vm.reviewStatus && vm.reviewStatus !== 'auto_cleared' && <span>{vm.reviewLabel}</span>}
+		                  {vm.reviewReasonLabel && <span>{vm.reviewReasonLabel}</span>}
+		                  {vm.nextActionLabel && <span>Next: {vm.nextActionLabel}</span>}
+		                </span>
               </span>
               <span className="announcement-router-queue-time">{row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}</span>
             </button>
@@ -1154,14 +1495,20 @@ function RouterQueue({ events, selectedEventId, onSelect }) {
 
 function eventMatchesQueueFilter(row, filterKey) {
   const bucket = routerActionBucket(row);
-  if (filterKey === 'attention') return bucket === 'attention';
-  if (filterKey === 'trajectory') return bucket === 'trajectory';
-  if (filterKey === 'no_change') return bucket === 'no_change';
+  if (filterKey === 'open_review') return bucket === 'open_review';
+  if (filterKey === 'positive_movement') return bucket === 'positive_movement';
+  if (filterKey === 'cleared') return bucket === 'cleared';
   if (filterKey === 'administrative') return bucket === 'administrative';
   return true;
 }
 
-function DecisionPanel({ router, emptyTitle = 'No announcement decision attached', emptyCopy = '' }) {
+function DecisionPanel({
+  router,
+  emptyTitle = 'No announcement decision attached',
+  emptyCopy = '',
+  onReviewAction = null,
+  reviewBusy = '',
+}) {
   const decisionAvailable = hasRouterDecision(router);
   const matchedConditions = routerDetailItems(router, 'matched_condition_details', 'matched_conditions');
   const watchHits = routerDetailItems(router, 'triggered_watchlist_details', 'triggered_watchlist');
@@ -1199,34 +1546,27 @@ function DecisionPanel({ router, emptyTitle = 'No announcement decision attached
           <span>{router?.saved_at_utc ? fmtRelativeSince(router.saved_at_utc) : 'n/a'}</span>
         </div>
         <h1>{routerTitle(router)}</h1>
-        {filingSummary && (
-          <p className="announcement-router-filing-summary">
-            <strong>Filing summary</strong>
-            <span>{filingSummary}</span>
-          </p>
-        )}
-        <div className="announcement-router-verdict-card">
-          <span className="announcement-router-verdict-kicker">Trajectory assessment</span>
-          <strong>{vm.trajectoryLabel}</strong>
-          <p>{routerVerdictCopy(router)}</p>
-          <div className="announcement-router-verdict-grid">
-            <span>
-              <em>Driver</em>
-              <b>{routerDriverLabel(router)}</b>
-            </span>
-            <span>
-              <em>Materiality</em>
-              <b>{routerMaterialityLabel(router)}</b>
-            </span>
-            <span>
-              <em>Evidence</em>
-              <b>{vm.evidenceLabel}</b>
-            </span>
-            <span>
-              <em>System action</em>
-              <b>{vm.actionLabel}</b>
-            </span>
+        <div className="announcement-router-decision-summary">
+          <div className="announcement-router-decision-verdict">
+            <span>Trajectory</span>
+            <strong>{vm.trajectoryLabel}</strong>
+            <p>{vm.primaryReason}</p>
           </div>
+        </div>
+        {filingSummary && <p className="announcement-router-filing-summary">{filingSummary}</p>}
+        <div className="announcement-router-verdict-grid" aria-label="Router decision facts">
+          <span>
+            <em>Driver</em>
+            <b>{routerDriverLabel(router)}</b>
+          </span>
+          <span>
+            <em>Materiality</em>
+            <b>{routerMaterialityLabel(router)}</b>
+          </span>
+          <span>
+            <em>Evidence</em>
+            <b>{vm.evidenceLabel}</b>
+          </span>
         </div>
         <div className="announcement-router-hero-actions">
           {router?.source_url && (
@@ -1235,6 +1575,12 @@ function DecisionPanel({ router, emptyTitle = 'No announcement decision attached
           <span className="announcement-router-hero-metric">{classificationConfidence != null && classificationConfidence !== '' ? `Classification confidence ${fmtPct(classificationConfidence)}` : 'Classification confidence n/a'}</span>
           <span className="announcement-router-hero-tag">{router?.source_type ? titleizeKey(router.source_type) : 'Source unresolved'}</span>
         </div>
+        <ReviewWorkflow
+          key={router?.event_id || routerTitle(router)}
+          router={router}
+          onReviewAction={onReviewAction}
+          reviewBusy={reviewBusy}
+        />
       </div>
       <PathTransition router={router} />
       <MarketPathProjection router={router} />
@@ -1347,7 +1693,8 @@ export default function AnnouncementRouterMonitor({
   const [error, setError] = useState('');
   const [tickerFilter, setTickerFilter] = useState('');
   const [selectedEventId, setSelectedEventId] = useState('');
-  const [activeQueueFilter, setActiveQueueFilter] = useState('attention');
+  const [activeQueueFilter, setActiveQueueFilter] = useState('open_review');
+  const [reviewBusy, setReviewBusy] = useState('');
 
   const effectiveTicker = useMemo(
     () => String(tickerFilter || selectedTicker || '').trim().toUpperCase(),
@@ -1406,11 +1753,11 @@ export default function AnnouncementRouterMonitor({
 	  const queueFilters = useMemo(() => {
 	    const count = (key) => queueEvents.filter((row) => eventMatchesQueueFilter(row, key)).length;
 	    return [
-	      { key: 'attention', label: 'Needs Review', tone: 'warn', count: count('attention') },
-	      { key: 'trajectory', label: 'Thesis Improved', tone: 'positive', count: count('trajectory') },
-	      { key: 'no_change', label: 'No Thesis Change', tone: 'neutral', count: count('no_change') },
+	      { key: 'open_review', label: 'Needs thesis decision', tone: 'warn', count: count('open_review') },
+	      { key: 'positive_movement', label: 'Thesis improved', tone: 'positive', count: count('positive_movement') },
+	      { key: 'cleared', label: 'No thesis change', tone: 'neutral', count: count('cleared') },
 	      { key: 'administrative', label: 'Administrative', tone: 'neutral', count: count('administrative') },
-	      { key: 'all', label: 'All Filings', tone: 'neutral', count: queueEvents.length },
+	      { key: 'all', label: 'All filings', tone: 'neutral', count: queueEvents.length },
 	    ];
 	  }, [queueEvents]);
   const filteredEvents = useMemo(
@@ -1429,6 +1776,35 @@ export default function AnnouncementRouterMonitor({
     }
     openAnnouncementRouter();
   }, [onOpenFullMonitor]);
+
+  const updateReview = useCallback(async (row, status, options = {}) => {
+    const eventId = String(row?.event_id || '').trim();
+    const reviewStatus = String(status || '').trim().toLowerCase();
+    if (!eventId || !reviewStatus) return;
+    setReviewBusy(reviewStatus);
+    try {
+      const payload = await api.updateAnnouncementRouterReview(eventId, {
+        review_status: reviewStatus,
+        review_note: options.review_note || `Router event ${reviewStatus} from announcement monitor.`,
+        reviewed_by: 'analyst',
+        review_owner: options.review_owner || 'analyst',
+        escalation_reason: options.escalation_reason || '',
+        next_action: options.next_action || '',
+      });
+      const review = payload?.review || {};
+      setOverview((current) => {
+        if (!current || !Array.isArray(current.recent_events)) return current;
+        return {
+          ...current,
+          recent_events: current.recent_events.map((item) => applyReviewOverlayToEvent(item, review)),
+        };
+      });
+    } catch (err) {
+      setError(err?.message || 'Failed to update router review');
+    } finally {
+      setReviewBusy('');
+    }
+  }, []);
 
   if (embedded) {
     return (
@@ -1465,7 +1841,7 @@ export default function AnnouncementRouterMonitor({
             <div>
               <h3>Announcement Thesis Router</h3>
 	              <p className="scenario-router-monitor-copy">
-	                Tracks announcement filings against the saved thesis map and shows how each filing changes the stock's thesis trajectory.
+	                Tracks new filings against the saved thesis map and shows which ones need a human thesis decision.
 	              </p>
             </div>
             <div className="scenario-router-monitor-actions">
@@ -1488,7 +1864,7 @@ export default function AnnouncementRouterMonitor({
           <div className="announcement-router-console">
             <aside className="announcement-router-side-rail">
 	              <div className="announcement-router-side-head">
-	                <span>Filing Queue</span>
+	                <span>Thesis inbox</span>
                 <strong>{filteredEvents.length}</strong>
               </div>
               <RouterKpiStrip
@@ -1508,7 +1884,12 @@ export default function AnnouncementRouterMonitor({
                   selectedEventId={selectedEvent?.event_id || selectedEventId}
                   onSelect={setSelectedEventId}
                 />
-                <DecisionPanel router={selectedRouter} emptyTitle="No routed announcements yet" />
+                <DecisionPanel
+                  router={selectedRouter}
+                  emptyTitle="No routed announcements yet"
+                  onReviewAction={updateReview}
+                  reviewBusy={selectedRouter?.event_id ? reviewBusy : ''}
+                />
               </div>
 
               <RouterTimeline

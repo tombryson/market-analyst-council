@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from .action_judge import ActionJudge
 from .announcement_interpreter import AnnouncementInterpreter
+from .display_contract import build_router_display_contract
 from .models import AnnouncementFacts, BaselineRunPacket, EvidenceRef
 from .thesis_comparator import ThesisComparator
 
@@ -221,6 +222,13 @@ def build_mock_baseline_run(case: Dict[str, Any]) -> BaselineRunPacket:
 
 
 def _actual_result(facts: AnnouncementFacts, report, action) -> Dict[str, Any]:
+    display = build_router_display_contract(
+        report.to_dict(),
+        action.to_dict(),
+        matched_conditions_count=len(report.matched_condition_ids or []),
+        triggered_watchlist_count=len(report.triggered_watchlist_ids or []),
+        triggered_verification_count=len(getattr(report, "triggered_verification_ids", []) or []),
+    )
     return {
         "announcement_class": facts.announcement_class,
         "materiality": report.materiality,
@@ -242,6 +250,7 @@ def _actual_result(facts: AnnouncementFacts, report, action) -> Dict[str, Any]:
         "classification_confidence": report.classification_confidence,
         "thesis_match_confidence": report.thesis_match_confidence,
         "filing_summary": report.filing_summary,
+        "display": display,
     }
 
 
