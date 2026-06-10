@@ -59,6 +59,9 @@ from .config import (
     SUPPLEMENTARY_API_PIPELINES_ENABLED,
     SCENARIO_ROUTER_WEBHOOK_SECRET,
     SCENARIO_ROUTER_WEBHOOK_REQUIRE_SECRET,
+    OPENROUTER_API_KEY,
+    SCENARIO_ROUTER_MODEL_ADJUDICATION_ENABLED,
+    SCENARIO_ROUTER_MODEL_ADJUDICATION_MAX_CASES,
 )
 from .research import ResearchService, format_evidence_pack_for_prompt
 from .research.supplementary_registry import (
@@ -184,11 +187,21 @@ def _build_scenario_router_service():
     from .scenario_router.lab_scribe import LabScribe
     from .scenario_router.market_facts_resolver import ScenarioMarketFactsResolver
     from .scenario_router.run_selector import LatestRunSelector
+    from .scenario_router.semantic_adjudicator import ModelSemanticAdjudicator
     from .scenario_router.source_resolver import SourceResolver
     from .scenario_router.thesis_comparator import ThesisComparator
     from .scenario_router.service import (
         ScenarioRouterDependencies,
         ScenarioRouterService,
+    )
+    model_adjudicator = (
+        ModelSemanticAdjudicator().adjudicate
+        if SCENARIO_ROUTER_MODEL_ADJUDICATION_ENABLED and OPENROUTER_API_KEY
+        else None
+    )
+    thesis_comparator = ThesisComparator(
+        semantic_adjudicator=model_adjudicator,
+        max_semantic_adjudications=SCENARIO_ROUTER_MODEL_ADJUDICATION_MAX_CASES,
     )
 
     return ScenarioRouterService(
@@ -198,7 +211,7 @@ def _build_scenario_router_service():
             run_selector=LatestRunSelector(limit=25).select_latest,
             announcement_interpreter=AnnouncementInterpreter().interpret,
             market_facts_resolver=ScenarioMarketFactsResolver().resolve,
-            thesis_comparator=ThesisComparator().compare,
+            thesis_comparator=thesis_comparator.compare_async if model_adjudicator else thesis_comparator.compare,
             lab_scribe=LabScribe().persist,
         )
     )
@@ -3088,6 +3101,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
     build_router_display_contract = None
     market_only_watch_projection = None
     should_project_market_only_watch = None
+    watchlist_engagement_projection = None
     router_condition_details = None
     router_thesis_snapshot = None
     try:
@@ -3096,6 +3110,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
             build_router_display_contract,
             market_only_watch_projection,
             should_project_market_only_watch,
+            watchlist_engagement_projection,
         )
         from .scenario_router.observability import (
             _condition_details as router_condition_details,
@@ -3142,7 +3157,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         str(item.get("label") or item.get("condition_id") or "").strip()
         for item in condition_evaluations
         if isinstance(item, dict)
-        and str(item.get("status") or "").strip() == "matched"
+        and str(item.get("status") or "").strip() in {"matched", "partial_match"}
         and str(item.get("group") or "").strip() in {"red_flag", "confirmatory"}
         and str(item.get("matched_via") or "").strip() != "market_facts"
         and str(item.get("label") or item.get("condition_id") or "").strip()
@@ -3202,7 +3217,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         }
         for item in condition_evaluations
         if isinstance(item, dict)
-        and str(item.get("status") or "").strip() == "matched"
+        and str(item.get("status") or "").strip() in {"matched", "partial_match"}
         and str(item.get("group") or "").strip() in {"red_flag", "confirmatory"}
         and str(item.get("matched_via") or "").strip() != "market_facts"
         and str(item.get("label") or item.get("condition_id") or "").strip()
@@ -3260,15 +3275,20 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
             materiality=str(comparison.get("materiality") or facts.get("materiality") or "").strip(),
             trajectory_state=str(comparison.get("trajectory_state") or "").strip(),
         )
-    display_projection = (
-        market_only_watch_projection(
+    if suppress_stale_market_only_reroute and market_only_watch_projection:
+        display_projection = market_only_watch_projection(
             baseline_path=raw_baseline_path,
             current_path=raw_current_path,
             raw_impact=raw_impact,
         )
-        if suppress_stale_market_only_reroute and market_only_watch_projection
-        else {}
-    )
+    elif watchlist_engagement_projection:
+        display_projection = watchlist_engagement_projection(
+            comparison,
+            action,
+            triggered_watchlist_count=len(triggered_watchlist),
+        )
+    else:
+        display_projection = {}
     display_current_path = str(display_projection.get("current_path") or raw_current_path).strip()
     display_action = str(display_projection.get("action") or raw_action).strip()
     display_impact = str(display_projection.get("impact_level") or raw_impact).strip()
@@ -3306,6 +3326,11 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         "impact_level": display_impact,
         "announcement_class": str(comparison.get("announcement_class") or facts.get("announcement_class") or "").strip(),
         "materiality": str(comparison.get("materiality") or facts.get("materiality") or "").strip(),
+        "relationship_priority": comparison.get("relationship_priority", 0),
+        "relationship_kind": str(comparison.get("relationship_kind") or "").strip(),
+        "relationship_strength": str(comparison.get("relationship_strength") or "").strip(),
+        "relationship_direction": str(comparison.get("relationship_direction") or "").strip(),
+        "relationship_summary": str(comparison.get("relationship_summary") or "").strip(),
         "trajectory_state": display_trajectory_state,
         "trajectory_effect": str(display_projection.get("trajectory_effect") or comparison.get("trajectory_effect") or facts.get("trajectory_effect") or "").strip(),
         "price_time_effect": str(display_projection.get("price_time_effect") or comparison.get("price_time_effect") or facts.get("price_time_effect") or "").strip(),
@@ -3342,7 +3367,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
             router_condition_details(
                 condition_evaluations,
                 groups={"required", "failure"},
-                statuses={"matched", "not_matched", "contradicted", "unclear"},
+                statuses={"matched", "partial_match", "not_matched", "contradicted", "unclear"},
                 exclude_market=True,
                 limit=40,
             )
@@ -3353,7 +3378,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
             router_condition_details(
                 condition_evaluations,
                 groups={"red_flag", "confirmatory"},
-                statuses={"matched", "not_matched", "contradicted", "unclear"},
+                statuses={"matched", "partial_match", "not_matched", "contradicted", "unclear"},
                 exclude_market=True,
                 limit=30,
             )
@@ -3364,7 +3389,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
             router_condition_details(
                 condition_evaluations,
                 groups={"verification"},
-                statuses={"matched", "not_matched", "contradicted", "unclear"},
+                statuses={"matched", "partial_match", "not_matched", "contradicted", "unclear"},
                 exclude_market=True,
                 limit=30,
             )
@@ -3375,6 +3400,14 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         "trajectory_projection": (
             comparison.get("trajectory_projection")
             if isinstance(comparison.get("trajectory_projection"), dict)
+            else {}
+        ),
+        "trajectory_score": (
+            display_projection.get("trajectory_score")
+            if isinstance(display_projection.get("trajectory_score"), dict)
+            else
+            comparison.get("trajectory_score")
+            if isinstance(comparison.get("trajectory_score"), dict)
             else {}
         ),
         "thesis_snapshot": router_thesis_snapshot(router_state.get("baseline_run")) if router_thesis_snapshot else {},
@@ -3930,6 +3963,13 @@ async def list_scenario_router_events(limit: int = 50, ticker: str = ""):
     return {
         "events": observer.list_recent_events(limit=max(1, min(int(limit or 50), 500)), ticker=str(ticker or "").strip()),
     }
+
+
+@app.get("/api/market-path/security-history/{ticker:path}")
+async def get_market_path_security_history(ticker: str):
+    from .price_history_bridge import fetch_alpha_edge_security_history
+
+    return await fetch_alpha_edge_security_history(str(ticker or "").strip())
 
 
 @app.post("/api/announcement-router/reviews/{event_id}")

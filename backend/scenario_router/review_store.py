@@ -28,7 +28,7 @@ ESCALATION_REASON_LABELS = {
     "timeline_changed": "Review timeline assumptions",
     "valuation_changed": "Review valuation assumptions",
     "contradicts_saved_thesis": "Review thesis conflict",
-    "needs_evidence_refresh": "Refresh evidence pack",
+    "needs_evidence_refresh": "Add filing to saved analysis",
     "needs_full_rerun": "Rebuild council analysis",
     "source_verification": "Verify source and extraction",
     "other": "Other analyst concern",
@@ -37,11 +37,20 @@ ESCALATION_REASON_LABELS = {
 NEXT_ACTION_LABELS = {
     "add_note": "Add note",
     "update_thesis_map": "Update thesis map",
-    "refresh_evidence": "Refresh evidence",
+    "refresh_evidence": "Update saved analysis",
     "rebuild_analysis": "Rebuild analysis",
     "verify_source": "Verify source",
     "label_filing": "Label filing",
     "none": "No system action",
+}
+
+NEXT_ACTION_QUEUE_LABELS = {
+    "add_note": "Queued note",
+    "update_thesis_map": "Thesis-map queue",
+    "refresh_evidence": "Analysis update queue",
+    "rebuild_analysis": "Council rebuild queue",
+    "verify_source": "Source check queue",
+    "label_filing": "Classification queue",
 }
 
 REASON_TO_NEXT_ACTION = {
@@ -137,24 +146,27 @@ def apply_review_overlay(row: Dict[str, Any], review: Dict[str, Any]) -> Dict[st
     label = {
         "reviewed": "Reviewed",
         "dismissed": "Dismissed",
-        "escalated": "Queued for review",
+        "escalated": "Queued task",
     }.get(status, status.title())
     reason_label = str(review.get("escalation_reason_label") or "").strip()
     next_action_label = str(review.get("next_action_label") or "").strip()
+    next_action = str(review.get("next_action") or "").strip()
+    queued_label = NEXT_ACTION_QUEUE_LABELS.get(next_action, "Queued follow-up")
     current_tone = str(display.get("tone") or "").strip()
     row["display"] = {
         **display,
-        "queue_bucket": "open_review" if status == "escalated" else "cleared",
-        "queue_label": "Needs thesis decision" if status == "escalated" else "Cleared",
+        "queue_bucket": str(display.get("queue_bucket") or "").strip(),
+        "queue_label": str(display.get("queue_label") or "").strip(),
+        "review_queue_label": queued_label if status == "escalated" else "",
         "review_status": status,
         "review_label": label,
         "review_reason": str(review.get("escalation_reason") or display.get("review_reason") or "").strip(),
         "review_reason_label": reason_label,
         "review_owner": str(review.get("review_owner") or "").strip(),
-        "next_action": str(review.get("next_action") or "").strip(),
+        "next_action": next_action,
         "next_action_label": next_action_label,
-        "is_user_action_required": status == "escalated",
-        "tone": current_tone if status == "escalated" and current_tone and current_tone != "neutral" else ("warn" if status == "escalated" else "neutral"),
+        "is_user_action_required": False,
+        "tone": current_tone or str(display.get("tone") or "").strip(),
     }
     row["review_overlay"] = review
     return row

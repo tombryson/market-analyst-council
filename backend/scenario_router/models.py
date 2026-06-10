@@ -34,7 +34,7 @@ ActionType = Literal[
 ]
 ScenarioPath = Literal["unknown", "bull", "base", "bear", "mixed"]
 RunValidity = Literal["intact", "watch", "partial_invalidation", "invalidated"]
-ConditionStatus = Literal["matched", "not_matched", "contradicted", "unclear"]
+ConditionStatus = Literal["matched", "partial_match", "not_matched", "contradicted", "unclear"]
 MaterialChangeType = Literal[
     "financing",
     "permitting",
@@ -212,6 +212,9 @@ class ConditionEvaluation:
     reason: str = ""
     confidence: float = 0.0
     matched_via: str = ""
+    relationship: str = ""
+    satisfies_condition: bool = False
+    missing_for_full_match: List[str] = field(default_factory=list)
     market_field: str = ""
     observed_value: Any = None
     comparator: str = ""
@@ -242,6 +245,11 @@ class ComparisonReport:
     capital_effect: CapitalEffect = "unknown"
     announcement_class: str = ""
     materiality: str = ""
+    relationship_priority: int = 0
+    relationship_kind: str = ""
+    relationship_strength: str = ""
+    relationship_direction: str = ""
+    relationship_summary: str = ""
     trajectory_state: str = ""
     trajectory_effect: str = ""
     price_time_effect: str = ""
@@ -261,6 +269,7 @@ class ComparisonReport:
     triggered_watchlist_ids: List[str] = field(default_factory=list)
     triggered_verification_ids: List[str] = field(default_factory=list)
     market_facts_used: Dict[str, Any] = field(default_factory=dict)
+    trajectory_score: Dict[str, Any] = field(default_factory=dict)
     trajectory_projection: Dict[str, Any] = field(default_factory=dict)
     key_findings: List[ComparisonFinding] = field(default_factory=list)
     conflicts_with_run: List[ComparisonFinding] = field(default_factory=list)

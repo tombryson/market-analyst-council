@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 
 from backend.main import _build_integration_packet
@@ -5,7 +6,9 @@ from backend.scenario_router.action_judge import ActionJudge
 from backend.scenario_router.announcement_interpreter import AnnouncementInterpreter
 from backend.scenario_router.models import AnnouncementFacts, BaselineRunPacket, EvidenceRef
 from backend.scenario_router.run_selector import LatestRunSelector
+from backend.scenario_router.semantic_adjudicator import parse_adjudicator_json
 from backend.scenario_router.thesis_comparator import ThesisComparator
+from backend.scenario_router.trajectory_scoring import apply_cumulative_scores
 
 
 def baseline(template_id="software_saas", leaning="base", conditions=None):
@@ -58,8 +61,10 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         self.assertEqual(interpreted.domain_profile, "resources")
         self.assertIn("drilling_exploration", interpreted.affected_drivers)
         self.assertEqual(report.trajectory_state, "material_unmapped")
+        self.assertEqual(report.relationship_priority, 3)
+        self.assertEqual(report.relationship_kind, "material_unmapped")
         self.assertEqual(action.action, "annotate_run")
-        self.assertIn("thesis-map coverage gap", action.reason)
+        self.assertIn("saved thesis evidence set", action.reason)
 
     def test_generic_customer_contract_classifies_without_resource_topics(self):
         announcement = facts(
@@ -122,6 +127,71 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
 
         self.assertEqual(state, "material_unmapped")
 
+    def test_positive_material_unmapped_scores_bull_leaning_without_claiming_bull_case(self):
+        announcement = facts(
+            "Viridis Executes First Major Project Delivery Contract",
+            (
+                "The company signed a binding agreement for dedicated 138kV power transmission infrastructure. "
+                "The agreement secures critical electrical infrastructure and provides a de-risked pathway to "
+                "Stage 1 operations and first production."
+            ),
+        )
+
+        interpreted = AnnouncementInterpreter().interpret(
+            announcement,
+            baseline(template_id="rare_earths_critical_minerals", leaning="base"),
+        )
+        report = ThesisComparator().compare(interpreted, baseline(template_id="rare_earths_critical_minerals", leaning="base"))
+
+        self.assertEqual(report.trajectory_state, "material_unmapped")
+        self.assertEqual(report.trajectory_score["direction"], "positive")
+        self.assertEqual(report.trajectory_score["event_delta"], 2.0)
+        self.assertEqual(report.trajectory_score["position_label"], "Base, bull-leaning")
+        self.assertFalse(report.trajectory_score["mapped_condition"])
+        self.assertIn("Bull-leaning", report.trajectory_score["reason"])
+
+    def test_saved_thesis_condition_scores_above_unmapped_confirmation(self):
+        announcement = facts(
+            "Power Transmission Infrastructure Secured",
+            "The company confirmed dedicated power transmission infrastructure secured for Stage 1 operations.",
+        )
+        run = baseline(
+            template_id="rare_earths_critical_minerals",
+            leaning="base",
+            conditions=[
+                {
+                    "condition_id": "bull_power_transmission",
+                    "condition": "dedicated power transmission infrastructure secured",
+                }
+            ],
+        )
+
+        interpreted = AnnouncementInterpreter().interpret(announcement, run)
+        report = ThesisComparator().compare(interpreted, run)
+
+        self.assertEqual(report.trajectory_score["validation_type"], "saved_thesis_condition")
+        self.assertEqual(report.trajectory_score["validation_weight"], 3.0)
+        self.assertEqual(report.trajectory_score["event_delta"], 3.0)
+        self.assertEqual(report.trajectory_score["position_label"], "Base, bull-leaning")
+        self.assertTrue(report.trajectory_score["mapped_condition"])
+
+    def test_negative_material_unmapped_scores_bear_leaning(self):
+        announcement = facts(
+            "Key Permit Decision Delayed",
+            "The regulator delayed the key operating permit decision and management said the project schedule is at risk.",
+        )
+
+        interpreted = AnnouncementInterpreter().interpret(
+            announcement,
+            baseline(template_id="rare_earths_critical_minerals", leaning="base"),
+        )
+        report = ThesisComparator().compare(interpreted, baseline(template_id="rare_earths_critical_minerals", leaning="base"))
+
+        self.assertEqual(report.trajectory_state, "material_unmapped")
+        self.assertEqual(report.trajectory_score["direction"], "negative")
+        self.assertLess(report.trajectory_score["event_delta"], 0)
+        self.assertIn("bear", report.trajectory_score["position_band"])
+
     def test_buyback_update_is_capital_management_not_low_confidence_unknown(self):
         announcement = facts(
             "Update - Notification of buy-back - BRK",
@@ -141,7 +211,42 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         self.assertIn("buy-back", interpreted.filing_summary.lower())
         self.assertGreater(interpreted.classification_confidence, 0.45)
         self.assertEqual(report.trajectory_state, "no_thesis_change")
-        self.assertEqual(action.action, "annotate_run")
+        self.assertEqual(report.relationship_priority, 1)
+        self.assertEqual(report.relationship_kind, "no_relation")
+        self.assertEqual(report.trajectory_score["event_delta"], 0.0)
+        self.assertEqual(action.action, "ignore")
+
+    def test_cumulative_scores_roll_forward_by_ticker_and_run(self):
+        rows = [
+            {
+                "ticker": "ASX:TST",
+                "run_id": "run-1",
+                "saved_at_utc": "2026-01-01T00:00:00Z",
+                "baseline_path": "base",
+                "trajectory_score": {"event_delta": 2.0, "baseline_score": 0.0},
+            },
+            {
+                "ticker": "ASX:TST",
+                "run_id": "run-1",
+                "saved_at_utc": "2026-02-01T00:00:00Z",
+                "baseline_path": "base",
+                "trajectory_score": {"event_delta": 1.5, "baseline_score": 0.0},
+            },
+            {
+                "ticker": "ASX:TST",
+                "run_id": "run-1",
+                "saved_at_utc": "2026-03-01T00:00:00Z",
+                "baseline_path": "base",
+                "trajectory_score": {"event_delta": -1.0, "baseline_score": 0.0},
+            },
+        ]
+
+        apply_cumulative_scores(rows)
+
+        self.assertEqual(rows[0]["trajectory_score"]["cumulative_delta"], 2.0)
+        self.assertEqual(rows[1]["trajectory_score"]["cumulative_delta"], 3.5)
+        self.assertEqual(rows[2]["trajectory_score"]["cumulative_delta"], 2.5)
+        self.assertEqual(rows[2]["trajectory_score"]["cumulative_position_label"], "Base, bull-leaning")
 
     def test_unknown_filing_exposes_confidence_breakdown(self):
         announcement = facts(
@@ -279,8 +384,247 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
 
         self.assertEqual(report.triggered_verification_ids, ["verify_jorc_resource"])
         self.assertIn("verify_jorc_resource", [item.condition_id for item in report.condition_evaluations if item.status == "matched"])
-        self.assertEqual(action.action, "annotate_run")
+        self.assertEqual(report.relationship_priority, 5)
+        self.assertEqual(report.relationship_kind, "verification_queue")
+        self.assertEqual(action.action, "run_delta_only")
         self.assertEqual(report.trajectory_projection["rerun_signal"], "annotate_evidence")
+
+    def test_watchlist_semantic_adjudication_flags_offtake_loi_as_partial_not_unmapped(self):
+        announcement = facts(
+            "VMM Signs Strategic Offtake/Tech Partnership LoI with Solvay",
+            "The company signed a strategic offtake and technology partnership letter of intent with Solvay.",
+        )
+        run = baseline(template_id="rare_earths_critical_minerals", leaning="base")
+        run.lab_payload["structured_data"]["monitoring_watchlist"] = {
+            "red_flags": [],
+            "confirmatory_signals": [
+                {
+                    "watch_id": "watch_binding_offtake",
+                    "condition": "Binding Offtake Announcement",
+                    "severity": "high",
+                }
+            ],
+        }
+
+        interpreted = AnnouncementInterpreter().interpret(announcement, run)
+        report = ThesisComparator().compare(interpreted, run)
+        action = ActionJudge().judge(report)
+        watch_eval = next(item for item in report.condition_evaluations if item.condition_id == "watch_binding_offtake")
+
+        self.assertEqual(watch_eval.status, "partial_match")
+        self.assertEqual(watch_eval.relationship, "precursor_partial_match")
+        self.assertFalse(watch_eval.satisfies_condition)
+        self.assertIn("binding or definitive offtake terms", watch_eval.missing_for_full_match)
+        self.assertEqual(report.triggered_watchlist_ids, ["watch_binding_offtake"])
+        self.assertEqual(report.trajectory_state, "thesis_strengthened")
+        self.assertEqual(report.relationship_priority, 4)
+        self.assertEqual(report.relationship_kind, "watchlist_confirmatory")
+        self.assertEqual(report.relationship_strength, "partial")
+        self.assertEqual(report.trajectory_score["validation_type"], "watchlist_confirmatory_partial")
+        self.assertEqual(report.trajectory_score["event_delta"], 2.0)
+        self.assertEqual(action.action, "run_delta_only")
+
+    def test_model_adjudicator_reviews_deterministic_offtake_partial(self):
+        calls = []
+
+        async def fake_adjudicator(request):
+            calls.append(request)
+            return {
+                "status": "partial_match",
+                "relationship": "precursor_partial_match",
+                "satisfies_condition": False,
+                "confidence": 0.82,
+                "reason": "The filing is an offtake-related LoI, but not a binding offtake agreement.",
+                "missing_for_full_match": ["binding or definitive offtake terms"],
+            }
+
+        announcement = facts(
+            "VMM Signs Strategic Offtake/Tech Partnership LoI with Solvay",
+            "The company signed a strategic offtake and technology partnership letter of intent with Solvay.",
+        )
+        run = baseline(template_id="rare_earths_critical_minerals", leaning="base")
+        run.lab_payload["structured_data"]["monitoring_watchlist"] = {
+            "red_flags": [],
+            "confirmatory_signals": [
+                {
+                    "watch_id": "watch_binding_offtake",
+                    "condition": "Binding Offtake Announcement",
+                    "severity": "high",
+                }
+            ],
+        }
+
+        interpreted = AnnouncementInterpreter().interpret(announcement, run)
+        report = asyncio.run(ThesisComparator(semantic_adjudicator=fake_adjudicator).compare_async(interpreted, run))
+        watch_eval = next(item for item in report.condition_evaluations if item.condition_id == "watch_binding_offtake")
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(watch_eval.status, "partial_match")
+        self.assertEqual(watch_eval.matched_via, "model_semantic_adjudication")
+        self.assertFalse(watch_eval.satisfies_condition)
+        self.assertIn("binding or definitive offtake terms", watch_eval.missing_for_full_match)
+
+    def test_watchlist_semantic_adjudication_satisfies_binding_offtake_when_terms_are_binding(self):
+        announcement = facts(
+            "Binding Offtake Agreement Signed with Solvay",
+            "The company signed a binding offtake agreement with Solvay for committed product supply.",
+        )
+        run = baseline(template_id="rare_earths_critical_minerals", leaning="base")
+        run.lab_payload["structured_data"]["monitoring_watchlist"] = {
+            "red_flags": [],
+            "confirmatory_signals": [
+                {
+                    "watch_id": "watch_binding_offtake",
+                    "condition": "Binding Offtake Announcement",
+                    "severity": "high",
+                }
+            ],
+        }
+
+        interpreted = AnnouncementInterpreter().interpret(announcement, run)
+        report = ThesisComparator().compare(interpreted, run)
+        watch_eval = next(item for item in report.condition_evaluations if item.condition_id == "watch_binding_offtake")
+
+        self.assertEqual(watch_eval.status, "matched")
+        self.assertEqual(watch_eval.relationship, "full_match")
+        self.assertTrue(watch_eval.satisfies_condition)
+        self.assertEqual(report.triggered_watchlist_ids, ["watch_binding_offtake"])
+        self.assertEqual(report.trajectory_state, "thesis_strengthened")
+        self.assertEqual(report.trajectory_score["validation_type"], "watchlist_confirmatory_full")
+        self.assertEqual(report.trajectory_score["validation_weight"], 2.5)
+        self.assertEqual(report.trajectory_score["event_delta"], 2.5)
+
+    def test_saved_failure_condition_scores_as_bear_case_break(self):
+        announcement = facts(
+            "Permit Revoked",
+            "The regulator confirmed the key operating permit was revoked for the project.",
+        )
+        run = baseline(template_id="rare_earths_critical_minerals", leaning="bull")
+        run.lab_payload["structured_data"]["thesis_map"]["bull"]["failure_conditions"] = [
+            {
+                "condition_id": "bull_permit_revoked",
+                "condition": "key operating permit was revoked",
+            }
+        ]
+
+        interpreted = AnnouncementInterpreter().interpret(announcement, run)
+        report = ThesisComparator().compare(interpreted, run)
+
+        self.assertEqual(report.trajectory_score["validation_type"], "saved_thesis_failure")
+        self.assertEqual(report.trajectory_score["validation_weight"], 4.0)
+        self.assertEqual(report.trajectory_score["event_delta"], -4.0)
+        self.assertEqual(report.trajectory_score["position_label"], "Base case")
+
+    def test_model_adjudicator_handles_ambiguous_watchlist_candidate_without_literal_match(self):
+        calls = []
+
+        async def fake_adjudicator(request):
+            calls.append(request)
+            return {
+                "status": "partial_match",
+                "relationship": "related_partial_match",
+                "satisfies_condition": False,
+                "confidence": 0.74,
+                "reason": "The filing names a strategic partner, but does not disclose a final commercial agreement.",
+                "missing_for_full_match": ["final commercial agreement terms"],
+            }
+
+        announcement = facts(
+            "Strategic Technology Partner Signed",
+            "The company signed a strategic technology partner for its customer rollout program.",
+        )
+        run = baseline(template_id="software_saas", leaning="base")
+        run.lab_payload["structured_data"]["monitoring_watchlist"] = {
+            "red_flags": [],
+            "confirmatory_signals": [
+                {
+                    "watch_id": "watch_commercial_partner",
+                    "condition": "Strategic partner agreement converted into commercial customer rollout",
+                    "severity": "medium",
+                }
+            ],
+        }
+
+        interpreted = AnnouncementInterpreter().interpret(announcement, run)
+        report = asyncio.run(ThesisComparator(semantic_adjudicator=fake_adjudicator).compare_async(interpreted, run))
+        watch_eval = next(item for item in report.condition_evaluations if item.condition_id == "watch_commercial_partner")
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(watch_eval.status, "partial_match")
+        self.assertEqual(watch_eval.matched_via, "model_semantic_adjudication")
+        self.assertEqual(watch_eval.relationship, "related_partial_match")
+        self.assertEqual(report.triggered_watchlist_ids, ["watch_commercial_partner"])
+        self.assertEqual(report.trajectory_state, "thesis_strengthened")
+
+    def test_model_adjudicator_low_confidence_match_is_ignored(self):
+        async def weak_adjudicator(_request):
+            return {
+                "status": "matched",
+                "relationship": "full_match",
+                "satisfies_condition": True,
+                "confidence": 0.3,
+                "reason": "Weak match.",
+            }
+
+        announcement = facts(
+            "Strategic Technology Partner Signed",
+            "The company signed a strategic technology partner for its customer rollout program.",
+        )
+        run = baseline(template_id="software_saas", leaning="base")
+        run.lab_payload["structured_data"]["monitoring_watchlist"] = {
+            "red_flags": [],
+            "confirmatory_signals": [
+                {
+                    "watch_id": "watch_commercial_partner",
+                    "condition": "Strategic partner agreement converted into commercial customer rollout",
+                    "severity": "medium",
+                }
+            ],
+        }
+
+        interpreted = AnnouncementInterpreter().interpret(announcement, run)
+        report = asyncio.run(ThesisComparator(semantic_adjudicator=weak_adjudicator).compare_async(interpreted, run))
+        watch_eval = next(item for item in report.condition_evaluations if item.condition_id == "watch_commercial_partner")
+
+        self.assertEqual(watch_eval.status, "not_matched")
+        self.assertEqual(report.triggered_watchlist_ids, [])
+
+    def test_model_adjudicator_not_called_for_administrative_filing(self):
+        calls = []
+
+        async def fake_adjudicator(request):
+            calls.append(request)
+            return {"status": "matched", "relationship": "full_match", "satisfies_condition": True, "confidence": 0.9}
+
+        announcement = facts(
+            "Cleansing Notice",
+            "The company issued a cleansing notice in connection with quoted securities.",
+        )
+        run = baseline(template_id="software_saas", leaning="base")
+        run.lab_payload["structured_data"]["monitoring_watchlist"] = {
+            "red_flags": [],
+            "confirmatory_signals": [
+                {
+                    "watch_id": "watch_contract",
+                    "condition": "Major customer contract signed",
+                    "severity": "medium",
+                }
+            ],
+        }
+
+        interpreted = AnnouncementInterpreter().interpret(announcement, run)
+        report = asyncio.run(ThesisComparator(semantic_adjudicator=fake_adjudicator).compare_async(interpreted, run))
+
+        self.assertEqual(calls, [])
+        self.assertEqual(report.triggered_watchlist_ids, [])
+
+    def test_adjudicator_json_parser_extracts_fenced_json(self):
+        parsed = parse_adjudicator_json(
+            '```json\n{"status":"partial_match","relationship":"related_partial_match","confidence":0.7}\n```'
+        )
+
+        self.assertEqual(parsed["status"], "partial_match")
+        self.assertEqual(parsed["relationship"], "related_partial_match")
 
 
 if __name__ == "__main__":

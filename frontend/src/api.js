@@ -348,6 +348,23 @@ export const api = {
     return this.listAnnouncementRouterEvents(limit, ticker);
   },
 
+  async getSecurityPriceHistory(ticker = '') {
+    const cleanTicker = String(ticker || '').trim();
+    if (!cleanTicker) {
+      return { available: false, points: [], latest: null, error: 'missing_ticker' };
+    }
+    const { response, body } = await fetchJsonWithRetry(
+      `${API_BASE}/api/market-path/security-history/${encodeURIComponent(cleanTicker)}`,
+      { method: 'GET' },
+      { retries: 1, timeoutMs: 15000 }
+    );
+    if (!response.ok) {
+      const detail = errorDetailFromPayload(body);
+      throw new Error(detail ? `Failed to load price history: ${detail}` : 'Failed to load price history');
+    }
+    return body;
+  },
+
   async getAnnouncementRouterEvaluations() {
     const { response, body } = await fetchJsonWithRetry(
       `${API_BASE}/api/announcement-router/evaluations`,

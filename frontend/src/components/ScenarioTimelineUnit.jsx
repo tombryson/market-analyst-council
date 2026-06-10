@@ -1,13 +1,14 @@
 const CHART_METRICS = {
   width: 820,
-  height: 360,
-  margin: { top: 12, right: 24, bottom: 42, left: 58 },
+  height: 374,
+  margin: { top: 12, right: 24, bottom: 58, left: 58 },
 };
 
-const chartX = (months) => {
+const chartX = (months, domainStart = 0, domainEnd = 24) => {
   const { width, margin } = CHART_METRICS;
   const plotW = width - margin.left - margin.right;
-  return margin.left + (months / 24) * plotW;
+  const span = Math.max(1, domainEnd - domainStart);
+  return margin.left + ((months - domainStart) / span) * plotW;
 };
 
 const LANE_AXIS_STYLE = {
@@ -27,6 +28,172 @@ function fmtMoney(value, currency = 'AUD') {
   return `${symbol}${n.toFixed(2)}`;
 }
 
+function parseDate(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function shortDate(value) {
+  const parsed = parseDate(value);
+  if (!parsed) return 'n/a';
+  return parsed.toISOString().slice(0, 10);
+}
+
+function addMonths(dateValue, months) {
+  const parsed = parseDate(dateValue);
+  if (!parsed) return null;
+  return new Date(Date.UTC(
+    parsed.getUTCFullYear(),
+    parsed.getUTCMonth() + months,
+    1
+  ));
+}
+
+function monthAxisLabel(dateValue, months) {
+  const date = addMonths(dateValue, months);
+  if (!date) return '';
+  return date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+}
+
+function horizonAxisLabel(months) {
+  if (months === 0) return 'Run';
+  if (months % 6 === 0) return `+${months}M`;
+  return '';
+}
+
+function monthOffsetFromDate(dateValue, startDate) {
+  const date = parseDate(dateValue);
+  const start = parseDate(startDate);
+  if (!date || !start) return null;
+  return (date.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30.4375);
+}
+
+function normalizePricePoints(points, startDate, runPrice = null) {
+  const rows = (Array.isArray(points) ? points : [])
+    .map((point) => {
+      const price = Number(point?.price);
+      const m = monthOffsetFromDate(point?.date || point?.observed_at, startDate);
+      if (!Number.isFinite(price) || price <= 0 || m == null || m < 0 || m > 24) return null;
+      return {
+        ...point,
+        date: shortDate(point?.date || point?.observed_at),
+        m,
+        price,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.m - b.m);
+  const anchorPrice = Number(runPrice);
+  if (Number.isFinite(anchorPrice) && anchorPrice > 0 && (!rows.length || rows[0].m > 0.05)) {
+    rows.unshift({
+      date: shortDate(startDate),
+      m: 0,
+      price: anchorPrice,
+      source: 'run baseline',
+    });
+  }
+  return rows;
+}
+
+function smoothedPricePoints(points) {
+  if (!Array.isArray(points) || points.length <= 2) return points || [];
+  const bucketSizeMonths = 0.25;
+  const buckets = new Map();
+  points.forEach((point) => {
+    const key = Math.floor(point.m / bucketSizeMonths);
+    const bucket = buckets.get(key) || [];
+    bucket.push(point);
+    buckets.set(key, bucket);
+  });
+  const bucketed = Array.from(buckets.values()).map((bucket) => {
+    const last = bucket[bucket.length - 1];
+    const sum = bucket.reduce((acc, point) => ({
+      m: acc.m + point.m,
+      price: acc.price + point.price,
+    }), { m: 0, price: 0 });
+    return {
+      ...last,
+      m: sum.m / bucket.length,
+      price: sum.price / bucket.length,
+    };
+  });
+  return bucketed.map((point, idx) => {
+    if (idx === 0 || idx === bucketed.length - 1) return point;
+    const prev = bucketed[idx - 1];
+    const next = bucketed[idx + 1];
+    return {
+      ...point,
+      price: (prev.price + point.price + next.price) / 3,
+    };
+  });
+}
+
+function todayPriceMarker(latestPoint, startDate) {
+  if (!latestPoint) return null;
+  const todayM = monthOffsetFromDate(new Date().toISOString(), startDate);
+  if (todayM == null || todayM < 0 || todayM > 24) return latestPoint;
+  return {
+    ...latestPoint,
+    m: Math.max(latestPoint.m, todayM),
+    markerDate: shortDate(new Date().toISOString()),
+  };
+}
+
+function smoothSvgPath(points, x, y) {
+  if (!Array.isArray(points) || !points.length) return '';
+  const coords = points.map((point) => ({ x: x(point.m), y: y(point.price) }));
+  if (coords.length === 1) return `M ${coords[0].x} ${coords[0].y}`;
+  return coords.reduce((path, point, idx) => {
+    if (idx === 0) return `M ${point.x} ${point.y}`;
+    const p0 = coords[idx - 2] || coords[idx - 1];
+    const p1 = coords[idx - 1];
+    const p2 = point;
+    const p3 = coords[idx + 1] || p2;
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    return `${path} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${p2.x} ${p2.y}`;
+  }, '');
+}
+
+function markerTone(event) {
+  const raw = String(event?.tone || event?.trajectory_state || event?.impact_level || '').trim().toLowerCase();
+  if (raw.includes('strength') || raw.includes('accelerat') || raw.includes('reduced') || raw.includes('positive')) return 'positive';
+  if (raw.includes('weaken') || raw.includes('delay') || raw.includes('increased') || raw.includes('negative') || raw.includes('bear')) return 'negative';
+  return 'neutral';
+}
+
+function normalizeRouterEvents(events, startDate) {
+  return (Array.isArray(events) ? events : [])
+    .map((event) => {
+      const eventDate = event?.date || event?.saved_at_utc || event?.received_at_utc || event?.occurred_at;
+      const m = monthOffsetFromDate(eventDate, startDate);
+      if (m == null || m < 0 || m > 24) return null;
+      const tone = markerTone(event);
+      if (tone !== 'positive' && tone !== 'negative') return null;
+      return {
+        ...event,
+        date: shortDate(eventDate),
+        m,
+        tone,
+        title: String(event?.title || event?.announcement_title || 'Routed announcement').trim(),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.m - b.m);
+}
+
+function nearestPrice(points, month) {
+  if (!points.length) return null;
+  return points.reduce((best, point) => (
+    !best || Math.abs(point.m - month) < Math.abs(best.m - month) ? point : best
+  ), null);
+}
+
 function statusTone(status) {
   const s = String(status || '').toLowerCase();
   if (s.includes('met') || s.includes('likely') || s.includes('planned') || s.includes('imminent')) return 'bull';
@@ -43,13 +210,36 @@ function statusLabel(status) {
   return s ? s.replace(/_/g, ' ') : 'n/a';
 }
 
-export default function ScenarioTimelineUnit({ data, currency, timelineBars, orientation = 'vertical' }) {
+export default function ScenarioTimelineUnit({
+  data,
+  currency,
+  timelineBars,
+  orientation = 'vertical',
+  actualPrices = [],
+  routerEvents = [],
+  showPriceHistory = false,
+  showRouterEvents = false,
+  startDate = '',
+}) {
   const { width, height, margin } = CHART_METRICS;
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
 
-  const x = (m) => margin.left + (m / 24) * plotW;
-  const now = new Date();
+  const runStart = parseDate(startDate || data?.runDate || data?.asOfDate) || new Date();
+  const rawPricePoints = showPriceHistory ? normalizePricePoints(actualPrices, runStart, data?.current) : [];
+  const latestRawPricePoint = rawPricePoints.length ? rawPricePoints[rawPricePoints.length - 1] : null;
+  const currentPricePoint = todayPriceMarker(latestRawPricePoint, runStart);
+  const pricePoints = smoothedPricePoints(
+    currentPricePoint && latestRawPricePoint && currentPricePoint.m > latestRawPricePoint.m
+      ? [...rawPricePoints, currentPricePoint]
+      : rawPricePoints
+  );
+  const routeMarkers = showRouterEvents ? normalizeRouterEvents(routerEvents, runStart) : [];
+  const domainStart = 0;
+  const domainEnd = 24;
+  const x = (m) => chartX(m, domainStart, domainEnd);
+
+  const now = runStart;
   const yearSegments = (() => {
     const startYear = now.getFullYear();
     const startMonth = now.getMonth();
@@ -85,6 +275,8 @@ export default function ScenarioTimelineUnit({ data, currency, timelineBars, ori
     data.targets24.bull,
     data.weighted12,
     data.weighted24,
+    ...rawPricePoints.map((point) => point.price),
+    currentPricePoint?.price,
   ].filter((v) => Number.isFinite(v) && v > 0);
   const safeValues = values.length ? values : [1];
   const min = Math.min(...safeValues);
@@ -134,6 +326,21 @@ export default function ScenarioTimelineUnit({ data, currency, timelineBars, ori
     { m: 12, v: data.weighted12 },
     { m: 24, v: data.weighted24 },
   ].filter((p) => Number.isFinite(p.v) && p.v > 0);
+  const axisTicks = Array.from({ length: 9 }, (_, idx) => idx * 3);
+  const actualPath = smoothSvgPath(pricePoints, x, y);
+  const markerY = (event) => {
+    const nearby = nearestPrice(rawPricePoints, event.m) || nearestPrice(pricePoints, event.m);
+    if (nearby) return y(nearby.price);
+    if (Number.isFinite(data.current) && data.current > 0) return y(data.current);
+    return margin.top + plotH * 0.5;
+  };
+  const markerPath = (event) => {
+    const px = x(event.m);
+    const py = markerY(event);
+    if (event.tone === 'positive') return `M ${px} ${py - 8} L ${px - 7} ${py + 7} L ${px + 7} ${py + 7} Z`;
+    if (event.tone === 'negative') return `M ${px} ${py + 8} L ${px - 7} ${py - 7} L ${px + 7} ${py - 7} Z`;
+    return `M ${px - 6} ${py - 6} L ${px + 6} ${py - 6} L ${px + 6} ${py + 6} L ${px - 6} ${py + 6} Z`;
+  };
 
   return (
     <div className={`lab-chart-wrap orientation-${orientation}`}>
@@ -158,12 +365,17 @@ export default function ScenarioTimelineUnit({ data, currency, timelineBars, ori
           );
         })}
 
-        {[0, 6, 12, 18, 24].map((m) => (
+        {axisTicks.map((m) => (
           <g key={`xt-${m}`}>
             <line x1={x(m)} y1={margin.top} x2={x(m)} y2={margin.top + plotH} className="lab-grid-vert" />
-            <text x={x(m)} y={margin.top + plotH + 18} textAnchor="middle" className="lab-axis-label">
-              {m === 0 ? 'Now' : `${m}M`}
+            <text x={x(m)} y={margin.top + plotH + 16} textAnchor="middle" className="lab-axis-month-label">
+              {monthAxisLabel(runStart, m)}
             </text>
+            {horizonAxisLabel(m) && (
+              <text x={x(m)} y={margin.top + plotH + 31} textAnchor="middle" className="lab-axis-label">
+                {horizonAxisLabel(m)}
+              </text>
+            )}
           </g>
         ))}
 
@@ -171,7 +383,7 @@ export default function ScenarioTimelineUnit({ data, currency, timelineBars, ori
           <text
             key={`yr-${segment.label}-${segment.center}`}
             x={x(segment.center)}
-            y={margin.top + plotH + 34}
+            y={margin.top + plotH + 48}
             textAnchor="middle"
             className="lab-axis-year-label"
           >
@@ -180,6 +392,14 @@ export default function ScenarioTimelineUnit({ data, currency, timelineBars, ori
         ))}
 
         <polygon points={ribbonPoints} className="lab-ribbon" />
+
+        {pricePoints.length > 1 && (
+          <path
+            d={actualPath}
+            fill="none"
+            className="lab-actual-price-line"
+          />
+        )}
 
         {Object.entries(series).map(([key, points]) => (
           <g key={key}>
@@ -221,7 +441,37 @@ export default function ScenarioTimelineUnit({ data, currency, timelineBars, ori
             ))}
           </g>
         )}
+
+        {currentPricePoint && (
+          <g className="lab-current-price-marker">
+            <circle cx={x(currentPricePoint.m)} cy={y(currentPricePoint.price)} r="6">
+              <title>{`Today: ${fmtMoney(currentPricePoint.price, currency)} (latest source date ${currentPricePoint.date})`}</title>
+            </circle>
+          </g>
+        )}
+
+        {routeMarkers.length > 0 && (
+          <g className="lab-router-markers">
+            {routeMarkers.map((event, idx) => (
+              <path
+                key={`router-${event.date}-${event.title}-${idx}`}
+                d={markerPath(event)}
+                className={`tone-${event.tone}`}
+              >
+                <title>{`${event.date}: ${event.title}`}</title>
+              </path>
+            ))}
+          </g>
+        )}
       </svg>
+      {(pricePoints.length > 0 || routeMarkers.length > 0) && (
+        <div className="lab-chart-overlay-legend">
+          {pricePoints.length > 0 && <span><i className="is-price" />Actual price history</span>}
+          {currentPricePoint && <span><i className="is-current" />Today {fmtMoney(currentPricePoint.price, currency)}</span>}
+          {routeMarkers.length > 0 && <span><i className="is-positive" />Positive catalyst</span>}
+          {routeMarkers.length > 0 && <span><i className="is-negative" />Negative catalyst</span>}
+        </div>
+      )}
       <div className="timeline-impact-embedded" style={LANE_AXIS_STYLE}>
         <div className="timeline-lane">
           {(timelineBars || []).map((row, idx) => (
@@ -240,14 +490,14 @@ export default function ScenarioTimelineUnit({ data, currency, timelineBars, ori
                   aria-label={`timeline track for ${row.milestone}`}
                 >
                   <line
-                    x1={chartX(0)}
+                    x1={chartX(0, domainStart, domainEnd)}
                     y1={8}
-                    x2={chartX(24)}
+                    x2={chartX(24, domainStart, domainEnd)}
                     y2={8}
                     className="timeline-track-line"
                   />
                   <circle
-                    cx={chartX(row.offset ?? 24)}
+                    cx={chartX(row.offset ?? 24, domainStart, domainEnd)}
                     cy={8}
                     r={6}
                     className={`timeline-track-dot tone-${statusTone(row.status)}`}

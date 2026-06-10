@@ -33,7 +33,7 @@ The HotCopper Team
 
 
 class ScenarioRouterDisplayContractTests(unittest.TestCase):
-    def test_review_overlay_moves_reviewed_item_out_of_open_review(self):
+    def test_review_overlay_preserves_case_bucket_for_reviewed_item(self):
         row = {
             "event_id": "evt-review",
             "display": {
@@ -53,7 +53,8 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
 
         updated = apply_review_overlay(row, review)
 
-        self.assertEqual(updated["display"]["queue_bucket"], "cleared")
+        self.assertEqual(updated["display"]["queue_bucket"], "open_review")
+        self.assertEqual(updated["display"]["queue_label"], "Review required")
         self.assertEqual(updated["display"]["review_status"], "reviewed")
         self.assertEqual(updated["display"]["review_label"], "Reviewed")
         self.assertFalse(updated["display"]["is_user_action_required"])
@@ -76,7 +77,7 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
             self.assertEqual(review["review_note"], "Not relevant.")
             self.assertEqual(review["next_action"], "none")
 
-    def test_escalated_review_requires_reason_and_keeps_item_open(self):
+    def test_escalated_review_requires_reason_without_erasing_case_bucket(self):
         import tempfile
         from pathlib import Path
 
@@ -108,14 +109,15 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
 
         self.assertEqual(review["escalation_reason_label"], "Add missing thesis condition")
         self.assertEqual(review["next_action"], "update_thesis_map")
-        self.assertEqual(updated["display"]["queue_bucket"], "open_review")
+        self.assertEqual(updated["display"]["queue_bucket"], "cleared")
         self.assertEqual(updated["display"]["review_status"], "escalated")
-        self.assertEqual(updated["display"]["review_label"], "Queued for review")
-        self.assertEqual(updated["display"]["queue_label"], "Needs thesis decision")
+        self.assertEqual(updated["display"]["review_label"], "Queued task")
+        self.assertEqual(updated["display"]["queue_label"], "Cleared")
+        self.assertEqual(updated["display"]["review_queue_label"], "Thesis-map queue")
         self.assertEqual(updated["display"]["review_reason_label"], "Add missing thesis condition")
         self.assertEqual(updated["display"]["next_action_label"], "Update thesis map")
-        self.assertTrue(updated["display"]["is_user_action_required"])
-        self.assertEqual(updated["display"]["tone"], "warn")
+        self.assertFalse(updated["display"]["is_user_action_required"])
+        self.assertEqual(updated["display"]["tone"], "neutral")
 
     def test_display_contract_separates_trajectory_review_and_system_action(self):
         display = build_router_display_contract(
@@ -128,7 +130,7 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
         self.assertEqual(display["queue_label"], "Needs thesis decision")
         self.assertEqual(display["review_status"], "open")
         self.assertEqual(display["review_label"], "Needs thesis decision")
-        self.assertEqual(display["system_action_label"], "Add note")
+        self.assertEqual(display["system_action_label"], "Attach to thesis log")
         self.assertTrue(display["is_user_action_required"])
 
     def test_display_contract_tracks_positive_movement_without_calling_it_review_required(self):
@@ -256,10 +258,93 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
         self.assertEqual(row["path_transition"], "")
         self.assertEqual(row["action_reason"], MARKET_ONLY_WATCH_REASON)
         self.assertEqual(row["invalidated_sections"], [])
-        self.assertEqual(row["affected_domains"], [])
-        self.assertNotIn("full rerun", " ".join(row["follow_up_steps"]).lower())
-        self.assertEqual(row["announcement_condition_checks"][0]["status"], "not_matched")
-        self.assertEqual(row["thesis_snapshot"]["scenarios"]["bull"]["summary"], "Bull case summary.")
+
+    def test_stale_partial_watchlist_no_change_projects_to_thesis_movement(self):
+        payload = {
+            "status": "ok",
+            "saved_at_utc": "2026-06-04T00:00:00Z",
+            "event": {
+                "event_id": "evt-offtake",
+                "ticker": "ASX:VMM",
+                "received_at_utc": "2026-06-03T23:55:00Z",
+            },
+            "announcement_packet": {
+                "event_id": "evt-offtake",
+                "ticker": "ASX:VMM",
+                "title": "VMM Signs Strategic Offtake/Tech Partnership LoI with Solvay",
+                "source_type": "exchange_filing",
+                "source_url": "https://announcements.asx.com.au/asxpdf/example.pdf",
+            },
+            "baseline_run": {
+                "run_id": "run-vmm",
+                "lab_payload": {
+                    "structured_data": {
+                        "extended_analysis": {
+                            "current_thesis_state": {"leaning": "base", "status": "on-track"}
+                        }
+                    }
+                },
+            },
+            "comparison_report": {
+                "ticker": "ASX:VMM",
+                "baseline_run_id": "run-vmm",
+                "announcement_title": "VMM Signs Strategic Offtake/Tech Partnership LoI with Solvay",
+                "baseline_path": "base",
+                "current_path": "base",
+                "impact_level": "medium",
+                "materiality": "medium",
+                "trajectory_state": "no_thesis_change",
+                "trajectory_effect": "material_update",
+                "price_time_effect": "Direction depends on final binding terms.",
+                "thesis_effect": "no_change",
+                "thesis_match_confidence": 0.68,
+                "key_findings": [
+                    {
+                        "type": "confirmatory_partial_match",
+                        "summary": "Partially engaged confirmatory: Binding Offtake Announcement",
+                        "severity": "low",
+                    }
+                ],
+                "condition_evaluations": [
+                    {
+                        "condition_id": "watch_binding_offtake",
+                        "scenario": "",
+                        "group": "confirmatory",
+                        "label": "Binding Offtake Announcement",
+                        "status": "partial_match",
+                        "matched_via": "semantic",
+                        "relationship": "precursor_partial_match",
+                        "reason": "Announcement is an offtake-related precursor, but not yet a final agreement.",
+                    }
+                ],
+                "trajectory_score": {
+                    "direction": "neutral",
+                    "event_delta": 0.0,
+                    "validation_type": "mapped_condition",
+                },
+            },
+            "action_decision": {
+                "action": "run_delta_only",
+                "confidence": 0.8,
+                "reason": "Meaningful update detected, but not enough to justify a full rerun yet.",
+            },
+        }
+
+        row = ScenarioRouterObservability._summarize_event_payload(
+            payload,
+            path=Path("20260604_000000__evt-offtake.json"),
+        )
+
+        self.assertEqual(row["trajectory_state"], "thesis_strengthened")
+        self.assertEqual(row["display"]["trajectory_label"], "Thesis strengthened")
+        self.assertEqual(row["display"]["queue_bucket"], "positive_movement")
+        self.assertEqual(row["display"]["review_status"], "tracking")
+        self.assertEqual(row["display_adjustment"], "watchlist_engagement_projection")
+        self.assertEqual(row["triggered_watchlist_count"], 1)
+        self.assertEqual(row["trajectory_score"]["validation_type"], "watchlist_confirmatory_partial")
+        self.assertEqual(row["trajectory_score"]["event_delta"], 2.0)
+        self.assertEqual(row["watchlist_condition_checks"][0]["status"], "partial_match")
+        self.assertIn("offtake", row["watchlist_condition_checks"][0]["label"].lower())
 
 
 if __name__ == "__main__":

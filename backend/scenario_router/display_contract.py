@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from .trajectory_scoring import baseline_path_score, position_label, score_band
+
 RERUN_ACTIONS = {"full_rerun", "rerun_stage1", "run_delta_only"}
 MARKET_ONLY_WATCH_REASON = (
     "The announcement did not match any saved thesis condition. "
@@ -33,13 +35,13 @@ TRAJECTORY_LABELS = {
 }
 
 SYSTEM_ACTION_LABELS = {
-    "ignore": "No system action",
+    "ignore": "No maintenance",
     "watch": "Monitor only",
-    "annotate_run": "Add note",
-    "run_delta_only": "Update section",
-    "rerun_stage1": "Refresh evidence",
-    "full_rerun": "Rebuild analysis",
-    "urgent_human_review": "Urgent thesis review",
+    "annotate_run": "Attach to thesis log",
+    "run_delta_only": "Update thesis note",
+    "rerun_stage1": "Refresh evidence pack",
+    "full_rerun": "Rebuild council run",
+    "urgent_human_review": "Human review now",
 }
 
 QUEUE_BUCKET_LABELS = {
@@ -161,7 +163,7 @@ def build_router_display_contract(
         "review_reason": review_reason,
         "is_user_action_required": review_status == "open",
         "system_action": action_key,
-        "system_action_label": SYSTEM_ACTION_LABELS.get(action_key) or _titleize(action_key) or "No system action",
+        "system_action_label": SYSTEM_ACTION_LABELS.get(action_key) or _titleize(action_key) or "No maintenance",
         "primary_reason": _primary_reason(state=state, action=action, direct_hit_count=direct_hit_count),
         "tone": tone,
     }
@@ -191,6 +193,93 @@ def market_only_watch_projection(
         "trajectory_effect": "no_clear_change",
         "price_time_effect": "Market-only context; no direct announcement-led trajectory change identified.",
         "display_adjustment": "market_context_only_watch",
+    }
+
+
+def watchlist_engagement_projection(
+    report: Dict[str, Any],
+    action: Dict[str, Any],
+    *,
+    triggered_watchlist_count: int = 0,
+) -> Dict[str, Any]:
+    """Repair stale rows where watchlist engagement was saved as no-change."""
+
+    report = report if isinstance(report, dict) else {}
+    action = action if isinstance(action, dict) else {}
+    if _norm(report.get("trajectory_state")) != "no_thesis_change":
+        return {}
+    if int(triggered_watchlist_count or 0) <= 0:
+        return {}
+
+    action_key = _norm(action.get("action"))
+    impact = _norm(report.get("impact_level"))
+    materiality = _norm(report.get("materiality"))
+    if (
+        action_key not in RERUN_ACTIONS
+        and impact not in {"medium", "high", "critical"}
+        and materiality not in {"medium", "high", "critical"}
+    ):
+        return {}
+
+    finding_text = _findings_text(report)
+    is_red_flag = "red_flag" in finding_text or "red flag" in finding_text
+    is_confirmatory = "confirmatory" in finding_text
+    if not is_red_flag and not is_confirmatory:
+        return {}
+
+    is_partial = "partial" in finding_text or "partially" in finding_text
+    direction = "negative" if is_red_flag else "positive"
+    trajectory_state = "risk_increased" if is_red_flag else "thesis_strengthened"
+    thesis_effect = "undermines" if is_red_flag else "confirms"
+    validation_type = (
+        "watchlist_red_flag_partial"
+        if is_red_flag and is_partial
+        else "watchlist_red_flag_full"
+        if is_red_flag
+        else "watchlist_confirmatory_partial"
+        if is_partial
+        else "watchlist_confirmatory_full"
+    )
+    validation_weight = {
+        "watchlist_red_flag_partial": 2.0,
+        "watchlist_red_flag_full": 3.0,
+        "watchlist_confirmatory_partial": 2.0,
+        "watchlist_confirmatory_full": 2.5,
+    }[validation_type]
+    event_delta = -validation_weight if direction == "negative" else validation_weight
+    baseline_path = _norm(report.get("baseline_path"))
+    baseline_score = baseline_path_score(baseline_path)
+    score_after_event = round(baseline_score + event_delta, 2)
+    intensity = impact if impact in {"low", "medium", "high", "critical"} else "medium"
+    scope = "red-flag watchlist hit" if is_red_flag else "confirmatory watchlist hit"
+    if is_partial:
+        scope = f"partial {scope}"
+    direction_text = "Bear-leaning" if direction == "negative" else "Bull-leaning"
+    price_time_effect = str(report.get("price_time_effect") or "").strip()
+    reason = f"{direction_text} {intensity} evidence from a {scope}."
+    if price_time_effect:
+        reason = f"{direction_text} {intensity} evidence from a {scope}: {price_time_effect}"
+
+    return {
+        "trajectory_state": trajectory_state,
+        "trajectory_effect": "weakens" if is_red_flag else "strengthens",
+        "thesis_effect": thesis_effect,
+        "run_validity": str(report.get("run_validity") or "watch").strip() or "watch",
+        "display_adjustment": "watchlist_engagement_projection",
+        "trajectory_score": {
+            "direction": direction,
+            "intensity": intensity,
+            "event_delta": round(event_delta, 2),
+            "baseline_score": baseline_score,
+            "score_after_event": score_after_event,
+            "position_band": score_band(score_after_event),
+            "position_label": position_label(baseline_path, score_after_event),
+            "confidence": report.get("thesis_match_confidence") or report.get("classification_confidence") or 0.0,
+            "mapped_condition": True,
+            "validation_type": validation_type,
+            "validation_weight": validation_weight,
+            "reason": reason,
+        },
     }
 
 
@@ -263,10 +352,19 @@ def _tone(
 
 def _primary_reason(*, state: str, action: Dict[str, Any], direct_hit_count: int) -> str:
     if direct_hit_count > 0:
-        return f"Matched {direct_hit_count} saved thesis, watchlist, or verification item{'' if direct_hit_count == 1 else 's'}."
+        return f"Engaged {direct_hit_count} saved thesis, watchlist, or verification item{'' if direct_hit_count == 1 else 's'}."
     if state in PRIMARY_REASONS:
         return PRIMARY_REASONS[state]
     return str(action.get("reason") or "").strip()
+
+
+def _findings_text(report: Dict[str, Any]) -> str:
+    chunks = []
+    for item in report.get("key_findings") or []:
+        if not isinstance(item, dict):
+            continue
+        chunks.extend([str(item.get("type") or ""), str(item.get("summary") or "")])
+    return " ".join(chunks).strip().lower()
 
 
 def _norm(value: Any) -> str:

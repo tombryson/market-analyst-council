@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import inspect
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 from .models import (
     AnnouncementFacts,
@@ -13,6 +14,7 @@ from .models import (
     ConditionEvaluation,
     EvidenceRef,
 )
+from .trajectory_scoring import build_trajectory_score
 
 POSITIVE_TOKENS = {"approved", "secured", "completed", "achieved", "on track", "ahead", "accelerated", "funded", "signed"}
 POSITIVE_ACTION_TOKENS = {
@@ -28,6 +30,30 @@ POSITIVE_ACTION_TOKENS = {
     "renewed",
     "expanded",
     "launched",
+}
+PARTIAL_MATCH_STATUSES = {"matched", "partial_match"}
+NON_FINAL_AGREEMENT_TERMS = {"letter of intent", "loi", "mou", "memorandum of understanding", "non-binding", "non binding"}
+BINDING_AGREEMENT_TERMS = {"binding", "definitive", "take-or-pay", "take or pay", "executed agreement"}
+MODEL_ADJUDICATION_STOP_WORDS = {
+    "about",
+    "against",
+    "announcement",
+    "condition",
+    "company",
+    "current",
+    "evidence",
+    "filing",
+    "latest",
+    "material",
+    "milestone",
+    "monitor",
+    "monitoring",
+    "signal",
+    "signals",
+    "source",
+    "thesis",
+    "update",
+    "updates",
 }
 NEGATIVE_TOKENS = {
     "delay",
@@ -99,12 +125,42 @@ MARKET_FIELD_MAP = {
     ("natural gas", "aud"): "henry_hub_price_aud_mmbtu",
 }
 
+SemanticAdjudicatorFn = Callable[[Dict[str, Any]], Any]
+
+
+@dataclass
+class ThesisRelationship:
+    priority: int = 1
+    kind: str = "no_relation"
+    strength: str = "none"
+    direction: str = "neutral"
+    label: str = ""
+    condition_id: str = ""
+    scenario: str = ""
+    group: str = ""
+    confidence: float = 0.0
+    summary: str = "No saved thesis relationship found."
+    evaluation: Optional[ConditionEvaluation] = None
+
 
 @dataclass
 class ThesisComparator:
     """Compare announcement evidence to explicit thesis-map and watchlist conditions."""
 
+    semantic_adjudicator: Optional[SemanticAdjudicatorFn] = None
+    max_semantic_adjudications: int = 3
+
     def compare(self, facts: AnnouncementFacts, baseline_run: BaselineRunPacket) -> ComparisonReport:
+        ctx = self._comparison_context(facts, baseline_run)
+        evaluations = self._collect_evaluations(ctx)
+        return self._build_report(facts, baseline_run, ctx, evaluations)
+
+    async def compare_async(self, facts: AnnouncementFacts, baseline_run: BaselineRunPacket) -> ComparisonReport:
+        ctx = self._comparison_context(facts, baseline_run)
+        evaluations = await self._collect_evaluations_async(facts, baseline_run, ctx)
+        return self._build_report(facts, baseline_run, ctx, evaluations)
+
+    def _comparison_context(self, facts: AnnouncementFacts, baseline_run: BaselineRunPacket) -> Dict[str, Any]:
         structured = self._structured(baseline_run)
         thesis_map = structured.get("thesis_map") if isinstance(structured.get("thesis_map"), dict) else {}
         current_state = (structured.get("extended_analysis") or {}).get("current_thesis_state") if isinstance(structured.get("extended_analysis"), dict) else {}
@@ -116,7 +172,25 @@ class ThesisComparator:
         evidence_haystack = self._build_evidence_haystack(facts) or context_haystack
         evidence = facts.evidence[0] if facts.evidence else EvidenceRef(source_title=facts.title)
         market_facts = self._normalized_market_facts(facts.market_facts)
+        return {
+            "structured": structured,
+            "thesis_map": thesis_map,
+            "watchlist": watchlist,
+            "verification_queue": verification_queue,
+            "baseline_path": baseline_path,
+            "context_haystack": context_haystack,
+            "evidence_haystack": evidence_haystack,
+            "evidence": evidence,
+            "market_facts": market_facts,
+        }
 
+    def _collect_evaluations(self, ctx: Dict[str, Any]) -> List[ConditionEvaluation]:
+        thesis_map = ctx["thesis_map"]
+        watchlist = ctx["watchlist"]
+        verification_queue = ctx["verification_queue"]
+        evidence_haystack = ctx["evidence_haystack"]
+        evidence = ctx["evidence"]
+        market_facts = ctx["market_facts"]
         evaluations: List[ConditionEvaluation] = []
         for scenario in ("bull", "base", "bear"):
             block = thesis_map.get(scenario) if isinstance(thesis_map, dict) else {}
@@ -126,10 +200,71 @@ class ThesisComparator:
         evaluations.extend(self._evaluate_watchlist(watchlist.get("red_flags") or [], "red_flag", evidence_haystack, market_facts, evidence))
         evaluations.extend(self._evaluate_watchlist(watchlist.get("confirmatory_signals") or [], "confirmatory", evidence_haystack, market_facts, evidence))
         evaluations.extend(self._evaluate_verification_queue(verification_queue, evidence_haystack, market_facts, evidence))
+        return evaluations
 
+    async def _collect_evaluations_async(
+        self,
+        facts: AnnouncementFacts,
+        baseline_run: BaselineRunPacket,
+        ctx: Dict[str, Any],
+    ) -> List[ConditionEvaluation]:
+        thesis_map = ctx["thesis_map"]
+        watchlist = ctx["watchlist"]
+        verification_queue = ctx["verification_queue"]
+        evidence_haystack = ctx["evidence_haystack"]
+        evidence = ctx["evidence"]
+        market_facts = ctx["market_facts"]
+        evaluations: List[ConditionEvaluation] = []
+        for scenario in ("bull", "base", "bear"):
+            block = thesis_map.get(scenario) if isinstance(thesis_map, dict) else {}
+            evaluations.extend(self._evaluate_items(block.get("required_conditions") or [], scenario, "required", evidence_haystack, market_facts, evidence))
+            evaluations.extend(self._evaluate_items(block.get("failure_conditions") or [], scenario, "failure", evidence_haystack, market_facts, evidence))
+
+        evaluations.extend(
+            await self._evaluate_watchlist_async(
+                watchlist.get("red_flags") or [],
+                "red_flag",
+                evidence_haystack,
+                market_facts,
+                evidence,
+                facts,
+                baseline_run,
+            )
+        )
+        evaluations.extend(
+            await self._evaluate_watchlist_async(
+                watchlist.get("confirmatory_signals") or [],
+                "confirmatory",
+                evidence_haystack,
+                market_facts,
+                evidence,
+                facts,
+                baseline_run,
+            )
+        )
+        evaluations.extend(self._evaluate_verification_queue(verification_queue, evidence_haystack, market_facts, evidence))
+        return evaluations
+
+    def _build_report(
+        self,
+        facts: AnnouncementFacts,
+        baseline_run: BaselineRunPacket,
+        ctx: Dict[str, Any],
+        evaluations: List[ConditionEvaluation],
+    ) -> ComparisonReport:
+        structured = ctx["structured"]
+        baseline_path = ctx["baseline_path"]
+        evidence_haystack = ctx["evidence_haystack"]
+        evidence = ctx["evidence"]
+        market_facts = ctx["market_facts"]
         matched_evals = [item for item in evaluations if item.status == "matched"]
         announcement_matched_evals = [
             item for item in matched_evals if str(item.matched_via or "").strip() != "market_facts"
+        ]
+        announcement_engaged_evals = [
+            item
+            for item in evaluations
+            if item.status in PARTIAL_MATCH_STATUSES and str(item.matched_via or "").strip() != "market_facts"
         ]
         matched_condition_ids = [
             item.condition_id
@@ -138,7 +273,7 @@ class ThesisComparator:
         ]
         triggered_watchlist_ids = [
             item.condition_id
-            for item in announcement_matched_evals
+            for item in announcement_engaged_evals
             if item.group in {"red_flag", "confirmatory"} and item.condition_id
         ]
         triggered_verification_ids = [
@@ -146,42 +281,54 @@ class ThesisComparator:
             for item in announcement_matched_evals
             if item.group == "verification" and item.condition_id
         ]
-        thesis_match_confidence = self._thesis_match_confidence(evaluations, announcement_matched_evals, facts)
+        thesis_match_confidence = self._thesis_match_confidence(evaluations, announcement_engaged_evals, facts)
 
         bull_required = self._matched_count(announcement_matched_evals, scenario="bull", group="required")
         base_required = self._matched_count(announcement_matched_evals, scenario="base", group="required")
         bear_required = self._matched_count(announcement_matched_evals, scenario="bear", group="required")
         bull_failure = self._matched_count(announcement_matched_evals, scenario="bull", group="failure")
         base_failure = self._matched_count(announcement_matched_evals, scenario="base", group="failure")
+        thesis_required_hits = self._matched_count(announcement_matched_evals, group="required")
+        thesis_failure_hits = self._matched_count(announcement_matched_evals, group="failure")
         red_flag_hits = self._matched_count(announcement_matched_evals, group="red_flag")
         confirmatory_hits = self._matched_count(announcement_matched_evals, group="confirmatory")
         verification_hits = self._matched_count(announcement_matched_evals, group="verification")
+        red_flag_partial_hits = sum(
+            1
+            for item in announcement_engaged_evals
+            if item.group == "red_flag" and item.status == "partial_match"
+        )
+        confirmatory_partial_hits = sum(
+            1
+            for item in announcement_engaged_evals
+            if item.group == "confirmatory" and item.status == "partial_match"
+        )
 
         positive = self._contains_any(evidence_haystack, POSITIVE_TOKENS)
         negative = self._contains_any(evidence_haystack, NEGATIVE_TOKENS)
         affected_domains = self._infer_domains(
             facts=facts,
-            matched_evaluations=announcement_matched_evals,
+            matched_evaluations=announcement_engaged_evals,
         )
-
-        current_path = self._choose_current_path(
-            baseline_path=baseline_path,
-            bull_required=bull_required,
-            base_required=base_required,
-            bear_required=bear_required,
-            bull_failure=bull_failure,
-            base_failure=base_failure,
-            red_flag_hits=red_flag_hits,
-            confirmatory_hits=confirmatory_hits,
-            positive=positive,
-            negative=negative,
-        )
-        path_transition = f"{baseline_path}->{current_path}" if baseline_path and current_path and baseline_path != current_path else ""
 
         semantic_materiality = str(facts.materiality or "").strip().lower()
         announcement_class = str(facts.announcement_class or "").strip().lower()
         trajectory_effect = str(facts.trajectory_effect or "").strip().lower()
-        key_findings, conflicts = self._build_findings(announcement_matched_evals)
+        market_match_count = self._matched_count([item for item in matched_evals if str(item.matched_via or '').strip() == "market_facts"])
+        relationship = self._resolve_dominant_relationship(
+            facts=facts,
+            announcement_engaged_evals=announcement_engaged_evals,
+            market_match_count=market_match_count,
+            semantic_materiality=semantic_materiality,
+            announcement_class=announcement_class,
+            trajectory_effect=trajectory_effect,
+            positive=positive,
+            negative=negative,
+        )
+        current_path = self._current_path_from_relationship(baseline_path, relationship)
+        path_transition = f"{baseline_path}->{current_path}" if baseline_path and current_path and baseline_path != current_path else ""
+
+        key_findings, conflicts = self._build_findings(announcement_engaged_evals)
         material_change_types = list(sorted(affected_domains))
         impact_level = self._impact_level(
             affected_domains,
@@ -193,12 +340,7 @@ class ThesisComparator:
             verification_hits,
             semantic_materiality=semantic_materiality,
         )
-        unmapped_material = self._is_unmapped_material_filing(
-            semantic_materiality=semantic_materiality,
-            announcement_class=announcement_class,
-            direct_match_count=len(announcement_matched_evals),
-        )
-        if unmapped_material:
+        if relationship.kind == "material_unmapped":
             key_findings.insert(
                 0,
                 ComparisonFinding(
@@ -211,31 +353,17 @@ class ThesisComparator:
                     evidence=evidence,
                 ),
             )
-        thesis_effect = self._thesis_effect(
-            baseline_path,
-            current_path,
-            conflicts,
-            confirmatory_hits,
-            red_flag_hits,
-            positive,
-            negative,
-            trajectory_effect=trajectory_effect,
-        )
         timeline_effect = self._timeline_effect(affected_domains, positive, negative, evaluations)
-        capital_effect = self._capital_effect(affected_domains, positive, negative, evaluations)
-        run_validity = self._run_validity(impact_level, current_path, baseline_path, conflicts, red_flag_hits)
-        trajectory_state = self._trajectory_state(
-            announcement_class=announcement_class,
-            semantic_materiality=semantic_materiality,
+        thesis_effect = self._thesis_effect_from_relationship(
+            relationship,
             trajectory_effect=trajectory_effect,
-            thesis_effect=thesis_effect,
-            timeline_effect=timeline_effect,
-            direct_match_count=len(announcement_matched_evals),
-            market_match_count=self._matched_count([item for item in matched_evals if str(item.matched_via or '').strip() == "market_facts"]),
-            conflicts=conflicts,
-            path_transition=path_transition,
-            verification_match_count=verification_hits,
         )
+        capital_effect = self._capital_effect(affected_domains, positive, negative, evaluations)
+        trajectory_state = self._trajectory_state_from_relationship(
+            relationship,
+            timeline_effect=timeline_effect,
+        )
+        run_validity = self._run_validity(impact_level, current_path, baseline_path, conflicts, red_flag_hits)
 
         used_market_fields = {
             item.market_field: market_facts.get(item.market_field)
@@ -249,9 +377,13 @@ class ThesisComparator:
             f"announcement_red_flag_hits={red_flag_hits}",
             f"announcement_confirmatory_hits={confirmatory_hits}",
             f"announcement_verification_hits={verification_hits}",
-            f"market_condition_matches={self._matched_count([item for item in matched_evals if str(item.matched_via or '').strip() == 'market_facts'])}",
+            f"market_condition_matches={market_match_count}",
             f"announcement_class={announcement_class or 'unknown'}",
             f"materiality={semantic_materiality or 'unknown'}",
+            f"relationship_priority={relationship.priority}",
+            f"relationship_kind={relationship.kind or 'unknown'}",
+            f"relationship_strength={relationship.strength or 'unknown'}",
+            f"relationship_direction={relationship.direction or 'unknown'}",
             f"trajectory_state={trajectory_state or 'unknown'}",
         ]
         trajectory_projection = self._trajectory_projection(
@@ -262,8 +394,40 @@ class ThesisComparator:
             current_path=current_path,
             impact_level=impact_level,
             trajectory_state=trajectory_state,
-            direct_match_count=len(announcement_matched_evals),
+            direct_match_count=len(announcement_engaged_evals),
             verification_match_count=verification_hits,
+        )
+        trajectory_score = build_trajectory_score(
+            baseline_path=baseline_path,
+            current_path=current_path,
+            trajectory_state=trajectory_state,
+            trajectory_effect=trajectory_effect,
+            thesis_effect=thesis_effect,
+            timeline_effect=timeline_effect,
+            impact_level=impact_level,
+            materiality=semantic_materiality,
+            classification_confidence=float(facts.classification_confidence or facts.semantic_confidence or 0.0),
+            thesis_match_confidence=thesis_match_confidence,
+            direct_match_count=len(announcement_engaged_evals),
+            thesis_required_hits=thesis_required_hits,
+            thesis_failure_hits=thesis_failure_hits,
+            red_flag_hits=red_flag_hits,
+            confirmatory_hits=confirmatory_hits,
+            red_flag_partial_hits=red_flag_partial_hits,
+            confirmatory_partial_hits=confirmatory_partial_hits,
+            verification_hits=verification_hits,
+            positive=positive,
+            negative=negative,
+            price_time_effect=str(facts.price_time_effect or "").strip(),
+        )
+        trajectory_score.update(
+            {
+                "relationship_priority": relationship.priority,
+                "relationship_kind": relationship.kind,
+                "relationship_strength": relationship.strength,
+                "relationship_direction": relationship.direction,
+                "relationship_summary": relationship.summary,
+            }
         )
 
         return ComparisonReport(
@@ -281,6 +445,11 @@ class ThesisComparator:
             capital_effect=capital_effect,
             announcement_class=announcement_class,
             materiality=semantic_materiality,
+            relationship_priority=relationship.priority,
+            relationship_kind=relationship.kind,
+            relationship_strength=relationship.strength,
+            relationship_direction=relationship.direction,
+            relationship_summary=relationship.summary,
             trajectory_state=trajectory_state,
             trajectory_effect=trajectory_effect,
             price_time_effect=str(facts.price_time_effect or "").strip(),
@@ -292,7 +461,7 @@ class ThesisComparator:
             classification_confidence=float(facts.classification_confidence or facts.semantic_confidence or 0.0),
             thesis_match_confidence=thesis_match_confidence,
             classification_reason=str(facts.classification_reason or "").strip(),
-            confidence_breakdown=self._confidence_breakdown(facts, thesis_match_confidence, evaluations, announcement_matched_evals),
+            confidence_breakdown=self._confidence_breakdown(facts, thesis_match_confidence, evaluations, announcement_engaged_evals),
             affected_domains=material_change_types,
             material_change_types=material_change_types,
             condition_evaluations=evaluations,
@@ -300,6 +469,7 @@ class ThesisComparator:
             triggered_watchlist_ids=triggered_watchlist_ids,
             triggered_verification_ids=triggered_verification_ids,
             market_facts_used=used_market_fields,
+            trajectory_score=trajectory_score,
             trajectory_projection=trajectory_projection,
             key_findings=key_findings,
             conflicts_with_run=conflicts,
@@ -380,11 +550,70 @@ class ThesisComparator:
             payload = {
                 "condition_id": condition_id,
                 "condition": str(item.get("condition") or item.get("title") or "").strip(),
+                "evidence_hooks": item.get("evidence_hooks") or item.get("source_terms") or [],
+                "description": str(item.get("description") or item.get("reason") or item.get("source_to_monitor") or "").strip(),
                 "severity": str(item.get("severity") or "").strip().lower(),
                 "linked_milestones": item.get("linked_milestones") or [],
             }
             evaluations.append(self._evaluate_item(payload, "", group, haystack, market_facts, evidence))
         return evaluations
+
+    async def _evaluate_watchlist_async(
+        self,
+        items: Iterable[Any],
+        group: str,
+        haystack: str,
+        market_facts: Dict[str, Any],
+        evidence: EvidenceRef,
+        facts: AnnouncementFacts,
+        baseline_run: BaselineRunPacket,
+    ) -> List[ConditionEvaluation]:
+        evaluations: List[ConditionEvaluation] = []
+        adjudications_used = 0
+        for idx, item in enumerate(items or []):
+            payload = self._watchlist_payload(item, group, idx)
+            if not payload:
+                continue
+            evaluation = self._evaluate_item(payload, "", group, haystack, market_facts, evidence)
+            if (
+                evaluation.status in {"not_matched", "partial_match"}
+                and self.semantic_adjudicator is not None
+                and adjudications_used < max(0, int(self.max_semantic_adjudications or 0))
+                and self._should_model_adjudicate_watchlist_item(payload, facts, haystack)
+            ):
+                adjudications_used += 1
+                semantic_eval = await self._model_adjudicate_watchlist_item(
+                    payload=payload,
+                    group=group,
+                    fallback=evaluation,
+                    facts=facts,
+                    baseline_run=baseline_run,
+                    haystack=haystack,
+                    evidence=evidence,
+                )
+                if semantic_eval is not None:
+                    evaluation = semantic_eval
+            evaluations.append(evaluation)
+        return evaluations
+
+    @staticmethod
+    def _watchlist_payload(item: Any, group: str, idx: int) -> Dict[str, Any]:
+        if isinstance(item, str):
+            item = {
+                "watch_id": f"{group}_{idx}",
+                "condition": str(item or "").strip(),
+            }
+        if not isinstance(item, dict):
+            return {}
+        condition_id = str(item.get("watch_id") or item.get("condition_id") or f"{group}_{idx}").strip()
+        return {
+            "condition_id": condition_id,
+            "condition": str(item.get("condition") or item.get("title") or "").strip(),
+            "evidence_hooks": item.get("evidence_hooks") or item.get("source_terms") or [],
+            "description": str(item.get("description") or item.get("reason") or item.get("source_to_monitor") or "").strip(),
+            "severity": str(item.get("severity") or "").strip().lower(),
+            "linked_milestones": item.get("linked_milestones") or [],
+        }
 
     def _evaluate_verification_queue(
         self,
@@ -464,6 +693,8 @@ class ThesisComparator:
                 reason="Market-price condition was not text-matched; no parseable market rule was available.",
                 confidence=0.35,
                 matched_via="market_facts",
+                relationship="unclear_market_rule",
+                satisfies_condition=False,
                 severity=severity,
                 linked_milestones=linked_milestones,
                 evidence=evidence,
@@ -494,10 +725,25 @@ class ThesisComparator:
                 reason=f"Matched primary filing text via {source_label}: {matched_phrase}",
                 confidence=0.78 if group in {"required", "confirmatory"} else 0.84,
                 matched_via="text",
+                relationship="full_match",
+                satisfies_condition=True,
                 severity=severity,
                 linked_milestones=linked_milestones,
                 evidence=evidence,
             )
+
+        semantic_eval = self._try_semantic_evaluation(
+            condition_id=condition_id,
+            scenario=scenario,
+            group=group,
+            label=label,
+            haystack=haystack,
+            linked_milestones=linked_milestones,
+            severity=severity,
+            evidence=evidence,
+        )
+        if semantic_eval is not None:
+            return semantic_eval
 
         return ConditionEvaluation(
             condition_id=condition_id,
@@ -508,10 +754,315 @@ class ThesisComparator:
             reason="No explicit support found in the announcement text or market context.",
             confidence=0.5,
             matched_via="",
+            relationship="not_related",
+            satisfies_condition=False,
             severity=severity,
             linked_milestones=linked_milestones,
             evidence=evidence,
         )
+
+    def _try_semantic_evaluation(
+        self,
+        *,
+        condition_id: str,
+        scenario: str,
+        group: str,
+        label: str,
+        haystack: str,
+        linked_milestones: List[str],
+        severity: str,
+        evidence: EvidenceRef,
+    ) -> Optional[ConditionEvaluation]:
+        """Strict semantic bridge for saved watchlist items.
+
+        Exact thesis-map conditions stay literal. Watchlist rows are looser
+        monitoring intents, so this layer can say "related, but not satisfied"
+        without pretending a non-binding disclosure completed a binding catalyst.
+        """
+        if group not in {"red_flag", "confirmatory"}:
+            return None
+
+        label_norm = self._normalize_semantic_text(label)
+        haystack_norm = self._normalize_semantic_text(haystack)
+        if not label_norm or not haystack_norm:
+            return None
+
+        offtake_eval = self._semantic_offtake_evaluation(
+            condition_id=condition_id,
+            scenario=scenario,
+            group=group,
+            label=label,
+            label_norm=label_norm,
+            haystack_norm=haystack_norm,
+            linked_milestones=linked_milestones,
+            severity=severity,
+            evidence=evidence,
+        )
+        if offtake_eval is not None:
+            return offtake_eval
+
+        return None
+
+    def _should_model_adjudicate_watchlist_item(
+        self,
+        payload: Dict[str, Any],
+        facts: AnnouncementFacts,
+        haystack: str,
+    ) -> bool:
+        label = self._condition_label(payload)
+        if not label or not str(haystack or "").strip():
+            return False
+        materiality = str(facts.materiality or "").strip().lower()
+        effect = str(facts.trajectory_effect or "").strip().lower()
+        if materiality not in {"medium", "high", "critical"} and effect not in {
+            "material_update",
+            "strengthens",
+            "weakens",
+            "delays",
+            "risk_reduced",
+        }:
+            return False
+
+        candidate_text = " ".join(
+            [
+                label,
+                str(payload.get("description") or ""),
+                " ".join(str(item or "") for item in payload.get("evidence_hooks") or []),
+            ]
+        )
+        candidate_terms = self._model_candidate_terms(candidate_text)
+        if not candidate_terms:
+            return False
+        haystack_norm = self._normalize_semantic_text(haystack)
+        driver_terms = {
+            term
+            for value in list(facts.affected_drivers or []) + list(facts.material_topics or [])
+            for term in self._model_candidate_terms(str(value or "").replace("_", " "))
+        }
+        if candidate_terms & driver_terms:
+            return True
+        return any(term in haystack_norm for term in candidate_terms)
+
+    async def _model_adjudicate_watchlist_item(
+        self,
+        *,
+        payload: Dict[str, Any],
+        group: str,
+        fallback: ConditionEvaluation,
+        facts: AnnouncementFacts,
+        baseline_run: BaselineRunPacket,
+        haystack: str,
+        evidence: EvidenceRef,
+    ) -> Optional[ConditionEvaluation]:
+        if self.semantic_adjudicator is None:
+            return None
+        request = {
+            "kind": "watchlist_condition_adjudication",
+            "ticker": facts.ticker,
+            "company_name": facts.company_name or baseline_run.company_name,
+            "template_id": baseline_run.template_id,
+            "announcement": {
+                "title": facts.title,
+                "filing_summary": facts.filing_summary,
+                "semantic_summary": facts.semantic_summary,
+                "announcement_class": facts.announcement_class,
+                "materiality": facts.materiality,
+                "trajectory_effect": facts.trajectory_effect,
+                "affected_drivers": list(facts.affected_drivers or [])[:8],
+                "evidence_text": str(haystack or "")[:6000],
+            },
+            "watchlist_item": {
+                "condition_id": fallback.condition_id,
+                "group": group,
+                "label": fallback.label,
+                "description": str(payload.get("description") or "").strip(),
+                "evidence_hooks": [str(item or "").strip() for item in (payload.get("evidence_hooks") or []) if str(item or "").strip()][:8],
+                "severity": fallback.severity,
+            },
+            "baseline": {
+                "run_id": baseline_run.run_id,
+                "current_path": self._normalize_path(
+                    ((self._structured(baseline_run).get("extended_analysis") or {}).get("current_thesis_state") or {}).get("leaning")
+                    if isinstance((self._structured(baseline_run).get("extended_analysis") or {}), dict)
+                    else ""
+                ),
+            },
+        }
+        try:
+            response = self.semantic_adjudicator(request)
+            if inspect.isawaitable(response):
+                response = await response
+        except Exception:
+            return None
+        return self._coerce_model_condition_evaluation(
+            response,
+            fallback=fallback,
+            group=group,
+            evidence=evidence,
+        )
+
+    @staticmethod
+    def _coerce_model_condition_evaluation(
+        response: Any,
+        *,
+        fallback: ConditionEvaluation,
+        group: str,
+        evidence: EvidenceRef,
+    ) -> Optional[ConditionEvaluation]:
+        if not isinstance(response, dict):
+            return None
+        status = str(response.get("status") or "").strip().lower()
+        relationship = str(response.get("relationship") or "").strip().lower()
+        if relationship == "contradiction":
+            relationship = "contradicts"
+        allowed_statuses = {"matched", "partial_match", "contradicted", "not_matched", "unclear"}
+        if status not in allowed_statuses:
+            if relationship == "full_match":
+                status = "matched"
+            elif relationship in {"partial_match", "precursor_partial_match", "related_partial_match"}:
+                status = "partial_match"
+            elif relationship == "contradicts":
+                status = "contradicted"
+            elif relationship == "not_related":
+                status = "not_matched"
+            else:
+                return None
+        try:
+            confidence = float(response.get("confidence"))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        confidence = max(0.0, min(1.0, confidence))
+        if status == "matched" and confidence < 0.65:
+            return None
+        if status == "partial_match" and confidence < 0.55:
+            return None
+        if status in {"not_matched", "unclear"}:
+            return None
+        satisfies_condition = bool(response.get("satisfies_condition"))
+        if status == "matched" and not satisfies_condition:
+            return None
+        if status == "partial_match":
+            satisfies_condition = False
+        reason = str(response.get("reason") or "").strip()
+        if not reason:
+            reason = "Model compared the announcement against this saved watchlist item."
+        missing = [
+            str(item or "").strip()
+            for item in (response.get("missing_for_full_match") or [])
+            if str(item or "").strip()
+        ][:8]
+        return ConditionEvaluation(
+            condition_id=fallback.condition_id,
+            scenario=fallback.scenario,
+            group=group,
+            label=fallback.label,
+            status=status,
+            reason=reason,
+            confidence=confidence,
+            matched_via="model_semantic_adjudication",
+            relationship=relationship or ("full_match" if status == "matched" else status),
+            satisfies_condition=satisfies_condition,
+            missing_for_full_match=missing,
+            severity=fallback.severity,
+            linked_milestones=list(fallback.linked_milestones or []),
+            evidence=evidence,
+        )
+
+    @staticmethod
+    def _model_candidate_terms(text: str) -> Set[str]:
+        return {
+            term
+            for term in re.split(r"[^a-z0-9]+", str(text or "").lower())
+            if len(term) >= 5 and term not in MODEL_ADJUDICATION_STOP_WORDS
+        }
+
+    def _semantic_offtake_evaluation(
+        self,
+        *,
+        condition_id: str,
+        scenario: str,
+        group: str,
+        label: str,
+        label_norm: str,
+        haystack_norm: str,
+        linked_milestones: List[str],
+        severity: str,
+        evidence: EvidenceRef,
+    ) -> Optional[ConditionEvaluation]:
+        if "offtake" not in label_norm and "off take" not in label_norm:
+            return None
+        if "offtake" not in haystack_norm and "off take" not in haystack_norm:
+            return None
+
+        condition_requires_binding = "binding" in label_norm or "definitive" in label_norm
+        filing_is_non_final = any(term in haystack_norm for term in NON_FINAL_AGREEMENT_TERMS)
+        filing_has_binding_terms = any(term in haystack_norm for term in BINDING_AGREEMENT_TERMS)
+        filing_has_agreement = any(term in haystack_norm for term in ("agreement", "contract", "customer", "supply"))
+
+        if condition_requires_binding and not filing_has_binding_terms:
+            return ConditionEvaluation(
+                condition_id=condition_id,
+                scenario=scenario,
+                group=group,
+                label=label,
+                status="partial_match",
+                reason=(
+                    "Announcement is related to the saved offtake watchlist item, but it appears to be an "
+                    "LoI, MoU, partnership, or otherwise non-final step rather than a binding offtake agreement."
+                ),
+                confidence=0.72,
+                matched_via="semantic_adjudication",
+                relationship="precursor_partial_match",
+                satisfies_condition=False,
+                missing_for_full_match=[
+                    "binding or definitive offtake terms",
+                    "counterparty commitment scope",
+                    "volume, duration, pricing, or take-or-pay economics where disclosed",
+                ],
+                severity=severity,
+                linked_milestones=linked_milestones,
+                evidence=evidence,
+            )
+
+        if condition_requires_binding and filing_has_binding_terms and not filing_is_non_final:
+            return ConditionEvaluation(
+                condition_id=condition_id,
+                scenario=scenario,
+                group=group,
+                label=label,
+                status="matched",
+                reason="Announcement appears to satisfy the saved binding offtake watchlist item.",
+                confidence=0.86,
+                matched_via="semantic_adjudication",
+                relationship="full_match",
+                satisfies_condition=True,
+                severity=severity,
+                linked_milestones=linked_milestones,
+                evidence=evidence,
+            )
+
+        if filing_has_agreement or filing_is_non_final:
+            return ConditionEvaluation(
+                condition_id=condition_id,
+                scenario=scenario,
+                group=group,
+                label=label,
+                status="matched" if not filing_is_non_final else "partial_match",
+                reason=(
+                    "Announcement engages the saved offtake watchlist item."
+                    if not filing_is_non_final
+                    else "Announcement is an offtake-related precursor, but not yet a final agreement."
+                ),
+                confidence=0.78 if not filing_is_non_final else 0.68,
+                matched_via="semantic_adjudication",
+                relationship="full_match" if not filing_is_non_final else "precursor_partial_match",
+                satisfies_condition=not filing_is_non_final,
+                missing_for_full_match=[] if not filing_is_non_final else ["final executed offtake agreement"],
+                severity=severity,
+                linked_milestones=linked_milestones,
+                evidence=evidence,
+            )
+        return None
 
     def _try_market_evaluation(
         self,
@@ -556,6 +1107,8 @@ class ThesisComparator:
                 reason=f"Condition depends on {market_field}, but no fresh market fact was available.",
                 confidence=0.35,
                 matched_via="market_facts",
+                relationship="unclear_market_fact",
+                satisfies_condition=False,
                 market_field=market_field,
                 observed_value=None,
                 comparator=op,
@@ -579,6 +1132,8 @@ class ThesisComparator:
             ),
             confidence=0.92,
             matched_via="market_facts",
+            relationship="full_match" if comparison_ok else "contradicts",
+            satisfies_condition=bool(comparison_ok),
             market_field=market_field,
             observed_value=float(observed_value),
             comparator=op,
@@ -676,6 +1231,12 @@ class ThesisComparator:
     @staticmethod
     def _phrase_terms(text: str) -> List[str]:
         return [term for term in re.split(r"[^a-z0-9]+", str(text or "").lower()) if len(term) >= 3]
+
+    @staticmethod
+    def _normalize_semantic_text(text: str) -> str:
+        normalized = re.sub(r"[^a-z0-9$./&+\-\s]", " ", str(text or "").lower())
+        normalized = normalized.replace("off-take", "offtake").replace("buy-back", "buyback")
+        return re.sub(r"\s+", " ", normalized).strip()
 
     @staticmethod
     def _negates_phrase(sentence: str, phrase_terms: List[str]) -> bool:
@@ -799,15 +1360,247 @@ class ThesisComparator:
             return baseline_path
         return "mixed" if positive and negative else "unknown"
 
+    def _resolve_dominant_relationship(
+        self,
+        *,
+        facts: AnnouncementFacts,
+        announcement_engaged_evals: List[ConditionEvaluation],
+        market_match_count: int,
+        semantic_materiality: str,
+        announcement_class: str,
+        trajectory_effect: str,
+        positive: bool,
+        negative: bool,
+    ) -> ThesisRelationship:
+        candidates = [
+            relationship
+            for relationship in (
+                self._relationship_from_evaluation(item)
+                for item in announcement_engaged_evals
+            )
+            if relationship is not None
+        ]
+        if candidates:
+            return sorted(
+                candidates,
+                key=lambda item: (
+                    int(item.priority or 0),
+                    1 if item.strength == "full" else 0,
+                    float(item.confidence or 0.0),
+                ),
+                reverse=True,
+            )[0]
+
+        materiality = str(semantic_materiality or "").strip().lower()
+        announcement = str(announcement_class or "").strip().lower()
+        direction = self._relationship_direction_from_facts(
+            trajectory_effect=trajectory_effect,
+            positive=positive,
+            negative=negative,
+        )
+        if announcement == "administrative" and materiality in {"", "none", "low"}:
+            return ThesisRelationship(
+                priority=0,
+                kind="administrative",
+                direction="neutral",
+                confidence=float(facts.classification_confidence or facts.semantic_confidence or 0.0),
+                summary="Administrative filing with no investment-thesis relationship.",
+            )
+        if announcement == "needs_classification":
+            return ThesisRelationship(
+                priority=3,
+                kind="needs_classification",
+                direction="neutral",
+                confidence=float(facts.classification_confidence or facts.semantic_confidence or 0.0),
+                summary="Filing could not be classified confidently enough to judge the thesis relationship.",
+            )
+        if self._is_unmapped_material_filing(
+            semantic_materiality=materiality,
+            announcement_class=announcement,
+            direct_match_count=0,
+        ):
+            return ThesisRelationship(
+                priority=3,
+                kind="material_unmapped",
+                strength="none",
+                direction=direction,
+                confidence=float(facts.classification_confidence or facts.semantic_confidence or 0.0),
+                summary="Material filing did not match the saved thesis evidence set.",
+            )
+        if int(market_match_count or 0) > 0:
+            return ThesisRelationship(
+                priority=2,
+                kind="market_backdrop_only",
+                direction="neutral",
+                confidence=0.4,
+                summary="Only market backdrop conditions matched; no announcement-led thesis relationship was found.",
+            )
+        return ThesisRelationship(
+            priority=1,
+            kind="no_relation",
+            direction="neutral",
+            confidence=float(facts.classification_confidence or facts.semantic_confidence or 0.0),
+            summary="No thesis-relevant relationship was found.",
+        )
+
+    @staticmethod
+    def _relationship_from_evaluation(item: ConditionEvaluation) -> Optional[ThesisRelationship]:
+        if str(item.matched_via or "").strip() == "market_facts":
+            return None
+        if item.status not in PARTIAL_MATCH_STATUSES:
+            return None
+        group = str(item.group or "").strip().lower()
+        scenario = str(item.scenario or "").strip().lower()
+        strength = "full" if item.status == "matched" else "partial"
+        label = str(item.label or item.condition_id or "").strip()
+        condition_id = str(item.condition_id or "").strip()
+        confidence = float(item.confidence or 0.0)
+
+        if group == "failure":
+            return ThesisRelationship(
+                priority=7,
+                kind="saved_thesis_failure",
+                strength=strength,
+                direction="negative",
+                label=label,
+                condition_id=condition_id,
+                scenario=scenario,
+                group=group,
+                confidence=confidence,
+                summary=f"{strength.title()} saved failure condition: {label}",
+                evaluation=item,
+            )
+        if group == "required":
+            direction = "negative" if scenario == "bear" else "positive" if scenario == "bull" else "neutral"
+            priority = 7 if direction == "negative" else 6
+            return ThesisRelationship(
+                priority=priority,
+                kind="saved_thesis_condition",
+                strength=strength,
+                direction=direction,
+                label=label,
+                condition_id=condition_id,
+                scenario=scenario,
+                group=group,
+                confidence=confidence,
+                summary=f"{strength.title()} saved {scenario or 'thesis'} condition: {label}",
+                evaluation=item,
+            )
+        if group == "red_flag":
+            return ThesisRelationship(
+                priority=7 if strength == "full" else 4,
+                kind="watchlist_red_flag",
+                strength=strength,
+                direction="negative",
+                label=label,
+                condition_id=condition_id,
+                scenario=scenario,
+                group=group,
+                confidence=confidence,
+                summary=f"{strength.title()} red-flag watchlist relationship: {label}",
+                evaluation=item,
+            )
+        if group == "confirmatory":
+            return ThesisRelationship(
+                priority=5 if strength == "full" else 4,
+                kind="watchlist_confirmatory",
+                strength=strength,
+                direction="positive",
+                label=label,
+                condition_id=condition_id,
+                scenario=scenario,
+                group=group,
+                confidence=confidence,
+                summary=f"{strength.title()} confirmatory watchlist relationship: {label}",
+                evaluation=item,
+            )
+        if group == "verification":
+            return ThesisRelationship(
+                priority=5 if strength == "full" else 4,
+                kind="verification_queue",
+                strength=strength,
+                direction="positive",
+                label=label,
+                condition_id=condition_id,
+                scenario=scenario,
+                group=group,
+                confidence=confidence,
+                summary=f"{strength.title()} verification relationship: {label}",
+                evaluation=item,
+            )
+        return None
+
+    @staticmethod
+    def _relationship_direction_from_facts(*, trajectory_effect: str, positive: bool, negative: bool) -> str:
+        effect = str(trajectory_effect or "").strip().lower()
+        if effect in {"weakens", "delays", "risk_increased"}:
+            return "negative"
+        if effect in {"strengthens", "risk_reduced", "accelerates"}:
+            return "positive"
+        if positive and not negative:
+            return "positive"
+        if negative and not positive:
+            return "negative"
+        if positive and negative:
+            return "mixed"
+        return "neutral"
+
+    @staticmethod
+    def _current_path_from_relationship(baseline_path: str, relationship: ThesisRelationship) -> str:
+        baseline = str(baseline_path or "").strip().lower()
+        if relationship.priority >= 7 and relationship.direction == "negative":
+            return "bear"
+        if relationship.kind == "saved_thesis_condition":
+            if relationship.scenario in {"bull", "base", "bear"}:
+                return relationship.scenario
+        if baseline in {"bull", "base", "bear"}:
+            return baseline
+        return "mixed" if relationship.direction == "mixed" else "unknown"
+
+    @staticmethod
+    def _thesis_effect_from_relationship(relationship: ThesisRelationship, *, trajectory_effect: str = "") -> str:
+        effect = str(trajectory_effect or "").strip().lower()
+        if relationship.priority >= 7 and relationship.direction == "negative":
+            return "undermines"
+        if relationship.direction == "negative":
+            return "undermines" if effect == "weakens" else "delays" if effect == "delays" else "undermines"
+        if relationship.direction == "positive":
+            return "partially_confirms" if relationship.strength == "partial" else "confirms"
+        return "no_change"
+
+    @staticmethod
+    def _trajectory_state_from_relationship(relationship: ThesisRelationship, *, timeline_effect: str = "") -> str:
+        timeline = str(timeline_effect or "").strip().lower()
+        if relationship.kind == "administrative":
+            return "administrative_filing"
+        if relationship.kind == "needs_classification":
+            return "needs_classification"
+        if relationship.kind == "material_unmapped":
+            return "material_unmapped"
+        if relationship.kind == "market_backdrop_only":
+            return "market_backdrop_only"
+        if relationship.kind == "no_relation":
+            return "no_thesis_change"
+        if relationship.direction == "negative":
+            if timeline == "delayed":
+                return "timeline_delayed"
+            return "thesis_weakened" if relationship.priority >= 7 else "risk_increased"
+        if relationship.direction == "positive":
+            if timeline == "accelerated":
+                return "timeline_accelerated"
+            return "thesis_strengthened"
+        return "no_thesis_change"
+
     def _build_findings(self, evaluations: List[ConditionEvaluation]) -> Tuple[List[ComparisonFinding], List[ComparisonFinding]]:
         findings: List[ComparisonFinding] = []
         conflicts: List[ComparisonFinding] = []
         for item in evaluations:
-            if item.status != "matched":
+            if item.status not in PARTIAL_MATCH_STATUSES:
                 continue
+            prefix = "Partially engaged" if item.status == "partial_match" else "Matched"
             finding = ComparisonFinding(
-                type=f"{item.group}_match" if item.group else "condition_match",
-                summary=f"Matched {item.group or 'condition'}: {item.label}",
+                type=f"{item.group}_{item.status}" if item.group else f"condition_{item.status}",
+                summary=f"{prefix} {item.group or 'condition'}: {item.label}",
                 severity="high" if item.group in {"failure", "red_flag"} else "low",
                 evidence=item.evidence,
             )

@@ -82,7 +82,7 @@ class ScenarioRouterMockHarnessTests(unittest.TestCase):
                     "expected": {
                         "announcement_class": "capital_management",
                         "trajectory_state": "no_thesis_change",
-                        "action": "annotate_run",
+                        "action": "ignore",
                     },
                 },
                 {

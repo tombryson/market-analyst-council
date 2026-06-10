@@ -1096,6 +1096,11 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
     oldUnits: '10',
     newUnits: '1',
   });
+  const [showPriceHistoryOverlay, setShowPriceHistoryOverlay] = useState(true);
+  const [showRouterEventOverlay, setShowRouterEventOverlay] = useState(true);
+  const [securityHistoryPayload, setSecurityHistoryPayload] = useState(null);
+  const [routerOverlayEvents, setRouterOverlayEvents] = useState([]);
+  const [marketPathError, setMarketPathError] = useState('');
   const preferredRunIdFromUrl = useMemo(() => {
     try {
       const params = new URLSearchParams(locationSearch || '');
@@ -1380,10 +1385,14 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
     : 'Investment Analysis';
   const bannerCompanyName = mapped?.companyName || fallbackCompanyName || 'Loading run…';
   const bannerTicker = mapped?.ticker || String(selectedMeta?.ticker || '').trim();
+  const marketPathTicker = String(bannerTicker || selectedMeta?.ticker || '').trim().toUpperCase();
   const bannerThesis = selectionPending
     ? 'Loading selected analysis run…'
     : (stage3?.investment_recommendation?.summary || mapped.thesis || 'No thesis summary provided.');
-  const selectedRunRouter = selectedPayload?.scenario_router || {};
+  const selectedRunRouter = useMemo(
+    () => selectedPayload?.scenario_router || {},
+    [selectedPayload?.scenario_router]
+  );
   const selectedRunRouterHasDecision = Boolean(
     selectedRunRouter
     && typeof selectedRunRouter === 'object'
@@ -1434,6 +1443,13 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
   const displayTargets24 = rebaseTargets(scaledTargets24, priceRebaseFactor);
   const displayWeighted12 = rebasePrice(weighted12, priceRebaseFactor);
   const displayWeighted24 = rebasePrice(weighted24, priceRebaseFactor);
+  const chartStartDate = String(
+    selectedPayload?.updated_at
+      || selectedMeta?.updated_at
+      || selectedMeta?.created_at
+      || stage3?.analysis_date
+      || ''
+  ).trim();
 
   const timeline = useMemo(
     () => normalizeTimelineRows(stage3?.development_timeline),
@@ -1461,6 +1477,7 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
   const claimLedger = stage3?.council_metadata?.claim_ledger_counts || {};
 
   const chartPayload = {
+    runDate: chartStartDate,
     current: displayCurrentSpotPrice,
     targets12: {
       bear: displayTargets12.bear || 0,
@@ -1475,6 +1492,59 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
     weighted12: displayWeighted12 ?? 0,
     weighted24: displayWeighted24 ?? 0,
   };
+  const actualPricePoints = Array.isArray(securityHistoryPayload?.points)
+    ? securityHistoryPayload.points
+    : [];
+  const marketPathRouterEvents = useMemo(() => {
+    const rows = Array.isArray(routerOverlayEvents) ? [...routerOverlayEvents] : [];
+    if (selectedRunRouterHasDecision) {
+      rows.push({
+        ...selectedRunRouter,
+        date: selectedRunRouter.saved_at_utc || selectedRunRouter.received_at_utc || chartStartDate,
+        title: selectedRunRouter.title || selectedRunRouter.announcement_title,
+      });
+    }
+    const seen = new Set();
+    return rows
+      .filter((row) => row && typeof row === 'object')
+      .filter((row) => {
+        const key = String(row.event_id || `${row.date || row.saved_at_utc || ''}:${row.title || row.announcement_title || ''}`);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }, [chartStartDate, routerOverlayEvents, selectedRunRouter, selectedRunRouterHasDecision]);
+
+  useEffect(() => {
+    if (monitorOnly || !marketPathTicker) {
+      setSecurityHistoryPayload(null);
+      setRouterOverlayEvents([]);
+      setMarketPathError('');
+      return undefined;
+    }
+    let cancelled = false;
+    const loadMarketPathContext = async () => {
+      try {
+        setMarketPathError('');
+        const [history, routerEventsPayload] = await Promise.all([
+          api.getSecurityPriceHistory(marketPathTicker),
+          api.listAnnouncementRouterEvents(120, marketPathTicker),
+        ]);
+        if (cancelled) return;
+        setSecurityHistoryPayload(history || null);
+        setRouterOverlayEvents(Array.isArray(routerEventsPayload?.events) ? routerEventsPayload.events : []);
+      } catch (err) {
+        if (cancelled) return;
+        setSecurityHistoryPayload(null);
+        setRouterOverlayEvents([]);
+        setMarketPathError(err?.message || 'Could not load market path overlays');
+      }
+    };
+    loadMarketPathContext();
+    return () => {
+      cancelled = true;
+    };
+  }, [marketPathTicker, monitorOnly]);
 
   const freshnessStatus = String(freshness?.status || '').toLowerCase();
   const freshnessTone =
@@ -1741,11 +1811,40 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
       )}
 
       {!monitorOnly && (
+      <div className="lab-chart-toolbar" aria-label="Scenario chart overlays">
+        <span>Chart overlays</span>
+        <button
+          type="button"
+          className={showPriceHistoryOverlay ? 'is-active' : ''}
+          onClick={() => setShowPriceHistoryOverlay((value) => !value)}
+        >
+          Price history
+        </button>
+        <button
+          type="button"
+          className={showRouterEventOverlay ? 'is-active' : ''}
+          onClick={() => setShowRouterEventOverlay((value) => !value)}
+        >
+          Router events
+        </button>
+        {securityHistoryPayload?.latest?.date && (
+          <em>Latest Alpha Edge price: {fmtMoney(securityHistoryPayload.latest.price, priceDisplayCurrency)} on {securityHistoryPayload.latest.date}</em>
+        )}
+        {marketPathError && <em>{marketPathError}</em>}
+      </div>
+      )}
+
+      {!monitorOnly && (
       <ScenarioTimelineUnit
         data={chartPayload}
         currency={priceDisplayCurrency}
         timelineBars={timelineBars}
         orientation={timelineOrientation}
+        actualPrices={actualPricePoints}
+        routerEvents={marketPathRouterEvents}
+        showPriceHistory={showPriceHistoryOverlay}
+        showRouterEvents={showRouterEventOverlay}
+        startDate={chartStartDate}
       />
       )}
 

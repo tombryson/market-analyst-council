@@ -25,6 +25,15 @@ class ActionJudge:
         material_change_types = {
             str(item or "").strip().lower() for item in (report.material_change_types or []) if str(item or "").strip()
         }
+        relationship_kind = str(getattr(report, "relationship_kind", "") or "").strip().lower()
+        if relationship_kind:
+            return self._judge_relationship(
+                report=report,
+                impact=impact,
+                run_validity=run_validity,
+                affected_domains=affected_domains,
+                material_change_types=material_change_types,
+            )
 
         full_rerun_domains = {
             "financing",
@@ -230,4 +239,130 @@ class ActionJudge:
             run_reuse_ok=True,
             follow_up_steps=["Keep the run active and monitor for follow-up disclosures."],
             tags=["watch"],
+        )
+
+    @staticmethod
+    def _judge_relationship(
+        *,
+        report: ComparisonReport,
+        impact: str,
+        run_validity: str,
+        affected_domains: list[str],
+        material_change_types: set[str],
+    ) -> ActionDecision:
+        priority = int(getattr(report, "relationship_priority", 0) or 0)
+        kind = str(getattr(report, "relationship_kind", "") or "").strip().lower()
+        direction = str(getattr(report, "relationship_direction", "") or "").strip().lower()
+        summary = str(getattr(report, "relationship_summary", "") or "").strip()
+        sections = list(sorted(set(affected_domains) | material_change_types))
+
+        if priority >= 7:
+            if impact == "critical" or run_validity == "invalidated":
+                return ActionDecision(
+                    action="urgent_human_review",
+                    confidence=0.96,
+                    reason=summary or "Thesis-breaking filing requires immediate review.",
+                    should_trigger_workflow=True,
+                    run_reuse_ok=False,
+                    requires_human_ack=True,
+                    invalidated_sections=sections,
+                    follow_up_steps=[
+                        "Pause reuse of the current saved run.",
+                        "Review the filing against the saved thesis before using the old council view.",
+                    ],
+                    tags=["priority_7", kind or "thesis_break"],
+                )
+            return ActionDecision(
+                action="full_rerun",
+                confidence=0.92,
+                reason=summary or "High-priority saved thesis relationship may invalidate the current run.",
+                should_trigger_workflow=True,
+                run_reuse_ok=False,
+                invalidated_sections=sections,
+                follow_up_steps=[
+                    "Attach the filing to the thesis log.",
+                    "Rebuild the council view if the saved thesis remains broken after review.",
+                ],
+                tags=["priority_7", kind or "thesis_break"],
+            )
+
+        if priority == 6:
+            if (
+                kind == "saved_thesis_condition"
+                and direction == "neutral"
+                and str(getattr(report, "trajectory_state", "") or "").strip().lower() == "no_thesis_change"
+                and not str(getattr(report, "path_transition", "") or "").strip()
+            ):
+                return ActionDecision(
+                    action="ignore",
+                    confidence=0.9,
+                    reason=summary or "Saved base-case condition was confirmed without changing the thesis path.",
+                    should_trigger_workflow=False,
+                    run_reuse_ok=True,
+                    invalidated_sections=[],
+                    follow_up_steps=["Record the filing without changing the saved thesis path."],
+                    tags=["priority_6", kind, "base_case_confirmed"],
+                )
+            if direction == "negative":
+                return ActionDecision(
+                    action="full_rerun",
+                    confidence=0.9,
+                    reason=summary or "Direct negative thesis condition matched.",
+                    should_trigger_workflow=True,
+                    run_reuse_ok=False,
+                    invalidated_sections=sections,
+                    follow_up_steps=["Attach the filing to the thesis log.", "Rebuild affected council sections."],
+                    tags=["priority_6", kind or "direct_thesis"],
+                )
+            return ActionDecision(
+                action="rerun_stage1",
+                confidence=0.86,
+                reason=summary or "Direct saved thesis condition matched.",
+                should_trigger_workflow=True,
+                run_reuse_ok=False,
+                invalidated_sections=sections,
+                follow_up_steps=[
+                    "Attach the filing to the thesis log.",
+                    "Refresh the evidence pack before relying on the saved council view.",
+                ],
+                tags=["priority_6", kind or "direct_thesis"],
+            )
+
+        if priority in {4, 5}:
+            return ActionDecision(
+                action="run_delta_only",
+                confidence=0.82,
+                reason=summary or "Saved thesis evidence relationship found.",
+                should_trigger_workflow=True,
+                run_reuse_ok=True,
+                invalidated_sections=[],
+                follow_up_steps=[
+                    "Attach the filing to the thesis log.",
+                    "Update the saved thesis note with the relationship strength.",
+                ],
+                tags=[f"priority_{priority}", kind or "saved_relationship"],
+            )
+
+        if priority == 3:
+            return ActionDecision(
+                action="annotate_run",
+                confidence=0.78,
+                reason=summary or "Filing needs thesis classification or thesis-map coverage.",
+                should_trigger_workflow=False,
+                run_reuse_ok=True,
+                follow_up_steps=[
+                    "Attach the filing to the thesis log.",
+                    "Review whether the saved thesis evidence set needs a new condition.",
+                ],
+                tags=["priority_3", kind or "coverage_gap"],
+            )
+
+        return ActionDecision(
+            action="ignore",
+            confidence=0.88,
+            reason=summary or "No maintenance needed for this filing.",
+            should_trigger_workflow=False,
+            run_reuse_ok=True,
+            follow_up_steps=["Record the filing without changing the saved thesis path."],
+            tags=[f"priority_{priority}", kind or "no_relation"],
         )

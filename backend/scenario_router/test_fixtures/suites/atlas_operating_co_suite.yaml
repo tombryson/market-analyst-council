@@ -50,7 +50,7 @@ announcements:
       - Zone A approval delayed beyond Q4 2026
     expected:
       current_path: bear
-      trajectory_state: thesis_weakened
+      trajectory_state: timeline_delayed
       action: full_rerun
       impact_level: high
       user_bucket: needs_review
@@ -76,7 +76,7 @@ announcements:
     expected:
       current_path: base
       trajectory_state: no_thesis_change
-      action: run_delta_only
+      action: ignore
       impact_level: medium
       user_bucket: no_thesis_change
       matched_condition_ids:
@@ -170,7 +170,7 @@ announcements:
     expected:
       current_path: base
       trajectory_state: no_thesis_change
-      action: run_delta_only
+      action: ignore
       impact_level: medium
       user_bucket: no_thesis_change
       matched_condition_ids:
@@ -196,7 +196,7 @@ announcements:
     expected:
       current_path: base
       trajectory_state: no_thesis_change
-      action: run_delta_only
+      action: ignore
       impact_level: medium
       user_bucket: no_thesis_change
       matched_condition_ids:

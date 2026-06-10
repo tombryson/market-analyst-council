@@ -11,12 +11,15 @@ from .display_contract import (
     build_router_display_contract,
     market_only_watch_projection,
     should_project_market_only_watch,
+    watchlist_engagement_projection,
 )
 from .lab_scribe import SCENARIO_ROUTER_EVENTS_DIR
 from .mock_harness import run_mock_router_case
 from .review_store import apply_review_overlay, load_review
+from .trajectory_scoring import apply_cumulative_scores
 
 EVALUATION_CASES_PATH = Path(__file__).with_name("evaluation_cases.json")
+EVIDENCE_ENGAGED_STATUSES = {"matched", "partial_match"}
 
 
 @dataclass
@@ -39,6 +42,7 @@ class ScenarioRouterObservability:
                 continue
             rows.append(row)
 
+        apply_cumulative_scores(rows)
         rows.sort(
             key=lambda item: (
                 str(item.get("saved_at_utc") or "").strip(),
@@ -145,7 +149,7 @@ class ScenarioRouterObservability:
             1
             for item in evaluations
             if isinstance(item, dict)
-            and str(item.get("status") or "").strip() == "matched"
+            and str(item.get("status") or "").strip() in EVIDENCE_ENGAGED_STATUSES
             and str(item.get("group") or "").strip() in {"required", "failure"}
             and str(item.get("matched_via") or "").strip() != "market_facts"
         )
@@ -153,7 +157,7 @@ class ScenarioRouterObservability:
             1
             for item in evaluations
             if isinstance(item, dict)
-            and str(item.get("status") or "").strip() == "matched"
+            and str(item.get("status") or "").strip() in EVIDENCE_ENGAGED_STATUSES
             and str(item.get("group") or "").strip() in {"red_flag", "confirmatory"}
             and str(item.get("matched_via") or "").strip() != "market_facts"
         )
@@ -161,7 +165,7 @@ class ScenarioRouterObservability:
             1
             for item in evaluations
             if isinstance(item, dict)
-            and str(item.get("status") or "").strip() == "matched"
+            and str(item.get("status") or "").strip() in EVIDENCE_ENGAGED_STATUSES
             and str(item.get("group") or "").strip() == "verification"
             and str(item.get("matched_via") or "").strip() != "market_facts"
         )
@@ -183,11 +187,19 @@ class ScenarioRouterObservability:
             materiality=str(report.get("materiality") or facts.get("materiality") or "").strip(),
             trajectory_state=str(report.get("trajectory_state") or "").strip(),
         )
-        display_projection = market_only_watch_projection(
-            baseline_path=raw_baseline_path,
-            current_path=raw_current_path,
-            raw_impact=str(report.get("impact_level") or "").strip(),
-        ) if suppress_stale_market_only_reroute else {}
+        display_projection = (
+            market_only_watch_projection(
+                baseline_path=raw_baseline_path,
+                current_path=raw_current_path,
+                raw_impact=str(report.get("impact_level") or "").strip(),
+            )
+            if suppress_stale_market_only_reroute
+            else watchlist_engagement_projection(
+                report,
+                action,
+                triggered_watchlist_count=triggered_watchlist,
+            )
+        )
         display_action = str(display_projection.get("action") or raw_action).strip()
         display_report = {
             **report,
@@ -220,6 +232,11 @@ class ScenarioRouterObservability:
             "impact_level": str(display_projection.get("impact_level") or report.get("impact_level") or "").strip(),
             "announcement_class": str(report.get("announcement_class") or facts.get("announcement_class") or "").strip(),
             "materiality": str(report.get("materiality") or facts.get("materiality") or "").strip(),
+            "relationship_priority": report.get("relationship_priority", 0),
+            "relationship_kind": str(report.get("relationship_kind") or "").strip(),
+            "relationship_strength": str(report.get("relationship_strength") or "").strip(),
+            "relationship_direction": str(report.get("relationship_direction") or "").strip(),
+            "relationship_summary": str(report.get("relationship_summary") or "").strip(),
             "trajectory_state": str(display_projection.get("trajectory_state") or report.get("trajectory_state") or "").strip(),
             "trajectory_effect": str(display_projection.get("trajectory_effect") or report.get("trajectory_effect") or facts.get("trajectory_effect") or "").strip(),
             "price_time_effect": str(display_projection.get("price_time_effect") or report.get("price_time_effect") or facts.get("price_time_effect") or "").strip(),
@@ -262,27 +279,35 @@ class ScenarioRouterObservability:
             "announcement_condition_checks": _condition_details(
                 evaluations,
                 groups={"required", "failure"},
-                statuses={"matched", "not_matched", "contradicted", "unclear"},
+                statuses={"matched", "partial_match", "not_matched", "contradicted", "unclear"},
                 exclude_market=True,
                 limit=40,
             ),
             "watchlist_condition_checks": _condition_details(
                 evaluations,
                 groups={"red_flag", "confirmatory"},
-                statuses={"matched", "not_matched", "contradicted", "unclear"},
+                statuses={"matched", "partial_match", "not_matched", "contradicted", "unclear"},
                 exclude_market=True,
                 limit=30,
             ),
             "verification_condition_checks": _condition_details(
                 evaluations,
                 groups={"verification"},
-                statuses={"matched", "not_matched", "contradicted", "unclear"},
+                statuses={"matched", "partial_match", "not_matched", "contradicted", "unclear"},
                 exclude_market=True,
                 limit=30,
             ),
             "trajectory_projection": (
                 report.get("trajectory_projection")
                 if isinstance(report.get("trajectory_projection"), dict)
+                else {}
+            ),
+            "trajectory_score": (
+                display_projection.get("trajectory_score")
+                if isinstance(display_projection.get("trajectory_score"), dict)
+                else
+                report.get("trajectory_score")
+                if isinstance(report.get("trajectory_score"), dict)
                 else {}
             ),
             "thesis_snapshot": _thesis_snapshot(baseline_run),
@@ -354,7 +379,7 @@ def _condition_details(
             continue
         if statuses is not None and status not in statuses:
             continue
-        if statuses is None and status != "matched":
+        if statuses is None and status not in EVIDENCE_ENGAGED_STATUSES:
             continue
         if matched_via and via != matched_via:
             continue
@@ -372,6 +397,13 @@ def _condition_details(
                 "status": status,
                 "reason": str(item.get("reason") or "").strip(),
                 "matched_via": via,
+                "relationship": str(item.get("relationship") or "").strip(),
+                "satisfies_condition": bool(item.get("satisfies_condition")),
+                "missing_for_full_match": [
+                    str(value or "").strip()
+                    for value in (item.get("missing_for_full_match") or [])
+                    if str(value or "").strip()
+                ][:6],
                 "confidence": item.get("confidence"),
                 "market_field": str(item.get("market_field") or "").strip(),
                 "observed_value": item.get("observed_value"),
