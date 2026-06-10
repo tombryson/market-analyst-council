@@ -11,6 +11,7 @@ class ScenarioRouterMockHarnessTests(unittest.TestCase):
                 "ticker": "ASX:MOCK",
                 "template_id": "rare_earths_critical_minerals",
                 "baseline_path": "base",
+                "use_legacy_interpreter": True,
                 "title": "Mining Permit Approval Received",
                 "summary": "The regulator granted the mining permit approval ahead of schedule.",
                 "extracted_facts": [
@@ -77,6 +78,7 @@ class ScenarioRouterMockHarnessTests(unittest.TestCase):
                     "ticker": "ASX:BRK",
                     "template_id": "energy_oil_gas",
                     "baseline_path": "base",
+                    "use_legacy_interpreter": True,
                     "title": "Update - Notification of buy-back - BRK",
                     "summary": "The company lodged an update to its on-market share buy-back notification.",
                     "expected": {
@@ -90,6 +92,7 @@ class ScenarioRouterMockHarnessTests(unittest.TestCase):
                     "ticker": "ASX:ABC",
                     "template_id": "general",
                     "baseline_path": "base",
+                    "use_legacy_interpreter": True,
                     "title": "Corporate Update",
                     "summary": "The company provides an update for shareholders. " * 20,
                     "thesis_map": {

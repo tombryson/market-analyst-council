@@ -648,6 +648,8 @@ function hasTrajectoryScore(score) {
 
 function trajectoryScoreTone(score) {
   const direction = String(score?.direction || '').trim().toLowerCase();
+  const validationType = String(score?.validation_type || '').trim().toLowerCase();
+  if (validationType === 'material_unmapped') return 'warn';
   if (direction === 'positive') return 'positive';
   if (direction === 'negative') return 'urgent';
   if (direction === 'mixed') return 'warn';
@@ -656,10 +658,37 @@ function trajectoryScoreTone(score) {
 
 function trajectoryScoreDirectionLabel(score) {
   const direction = String(score?.direction || '').trim().toLowerCase();
+  const validationType = String(score?.validation_type || '').trim().toLowerCase();
+  if (validationType === 'material_unmapped' && direction === 'positive') return 'Positive drift';
+  if (validationType === 'material_unmapped' && direction === 'negative') return 'Negative drift';
   if (direction === 'positive') return 'Bull-leaning evidence';
   if (direction === 'negative') return 'Bear-leaning evidence';
   if (direction === 'mixed') return 'Mixed evidence';
   return 'No trajectory move';
+}
+
+function safeTrajectoryPositionLabel(score, key = 'position_label') {
+  const raw = String(score?.[key] || '').trim();
+  if (!raw) return '';
+  const validationType = String(score?.validation_type || '').trim().toLowerCase();
+  if (validationType === 'material_unmapped') {
+    if (/bull case/i.test(raw)) return 'Bull-leaning, unvalidated';
+    if (/bear case/i.test(raw)) return 'Bear-leaning, unvalidated';
+  }
+  return raw
+    .replace(/\bBull case\b/g, 'Bull evidence zone')
+    .replace(/\bBear case\b/g, 'Bear evidence zone')
+    .replace(/\bBase case\b/g, 'Base evidence zone');
+}
+
+function trajectoryScoreReason(score) {
+  const raw = String(score?.reason || '').trim();
+  if (!raw) return 'Directional evidence was scored against the saved scenario path.';
+  const validationType = String(score?.validation_type || '').trim().toLowerCase();
+  if (validationType !== 'material_unmapped') return raw;
+  return raw
+    .replace(/^Bull-leaning\b/i, 'Positive')
+    .replace(/^Bear-leaning\b/i, 'Negative');
 }
 
 function routerDirectHitCount(router) {
@@ -716,11 +745,14 @@ function routerNeedsAttention(router) {
 }
 
 function routerEvidenceState(router) {
+  const displayEvidence = String(routerDisplay(router)?.evidence_label || '').trim();
+  if (displayEvidence) return displayEvidence;
   const state = routerTrajectoryState(router);
   if (routerConflictCount(router)) return 'Saved thesis conflict';
   if (routerDetailItems(router, 'matched_condition_details', 'matched_conditions').length) return 'Thesis condition matched';
   if (routerDetailItems(router, 'triggered_watchlist_details', 'triggered_watchlist').length) return 'Watchlist condition matched';
   if (routerVerificationItems(router).length) return 'Verification item matched';
+  if (state === 'material_unmapped') return 'No saved condition match';
   if (state === 'needs_classification') return 'Classification unresolved';
   if (state === 'market_backdrop_only') return 'Market backdrop only';
   if (Array.isArray(router?.market_context_conditions) && router.market_context_conditions.length) return 'Market checked';
@@ -757,12 +789,12 @@ function routerPresentation(router) {
 }
 
 function routerRelationshipLabel(router) {
+  const displayRelationship = String(routerDisplay(router)?.relationship_label || '').trim();
+  if (displayRelationship) return displayRelationship;
   const kind = String(router?.relationship_kind || '').trim();
   if (!kind) return 'Not assessed';
-  const priority = Number(router?.relationship_priority);
   const strength = String(router?.relationship_strength || '').trim();
-  const prefix = Number.isFinite(priority) && priority > 0 ? `P${priority}` : '';
-  return [prefix, strength && strength !== 'none' ? titleizeKey(strength) : '', titleizeKey(kind)]
+  return [strength && strength !== 'none' ? titleizeKey(strength) : '', titleizeKey(kind)]
     .filter(Boolean)
     .join(' ');
 }
@@ -1361,20 +1393,21 @@ function TrajectoryScorePanel({ router }) {
   const score = routerTrajectoryScore(router);
   if (!hasTrajectoryScore(score)) return null;
   const cumulative = Number(score?.cumulative_delta);
-  const cumulativeLabel = String(score?.cumulative_position_label || score?.position_label || '').trim();
+  const eventLabel = safeTrajectoryPositionLabel(score, 'position_label') || 'Position not assessed';
+  const cumulativeLabel = safeTrajectoryPositionLabel(score, 'cumulative_position_label') || eventLabel;
   const eventDelta = Number(score.event_delta);
   return (
     <div className="announcement-router-score-panel" data-tone={trajectoryScoreTone(score)}>
-      <span>Scenario impact</span>
+      <span>Path movement</span>
       <strong>
         {trajectoryScoreDirectionLabel(score)}
         <em>{fmtSignedDelta(eventDelta)}</em>
       </strong>
-      <p>{score.reason || 'Directional evidence was scored against the saved scenario path.'}</p>
+      <p>{trajectoryScoreReason(score)}</p>
       <div>
-        <b>{score.position_label || 'Position not assessed'}</b>
+        <b>Event: {eventLabel}</b>
         {Number.isFinite(cumulative) && (
-          <b>{cumulativeLabel || 'Cumulative position'} ({fmtSignedDelta(cumulative)} cumulative)</b>
+          <b>Cumulative: {cumulativeLabel || 'Position not assessed'} ({fmtSignedDelta(cumulative)})</b>
         )}
       </div>
     </div>
@@ -1444,19 +1477,19 @@ function ReviewWorkflow({ router, onReviewAction, reviewBusy = '' }) {
             {vm.reviewNote && <p>{vm.reviewNote}</p>}
           </div>
           <div className="announcement-router-follow-up-route">
-            <span>Maintenance outcome</span>
+            <span>System step</span>
             <strong>{vm.nextActionLabel || followUp.nextActionLabel}</strong>
           </div>
         </div>
       ) : (
         <div className="announcement-router-follow-up-card">
           <div>
-            <span>Relationship priority</span>
+            <span>Recommended follow-up</span>
             <strong>{followUp.label}</strong>
             <em>{followUp.helper}</em>
           </div>
           <div className="announcement-router-follow-up-route">
-            <span>Maintenance outcome</span>
+            <span>System step</span>
             <strong>{followUp.nextActionLabel}</strong>
           </div>
         </div>
@@ -1689,7 +1722,7 @@ function RouterQueue({ events, selectedEventId, onSelect }) {
 	                <span className="announcement-router-queue-title">{routerTitle(row)}</span>
 	                <span className="announcement-router-queue-meta">
 		                  <span>{labelScenarioPathShort(routerScenarioPath(row))}</span>
-                      {hasTrajectoryScore(score) && <span>{score.cumulative_position_label || score.position_label}</span>}
+                      {hasTrajectoryScore(score) && <span>{safeTrajectoryPositionLabel(score, 'cumulative_position_label') || safeTrajectoryPositionLabel(score, 'position_label')}</span>}
 		                  <span>{routerMaterialityLabel(row)}</span>
 		                  <span>{routerDriverLabel(row)}</span>
 		                  {vm.reviewStatus && vm.reviewStatus !== 'auto_cleared' && <span>{vm.reviewLabel}</span>}

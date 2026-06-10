@@ -62,6 +62,7 @@ from .config import (
     OPENROUTER_API_KEY,
     SCENARIO_ROUTER_MODEL_ADJUDICATION_ENABLED,
     SCENARIO_ROUTER_MODEL_ADJUDICATION_MAX_CASES,
+    SCENARIO_ROUTER_THESIS_JUDGE_ENABLED,
 )
 from .research import ResearchService, format_evidence_pack_for_prompt
 from .research.supplementary_registry import (
@@ -182,10 +183,10 @@ _ANALYSIS_STAGE_RANGES: Dict[str, Tuple[int, int]] = {
 
 
 def _build_scenario_router_service():
-    from .scenario_router.announcement_interpreter import AnnouncementInterpreter
     from .scenario_router.document_reader import DocumentReader
     from .scenario_router.lab_scribe import LabScribe
     from .scenario_router.market_facts_resolver import ScenarioMarketFactsResolver
+    from .scenario_router.model_thesis_judge import ModelAnnouncementThesisJudge
     from .scenario_router.run_selector import LatestRunSelector
     from .scenario_router.semantic_adjudicator import ModelSemanticAdjudicator
     from .scenario_router.source_resolver import SourceResolver
@@ -203,13 +204,18 @@ def _build_scenario_router_service():
         semantic_adjudicator=model_adjudicator,
         max_semantic_adjudications=SCENARIO_ROUTER_MODEL_ADJUDICATION_MAX_CASES,
     )
+    announcement_interpreter = (
+        ModelAnnouncementThesisJudge().interpret
+        if SCENARIO_ROUTER_THESIS_JUDGE_ENABLED and OPENROUTER_API_KEY
+        else ModelAnnouncementThesisJudge(model="").interpret
+    )
 
     return ScenarioRouterService(
         ScenarioRouterDependencies(
             source_resolver=SourceResolver().resolve,
             document_reader=DocumentReader().read,
             run_selector=LatestRunSelector(limit=25).select_latest,
-            announcement_interpreter=AnnouncementInterpreter().interpret,
+            announcement_interpreter=announcement_interpreter,
             market_facts_resolver=ScenarioMarketFactsResolver().resolve,
             thesis_comparator=thesis_comparator.compare_async if model_adjudicator else thesis_comparator.compare,
             lab_scribe=LabScribe().persist,

@@ -72,6 +72,19 @@ PRIMARY_REASONS = {
     "administrative_filing": "Administrative filing. Recorded without a thesis trajectory change.",
 }
 
+RELATIONSHIP_LABELS = {
+    "administrative": "Administrative filing",
+    "no_relation": "No saved relationship",
+    "market_backdrop_only": "Market backdrop only",
+    "material_unmapped": "Material outside thesis map",
+    "needs_classification": "Needs classification",
+    "saved_thesis_condition": "Saved thesis condition",
+    "saved_thesis_failure": "Saved thesis failure",
+    "watchlist_red_flag": "Watchlist red flag",
+    "watchlist_confirmatory": "Watchlist signal",
+    "verification_queue": "Verification item",
+}
+
 
 def should_project_market_only_watch(
     *,
@@ -132,6 +145,9 @@ def build_router_display_contract(
         + int(triggered_verification_count or 0)
     )
     has_verification_hit = int(triggered_verification_count or 0) > 0
+    relationship_kind = _norm(report.get("relationship_kind"))
+    relationship_strength = _norm(report.get("relationship_strength"))
+    relationship_priority = report.get("relationship_priority", 0)
 
     queue_bucket = _queue_bucket(
         state=state,
@@ -164,6 +180,17 @@ def build_router_display_contract(
         "is_user_action_required": review_status == "open",
         "system_action": action_key,
         "system_action_label": SYSTEM_ACTION_LABELS.get(action_key) or _titleize(action_key) or "No maintenance",
+        "evidence_label": _evidence_label(
+            state=state,
+            matched_conditions_count=matched_conditions_count,
+            triggered_watchlist_count=triggered_watchlist_count,
+            triggered_verification_count=triggered_verification_count,
+        ),
+        "relationship_label": _relationship_label(
+            kind=relationship_kind,
+            strength=relationship_strength,
+            priority=relationship_priority,
+        ),
         "primary_reason": _primary_reason(state=state, action=action, direct_hit_count=direct_hit_count),
         "tone": tone,
     }
@@ -273,7 +300,7 @@ def watchlist_engagement_projection(
             "baseline_score": baseline_score,
             "score_after_event": score_after_event,
             "position_band": score_band(score_after_event),
-            "position_label": position_label(baseline_path, score_after_event),
+            "position_label": position_label(baseline_path, score_after_event, validated_delta=event_delta),
             "confidence": report.get("thesis_match_confidence") or report.get("classification_confidence") or 0.0,
             "mapped_condition": True,
             "validation_type": validation_type,
@@ -358,6 +385,39 @@ def _primary_reason(*, state: str, action: Dict[str, Any], direct_hit_count: int
     return str(action.get("reason") or "").strip()
 
 
+def _evidence_label(
+    *,
+    state: str,
+    matched_conditions_count: int,
+    triggered_watchlist_count: int,
+    triggered_verification_count: int,
+) -> str:
+    if int(matched_conditions_count or 0) > 0:
+        return "Thesis condition matched"
+    if int(triggered_watchlist_count or 0) > 0:
+        return "Watchlist condition matched"
+    if int(triggered_verification_count or 0) > 0:
+        return "Verification item matched"
+    if state == "material_unmapped":
+        return "No saved condition match"
+    if state == "needs_classification":
+        return "Classification unresolved"
+    if state == "market_backdrop_only":
+        return "Market backdrop only"
+    if state == "administrative_filing":
+        return "Administrative only"
+    return "No condition match"
+
+
+def _relationship_label(*, kind: str, strength: str, priority: Any) -> str:
+    label = RELATIONSHIP_LABELS.get(kind) or _titleize(kind) or "Not assessed"
+    strength_label = "Partial " if strength == "partial" else "Full " if strength == "full" else ""
+    priority_num = _to_int(priority)
+    if priority_num and priority_num >= 4 and strength_label:
+        return f"{strength_label}{label}".strip()
+    return label
+
+
 def _findings_text(report: Dict[str, Any]) -> str:
     chunks = []
     for item in report.get("key_findings") or []:
@@ -374,3 +434,10 @@ def _norm(value: Any) -> str:
 def _titleize(value: str) -> str:
     text = str(value or "").replace("_", " ").strip()
     return " ".join(part[:1].upper() + part[1:] for part in text.split()) if text else ""
+
+
+def _to_int(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except Exception:
+        return 0

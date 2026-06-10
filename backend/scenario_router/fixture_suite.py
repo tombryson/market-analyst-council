@@ -56,7 +56,9 @@ def compile_router_fixture_suite(
             "source_url": str(announcement.get("source_url") or "mock://scenario-router/backwards-fixture").strip(),
             "source_type": str(announcement.get("source_type") or "mock").strip(),
             "published_at_utc": str(announcement.get("published_at_utc") or "").strip(),
-            "use_interpreter": bool(announcement.get("use_interpreter", True)),
+            "use_legacy_interpreter": bool(
+                announcement.get("use_legacy_interpreter", announcement.get("use_interpreter", True))
+            ),
             "expected": {
                 key: value
                 for key, value in dict(announcement.get("expected") or {}).items()

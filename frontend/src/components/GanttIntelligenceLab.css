@@ -1969,7 +1969,7 @@
 
 .announcement-router-decision-hero .announcement-router-verdict-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1px;
   overflow: hidden;
   border: 1px solid var(--router-rule);
@@ -2181,14 +2181,14 @@
 
 .announcement-router-follow-up-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, auto);
   align-items: start;
   gap: 12px;
   margin-top: 0;
   padding: 12px 14px;
   border: 1px solid rgba(var(--router-warn-rgb), 0.34);
   border-radius: 6px;
-  background: rgba(var(--router-warn-rgb), 0.055);
+  background: rgba(var(--router-warn-rgb), 0.04);
 }
 
 .announcement-router-follow-up-card > div:first-child {
@@ -2238,10 +2238,10 @@
   display: inline-grid;
   justify-self: end;
   gap: 3px;
-  padding: 8px 10px;
+  padding: 7px 9px;
   border: 1px solid rgba(var(--router-warn-rgb), 0.24);
   border-radius: 5px;
-  background: rgba(11, 14, 18, 0.56);
+  background: rgba(11, 14, 18, 0.42);
 }
 
 .announcement-router-follow-up-route span {

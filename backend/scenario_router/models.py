@@ -145,6 +145,7 @@ class AnnouncementFacts:
     market_facts: Dict[str, Any] = field(default_factory=dict)
     evidence: List[EvidenceRef] = field(default_factory=list)
     raw_text_excerpt: str = ""
+    document_sections: Dict[str, Any] = field(default_factory=dict)
     parse_quality: Dict[str, Any] = field(default_factory=dict)
     announcement_class: str = ""
     materiality: str = ""
@@ -163,6 +164,7 @@ class AnnouncementFacts:
     parser_warnings: List[str] = field(default_factory=list)
     classification_reason: str = ""
     confidence_breakdown: Dict[str, Any] = field(default_factory=dict)
+    model_judgement: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         data = asdict(self)

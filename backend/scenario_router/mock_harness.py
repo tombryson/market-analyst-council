@@ -4,7 +4,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from .action_judge import ActionJudge
-from .announcement_interpreter import AnnouncementInterpreter
+from .announcement_interpreter import AnnouncementInterpreter as LegacyRuleBasedAnnouncementInterpreter
 from .display_contract import build_router_display_contract
 from .models import AnnouncementFacts, BaselineRunPacket, EvidenceRef
 from .thesis_comparator import ThesisComparator
@@ -21,8 +21,9 @@ def run_mock_router_case(case: Dict[str, Any]) -> Dict[str, Any]:
 
     baseline = build_mock_baseline_run(case)
     facts = build_mock_announcement_facts(case)
-    if case.get("use_interpreter", True):
-        facts = AnnouncementInterpreter().interpret(facts, baseline)
+    use_legacy_interpreter = bool(case.get("use_legacy_interpreter", case.get("use_interpreter", False)))
+    if use_legacy_interpreter:
+        facts = LegacyRuleBasedAnnouncementInterpreter().interpret(facts, baseline)
     report = ThesisComparator().compare(facts, baseline)
     action = ActionJudge().judge(report)
     actual = _actual_result(facts, report, action)
@@ -107,6 +108,9 @@ def build_mock_announcement_facts(case: Dict[str, Any]) -> AnnouncementFacts:
         "evidence_excerpt_count": len(evidence),
         "reader": "mock_harness",
     }
+    document_sections = case.get("document_sections") if isinstance(case.get("document_sections"), dict) else {}
+    if not document_sections:
+        document_sections = {"body": raw_text}
     market_facts = case.get("market_facts") if isinstance(case.get("market_facts"), dict) else {}
     if market_facts and "normalized_facts" not in market_facts:
         market_facts = {"normalized_facts": market_facts}
@@ -124,6 +128,7 @@ def build_mock_announcement_facts(case: Dict[str, Any]) -> AnnouncementFacts:
         market_facts=market_facts,
         evidence=evidence,
         raw_text_excerpt=raw_text,
+        document_sections=document_sections,
         parse_quality=parse_quality,
         source_confidence=source_confidence,
         extraction_confidence=extraction_confidence,

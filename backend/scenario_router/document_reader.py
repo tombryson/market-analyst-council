@@ -4,10 +4,12 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from ..pdf_processor import extract_text_from_pdf
 from .models import AnnouncementFacts, AnnouncementPacket, EvidenceRef
+
+MODEL_TEXT_CHAR_LIMIT = 18000
 
 TOPIC_KEYWORDS: Dict[str, Tuple[str, ...]] = {
     "financing": ("funding", "facility", "debt", "loan", "placement", "capital raise", "liquidity"),
@@ -58,6 +60,7 @@ class DocumentReader:
 
     async def read(self, packet: AnnouncementPacket) -> AnnouncementFacts:
         full_text, evidence_excerpts = await self._read_text(packet)
+        sections = self._segment_document(full_text)
         extracted_facts = self._extract_facts(full_text)
         summary = self._build_summary(full_text, extracted_facts)
         evidence = [
@@ -73,6 +76,7 @@ class DocumentReader:
             "decoded_chars": len(full_text or ""),
             "fact_count": len(extracted_facts),
             "evidence_excerpt_count": len(evidence),
+            "document_section_count": len([key for key, value in sections.items() if value]),
             "reader": "document_reader_raw",
         }
         source_confidence = self._source_confidence(packet)
@@ -86,7 +90,8 @@ class DocumentReader:
             extracted_facts=extracted_facts,
             material_topics=[],
             evidence=evidence,
-            raw_text_excerpt=full_text[:1800],
+            raw_text_excerpt=self._model_text_excerpt(full_text),
+            document_sections=sections,
             parse_quality=parse_quality,
             source_confidence=source_confidence,
             extraction_confidence=extraction_confidence,
@@ -167,6 +172,142 @@ class DocumentReader:
         return value.strip()
 
     @staticmethod
+    def _model_text_excerpt(text: str, limit: int = MODEL_TEXT_CHAR_LIMIT) -> str:
+        value = str(text or "").strip()
+        if len(value) <= int(limit or MODEL_TEXT_CHAR_LIMIT):
+            return value
+        head_len = int(limit * 0.72)
+        tail_len = max(0, int(limit) - head_len)
+        return (
+            value[:head_len].rstrip()
+            + "\n\n[... middle of filing truncated for model input ...]\n\n"
+            + value[-tail_len:].lstrip()
+        )
+
+    @staticmethod
+    def _segment_document(text: str) -> Dict[str, Any]:
+        """Segment filing text for model context without assigning thesis direction."""
+        lines = [re.sub(r"\s+", " ", line).strip() for line in str(text or "").splitlines()]
+        lines = [line for line in lines if line]
+        if not lines:
+            return {
+                "highlights": [],
+                "body": "",
+                "tables": [],
+                "disclaimers": [],
+                "footer": [],
+                "release_authority": [],
+            }
+
+        highlights: List[str] = []
+        body: List[str] = []
+        tables: List[str] = []
+        disclaimers: List[str] = []
+        footer: List[str] = []
+        release_authority: List[str] = []
+        in_highlights = False
+        in_disclaimer = False
+        footer_start = max(0, len(lines) - 18)
+
+        for idx, line in enumerate(lines):
+            if DocumentReader._is_release_authority_line(line):
+                release_authority.append(line)
+                continue
+            if DocumentReader._is_disclaimer_line(line):
+                disclaimers.append(line)
+                in_disclaimer = True
+                continue
+            if in_disclaimer and len(disclaimers) < 12 and DocumentReader._looks_like_disclaimer_continuation(line):
+                disclaimers.append(line)
+                continue
+            if re.fullmatch(r"(?i)highlights?", line):
+                in_highlights = True
+                continue
+            if in_highlights and len(highlights) < 10 and not re.fullmatch(r"[A-Z][A-Z0-9 &/-]{3,}", line):
+                highlights.append(line)
+                continue
+            if idx >= footer_start and DocumentReader._is_footer_line(line):
+                footer.append(line)
+                continue
+            if DocumentReader._is_table_like_line(line):
+                tables.append(line)
+                continue
+            body.append(line)
+
+        return {
+            "highlights": highlights[:10],
+            "body": DocumentReader._model_text_excerpt("\n".join(body), limit=12000),
+            "tables": tables[:20],
+            "disclaimers": disclaimers[:20],
+            "footer": footer[:20],
+            "release_authority": release_authority[:10],
+        }
+
+    @staticmethod
+    def _is_disclaimer_line(line: str) -> bool:
+        low = str(line or "").lower()
+        return any(
+            term in low
+            for term in (
+                "forward-looking statement",
+                "forward looking statement",
+                "cautionary statement",
+                "important notice",
+                "not investment advice",
+                "does not constitute financial advice",
+                "subject to risks",
+                "risks and uncertainties",
+                "no representation or warranty",
+                "reserves cautionary statement",
+            )
+        )
+
+    @staticmethod
+    def _looks_like_disclaimer_continuation(line: str) -> bool:
+        low = str(line or "").lower()
+        return any(
+            term in low
+            for term in (
+                "actual results",
+                "assumptions",
+                "risks",
+                "uncertainties",
+                "forward-looking",
+                "liability",
+                "investment objectives",
+                "financial situation",
+            )
+        )
+
+    @staticmethod
+    def _is_release_authority_line(line: str) -> bool:
+        low = str(line or "").lower()
+        return bool(re.search(r"\bapproved\s+for\s+release\b", low)) or bool(re.search(r"\bauthori[sz]ed\s+for\s+release\b", low))
+
+    @staticmethod
+    def _is_footer_line(line: str) -> bool:
+        low = str(line or "").lower()
+        return DocumentReader._is_boilerplate_line(line) or any(
+            term in low
+            for term in (
+                "registered office",
+                "corporate directory",
+                "for further information",
+                "investor relations",
+                "company secretary",
+                "www.",
+            )
+        )
+
+    @staticmethod
+    def _is_table_like_line(line: str) -> bool:
+        value = str(line or "").strip()
+        if not value:
+            return False
+        number_count = len(re.findall(r"\b\d+(?:\.\d+)?%?\b", value))
+        return number_count >= 3 or bool(re.search(r"\S\s{2,}\S\s{2,}\S", value))
+
+    @staticmethod
     def _pick_evidence_excerpts(text: str) -> List[str]:
         lines = [re.sub(r"\s+", " ", line).strip() for line in str(text or "").splitlines()]
         lines = [line for line in lines if len(line) >= 30 and not DocumentReader._is_boilerplate_line(line)]
@@ -200,9 +341,8 @@ class DocumentReader:
         """Legacy topic hinting retained for compatibility tests.
 
         The live router no longer uses this as the primary classifier. Parsed
-        filing text is interpreted after the baseline run is loaded by
-        AnnouncementInterpreter, where company context and sector adapters are
-        available.
+        filing text is interpreted after the baseline run is loaded by the
+        model thesis judge, with saved council context available.
         """
         haystack = "\n".join(facts) or str(text or "")[:2500]
         low = haystack.lower()

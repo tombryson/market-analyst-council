@@ -152,7 +152,7 @@ class ThesisComparator:
 
     def compare(self, facts: AnnouncementFacts, baseline_run: BaselineRunPacket) -> ComparisonReport:
         ctx = self._comparison_context(facts, baseline_run)
-        evaluations = self._collect_evaluations(ctx)
+        evaluations = self._collect_evaluations(facts, ctx)
         return self._build_report(facts, baseline_run, ctx, evaluations)
 
     async def compare_async(self, facts: AnnouncementFacts, baseline_run: BaselineRunPacket) -> ComparisonReport:
@@ -184,7 +184,10 @@ class ThesisComparator:
             "market_facts": market_facts,
         }
 
-    def _collect_evaluations(self, ctx: Dict[str, Any]) -> List[ConditionEvaluation]:
+    def _collect_evaluations(self, facts: AnnouncementFacts, ctx: Dict[str, Any]) -> List[ConditionEvaluation]:
+        if self._has_valid_model_judgement(facts):
+            return self._evaluate_model_judgement(facts, ctx["evidence"])
+
         thesis_map = ctx["thesis_map"]
         watchlist = ctx["watchlist"]
         verification_queue = ctx["verification_queue"]
@@ -208,6 +211,9 @@ class ThesisComparator:
         baseline_run: BaselineRunPacket,
         ctx: Dict[str, Any],
     ) -> List[ConditionEvaluation]:
+        if self._has_valid_model_judgement(facts):
+            return self._evaluate_model_judgement(facts, ctx["evidence"])
+
         thesis_map = ctx["thesis_map"]
         watchlist = ctx["watchlist"]
         verification_queue = ctx["verification_queue"]
@@ -397,13 +403,22 @@ class ThesisComparator:
             direct_match_count=len(announcement_engaged_evals),
             verification_match_count=verification_hits,
         )
+        score_trajectory_effect = trajectory_effect
+        score_timeline_effect = timeline_effect
+        score_positive = positive
+        score_negative = negative
+        if relationship.kind == "material_unmapped":
+            score_trajectory_effect = "material_update"
+            score_timeline_effect = "unknown"
+            score_positive = False
+            score_negative = False
         trajectory_score = build_trajectory_score(
             baseline_path=baseline_path,
             current_path=current_path,
             trajectory_state=trajectory_state,
-            trajectory_effect=trajectory_effect,
+            trajectory_effect=score_trajectory_effect,
             thesis_effect=thesis_effect,
-            timeline_effect=timeline_effect,
+            timeline_effect=score_timeline_effect,
             impact_level=impact_level,
             materiality=semantic_materiality,
             classification_confidence=float(facts.classification_confidence or facts.semantic_confidence or 0.0),
@@ -416,8 +431,8 @@ class ThesisComparator:
             red_flag_partial_hits=red_flag_partial_hits,
             confirmatory_partial_hits=confirmatory_partial_hits,
             verification_hits=verification_hits,
-            positive=positive,
-            negative=negative,
+            positive=score_positive,
+            negative=score_negative,
             price_time_effect=str(facts.price_time_effect or "").strip(),
         )
         trajectory_score.update(
@@ -513,6 +528,125 @@ class ThesisComparator:
             return {}
         normalized = payload.get("normalized_facts") if isinstance(payload.get("normalized_facts"), dict) else {}
         return {str(key): value for key, value in normalized.items()} if isinstance(normalized, dict) else {}
+
+    def _evaluate_model_judgement(self, facts: AnnouncementFacts, fallback_evidence: EvidenceRef) -> List[ConditionEvaluation]:
+        payload = facts.model_judgement if isinstance(facts.model_judgement, dict) else {}
+        if str(payload.get("status") or "").strip().lower() != "valid":
+            return []
+        rows: List[ConditionEvaluation] = []
+        relationships = payload.get("thesis_relationships") if isinstance(payload.get("thesis_relationships"), list) else []
+        for idx, item in enumerate(relationships):
+            evaluation = self._model_relationship_evaluation(item, idx, fallback_evidence)
+            if evaluation is not None:
+                rows.append(evaluation)
+        return rows
+
+    @staticmethod
+    def _has_valid_model_judgement(facts: AnnouncementFacts) -> bool:
+        payload = facts.model_judgement if isinstance(facts.model_judgement, dict) else {}
+        return str(payload.get("status") or "").strip().lower() == "valid"
+
+    @staticmethod
+    def _non_duplicate_model_evaluations(
+        existing: List[ConditionEvaluation],
+        model_evaluations: List[ConditionEvaluation],
+    ) -> List[ConditionEvaluation]:
+        engaged_keys = {
+            (str(item.condition_id or "").strip(), str(item.group or "").strip())
+            for item in existing
+            if item.status in PARTIAL_MATCH_STATUSES
+        }
+        out: List[ConditionEvaluation] = []
+        for item in model_evaluations:
+            key = (str(item.condition_id or "").strip(), str(item.group or "").strip())
+            if key in engaged_keys:
+                continue
+            engaged_keys.add(key)
+            out.append(item)
+        return out
+
+    @staticmethod
+    def _model_relationship_evaluation(
+        item: Any,
+        idx: int,
+        fallback_evidence: EvidenceRef,
+    ) -> Optional[ConditionEvaluation]:
+        if not isinstance(item, dict):
+            return None
+        reference_type = str(item.get("reference_type") or "").strip().lower()
+        relationship = str(item.get("relationship") or "").strip().lower()
+        direction = str(item.get("direction") or "").strip().lower()
+        evidence_quote = str(item.get("evidence_quote") or "").strip()
+        if reference_type in {"", "none"}:
+            return None
+        if relationship in {"", "none", "unmapped"}:
+            return None
+        if not evidence_quote:
+            return None
+        try:
+            confidence = float(item.get("confidence") or 0.0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        confidence = max(0.0, min(1.0, confidence))
+        if confidence < 0.5:
+            return None
+
+        group, scenario = ThesisComparator._model_relationship_group(
+            reference_type=reference_type,
+            relationship=relationship,
+            direction=direction,
+            scenario=str(item.get("scenario") or "").strip().lower(),
+        )
+        if not group:
+            return None
+        status = "partial_match" if relationship in {"partially_confirms", "updates"} else "matched"
+        if relationship == "contradicts":
+            status = "matched"
+        label = str(item.get("reference_label") or item.get("reference_id") or f"model reference {idx + 1}").strip()
+        condition_id = str(item.get("reference_id") or f"model_reference_{idx + 1}").strip()
+        evidence = EvidenceRef(
+            source_url=fallback_evidence.source_url,
+            quote_excerpt=evidence_quote,
+            source_title=fallback_evidence.source_title,
+            source_date_utc=fallback_evidence.source_date_utc,
+        )
+        return ConditionEvaluation(
+            condition_id=condition_id,
+            scenario=scenario,
+            group=group,
+            label=label,
+            status=status,
+            reason=str(item.get("reason") or "Model thesis judge matched this saved reference.").strip(),
+            confidence=confidence,
+            matched_via="model_thesis_judge",
+            relationship=ThesisComparator._model_condition_relationship(relationship, status),
+            satisfies_condition=status == "matched" and relationship != "contradicts",
+            missing_for_full_match=[] if status == "matched" else ["full saved-condition evidence not established"],
+            severity="high" if direction == "negative" or group in {"failure", "red_flag"} else "medium",
+            evidence=evidence,
+        )
+
+    @staticmethod
+    def _model_relationship_group(*, reference_type: str, relationship: str, direction: str, scenario: str) -> Tuple[str, str]:
+        scenario_norm = scenario if scenario in {"bull", "base", "bear"} else ""
+        is_negative = direction == "negative" or relationship == "contradicts"
+        if reference_type == "watchlist":
+            return ("red_flag" if is_negative else "confirmatory"), ""
+        if reference_type == "verification":
+            return "verification", ""
+        if reference_type in {"thesis_map", "timeline"}:
+            if is_negative:
+                return "failure", scenario_norm or "bear"
+            return "required", scenario_norm or "bull"
+        return "", scenario_norm
+
+    @staticmethod
+    def _model_condition_relationship(relationship: str, status: str) -> str:
+        if relationship == "contradicts":
+            return "contradicts"
+        if status == "partial_match":
+            return "related_partial_match"
+        return "full_match"
 
     def _evaluate_items(
         self,
@@ -1393,11 +1527,6 @@ class ThesisComparator:
 
         materiality = str(semantic_materiality or "").strip().lower()
         announcement = str(announcement_class or "").strip().lower()
-        direction = self._relationship_direction_from_facts(
-            trajectory_effect=trajectory_effect,
-            positive=positive,
-            negative=negative,
-        )
         if announcement == "administrative" and materiality in {"", "none", "low"}:
             return ThesisRelationship(
                 priority=0,
@@ -1423,9 +1552,12 @@ class ThesisComparator:
                 priority=3,
                 kind="material_unmapped",
                 strength="none",
-                direction=direction,
+                direction="neutral",
                 confidence=float(facts.classification_confidence or facts.semantic_confidence or 0.0),
-                summary="Material filing did not match the saved thesis evidence set.",
+                summary=(
+                    "Material filing did not match the saved thesis evidence set; no validated scenario "
+                    "movement was scored."
+                ),
             )
         if int(market_match_count or 0) > 0:
             return ThesisRelationship(

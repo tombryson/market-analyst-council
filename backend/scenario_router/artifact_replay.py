@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, Tuple
 
 from .action_judge import ActionJudge
-from .announcement_interpreter import AnnouncementInterpreter
+from .model_thesis_judge import ModelAnnouncementThesisJudge
 from .models import AnnouncementFacts, BaselineRunPacket, EvidenceRef
 from .thesis_comparator import ThesisComparator
 
@@ -29,7 +29,14 @@ def replay_comparison_from_artifact(payload: Dict[str, Any]) -> Tuple[Dict[str, 
     try:
         facts = _coerce_facts(facts_payload)
         baseline = _coerce_baseline(baseline_payload)
-        facts = AnnouncementInterpreter().interpret(facts, baseline)
+        has_model_judgement = (
+            isinstance(facts.model_judgement, dict)
+            and str(facts.model_judgement.get("status") or "").strip().lower() == "valid"
+        )
+        if not has_model_judgement:
+            if str(original_report.get("relationship_kind") or "").strip().lower() != "material_unmapped":
+                return original_report, original_action
+            facts = ModelAnnouncementThesisJudge._abstain(facts, "legacy_artifact_without_model_judgement")
         report = ThesisComparator().compare(facts, baseline)
         action = ActionJudge().judge(report)
         return report.to_dict(), action.to_dict()
@@ -60,6 +67,7 @@ def _coerce_facts(payload: Dict[str, Any]) -> AnnouncementFacts:
         market_facts=payload.get("market_facts") if isinstance(payload.get("market_facts"), dict) else {},
         evidence=evidence,
         raw_text_excerpt=str(payload.get("raw_text_excerpt") or ""),
+        document_sections=payload.get("document_sections") if isinstance(payload.get("document_sections"), dict) else {},
         parse_quality=payload.get("parse_quality") if isinstance(payload.get("parse_quality"), dict) else {},
         announcement_class=str(payload.get("announcement_class") or ""),
         materiality=str(payload.get("materiality") or ""),
@@ -78,6 +86,7 @@ def _coerce_facts(payload: Dict[str, Any]) -> AnnouncementFacts:
         parser_warnings=[str(item or "") for item in (payload.get("parser_warnings") or [])],
         classification_reason=str(payload.get("classification_reason") or ""),
         confidence_breakdown=payload.get("confidence_breakdown") if isinstance(payload.get("confidence_breakdown"), dict) else {},
+        model_judgement=payload.get("model_judgement") if isinstance(payload.get("model_judgement"), dict) else {},
     )
 
 

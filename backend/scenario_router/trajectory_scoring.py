@@ -19,6 +19,17 @@ INTENSITY_DELTAS = {
     "critical": 3.0,
 }
 
+VALIDATED_TYPES = {
+    "saved_thesis_condition",
+    "saved_thesis_failure",
+    "watchlist_confirmatory_full",
+    "watchlist_confirmatory_partial",
+    "watchlist_red_flag_full",
+    "watchlist_red_flag_partial",
+    "verification_queue",
+    "mapped_condition",
+}
+
 
 def build_trajectory_score(
     *,
@@ -76,15 +87,19 @@ def build_trajectory_score(
         direct_match_count=direct_match_count,
     )
     magnitude = max(INTENSITY_DELTAS.get(intensity, 0.0), validation_weight)
+    unvalidated_event_delta = 0.0
     if direction == "negative":
-        event_delta = -magnitude
+        unvalidated_event_delta = -magnitude
     elif direction == "positive":
-        event_delta = magnitude
+        unvalidated_event_delta = magnitude
+    if validation_type in VALIDATED_TYPES:
+        event_delta = unvalidated_event_delta
     else:
         event_delta = 0.0
 
     baseline_score = baseline_path_score(baseline_path)
     score_after_event = round(baseline_score + event_delta, 2)
+    event_validated_delta = event_delta if validation_type in VALIDATED_TYPES else 0.0
     confidence = _confidence(
         classification_confidence=classification_confidence,
         thesis_match_confidence=thesis_match_confidence,
@@ -95,10 +110,11 @@ def build_trajectory_score(
         "direction": direction,
         "intensity": intensity,
         "event_delta": round(event_delta, 2),
+        "unvalidated_event_delta": round(unvalidated_event_delta, 2),
         "baseline_score": baseline_score,
         "score_after_event": score_after_event,
         "position_band": score_band(score_after_event),
-        "position_label": position_label(baseline_path, score_after_event),
+        "position_label": position_label(baseline_path, score_after_event, validated_delta=event_validated_delta),
         "confidence": confidence,
         "mapped_condition": mapped,
         "validation_type": validation_type,
@@ -128,23 +144,33 @@ def apply_cumulative_scores(rows: List[Dict[str, Any]]) -> None:
 
     for group_rows in groups.values():
         cumulative = 0.0
+        cumulative_validated = 0.0
         for row in sorted(group_rows, key=_row_time_key):
             score = row.get("trajectory_score") if isinstance(row.get("trajectory_score"), dict) else {}
             event_delta = _to_float(score.get("event_delta"))
             if event_delta is None:
                 continue
-            cumulative = round(cumulative + event_delta, 2)
+            validation_type = str(score.get("validation_type") or "").strip().lower()
+            effective_event_delta = event_delta if validation_type in VALIDATED_TYPES else 0.0
+            cumulative = round(cumulative + effective_event_delta, 2)
             baseline_path = str(row.get("baseline_path") or "").strip().lower()
             baseline_score = _to_float(score.get("baseline_score"))
             if baseline_score is None:
                 baseline_score = baseline_path_score(baseline_path)
             score_after_cumulative = round(baseline_score + cumulative, 2)
+            validated_delta = effective_event_delta if validation_type in VALIDATED_TYPES else 0.0
+            cumulative_validated = round(cumulative_validated + validated_delta, 2)
             score.update(
                 {
                     "cumulative_delta": cumulative,
+                    "cumulative_validated_delta": cumulative_validated,
                     "score_after_cumulative": score_after_cumulative,
                     "cumulative_position_band": score_band(score_after_cumulative),
-                    "cumulative_position_label": position_label(baseline_path, score_after_cumulative),
+                    "cumulative_position_label": position_label(
+                        baseline_path,
+                        score_after_cumulative,
+                        validated_delta=cumulative_validated,
+                    ),
                 }
             )
 
@@ -168,24 +194,29 @@ def score_band(score: Any) -> str:
     return "bull"
 
 
-def position_label(baseline_path: str, score: Any) -> str:
+def position_label(baseline_path: str, score: Any, *, validated_delta: Any = None) -> str:
     band = score_band(score)
     labels = {
-        "bear": "Bear case",
+        "bear": "Bear evidence zone",
         "bear_leaning": "Bear-leaning",
-        "base": "Base case",
+        "base": "Base evidence zone",
         "bull_leaning": "Bull-leaning",
-        "bull": "Bull case",
+        "bull": "Bull evidence zone",
         "unknown": "Not assessed",
     }
     baseline = str(baseline_path or "").strip().lower()
+    validated = _to_float(validated_delta)
+    if baseline != "bull" and band == "bull" and (validated is None or validated <= 0):
+        return "Bull-leaning, unvalidated"
+    if baseline != "bear" and band == "bear" and (validated is None or validated >= 0):
+        return "Bear-leaning, unvalidated"
     label = labels.get(band, "Not assessed")
     if baseline == "base" and band in {"bear_leaning", "bull_leaning"}:
         return f"Base, {label.lower()}"
     if baseline == "bull" and band == "bull_leaning":
-        return "Bull case, weakening"
+        return "Bull path, weakening"
     if baseline == "bear" and band == "bear_leaning":
-        return "Bear case, improving"
+        return "Bear path, improving"
     return label
 
 
@@ -317,9 +348,12 @@ def _reason(
         return "No price/time thesis movement was scored."
     if direction == "mixed":
         return "The filing has mixed directional evidence, so no clean scenario move was scored."
+    if validation_type == "material_unmapped" and not mapped:
+        return "Material filing outside the saved thesis map; directional signal was left unvalidated and no scenario movement was scored."
     direction_text = "Bull-leaning" if direction == "positive" else "Bear-leaning"
     scope = _validation_scope(validation_type, mapped)
     if state == "material_unmapped" and not mapped:
+        direction_text = "Positive" if direction == "positive" else "Negative"
         scope = "material filing outside the saved thesis map"
     effect = str(price_time_effect or "").strip()
     if effect:

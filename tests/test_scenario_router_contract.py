@@ -131,7 +131,24 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
         self.assertEqual(display["review_status"], "open")
         self.assertEqual(display["review_label"], "Needs thesis decision")
         self.assertEqual(display["system_action_label"], "Attach to thesis log")
+        self.assertEqual(display["evidence_label"], "No saved condition match")
+        self.assertEqual(display["relationship_label"], "Not assessed")
         self.assertTrue(display["is_user_action_required"])
+
+    def test_display_contract_prioritises_unmapped_evidence_over_market_context(self):
+        display = build_router_display_contract(
+            {
+                "trajectory_state": "material_unmapped",
+                "impact_level": "medium",
+                "relationship_priority": 3,
+                "relationship_kind": "material_unmapped",
+                "relationship_strength": "none",
+            },
+            {"action": "annotate_run"},
+        )
+
+        self.assertEqual(display["evidence_label"], "No saved condition match")
+        self.assertEqual(display["relationship_label"], "Material outside thesis map")
 
     def test_display_contract_tracks_positive_movement_without_calling_it_review_required(self):
         display = build_router_display_contract(

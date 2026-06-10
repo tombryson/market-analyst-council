@@ -1,7 +1,6 @@
 """Scenario router models and orchestration helpers."""
 
 from .action_judge import ActionJudge
-from .announcement_interpreter import AnnouncementInterpreter
 from .document_reader import DocumentReader
 from .display_contract import build_router_display_contract
 from .fixture_suite import (
@@ -13,6 +12,7 @@ from .fixture_suite import (
 from .inbox_sentinel import InboxSentinel
 from .lab_scribe import LabScribe
 from .market_facts_resolver import ScenarioMarketFactsResolver
+from .model_thesis_judge import ModelAnnouncementThesisJudge
 from .mock_harness import (
     build_mock_announcement_facts,
     build_mock_baseline_run,
@@ -42,7 +42,6 @@ from .thesis_comparator import ThesisComparator
 __all__ = [
     "ActionDecision",
     "ActionJudge",
-    "AnnouncementInterpreter",
     "AnnouncementAttachment",
     "AnnouncementEvent",
     "AnnouncementFacts",
@@ -60,6 +59,7 @@ __all__ = [
     "InboxSentinel",
     "LabScribe",
     "ScenarioMarketFactsResolver",
+    "ModelAnnouncementThesisJudge",
     "LatestRunSelector",
     "build_mock_announcement_facts",
     "build_mock_baseline_run",

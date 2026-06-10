@@ -127,7 +127,7 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
 
         self.assertEqual(state, "material_unmapped")
 
-    def test_positive_material_unmapped_scores_bull_leaning_without_claiming_bull_case(self):
+    def test_positive_material_unmapped_does_not_move_validated_path(self):
         announcement = facts(
             "Viridis Executes First Major Project Delivery Contract",
             (
@@ -144,11 +144,11 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         report = ThesisComparator().compare(interpreted, baseline(template_id="rare_earths_critical_minerals", leaning="base"))
 
         self.assertEqual(report.trajectory_state, "material_unmapped")
-        self.assertEqual(report.trajectory_score["direction"], "positive")
-        self.assertEqual(report.trajectory_score["event_delta"], 2.0)
-        self.assertEqual(report.trajectory_score["position_label"], "Base, bull-leaning")
+        self.assertEqual(report.trajectory_score["direction"], "neutral")
+        self.assertEqual(report.trajectory_score["event_delta"], 0.0)
+        self.assertEqual(report.trajectory_score["position_label"], "Base evidence zone")
         self.assertFalse(report.trajectory_score["mapped_condition"])
-        self.assertIn("Bull-leaning", report.trajectory_score["reason"])
+        self.assertIn("No price/time thesis movement", report.trajectory_score["reason"])
 
     def test_saved_thesis_condition_scores_above_unmapped_confirmation(self):
         announcement = facts(
@@ -175,7 +175,7 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         self.assertEqual(report.trajectory_score["position_label"], "Base, bull-leaning")
         self.assertTrue(report.trajectory_score["mapped_condition"])
 
-    def test_negative_material_unmapped_scores_bear_leaning(self):
+    def test_negative_material_unmapped_does_not_move_validated_path(self):
         announcement = facts(
             "Key Permit Decision Delayed",
             "The regulator delayed the key operating permit decision and management said the project schedule is at risk.",
@@ -188,9 +188,9 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         report = ThesisComparator().compare(interpreted, baseline(template_id="rare_earths_critical_minerals", leaning="base"))
 
         self.assertEqual(report.trajectory_state, "material_unmapped")
-        self.assertEqual(report.trajectory_score["direction"], "negative")
-        self.assertLess(report.trajectory_score["event_delta"], 0)
-        self.assertIn("bear", report.trajectory_score["position_band"])
+        self.assertEqual(report.trajectory_score["direction"], "neutral")
+        self.assertEqual(report.trajectory_score["event_delta"], 0.0)
+        self.assertEqual(report.trajectory_score["position_band"], "base")
 
     def test_buyback_update_is_capital_management_not_low_confidence_unknown(self):
         announcement = facts(
@@ -223,21 +223,21 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
                 "run_id": "run-1",
                 "saved_at_utc": "2026-01-01T00:00:00Z",
                 "baseline_path": "base",
-                "trajectory_score": {"event_delta": 2.0, "baseline_score": 0.0},
+                "trajectory_score": {"event_delta": 2.0, "baseline_score": 0.0, "validation_type": "mapped_condition"},
             },
             {
                 "ticker": "ASX:TST",
                 "run_id": "run-1",
                 "saved_at_utc": "2026-02-01T00:00:00Z",
                 "baseline_path": "base",
-                "trajectory_score": {"event_delta": 1.5, "baseline_score": 0.0},
+                "trajectory_score": {"event_delta": 1.5, "baseline_score": 0.0, "validation_type": "mapped_condition"},
             },
             {
                 "ticker": "ASX:TST",
                 "run_id": "run-1",
                 "saved_at_utc": "2026-03-01T00:00:00Z",
                 "baseline_path": "base",
-                "trajectory_score": {"event_delta": -1.0, "baseline_score": 0.0},
+                "trajectory_score": {"event_delta": -1.0, "baseline_score": 0.0, "validation_type": "mapped_condition"},
             },
         ]
 
@@ -247,6 +247,52 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         self.assertEqual(rows[1]["trajectory_score"]["cumulative_delta"], 3.5)
         self.assertEqual(rows[2]["trajectory_score"]["cumulative_delta"], 2.5)
         self.assertEqual(rows[2]["trajectory_score"]["cumulative_position_label"], "Base, bull-leaning")
+
+    def test_unmapped_cumulative_score_does_not_move_validated_path(self):
+        rows = [
+            {
+                "ticker": "ASX:TST",
+                "run_id": "run-1",
+                "saved_at_utc": "2026-01-01T00:00:00Z",
+                "baseline_path": "base",
+                "trajectory_score": {
+                    "direction": "positive",
+                    "event_delta": 2.0,
+                    "baseline_score": 0.0,
+                    "validation_type": "material_unmapped",
+                },
+            },
+            {
+                "ticker": "ASX:TST",
+                "run_id": "run-1",
+                "saved_at_utc": "2026-02-01T00:00:00Z",
+                "baseline_path": "base",
+                "trajectory_score": {
+                    "direction": "positive",
+                    "event_delta": 2.0,
+                    "baseline_score": 0.0,
+                    "validation_type": "material_unmapped",
+                },
+            },
+            {
+                "ticker": "ASX:TST",
+                "run_id": "run-1",
+                "saved_at_utc": "2026-03-01T00:00:00Z",
+                "baseline_path": "base",
+                "trajectory_score": {
+                    "direction": "positive",
+                    "event_delta": 6.0,
+                    "baseline_score": 0.0,
+                    "validation_type": "material_unmapped",
+                },
+            },
+        ]
+
+        apply_cumulative_scores(rows)
+
+        self.assertEqual(rows[2]["trajectory_score"]["cumulative_delta"], 0.0)
+        self.assertEqual(rows[2]["trajectory_score"]["cumulative_validated_delta"], 0.0)
+        self.assertEqual(rows[2]["trajectory_score"]["cumulative_position_label"], "Base evidence zone")
 
     def test_unknown_filing_exposes_confidence_breakdown(self):
         announcement = facts(
@@ -513,7 +559,7 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         self.assertEqual(report.trajectory_score["validation_type"], "saved_thesis_failure")
         self.assertEqual(report.trajectory_score["validation_weight"], 4.0)
         self.assertEqual(report.trajectory_score["event_delta"], -4.0)
-        self.assertEqual(report.trajectory_score["position_label"], "Base case")
+        self.assertEqual(report.trajectory_score["position_label"], "Base evidence zone")
 
     def test_model_adjudicator_handles_ambiguous_watchlist_candidate_without_literal_match(self):
         calls = []
