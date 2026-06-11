@@ -290,15 +290,15 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
         }
         updated = apply_review_overlay(row, review)
 
-        self.assertEqual(review["escalation_reason_label"], "Add missing thesis condition")
+        self.assertEqual(review["escalation_reason_label"], "Create thesis-map update task")
         self.assertEqual(review["next_action"], "update_thesis_map")
         self.assertEqual(updated["display"]["queue_bucket"], "cleared")
         self.assertEqual(updated["display"]["review_status"], "escalated")
         self.assertEqual(updated["display"]["review_label"], "Queued task")
         self.assertEqual(updated["display"]["queue_label"], "Cleared")
-        self.assertEqual(updated["display"]["review_queue_label"], "Thesis-map queue")
-        self.assertEqual(updated["display"]["review_reason_label"], "Add missing thesis condition")
-        self.assertEqual(updated["display"]["next_action_label"], "Update thesis map")
+        self.assertEqual(updated["display"]["review_queue_label"], "Queued for thesis-map update")
+        self.assertEqual(updated["display"]["review_reason_label"], "Create thesis-map update task")
+        self.assertEqual(updated["display"]["next_action_label"], "Add thesis-map condition")
         self.assertFalse(updated["display"]["is_user_action_required"])
         self.assertEqual(updated["display"]["tone"], "neutral")
 

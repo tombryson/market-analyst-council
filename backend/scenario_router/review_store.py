@@ -24,7 +24,7 @@ VALID_ESCALATION_REASONS = {
 
 ESCALATION_REASON_LABELS = {
     "router_misclassified": "Check router classification",
-    "thesis_map_gap": "Add missing thesis condition",
+    "thesis_map_gap": "Create thesis-map update task",
     "timeline_changed": "Review timeline assumptions",
     "valuation_changed": "Review valuation assumptions",
     "contradicts_saved_thesis": "Review thesis conflict",
@@ -36,7 +36,7 @@ ESCALATION_REASON_LABELS = {
 
 NEXT_ACTION_LABELS = {
     "add_note": "Add note",
-    "update_thesis_map": "Update thesis map",
+    "update_thesis_map": "Add thesis-map condition",
     "refresh_evidence": "Update saved analysis",
     "rebuild_analysis": "Rebuild analysis",
     "verify_source": "Verify source",
@@ -46,7 +46,7 @@ NEXT_ACTION_LABELS = {
 
 NEXT_ACTION_QUEUE_LABELS = {
     "add_note": "Queued note",
-    "update_thesis_map": "Thesis-map queue",
+    "update_thesis_map": "Queued for thesis-map update",
     "refresh_evidence": "Analysis update queue",
     "rebuild_analysis": "Council rebuild queue",
     "verify_source": "Source check queue",

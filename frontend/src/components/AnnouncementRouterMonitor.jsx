@@ -168,8 +168,8 @@ const FOLLOW_UP_RECOMMENDATIONS = [
   },
   {
     key: 'thesis_map_gap',
-    label: 'Add missing thesis condition',
-    helper: 'Add a catalyst or condition for this filing so future announcements are checked against the thesis map.',
+    label: 'Create thesis-map update task',
+    helper: 'Queue an analyst task to add or amend a saved condition. The model does not edit the thesis map automatically.',
   },
   {
     key: 'router_misclassified',
@@ -223,7 +223,7 @@ const FOLLOW_UP_NEXT_ACTIONS = {
 
 const NEXT_ACTION_LABELS = {
   add_note: 'Add note',
-  update_thesis_map: 'Update thesis map',
+  update_thesis_map: 'Add thesis-map condition',
   refresh_evidence: 'Update saved analysis',
   rebuild_analysis: 'Rebuild analysis',
   verify_source: 'Verify source',
@@ -233,7 +233,7 @@ const NEXT_ACTION_LABELS = {
 
 const NEXT_ACTION_QUEUE_LABELS = {
   add_note: 'Queued note',
-  update_thesis_map: 'Thesis-map queue',
+  update_thesis_map: 'Queued for thesis-map update',
   refresh_evidence: 'Analysis update queue',
   rebuild_analysis: 'Council rebuild queue',
   verify_source: 'Source check queue',
@@ -287,11 +287,11 @@ function recommendedFollowUp(router) {
 
 function followUpButtonLabel(followUp) {
   const action = String(followUp?.nextAction || '').trim().toLowerCase();
-  if (action === 'update_thesis_map') return 'Send to thesis-map queue';
-  if (action === 'refresh_evidence') return 'Send to analysis update queue';
+  if (action === 'update_thesis_map') return 'Queue thesis-map update';
+  if (action === 'refresh_evidence') return 'Add to saved analysis';
   if (action === 'rebuild_analysis') return 'Queue council rebuild';
-  if (action === 'verify_source') return 'Send to source check queue';
-  if (action === 'label_filing') return 'Send to classification queue';
+  if (action === 'verify_source') return 'Queue source check';
+  if (action === 'label_filing') return 'Queue classification check';
   if (action === 'add_note') return 'Add note to run';
   if (action === 'none') return 'No follow-up needed';
   return 'Queue next step';
@@ -300,17 +300,24 @@ function followUpButtonLabel(followUp) {
 function defaultReviewNote(router, status) {
   const title = routerTitle(router);
   const trajectory = routerOutcomeLabel(router);
-  if (status === 'reviewed') return `Reviewed ${title}. Router verdict accepted: ${trajectory}.`;
-  if (status === 'dismissed') return `Dismissed ${title} as not requiring thesis work.`;
+  if (status === 'reviewed') return `Completed review for ${title}. Router verdict accepted: ${trajectory}.`;
+  if (status === 'dismissed') return `Dismissed ${title} as not requiring thesis-map or evidence work.`;
   return '';
 }
 
 function reviewStateSubtext(vm) {
   if (vm.reviewStatus === 'escalated') {
-    return [
-      vm.reviewReasonLabel || 'Queued task',
-      vm.nextActionLabel && `Next: ${vm.nextActionLabel}`,
-    ].filter(Boolean).join(' | ');
+    const action = String(vm.nextAction || '').trim().toLowerCase();
+    if (action === 'update_thesis_map') {
+      return 'Queued for an analyst to add or amend a saved thesis-map condition. The model has not changed the thesis map.';
+    }
+    if (action === 'refresh_evidence') {
+      return 'Queued for an analyst to add this filing to the saved analysis evidence set.';
+    }
+    if (action === 'rebuild_analysis') {
+      return 'Queued for an analyst to decide whether the council analysis should be rebuilt.';
+    }
+    return [vm.reviewReasonLabel || 'Queued task', vm.nextActionLabel && `Next: ${vm.nextActionLabel}`].filter(Boolean).join(' | ');
   }
   if (vm.reviewStatus === 'reviewed') return 'Analyst accepted the router verdict and cleared this filing from the active queue.';
   if (vm.reviewStatus === 'dismissed') return 'Analyst dismissed this filing as not requiring thesis work.';
@@ -1550,25 +1557,25 @@ function ReviewWorkflow({ router, onReviewAction, reviewBusy = '' }) {
       {isQueuedTask ? (
         <div className="announcement-router-follow-up-card is-queued">
           <div>
-            <span>{vm.reviewLabel || 'Queued task'}</span>
-            <strong>{vm.reviewReasonLabel || followUp.label}</strong>
+            <span>Status</span>
+            <strong>{vm.reviewQueueLabel || 'Queued follow-up'}</strong>
             <em>{reviewStateSubtext(vm)}</em>
             {vm.reviewNote && <p>{vm.reviewNote}</p>}
           </div>
           <div className="announcement-router-follow-up-route">
-            <span>System step</span>
+            <span>Next analyst step</span>
             <strong>{vm.nextActionLabel || followUp.nextActionLabel}</strong>
           </div>
         </div>
       ) : (
         <div className="announcement-router-follow-up-card">
           <div>
-            <span>Recommended follow-up</span>
+            <span>Recommended action</span>
             <strong>{followUp.label}</strong>
             <em>{followUp.helper}</em>
           </div>
           <div className="announcement-router-follow-up-route">
-            <span>System step</span>
+            <span>Next analyst step</span>
             <strong>{followUp.nextActionLabel}</strong>
           </div>
         </div>
@@ -1599,31 +1606,41 @@ function ReviewWorkflow({ router, onReviewAction, reviewBusy = '' }) {
       )}
 
       <div className="announcement-router-review-actions" aria-label="Review actions">
-        {hasFollowUpAction && (!isQueuedTask || isAddingNote) && (
+        {hasFollowUpAction && !isQueuedTask && (
           <button
             type="button"
             className="announcement-router-review-primary"
             disabled={Boolean(reviewBusy)}
             onClick={submitFollowUp}
           >
-            {reviewBusy === 'escalated'
-              ? (isQueuedTask ? 'Saving...' : 'Sending...')
-              : (isQueuedTask ? 'Save queued note' : followUpButtonLabel(followUp))}
+            {reviewBusy === 'escalated' ? 'Queuing...' : followUpButtonLabel(followUp)}
+          </button>
+        )}
+        {isQueuedTask && isAddingNote && (
+          <button
+            type="button"
+            className="announcement-router-review-primary"
+            disabled={Boolean(reviewBusy)}
+            onClick={submitFollowUp}
+          >
+            {reviewBusy === 'escalated' ? 'Saving...' : 'Save queued note'}
+          </button>
+        )}
+        {isQueuedTask && (
+          <button
+            type="button"
+            disabled={Boolean(reviewBusy)}
+            onClick={() => submitSimple('reviewed')}
+          >
+            {reviewBusy === 'reviewed' ? 'Saving...' : 'Mark completed'}
           </button>
         )}
         <button
           type="button"
           disabled={Boolean(reviewBusy)}
-          onClick={() => submitSimple('reviewed')}
-        >
-          {reviewBusy === 'reviewed' ? 'Saving...' : 'Mark reviewed'}
-        </button>
-        <button
-          type="button"
-          disabled={Boolean(reviewBusy)}
           onClick={() => submitSimple('dismissed')}
         >
-          {reviewBusy === 'dismissed' ? 'Saving...' : 'Clear as no change'}
+          {reviewBusy === 'dismissed' ? 'Saving...' : (isQueuedTask ? 'Undo queue' : 'Dismiss as no change')}
         </button>
         <button
           type="button"
@@ -1906,6 +1923,7 @@ function DecisionPanel({
   const marketConditions = Array.isArray(router?.market_context_conditions) ? router.market_context_conditions : [];
   const announcementChecks = Array.isArray(router?.announcement_condition_checks) ? router.announcement_condition_checks : [];
   const watchlistChecks = Array.isArray(router?.watchlist_condition_checks) ? router.watchlist_condition_checks : [];
+  const checkedWatchlistRows = checkedNotTriggeredWatchlist(router);
   const verificationChecks = Array.isArray(router?.verification_condition_checks) ? router.verification_condition_checks : [];
   const followUps = Array.isArray(router?.follow_up_steps) ? router.follow_up_steps : [];
   const directHits = matchedConditions.length + watchHits.length + verificationHits.length;
