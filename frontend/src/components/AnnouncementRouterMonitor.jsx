@@ -160,167 +160,26 @@ function labelProjectionRerunSignal(value) {
   return labels[signal] || (signal ? titleizeKey(signal) : 'No rerun signal');
 }
 
-const FOLLOW_UP_RECOMMENDATIONS = [
-  {
-    key: 'no_follow_up',
-    label: 'No follow-up needed',
-    helper: 'This filing has been checked and does not need a thesis-map, evidence, or rerun action.',
-  },
-  {
-    key: 'thesis_map_gap',
-    label: 'Create thesis-map update task',
-    helper: 'Queue an analyst task to add or amend a saved condition. The model does not edit the thesis map automatically.',
-  },
-  {
-    key: 'router_misclassified',
-    label: 'Check router classification',
-    helper: 'The filing type, materiality, or trajectory label looks wrong.',
-  },
-  {
-    key: 'timeline_changed',
-    label: 'Review timeline assumptions',
-    helper: 'The announcement changes expected catalyst timing, delivery path, or project schedule.',
-  },
-  {
-    key: 'valuation_changed',
-    label: 'Review valuation assumptions',
-    helper: 'The announcement changes economics, contract value, funding, production, margin, or target assumptions.',
-  },
-  {
-    key: 'contradicts_saved_thesis',
-    label: 'Review thesis conflict',
-    helper: 'The announcement conflicts with a saved bull/base/bear assumption or failure condition.',
-  },
-  {
-    key: 'needs_evidence_refresh',
-    label: 'Add filing to saved analysis',
-    helper: 'The saved council run was written before this filing. Include this filing before relying on that run.',
-  },
-  {
-    key: 'needs_full_rerun',
-    label: 'Rebuild council analysis',
-    helper: 'The saved analysis may be stale enough that the council should rebuild the thesis.',
-  },
-  {
-    key: 'source_verification',
-    label: 'Verify source and extraction',
-    helper: 'The source, extracted filing facts, or classification confidence needs checking.',
-  },
-];
-
-const FOLLOW_UP_NEXT_ACTIONS = {
-  no_follow_up: 'none',
-  router_misclassified: 'label_filing',
-  thesis_map_gap: 'update_thesis_map',
-  timeline_changed: 'refresh_evidence',
-  valuation_changed: 'refresh_evidence',
-  contradicts_saved_thesis: 'rebuild_analysis',
-  needs_evidence_refresh: 'refresh_evidence',
-  needs_full_rerun: 'rebuild_analysis',
-  source_verification: 'verify_source',
-  other: 'add_note',
-};
-
-const NEXT_ACTION_LABELS = {
-  add_note: 'Add note',
-  update_thesis_map: 'Add thesis-map condition',
-  refresh_evidence: 'Update saved analysis',
-  rebuild_analysis: 'Rebuild analysis',
-  verify_source: 'Verify source',
-  label_filing: 'Label filing',
-  none: 'No system action',
-};
-
-const NEXT_ACTION_QUEUE_LABELS = {
-  add_note: 'Queued note',
-  update_thesis_map: 'Queued for thesis-map update',
-  refresh_evidence: 'Analysis update queue',
-  rebuild_analysis: 'Council rebuild queue',
-  verify_source: 'Source check queue',
-  label_filing: 'Classification queue',
-};
-
 const SCENARIO_PATHS = new Set(['bull', 'base', 'bear', 'mixed']);
-
-function defaultFollowUpReason(router) {
-  const display = routerDisplay(router);
-  const reviewStatus = String(display.review_status || '').trim().toLowerCase();
-  const state = routerTrajectoryState(router);
-  const relationship = routerThesisRelationship(router);
-  if (reviewStatus === 'auto_cleared' || ['no_thesis_change', 'administrative_filing', 'market_backdrop_only'].includes(state)) {
-    return 'no_follow_up';
-  }
-  const displayReason = String(routerDisplay(router)?.review_reason || '').trim().toLowerCase();
-  if (displayReason === 'thesis_map_gap') return 'thesis_map_gap';
-  if (displayReason === 'classification_unresolved') return 'router_misclassified';
-  if (displayReason === 'negative_trajectory') {
-    const state = routerTrajectoryState(router);
-    if (state === 'timeline_delayed') return 'timeline_changed';
-    if (state === 'thesis_weakened') return 'contradicts_saved_thesis';
-    return 'needs_evidence_refresh';
-  }
-  if (displayReason === 'verification_hit') return 'source_verification';
-  if (relationship === 'related_unmapped' || state === 'material_unmapped') return 'thesis_map_gap';
-  if (state === 'needs_classification') return 'router_misclassified';
-  if (state === 'timeline_delayed' || state === 'timeline_accelerated') return 'timeline_changed';
-  if (state === 'thesis_weakened') return 'contradicts_saved_thesis';
-  return 'needs_evidence_refresh';
-}
-
-function nextActionForFollowUpReason(reason) {
-  const key = String(reason || '').trim().toLowerCase();
-  return FOLLOW_UP_NEXT_ACTIONS[key] || 'add_note';
-}
-
-function recommendedFollowUp(router) {
-  const reason = defaultFollowUpReason(router);
-  const option = FOLLOW_UP_RECOMMENDATIONS.find((item) => item.key === reason) || FOLLOW_UP_RECOMMENDATIONS[0];
-  const nextAction = nextActionForFollowUpReason(reason);
-  return {
-    reason,
-    label: option.label,
-    helper: option.helper,
-    nextAction,
-    nextActionLabel: NEXT_ACTION_LABELS[nextAction] || titleizeKey(nextAction),
-  };
-}
-
-function followUpButtonLabel(followUp) {
-  const action = String(followUp?.nextAction || '').trim().toLowerCase();
-  if (action === 'update_thesis_map') return 'Queue thesis-map update';
-  if (action === 'refresh_evidence') return 'Add to saved analysis';
-  if (action === 'rebuild_analysis') return 'Queue council rebuild';
-  if (action === 'verify_source') return 'Queue source check';
-  if (action === 'label_filing') return 'Queue classification check';
-  if (action === 'add_note') return 'Add note to run';
-  if (action === 'none') return 'No follow-up needed';
-  return 'Queue next step';
-}
 
 function defaultReviewNote(router, status) {
   const title = routerTitle(router);
   const trajectory = routerOutcomeLabel(router);
-  if (status === 'reviewed') return `Completed review for ${title}. Router verdict accepted: ${trajectory}.`;
-  if (status === 'dismissed') return `Dismissed ${title} as not requiring thesis-map or evidence work.`;
+  if (status === 'reviewed') return `Handled ${title}. Router verdict accepted: ${trajectory}.`;
+  if (status === 'dismissed') return `Cleared ${title} as no further action.`;
   return '';
 }
 
+function isGeneratedReviewNote(note, router) {
+  const text = String(note || '').trim();
+  const title = routerTitle(router);
+  if (!text || !title || !text.endsWith(`: ${title}`)) return false;
+  return text.split(':').length === 2;
+}
+
 function reviewStateSubtext(vm) {
-  if (vm.reviewStatus === 'escalated') {
-    const action = String(vm.nextAction || '').trim().toLowerCase();
-    if (action === 'update_thesis_map') {
-      return 'Queued for an analyst to add or amend a saved thesis-map condition. The model has not changed the thesis map.';
-    }
-    if (action === 'refresh_evidence') {
-      return 'Queued for an analyst to add this filing to the saved analysis evidence set.';
-    }
-    if (action === 'rebuild_analysis') {
-      return 'Queued for an analyst to decide whether the council analysis should be rebuilt.';
-    }
-    return [vm.reviewReasonLabel || 'Queued task', vm.nextActionLabel && `Next: ${vm.nextActionLabel}`].filter(Boolean).join(' | ');
-  }
-  if (vm.reviewStatus === 'reviewed') return 'Analyst accepted the router verdict and cleared this filing from the active queue.';
-  if (vm.reviewStatus === 'dismissed') return 'Analyst dismissed this filing as not requiring thesis work.';
+  if (vm.reviewStatus === 'reviewed') return 'Handled and cleared from the active list.';
+  if (vm.reviewStatus === 'dismissed') return 'Cleared with no further action.';
   if (vm.reviewStatus === 'open') return 'The router cannot safely clear this filing. Decide whether the saved thesis map, evidence pack, or classification needs work.';
   if (vm.reviewStatus === 'tracking') return 'The filing supports the saved path. Track it against the run before changing the narrative.';
   if (vm.reviewStatus === 'auto_cleared') return 'No active analyst decision is required for this filing.';
@@ -543,34 +402,27 @@ function routerDisplay(router) {
 function reviewLabelFromStatus(status) {
   const key = String(status || '').trim().toLowerCase();
   if (key === 'reviewed') return 'Reviewed';
-  if (key === 'dismissed') return 'Dismissed';
-  if (key === 'escalated') return 'Queued task';
+  if (key === 'dismissed') return 'Cleared';
   if (key === 'open') return 'Needs thesis decision';
   return '';
 }
 
 function applyReviewOverlayToEvent(row, review) {
   if (!row || !review || row.event_id !== review.event_id) return row;
-  const status = String(review.review_status || '').trim().toLowerCase();
+  const rawStatus = String(review.review_status || '').trim().toLowerCase();
+  const status = rawStatus === 'escalated' ? 'open' : rawStatus;
   const label = reviewLabelFromStatus(status);
   const currentDisplay = routerDisplay(row);
-  const nextAction = String(review.next_action || currentDisplay.next_action || '').trim();
-  const queueLabel = NEXT_ACTION_QUEUE_LABELS[nextAction] || 'Queued follow-up';
   return {
     ...row,
-    review_overlay: review,
+    review_overlay: { ...review, review_status: status },
     display: {
       ...currentDisplay,
       queue_bucket: currentDisplay.queue_bucket,
       queue_label: currentDisplay.queue_label,
-      review_queue_label: status === 'escalated' ? queueLabel : '',
       review_status: status || currentDisplay.review_status,
       review_label: label || currentDisplay.review_label,
-      review_reason: review.escalation_reason || currentDisplay.review_reason,
-      review_reason_label: review.escalation_reason_label || currentDisplay.review_reason_label,
       review_owner: review.review_owner || currentDisplay.review_owner,
-      next_action: nextAction,
-      next_action_label: review.next_action_label || currentDisplay.next_action_label,
       is_user_action_required: status === 'open',
       tone: currentDisplay.tone,
     },
@@ -671,7 +523,6 @@ function routerCaseBucket(router) {
 function routerReviewBucket(router) {
   const status = String(routerPresentation(router).reviewStatus || '').trim().toLowerCase();
   if (status === 'open') return 'needs_decision';
-  if (status === 'escalated') return 'queued_follow_up';
   if (status === 'reviewed') return 'reviewed';
   if (status === 'dismissed') return 'dismissed';
   if (status === 'auto_cleared') return 'auto_cleared';
@@ -842,12 +693,8 @@ function routerPresentation(router) {
     trajectoryLabel,
     reviewLabel: display.review_label || (routerActionBucket(router) === 'open_review' ? 'Needs thesis decision' : 'Auto-cleared'),
     reviewStatus: display.review_status || '',
-    reviewReasonLabel: display.review_reason_label || reviewOverlay.escalation_reason_label || '',
     reviewNote: reviewOverlay.review_note || '',
     queueLabel: display.queue_label || titleizeKey(routerActionBucket(router)),
-    reviewQueueLabel: display.review_queue_label || '',
-    nextActionLabel: display.next_action_label || reviewOverlay.next_action_label || '',
-    nextAction: display.next_action || reviewOverlay.next_action || '',
     actionLabel: display.system_action_label || labelScenarioAction(action),
     outcomeLabel: trajectoryLabel,
     evidenceLabel: routerEvidenceState(router),
@@ -1504,31 +1351,18 @@ function ReviewWorkflow({ router, onReviewAction, reviewBusy = '' }) {
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [note, setNote] = useState('');
   const vm = routerPresentation(router);
-  const followUp = recommendedFollowUp(router);
-  const isQueuedTask = vm.reviewStatus === 'escalated';
   const isTerminalReview = ['reviewed', 'dismissed'].includes(vm.reviewStatus);
-  const hasFollowUpAction = String(followUp.nextAction || '').trim().toLowerCase() !== 'none';
+  const visibleNote = isGeneratedReviewNote(vm.reviewNote, router) ? '' : vm.reviewNote;
 
   if (!onReviewAction || !router?.event_id) return null;
-  if (isTerminalReview) {
+  if (isTerminalReview) return null;
+  if (vm.reviewStatus === 'auto_cleared') {
+    if (!visibleNote) return null;
     return (
       <div className="announcement-router-review-workflow">
         <div className="announcement-router-review-state">
-          <span>{vm.reviewLabel}</span>
-          <em>{reviewStateSubtext(vm)}</em>
-          {vm.reviewNote && <p>{vm.reviewNote}</p>}
-        </div>
-      </div>
-    );
-  }
-  if (!hasFollowUpAction && !isQueuedTask) {
-    if (!vm.reviewNote) return null;
-    return (
-      <div className="announcement-router-review-workflow">
-        <div className="announcement-router-review-state">
-          <span>{vm.reviewLabel}</span>
-          <em>{reviewStateSubtext(vm)}</em>
-          <p>{vm.reviewNote}</p>
+          <span>Note</span>
+          <p>{visibleNote}</p>
         </div>
       </div>
     );
@@ -1537,16 +1371,13 @@ function ReviewWorkflow({ router, onReviewAction, reviewBusy = '' }) {
   const submitSimple = (status) => {
     onReviewAction(router, status, {
       review_note: defaultReviewNote(router, status),
-      next_action: status === 'reviewed' || status === 'dismissed' ? 'none' : '',
       review_owner: 'analyst',
     });
   };
 
-  const submitFollowUp = () => {
-    onReviewAction(router, 'escalated', {
-      escalation_reason: followUp.reason,
-      next_action: followUp.nextAction,
-      review_note: note.trim() || `${followUp.label}: ${routerTitle(router)}`,
+  const submitNote = () => {
+    onReviewAction(router, 'open', {
+      review_note: note.trim(),
       review_owner: 'analyst',
     });
     setIsAddingNote(false);
@@ -1554,38 +1385,10 @@ function ReviewWorkflow({ router, onReviewAction, reviewBusy = '' }) {
 
   return (
     <div className="announcement-router-review-workflow">
-      {isQueuedTask ? (
-        <div className="announcement-router-follow-up-card is-queued">
-          <div>
-            <span>Status</span>
-            <strong>{vm.reviewQueueLabel || 'Queued follow-up'}</strong>
-            <em>{reviewStateSubtext(vm)}</em>
-            {vm.reviewNote && <p>{vm.reviewNote}</p>}
-          </div>
-          <div className="announcement-router-follow-up-route">
-            <span>Next analyst step</span>
-            <strong>{vm.nextActionLabel || followUp.nextActionLabel}</strong>
-          </div>
-        </div>
-      ) : (
-        <div className="announcement-router-follow-up-card">
-          <div>
-            <span>Recommended action</span>
-            <strong>{followUp.label}</strong>
-            <em>{followUp.helper}</em>
-          </div>
-          <div className="announcement-router-follow-up-route">
-            <span>Next analyst step</span>
-            <strong>{followUp.nextActionLabel}</strong>
-          </div>
-        </div>
-      )}
-
-      {!!vm.reviewNote && !isQueuedTask && (
+      {!!visibleNote && (
         <div className="announcement-router-review-state">
-          <span>{vm.reviewLabel}</span>
-          <em>{reviewStateSubtext(vm)}</em>
-          <p>{vm.reviewNote}</p>
+          <span>Note</span>
+          <p>{visibleNote}</p>
         </div>
       )}
 
@@ -1606,41 +1409,29 @@ function ReviewWorkflow({ router, onReviewAction, reviewBusy = '' }) {
       )}
 
       <div className="announcement-router-review-actions" aria-label="Review actions">
-        {hasFollowUpAction && !isQueuedTask && (
+        {isAddingNote && (
           <button
             type="button"
             className="announcement-router-review-primary"
-            disabled={Boolean(reviewBusy)}
-            onClick={submitFollowUp}
+            disabled={Boolean(reviewBusy) || !note.trim()}
+            onClick={submitNote}
           >
-            {reviewBusy === 'escalated' ? 'Queuing...' : followUpButtonLabel(followUp)}
-          </button>
-        )}
-        {isQueuedTask && isAddingNote && (
-          <button
-            type="button"
-            className="announcement-router-review-primary"
-            disabled={Boolean(reviewBusy)}
-            onClick={submitFollowUp}
-          >
-            {reviewBusy === 'escalated' ? 'Saving...' : 'Save queued note'}
-          </button>
-        )}
-        {isQueuedTask && (
-          <button
-            type="button"
-            disabled={Boolean(reviewBusy)}
-            onClick={() => submitSimple('reviewed')}
-          >
-            {reviewBusy === 'reviewed' ? 'Saving...' : 'Mark completed'}
+            {reviewBusy ? 'Saving...' : 'Save note'}
           </button>
         )}
         <button
           type="button"
           disabled={Boolean(reviewBusy)}
+          onClick={() => submitSimple('reviewed')}
+        >
+          {reviewBusy === 'reviewed' ? 'Saving...' : 'Mark handled'}
+        </button>
+        <button
+          type="button"
+          disabled={Boolean(reviewBusy)}
           onClick={() => submitSimple('dismissed')}
         >
-          {reviewBusy === 'dismissed' ? 'Saving...' : (isQueuedTask ? 'Undo queue' : 'Dismiss as no change')}
+          {reviewBusy === 'dismissed' ? 'Saving...' : 'Clear as no change'}
         </button>
         <button
           type="button"
@@ -1822,9 +1613,6 @@ function RouterQueue({ events, selectedEventId, onSelect }) {
 		                  <span>{routerMaterialityLabel(row)}</span>
 		                  <span>{routerDriverLabel(row)}</span>
 		                  {vm.reviewStatus && vm.reviewStatus !== 'auto_cleared' && <span>{vm.reviewLabel}</span>}
-		                  {vm.reviewQueueLabel && <span>{vm.reviewQueueLabel}</span>}
-		                  {vm.reviewReasonLabel && <span>{vm.reviewReasonLabel}</span>}
-		                  {vm.nextActionLabel && <span>Next: {vm.nextActionLabel}</span>}
 		                </span>
               </span>
               <span className="announcement-router-queue-time">{row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}</span>
@@ -1963,24 +1751,6 @@ function DecisionPanel({
           </div>
         </div>
         {filingSummary && <p className="announcement-router-filing-summary">{filingSummary}</p>}
-        <div className="announcement-router-verdict-grid" aria-label="Router decision facts">
-          <span>
-            <em>Driver</em>
-            <b>{routerDriverLabel(router)}</b>
-          </span>
-          <span>
-            <em>Materiality</em>
-            <b>{routerMaterialityLabel(router)}</b>
-          </span>
-          <span>
-            <em>Evidence</em>
-            <b>{vm.evidenceLabel}</b>
-          </span>
-          <span>
-            <em>Relationship</em>
-            <b>{routerRelationshipLabel(router)}</b>
-          </span>
-        </div>
         <TrajectoryScorePanel router={router} />
         <div className="announcement-router-hero-actions">
           {router?.source_url && (
@@ -2191,9 +1961,8 @@ export default function AnnouncementRouterMonitor({
     return [
       { key: 'all', label: 'All review states', tone: 'neutral', count: count('all') },
       { key: 'needs_decision', label: 'Needs decision', tone: 'warn', count: count('needs_decision') },
-      { key: 'queued_follow_up', label: 'Queued follow-up', tone: 'warn', count: count('queued_follow_up') },
       { key: 'reviewed', label: 'Reviewed', tone: 'neutral', count: count('reviewed') },
-      { key: 'dismissed', label: 'Dismissed', tone: 'neutral', count: count('dismissed') },
+      { key: 'dismissed', label: 'Cleared', tone: 'neutral', count: count('dismissed') },
       { key: 'auto_cleared', label: 'Auto-cleared', tone: 'neutral', count: count('auto_cleared') },
       { key: 'tracking', label: 'Tracking', tone: 'info', count: count('tracking') },
     ];
@@ -2274,8 +2043,6 @@ export default function AnnouncementRouterMonitor({
         review_note: options.review_note || `Router event ${reviewStatus} from announcement monitor.`,
         reviewed_by: 'analyst',
         review_owner: options.review_owner || 'analyst',
-        escalation_reason: options.escalation_reason || '',
-        next_action: options.next_action || '',
       });
       const review = payload?.review || {};
       setOverview((current) => {

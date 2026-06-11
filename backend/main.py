@@ -4003,8 +4003,6 @@ async def post_scenario_router_review(event_id: str, payload: Dict[str, Any]):
             status=str(payload.get("review_status") or payload.get("status") or "").strip(),
             note=str(payload.get("review_note") or payload.get("note") or "").strip(),
             actor=str(payload.get("reviewed_by") or payload.get("actor") or "analyst").strip() or "analyst",
-            escalation_reason=str(payload.get("escalation_reason") or "").strip(),
-            next_action=str(payload.get("next_action") or "").strip(),
             owner=str(payload.get("review_owner") or payload.get("owner") or "").strip(),
         )
     except ValueError as exc:

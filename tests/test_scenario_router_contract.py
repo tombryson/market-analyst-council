@@ -258,25 +258,13 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
             self.assertEqual(review["event_id"], "evt-store")
             self.assertEqual(review["review_status"], "dismissed")
             self.assertEqual(review["review_note"], "Not relevant.")
-            self.assertEqual(review["next_action"], "none")
 
-    def test_escalated_review_requires_reason_without_erasing_case_bucket(self):
-        import tempfile
-        from pathlib import Path
-
-        with tempfile.TemporaryDirectory() as tmp:
-            with self.assertRaises(ValueError):
-                save_review("evt-escalate", status="escalated", base_dir=Path(tmp))
-
-            review = save_review(
-                "evt-escalate",
-                status="escalated",
-                escalation_reason="thesis_map_gap",
-                note="Project delivery contract is missing from mapped catalysts.",
-                actor="test",
-                base_dir=Path(tmp),
-            )
-
+    def test_legacy_escalated_review_is_treated_as_open_without_workflow_labels(self):
+        review = {
+            "event_id": "evt-escalate",
+            "review_status": "escalated",
+            "review_note": "Project delivery contract is missing from mapped catalysts.",
+        }
         row = {
             "event_id": "evt-escalate",
             "display": {
@@ -290,15 +278,13 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
         }
         updated = apply_review_overlay(row, review)
 
-        self.assertEqual(review["escalation_reason_label"], "Create thesis-map update task")
-        self.assertEqual(review["next_action"], "update_thesis_map")
         self.assertEqual(updated["display"]["queue_bucket"], "cleared")
-        self.assertEqual(updated["display"]["review_status"], "escalated")
-        self.assertEqual(updated["display"]["review_label"], "Queued task")
+        self.assertEqual(updated["display"]["review_status"], "auto_cleared")
+        self.assertEqual(updated["review_overlay"]["review_status"], "open")
         self.assertEqual(updated["display"]["queue_label"], "Cleared")
-        self.assertEqual(updated["display"]["review_queue_label"], "Queued for thesis-map update")
-        self.assertEqual(updated["display"]["review_reason_label"], "Create thesis-map update task")
-        self.assertEqual(updated["display"]["next_action_label"], "Add thesis-map condition")
+        self.assertNotIn("review_queue_label", updated["display"])
+        self.assertNotIn("review_reason_label", updated["display"])
+        self.assertNotIn("next_action_label", updated["display"])
         self.assertFalse(updated["display"]["is_user_action_required"])
         self.assertEqual(updated["display"]["tone"], "neutral")
 
