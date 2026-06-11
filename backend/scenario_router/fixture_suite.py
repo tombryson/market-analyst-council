@@ -56,6 +56,11 @@ def compile_router_fixture_suite(
             "source_url": str(announcement.get("source_url") or "mock://scenario-router/backwards-fixture").strip(),
             "source_type": str(announcement.get("source_type") or "mock").strip(),
             "published_at_utc": str(announcement.get("published_at_utc") or "").strip(),
+            "model_judgement": (
+                announcement.get("model_judgement")
+                if isinstance(announcement.get("model_judgement"), dict)
+                else {}
+            ),
             "use_legacy_interpreter": bool(
                 announcement.get("use_legacy_interpreter", announcement.get("use_interpreter", True))
             ),
@@ -261,6 +266,17 @@ def _validate_suite_fixture(suite: Dict[str, Any], *, suite_path: Path | None = 
 
 
 def _user_bucket(actual: Dict[str, Any]) -> str:
+    display = actual.get("display") if isinstance(actual.get("display"), dict) else {}
+    queue_bucket = str(display.get("queue_bucket") or "").strip().lower()
+    if queue_bucket == "open_review":
+        return "needs_review"
+    if queue_bucket == "positive_movement":
+        return "thesis_moving"
+    if queue_bucket == "administrative":
+        return "administrative"
+    if queue_bucket == "cleared":
+        return "no_thesis_change"
+
     state = str(actual.get("trajectory_state") or "").strip().lower()
     action = str(actual.get("action") or "").strip().lower()
     if state in {"needs_classification", "material_unmapped", "thesis_weakened", "timeline_delayed", "risk_increased"}:

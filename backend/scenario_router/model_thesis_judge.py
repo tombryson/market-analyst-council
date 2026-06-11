@@ -53,10 +53,25 @@ REFERENCE_TYPES = {"thesis_map", "watchlist", "verification", "timeline", "none"
 RELATIONSHIPS = {
     "confirms",
     "partially_confirms",
+    "checked_not_triggered",
     "contradicts",
     "updates",
     "unmapped",
     "none",
+}
+SERIOUS_INCIDENT_TERMS = {
+    "fatality",
+    "fatal",
+    "death",
+    "died",
+    "killed",
+    "serious injury",
+    "formally notified",
+    "formal investigation",
+    "regulator",
+    "department",
+    "suspension",
+    "shutdown",
 }
 
 
@@ -91,9 +106,13 @@ class ModelAnnouncementThesisJudge:
                     "LLM council thesis packet. Return JSON only. Do not classify from keyword counts. Do not let "
                     "forward-looking disclaimers, risk boilerplate, exchange release footers, or authorisation text "
                     "drive thesis direction. A directional verdict requires a core filing claim with a short evidence "
-                    "quote and a relationship to a saved thesis-map, watchlist, verification, or timeline reference. "
-                    "If the filing is material but no saved reference covers it, call it material_unmapped and keep "
-                    "the direction neutral unless you can cite a saved reference."
+                    "quote. Treat thesis-map coverage separately from thesis impact: if the filing is material but no "
+                    "saved reference covers it, mark the relationship as unmapped, then still judge whether the filing "
+                    "is positive, negative, neutral, mixed, or unclear. For thesis_map and timeline references, "
+                    "relationship=confirms means the filing directly announces that the saved condition or milestone "
+                    "itself has occurred or has been near-explicitly satisfied. Targeted pathways, schedule support, "
+                    "enabling, de-risking, prerequisite, critical-path, progress-toward, or related support are "
+                    "partially_confirms or updates, not confirms."
                 ),
             },
             {
@@ -106,8 +125,8 @@ class ModelAnnouncementThesisJudge:
                     '  "document_type": "administrative|agm_presentation|annual_report|capital_management|earnings_update|financing_update|incident_report|investor_presentation|operational_update|permitting_regulatory|production_update|project_development|resource_update|trading_update|unknown",\n'
                     '  "core_claims": [{"claim": "", "evidence_quote": "", "claim_type": "", "is_new_information": true}],\n'
                     '  "ignored_text": [{"type": "boilerplate|footer|disclaimer", "reason": ""}],\n'
-                    '  "thesis_relationships": [{"reference_type": "thesis_map|watchlist|verification|timeline|none", "reference_id": "", "reference_label": "", "scenario": "bull|base|bear|", "relationship": "confirms|partially_confirms|contradicts|updates|unmapped|none", "direction": "positive|negative|neutral|mixed|unclear", "evidence_quote": "", "reason": "", "confidence": 0.0}],\n'
-                    '  "trajectory_verdict": {"state": "thesis_strengthened|thesis_weakened|timeline_accelerated|timeline_delayed|risk_reduced|risk_increased|material_unmapped|market_backdrop_only|administrative_filing|no_thesis_change|needs_classification", "direction": "positive|negative|neutral|mixed|unclear", "materiality": "none|low|medium|high|critical", "intensity": "none|low|medium|high|critical", "recommended_case": "bull|base|bear|unchanged|unclear", "confidence": 0.0, "reason": ""},\n'
+                    '  "thesis_relationships": [{"reference_type": "thesis_map|watchlist|verification|timeline|none", "reference_id": "", "reference_label": "", "scenario": "bull|base|bear|", "relationship": "confirms|partially_confirms|checked_not_triggered|contradicts|updates|unmapped|none", "direction": "positive|negative|neutral|mixed|unclear", "evidence_quote": "", "reason": "", "missing_for_full_match": [], "confidence": 0.0}],\n'
+                    '  "trajectory_verdict": {"state": "thesis_strengthened|thesis_weakened|timeline_accelerated|timeline_delayed|risk_reduced|risk_increased|administrative_filing|no_thesis_change|needs_classification", "direction": "positive|negative|neutral|mixed|unclear", "materiality": "none|low|medium|high|critical", "intensity": "none|low|medium|high|critical", "recommended_case": "bull|base|bear|unchanged|unclear", "confidence": 0.0, "reason": ""},\n'
                     '  "maintenance_action": {"action": "none|add_thesis_condition|refresh_evidence|rerun_council|human_review", "reason": ""}\n'
                     "}\n\n"
                     f"INPUT_JSON:\n{json.dumps(request, ensure_ascii=True)}"
@@ -240,68 +259,18 @@ class ModelAnnouncementThesisJudge:
         return {
             "decision_rules": [
                 "Use core announcement claims, not disclaimers or release footers.",
-                "A thesis movement requires a saved reference and an evidence quote.",
-                "If material but not covered by the saved thesis packet, return material_unmapped with neutral direction.",
+                "A thesis movement requires a core filing claim and an evidence quote.",
+                "Do not use thesis-map coverage as the verdict. If material but not covered by the saved thesis packet, mark the relationship as unmapped and judge impact direction separately.",
                 "Use partial relationships for precursors such as LoI/MoU where the saved condition requires binding terms.",
                 "Return needs_classification if the filing text is too thin or the thesis impact cannot be safely judged.",
+                "For watchlist red flags, if the filing discusses the risk area but says the risk did not occur or no material impact is expected, return relationship=checked_not_triggered and direction=neutral. Do not convert a non-triggered red flag into a confirmatory signal.",
+                "Fatalities, serious safety incidents, formal regulatory investigations, or safety-related operational shutdowns are risk events. If the company says no immediate production impact is expected, that may avoid a production-delay watchlist trigger, but it does not make the filing no_thesis_change. Classify the trajectory as risk_increased unless the source clearly shows the incident is immaterial and non-operational.",
             ]
         }
 
     @staticmethod
     def _validate_payload(payload: Any) -> tuple[Dict[str, Any], str]:
-        if not isinstance(payload, dict):
-            return {}, "payload_not_object"
-        summary = _clean_sentence(payload.get("one_sentence_summary"))
-        verdict = payload.get("trajectory_verdict") if isinstance(payload.get("trajectory_verdict"), dict) else {}
-        document_type = _norm_enum(payload.get("document_type"), DOCUMENT_TYPES, "unknown")
-        state = _norm_enum(verdict.get("state"), TRAJECTORY_STATES, "needs_classification")
-        direction = _norm_enum(verdict.get("direction"), TRAJECTORY_DIRECTIONS, "unclear")
-        materiality = _norm_enum(verdict.get("materiality"), MATERIALITY_VALUES, "low")
-        intensity = _norm_enum(verdict.get("intensity"), MATERIALITY_VALUES, materiality)
-        confidence = _safe_float(verdict.get("confidence"), default=0.0)
-        relationships = _normalize_relationships(payload.get("thesis_relationships") or [])
-        core_claims = _normalize_claims(payload.get("core_claims") or [])
-        ignored_text = _normalize_ignored_text(payload.get("ignored_text") or [])
-        action = payload.get("maintenance_action") if isinstance(payload.get("maintenance_action"), dict) else {}
-        normalized = {
-            "status": "valid",
-            "one_sentence_summary": summary,
-            "document_type": document_type,
-            "core_claims": core_claims,
-            "ignored_text": ignored_text,
-            "thesis_relationships": relationships,
-            "trajectory_verdict": {
-                "state": state,
-                "direction": direction,
-                "materiality": materiality,
-                "intensity": intensity,
-                "recommended_case": _norm_recommended_case(verdict.get("recommended_case")),
-                "confidence": max(0.0, min(1.0, confidence)),
-                "reason": _clean_sentence(verdict.get("reason")),
-            },
-            "maintenance_action": {
-                "action": _norm_action(action.get("action")),
-                "reason": _clean_sentence(action.get("reason")),
-            },
-        }
-        movement_state = state in {
-            "thesis_strengthened",
-            "thesis_weakened",
-            "timeline_accelerated",
-            "timeline_delayed",
-            "risk_reduced",
-            "risk_increased",
-        }
-        has_valid_relationship = any(_is_valid_directional_relationship(item) for item in relationships)
-        if movement_state and not has_valid_relationship:
-            normalized["trajectory_verdict"]["state"] = "material_unmapped" if materiality in {"medium", "high", "critical"} else "no_thesis_change"
-            normalized["trajectory_verdict"]["direction"] = "neutral"
-            normalized["trajectory_verdict"]["reason"] = (
-                "Directional model verdict was withheld because no evidence-bound saved thesis relationship was supplied."
-            )
-        if not summary and not core_claims:
-            return {}, "missing_summary_and_claims"
-        return normalized, ""
+        return normalize_model_thesis_payload(payload)
 
     @staticmethod
     def _apply_payload(facts: AnnouncementFacts, payload: Dict[str, Any]) -> AnnouncementFacts:
@@ -392,6 +361,76 @@ def parse_thesis_judge_json(content: str) -> Dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+def normalize_model_thesis_payload(payload: Any) -> tuple[Dict[str, Any], str]:
+    """Validate and normalize the model thesis judge contract.
+
+    This is intentionally shared by live model calls and stored-artifact replay.
+    A replayed artifact should not be able to bypass invariants that protect the
+    router from stale or unsafe model judgements.
+    """
+    if not isinstance(payload, dict):
+        return {}, "payload_not_object"
+    summary = _clean_sentence(payload.get("one_sentence_summary"))
+    verdict = payload.get("trajectory_verdict") if isinstance(payload.get("trajectory_verdict"), dict) else {}
+    document_type = _norm_enum(payload.get("document_type"), DOCUMENT_TYPES, "unknown")
+    state = _norm_enum(verdict.get("state"), TRAJECTORY_STATES, "needs_classification")
+    direction = _norm_enum(verdict.get("direction"), TRAJECTORY_DIRECTIONS, "unclear")
+    materiality = _norm_enum(verdict.get("materiality"), MATERIALITY_VALUES, "low")
+    intensity = _norm_enum(verdict.get("intensity"), MATERIALITY_VALUES, materiality)
+    confidence = _safe_float(verdict.get("confidence"), default=0.0)
+    relationships = _normalize_relationships(payload.get("thesis_relationships") or [])
+    core_claims = _normalize_claims(payload.get("core_claims") or [])
+    ignored_text = _normalize_ignored_text(payload.get("ignored_text") or [])
+    action = payload.get("maintenance_action") if isinstance(payload.get("maintenance_action"), dict) else {}
+    if _is_serious_incident(document_type, core_claims) and state in {"no_thesis_change", "material_unmapped"}:
+        state = "risk_increased"
+        direction = "negative"
+        materiality = _max_materiality(materiality, "medium")
+        intensity = _max_materiality(intensity, "medium")
+        verdict = {
+            **verdict,
+            "state": state,
+            "direction": direction,
+            "materiality": materiality,
+            "intensity": intensity,
+            "recommended_case": "bear",
+            "reason": (
+                "Fatal or serious safety incident increases regulatory, governance, and operational-risk "
+                "uncertainty even if no immediate production impact is expected."
+            ),
+        }
+        if _norm_action(action.get("action")) == "none":
+            action = {
+                **action,
+                "action": "human_review",
+                "reason": "Review safety/regulatory risk and whether the saved thesis map needs coverage.",
+            }
+    normalized = {
+        "status": "valid",
+        "one_sentence_summary": summary,
+        "document_type": document_type,
+        "core_claims": core_claims,
+        "ignored_text": ignored_text,
+        "thesis_relationships": relationships,
+        "trajectory_verdict": {
+            "state": state,
+            "direction": direction,
+            "materiality": materiality,
+            "intensity": intensity,
+            "recommended_case": _norm_recommended_case(verdict.get("recommended_case")),
+            "confidence": max(0.0, min(1.0, confidence)),
+            "reason": _clean_sentence(verdict.get("reason")),
+        },
+        "maintenance_action": {
+            "action": _norm_action(action.get("action")),
+            "reason": _clean_sentence(action.get("reason")),
+        },
+    }
+    if not summary and not core_claims:
+        return {}, "missing_summary_and_claims"
+    return normalized, ""
+
+
 def _normalize_relationships(items: Any) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     for idx, item in enumerate(items if isinstance(items, list) else []):
@@ -411,6 +450,11 @@ def _normalize_relationships(items: Any) -> List[Dict[str, Any]]:
                 "direction": direction,
                 "evidence_quote": evidence_quote,
                 "reason": _clean_sentence(item.get("reason")),
+                "missing_for_full_match": [
+                    _clean_sentence(value)
+                    for value in (item.get("missing_for_full_match") or [])
+                    if _clean_sentence(value)
+                ][:5],
                 "confidence": max(0.0, min(1.0, _safe_float(item.get("confidence"), default=0.0))),
             }
         )
@@ -449,6 +493,56 @@ def _normalize_ignored_text(items: Any) -> List[Dict[str, str]]:
         if reason:
             out.append({"type": text_type, "reason": reason})
     return out[:8]
+
+
+def _is_serious_incident(document_type: str, core_claims: List[Dict[str, Any]]) -> bool:
+    document_key = str(document_type or "").strip().lower()
+    claim_text = " ".join(
+        " ".join(
+            str(claim.get(key) or "").strip().lower()
+            for key in ("claim", "evidence_quote", "claim_type")
+        )
+        for claim in core_claims
+        if isinstance(claim, dict)
+    )
+    if not claim_text:
+        return False
+    context_terms = {
+        "safety",
+        "incident",
+        "accident",
+        "fatality",
+        "fatal",
+        "death",
+        "injury",
+        "regulator",
+        "regulatory",
+        "investigation",
+        "shutdown",
+        "suspension",
+        "operation",
+        "mine",
+        "plant",
+        "workplace",
+    }
+    incident_document_types = {
+        "incident_report",
+        "operational_update",
+        "production_update",
+        "permitting_regulatory",
+        "project_development",
+        "unknown",
+    }
+    if document_key not in incident_document_types and not any(term in claim_text for term in context_terms):
+        return False
+    return any(term in claim_text for term in SERIOUS_INCIDENT_TERMS)
+
+
+def _max_materiality(left: str, right: str) -> str:
+    order = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+    left_key = str(left or "").strip().lower()
+    right_key = str(right or "").strip().lower()
+    return left_key if order.get(left_key, 0) >= order.get(right_key, 0) else right_key
 
 
 def _is_valid_directional_relationship(item: Dict[str, Any]) -> bool:

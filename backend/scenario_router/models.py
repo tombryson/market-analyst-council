@@ -34,7 +34,7 @@ ActionType = Literal[
 ]
 ScenarioPath = Literal["unknown", "bull", "base", "bear", "mixed"]
 RunValidity = Literal["intact", "watch", "partial_invalidation", "invalidated"]
-ConditionStatus = Literal["matched", "partial_match", "not_matched", "contradicted", "unclear"]
+ConditionStatus = Literal["matched", "partial_match", "checked_not_triggered", "not_matched", "contradicted", "unclear"]
 MaterialChangeType = Literal[
     "financing",
     "permitting",
@@ -246,7 +246,12 @@ class ComparisonReport:
     timeline_effect: TimelineEffect = "unknown"
     capital_effect: CapitalEffect = "unknown"
     announcement_class: str = ""
+    filing_type: str = ""
     materiality: str = ""
+    evidence_scope: str = ""
+    thesis_relationship: str = ""
+    impact_verdict: str = ""
+    impact_dimension: str = ""
     relationship_priority: int = 0
     relationship_kind: str = ""
     relationship_strength: str = ""

@@ -2,6 +2,7 @@ from pathlib import Path
 import unittest
 
 from backend.scenario_router.inbox_sentinel import InboxSentinel
+from backend.scenario_router.artifact_replay import replay_comparison_from_artifact
 from backend.scenario_router.observability import ScenarioRouterObservability
 from backend.scenario_router.display_contract import MARKET_ONLY_WATCH_REASON, build_router_display_contract
 from backend.scenario_router.review_store import apply_review_overlay, save_review
@@ -33,6 +34,188 @@ The HotCopper Team
 
 
 class ScenarioRouterDisplayContractTests(unittest.TestCase):
+    def test_legacy_material_unmapped_artifact_suppresses_stale_positive_path_movement(self):
+        payload = {
+            "status": "ok",
+            "event": {"event_id": "evt-wwi", "ticker": "ASX:WWI"},
+            "announcement_packet": {
+                "event_id": "evt-wwi",
+                "ticker": "ASX:WWI",
+                "title": "Incident Report",
+                "source_type": "exchange_filing",
+            },
+            "announcement_facts": {
+                "event_id": "evt-wwi",
+                "ticker": "ASX:WWI",
+                "title": "Incident Report",
+                "summary": "Incident Report",
+                "raw_text_excerpt": "The company reported a fatal incident and regulator notification.",
+                "announcement_class": "regulatory_legal",
+                "materiality": "medium",
+                "trajectory_effect": "risk_reduced",
+                "price_time_effect": "Likely improves the price/time path through project delivery.",
+                "semantic_summary": "The filing appears to support project delivery and regulatory or legal matters.",
+                "model_judgement": {},
+            },
+            "baseline_run": {
+                "run_id": "run-wwi",
+                "ticker": "ASX:WWI",
+                "lab_payload": {
+                    "structured_data": {
+                        "extended_analysis": {"current_thesis_state": {"leaning": "bull"}},
+                        "thesis_map": {},
+                    }
+                },
+            },
+            "comparison_report": {
+                "ticker": "ASX:WWI",
+                "baseline_run_id": "run-wwi",
+                "announcement_title": "Incident Report",
+                "baseline_path": "bull",
+                "current_path": "bull",
+                "impact_level": "medium",
+                "announcement_class": "regulatory_legal",
+                "materiality": "medium",
+                "relationship_kind": "",
+                "relationship_direction": "",
+                "trajectory_state": "material_unmapped",
+                "trajectory_effect": "risk_reduced",
+                "price_time_effect": "Likely improves the price/time path through project delivery.",
+                "semantic_summary": "The filing appears to support project delivery and regulatory or legal matters.",
+                "trajectory_score": {
+                    "direction": "positive",
+                    "event_delta": 2.0,
+                    "validation_type": "material_unmapped",
+                    "position_label": "Bull-leaning, unvalidated",
+                    "reason": "Positive medium evidence from a material filing outside the saved thesis map.",
+                },
+            },
+            "action_decision": {"action": "annotate_run", "reason": "Old directional reason."},
+        }
+
+        report, action = replay_comparison_from_artifact(payload)
+
+        self.assertEqual(report["trajectory_state"], "needs_classification")
+        self.assertEqual(report["thesis_relationship"], "related_unmapped")
+        self.assertEqual(report["impact_verdict"], "uncertain")
+        self.assertEqual(report["relationship_direction"], "neutral")
+        self.assertEqual(report["trajectory_score"]["direction"], "neutral")
+        self.assertEqual(report["trajectory_score"]["event_delta"], 0.0)
+        self.assertNotIn("improves", report["price_time_effect"].lower())
+        self.assertIn("model thesis judgement", report["classification_reason"])
+        self.assertEqual(action["action"], "annotate_run")
+
+    def test_replay_normalizes_stale_valid_fatality_judgement_before_display(self):
+        payload = {
+            "status": "ok",
+            "saved_at_utc": "2026-06-10T00:00:00Z",
+            "event": {
+                "event_id": "evt-fatality",
+                "ticker": "ASX:WWI",
+                "received_at_utc": "2026-06-10T00:00:00Z",
+            },
+            "announcement_packet": {
+                "event_id": "evt-fatality",
+                "ticker": "ASX:WWI",
+                "title": "Incident Report",
+                "source_type": "exchange_filing",
+                "source_url": "https://announcements.asx.com.au/asxpdf/example.pdf",
+            },
+            "announcement_facts": {
+                "event_id": "evt-fatality",
+                "ticker": "ASX:WWI",
+                "title": "Incident Report",
+                "summary": "A contractor fatality occurred, with no expected material impact to operations.",
+                "raw_text_excerpt": (
+                    "West Wits reported a contractor fatality at Qala Shallows and stated it does not "
+                    "anticipate a material impact to mining operations."
+                ),
+                "source_confidence": 1.0,
+                "extraction_confidence": 0.98,
+                "model_judgement": {
+                    "status": "valid",
+                    "one_sentence_summary": (
+                        "West Wits reported a contractor fatality but stated no material operational impact is expected."
+                    ),
+                    "document_type": "incident_report",
+                    "core_claims": [
+                        {
+                            "claim": "A contractor fatality occurred, with no expected material operational impact.",
+                            "evidence_quote": "does not anticipate a material impact to mining operations",
+                            "claim_type": "safety_incident",
+                            "is_new_information": True,
+                        }
+                    ],
+                    "ignored_text": [],
+                    "thesis_relationships": [
+                        {
+                            "reference_type": "watchlist",
+                            "reference_id": "unexplained_delays_in_quarterly_production_ramp",
+                            "reference_label": "Unexplained delays in quarterly production ramp",
+                            "relationship": "partially_confirms",
+                            "direction": "neutral",
+                            "evidence_quote": "does not anticipate a material impact to mining operations",
+                            "reason": "The production-delay risk area was checked, but not triggered.",
+                            "confidence": 0.8,
+                        }
+                    ],
+                    "trajectory_verdict": {
+                        "state": "no_thesis_change",
+                        "direction": "neutral",
+                        "materiality": "low",
+                        "intensity": "none",
+                        "recommended_case": "unchanged",
+                        "confidence": 0.9,
+                        "reason": "Safety incident disclosed, but no expected operational impact.",
+                    },
+                    "maintenance_action": {"action": "none", "reason": "No thesis movement."},
+                },
+            },
+            "baseline_run": {
+                "run_id": "run-wwi",
+                "ticker": "ASX:WWI",
+                "lab_payload": {
+                    "structured_data": {
+                        "extended_analysis": {"current_thesis_state": {"leaning": "bull", "status": "on-track"}},
+                        "monitoring_watchlist": {
+                            "red_flags": [
+                                {
+                                    "watch_id": "unexplained_delays_in_quarterly_production_ramp",
+                                    "condition": "Unexplained delays in quarterly production ramp",
+                                    "severity": "high",
+                                }
+                            ],
+                            "confirmatory_signals": [],
+                        },
+                    }
+                },
+            },
+            "comparison_report": {
+                "trajectory_state": "no_thesis_change",
+                "impact_verdict": "neutral",
+            },
+            "action_decision": {"action": "ignore", "reason": "Old stale action."},
+        }
+
+        report, action = replay_comparison_from_artifact(payload)
+        row = ScenarioRouterObservability._summarize_event_payload(
+            payload,
+            path=Path("20260610_000000__evt-fatality.json"),
+        )
+
+        self.assertEqual(report["trajectory_state"], "risk_increased")
+        self.assertEqual(report["impact_verdict"], "negative")
+        self.assertEqual(report["relationship_kind"], "material_unmapped")
+        self.assertEqual(report["trajectory_score"]["event_delta"], 0.0)
+        self.assertLess(report["trajectory_score"]["unvalidated_event_delta"], 0.0)
+        self.assertEqual(action["action"], "annotate_run")
+        self.assertTrue(action["requires_human_ack"])
+        self.assertEqual(row["display"]["trajectory_label"], "Risk increased")
+        self.assertEqual(row["display"]["evidence_label"], "Risk event outside thesis map")
+        self.assertEqual(row["display"]["queue_bucket"], "open_review")
+        self.assertEqual(row["checked_watchlist_count"], 1)
+        self.assertEqual(row["watchlist_condition_checks"][0]["status"], "checked_not_triggered")
+
     def test_review_overlay_preserves_case_bucket_for_reviewed_item(self):
         row = {
             "event_id": "evt-review",
@@ -125,7 +308,7 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
             {"action": "annotate_run", "reason": "Material filing without a mapped thesis condition."},
         )
 
-        self.assertEqual(display["trajectory_label"], "Material filing outside thesis map")
+        self.assertEqual(display["trajectory_label"], "Needs assessment")
         self.assertEqual(display["queue_bucket"], "open_review")
         self.assertEqual(display["queue_label"], "Needs thesis decision")
         self.assertEqual(display["review_status"], "open")
@@ -162,6 +345,35 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
         self.assertEqual(display["queue_label"], "Thesis improved")
         self.assertEqual(display["review_status"], "tracking")
         self.assertFalse(display["is_user_action_required"])
+
+    def test_display_contract_does_not_call_unvalidated_positive_support_thesis_improved(self):
+        display = build_router_display_contract(
+            {
+                "trajectory_state": "timeline_accelerated",
+                "impact_level": "medium",
+                "relationship_kind": "saved_thesis_condition",
+                "relationship_strength": "partial",
+                "thesis_relationship": "direct_match",
+                "impact_verdict": "positive",
+                "trajectory_score": {
+                    "direction": "positive",
+                    "event_delta": 0.0,
+                    "validation_type": "none",
+                    "mapped_condition": False,
+                },
+            },
+            {"action": "rerun_stage1"},
+            matched_conditions_count=0,
+            triggered_watchlist_count=0,
+            triggered_verification_count=0,
+        )
+
+        self.assertEqual(display["trajectory_label"], "Related thesis evidence")
+        self.assertEqual(display["queue_bucket"], "open_review")
+        self.assertEqual(display["queue_label"], "Needs thesis decision")
+        self.assertEqual(display["review_status"], "open")
+        self.assertEqual(display["primary_reason"], "Related to the saved thesis, but no saved condition was achieved.")
+        self.assertEqual(display["evidence_label"], "No condition match")
 
     def test_display_contract_auto_clears_no_change_and_administrative_filings(self):
         no_change = build_router_display_contract(
@@ -269,7 +481,7 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
         self.assertEqual(row["action"], "watch")
         self.assertEqual(row["display"]["queue_bucket"], "cleared")
         self.assertEqual(row["display"]["review_status"], "auto_cleared")
-        self.assertEqual(row["display"]["trajectory_label"], "Market backdrop only")
+        self.assertEqual(row["display"]["trajectory_label"], "No thesis impact")
         self.assertEqual(row["impact_level"], "low")
         self.assertEqual(row["current_path"], "bull")
         self.assertEqual(row["path_transition"], "")
@@ -335,9 +547,9 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
                     }
                 ],
                 "trajectory_score": {
-                    "direction": "neutral",
-                    "event_delta": 0.0,
-                    "validation_type": "mapped_condition",
+                    "direction": "positive",
+                    "event_delta": 2.0,
+                    "validation_type": "watchlist_confirmatory_partial",
                 },
             },
             "action_decision": {
@@ -362,6 +574,149 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
         self.assertEqual(row["trajectory_score"]["event_delta"], 2.0)
         self.assertEqual(row["watchlist_condition_checks"][0]["status"], "partial_match")
         self.assertIn("offtake", row["watchlist_condition_checks"][0]["label"].lower())
+
+    def test_watchlist_projection_requires_structured_score_not_finding_prose(self):
+        payload = {
+            "status": "ok",
+            "saved_at_utc": "2026-06-04T00:00:00Z",
+            "event": {"event_id": "evt-offtake-stale", "ticker": "ASX:VMM"},
+            "announcement_packet": {
+                "event_id": "evt-offtake-stale",
+                "ticker": "ASX:VMM",
+                "title": "Offtake LoI",
+                "source_type": "exchange_filing",
+            },
+            "baseline_run": {
+                "run_id": "run-vmm",
+                "lab_payload": {"structured_data": {"extended_analysis": {"current_thesis_state": {"leaning": "base"}}}},
+            },
+            "comparison_report": {
+                "announcement_title": "Offtake LoI",
+                "baseline_path": "base",
+                "current_path": "base",
+                "impact_level": "medium",
+                "materiality": "medium",
+                "trajectory_state": "no_thesis_change",
+                "trajectory_effect": "no_clear_change",
+                "thesis_effect": "no_change",
+                "key_findings": [
+                    {
+                        "type": "confirmatory_partial_match",
+                        "summary": "Partially engaged confirmatory: Binding Offtake Announcement",
+                        "severity": "low",
+                    }
+                ],
+                "condition_evaluations": [
+                    {
+                        "condition_id": "watch_binding_offtake",
+                        "group": "confirmatory",
+                        "label": "Binding Offtake Announcement",
+                        "status": "partial_match",
+                        "matched_via": "semantic",
+                    }
+                ],
+            },
+            "action_decision": {"action": "run_delta_only", "reason": "Old row text."},
+        }
+
+        row = ScenarioRouterObservability._summarize_event_payload(
+            payload,
+            path=Path("20260604_000000__evt-offtake-stale.json"),
+        )
+
+        self.assertEqual(row["trajectory_state"], "no_thesis_change")
+        self.assertEqual(row["display_adjustment"], "")
+        self.assertEqual(row["display"]["trajectory_label"], "No thesis impact")
+
+    def test_explicit_neutral_watchlist_score_is_not_projected_to_thesis_movement(self):
+        payload = {
+            "status": "ok",
+            "saved_at_utc": "2026-06-10T00:00:00Z",
+            "event": {
+                "event_id": "evt-incident",
+                "ticker": "ASX:WWI",
+                "received_at_utc": "2026-06-10T00:00:00Z",
+            },
+            "announcement_packet": {
+                "event_id": "evt-incident",
+                "ticker": "ASX:WWI",
+                "title": "Incident Report",
+                "source_type": "exchange_filing",
+                "source_url": "https://announcements.asx.com.au/asxpdf/example.pdf",
+            },
+            "baseline_run": {
+                "run_id": "run-wwi",
+                "lab_payload": {
+                    "structured_data": {
+                        "extended_analysis": {"current_thesis_state": {"leaning": "bull"}}
+                    }
+                },
+            },
+            "comparison_report": {
+                "ticker": "ASX:WWI",
+                "baseline_run_id": "run-wwi",
+                "announcement_title": "Incident Report",
+                "baseline_path": "bull",
+                "current_path": "bull",
+                "impact_level": "medium",
+                "materiality": "medium",
+                "trajectory_state": "risk_increased",
+                "trajectory_effect": "weakens",
+                "price_time_effect": "The company does not anticipate a material impact to operations.",
+                "thesis_effect": "undermines",
+                "thesis_match_confidence": 0.9,
+                "relationship_kind": "material_unmapped",
+                "relationship_direction": "neutral",
+                "key_findings": [],
+                "condition_evaluations": [
+                    {
+                        "condition_id": "unexplained_delays_in_quarterly_production_ramp",
+                        "scenario": "",
+                        "group": "red_flag",
+                        "label": "Unexplained delays in quarterly production ramp",
+                        "status": "checked_not_triggered",
+                        "matched_via": "model_thesis_judge",
+                        "relationship": "checked_not_triggered",
+                        "reason": "The filing says no material impact to operations.",
+                        "evidence": {
+                            "quote_excerpt": "does not anticipate a material impact to mining operations",
+                            "source_url": "https://announcements.asx.com.au/asxpdf/example.pdf",
+                        },
+                    }
+                ],
+                "trajectory_score": {
+                    "direction": "negative",
+                    "event_delta": 0.0,
+                    "unvalidated_event_delta": -2.0,
+                    "validation_type": "related_unmapped",
+                },
+            },
+            "action_decision": {
+                "action": "run_delta_only",
+                "confidence": 0.8,
+                "reason": "A watchlist item was touched, but the model verdict scored no thesis movement.",
+            },
+        }
+
+        row = ScenarioRouterObservability._summarize_event_payload(
+            payload,
+            path=Path("20260610_000000__evt-incident.json"),
+        )
+
+        self.assertEqual(row["trajectory_state"], "risk_increased")
+        self.assertEqual(row["display"]["trajectory_label"], "Risk increased")
+        self.assertEqual(row["display"]["queue_bucket"], "open_review")
+        self.assertEqual(row["display_adjustment"], "")
+        self.assertEqual(row["triggered_watchlist_count"], 0)
+        self.assertEqual(row["checked_watchlist_count"], 1)
+        self.assertEqual(row["triggered_watchlist"], [])
+        self.assertEqual(row["display"]["evidence_label"], "Risk event outside thesis map")
+        self.assertEqual(row["watchlist_condition_checks"][0]["group"], "red_flag")
+        self.assertEqual(row["watchlist_condition_checks"][0]["status"], "checked_not_triggered")
+        self.assertIn("does not anticipate", row["watchlist_condition_checks"][0]["evidence_quote"])
+        self.assertEqual(row["trajectory_score"]["direction"], "negative")
+        self.assertEqual(row["trajectory_score"]["event_delta"], 0.0)
+        self.assertLess(row["trajectory_score"]["unvalidated_event_delta"], 0.0)
 
 
 if __name__ == "__main__":

@@ -123,7 +123,7 @@ announcements:
     expected:
       announcement_class: strategy_mna
       current_path: base
-      trajectory_state: material_unmapped
+      trajectory_state: no_thesis_change
       action: annotate_run
       impact_level: medium
       user_bucket: needs_review
@@ -220,7 +220,7 @@ announcements:
       - anchor customer has not renewed and expanded contract value
     expected:
       current_path: base
-      trajectory_state: material_unmapped
+      trajectory_state: no_thesis_change
       action: annotate_run
       impact_level: medium
       user_bucket: needs_review
@@ -257,3 +257,95 @@ announcements:
         - bull_zone_a_approval_ahead
       triggered_verification_ids:
         - verify_zone_a_approval_source
+
+  - id: serious_workplace_incident_no_shutdown
+    label: Serious incident should be risk even if no operational shutdown is expected
+    title: Workplace Incident Report
+    summary: Atlas reported a contractor fatality and formal regulator investigation.
+    body_text: >
+      Atlas Operating Co reported a contractor fatality at a field operations
+      site. The company notified the safety regulator and said it does not
+      expect a material interruption to customer operations.
+    extracted_facts:
+      - contractor fatality at a field operations site
+      - safety regulator notified
+      - no material interruption to customer operations expected
+    evidence_quotes:
+      - contractor fatality at a field operations site
+      - does not expect a material interruption to customer operations
+    use_legacy_interpreter: false
+    model_judgement:
+      status: valid
+      one_sentence_summary: Atlas reported a contractor fatality and regulator notification, with no expected customer-operations interruption.
+      document_type: operational_update
+      core_claims:
+        - claim: A contractor fatality occurred at a field operations site.
+          evidence_quote: contractor fatality at a field operations site
+          claim_type: safety_incident
+          is_new_information: true
+      ignored_text: []
+      thesis_relationships: []
+      trajectory_verdict:
+        state: no_thesis_change
+        direction: neutral
+        materiality: low
+        intensity: low
+        recommended_case: unchanged
+        confidence: 0.82
+        reason: No customer-operation interruption is expected.
+      maintenance_action:
+        action: none
+        reason: No operational thesis change was announced.
+    expected:
+      announcement_class: operational_update
+      current_path: base
+      trajectory_state: risk_increased
+      action: annotate_run
+      impact_level: medium
+      user_bucket: needs_review
+      matched_condition_ids: []
+
+  - id: routine_capital_management_update
+    label: Routine capital-management update should clear without thesis movement
+    title: Daily Buy-Back Notification
+    summary: Atlas bought back a small number of shares under an existing program.
+    body_text: >
+      Atlas Operating Co bought back 25,000 shares under its previously
+      announced on-market buy-back program. No operating, customer, financing,
+      product, guidance, or regulatory update was provided.
+    extracted_facts:
+      - bought back 25,000 shares under the existing on-market buy-back program
+      - no operating, customer, financing, product, guidance, or regulatory update was provided
+    evidence_quotes:
+      - bought back 25,000 shares under the existing on-market buy-back program
+    use_legacy_interpreter: false
+    model_judgement:
+      status: valid
+      one_sentence_summary: Atlas provided a routine update on an existing on-market buy-back.
+      document_type: capital_management
+      core_claims:
+        - claim: Atlas bought back a small number of shares under an existing program.
+          evidence_quote: bought back 25,000 shares under its previously announced on-market buy-back program
+          claim_type: capital_management
+          is_new_information: true
+      ignored_text: []
+      thesis_relationships: []
+      trajectory_verdict:
+        state: no_thesis_change
+        direction: neutral
+        materiality: low
+        intensity: low
+        recommended_case: unchanged
+        confidence: 0.86
+        reason: Routine capital-management update with no thesis trajectory change.
+      maintenance_action:
+        action: none
+        reason: No follow-up needed.
+    expected:
+      announcement_class: capital_management
+      current_path: base
+      trajectory_state: no_thesis_change
+      action: ignore
+      impact_level: low
+      user_bucket: no_thesis_change
+      matched_condition_ids: []

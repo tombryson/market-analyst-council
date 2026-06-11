@@ -34,6 +34,7 @@ def iter_router_artifacts(base_dir: Path) -> Iterable[Path]:
         path
         for path in base.rglob("*.json")
         if path.name != "latest.json"
+        and "/by_run/" not in path.as_posix()
         and "/reviews/" not in path.as_posix()
         and "/dedupe/" not in path.as_posix()
     )
@@ -56,7 +57,7 @@ async def rejudge_payload(payload: Dict[str, Any], judge: ModelAnnouncementThesi
     return updated
 
 
-async def scan_and_rejudge(base_dir: Path, *, write: bool = False, limit: int = 0) -> Dict[str, Any]:
+async def scan_and_rejudge(base_dir: Path, *, write: bool = False, limit: int = 0, force: bool = False) -> Dict[str, Any]:
     paths = list(iter_router_artifacts(base_dir))
     candidates: List[Path] = []
     rewritten: List[str] = []
@@ -68,7 +69,7 @@ async def scan_and_rejudge(base_dir: Path, *, write: bool = False, limit: int = 
         except Exception as exc:
             errors.append({"path": str(path), "error": f"read_error:{type(exc).__name__}"})
             continue
-        if needs_model_rejudge(payload):
+        if force or needs_model_rejudge(payload):
             candidates.append(path)
         if limit and len(candidates) >= limit:
             break
@@ -91,6 +92,7 @@ async def scan_and_rejudge(base_dir: Path, *, write: bool = False, limit: int = 
         "candidates": len(candidates),
         "candidate_paths": [str(path) for path in candidates[:50]],
         "write": bool(write),
+        "force": bool(force),
         "rewritten": len(rewritten),
         "rewritten_paths": rewritten[:50],
         "errors": errors,
@@ -102,8 +104,16 @@ def main() -> None:
     parser.add_argument("--base-dir", default=str(SCENARIO_ROUTER_EVENTS_DIR), help="Scenario router events directory.")
     parser.add_argument("--write", action="store_true", help="Rewrite candidate artifacts after model rejudgement.")
     parser.add_argument("--limit", type=int, default=0, help="Maximum candidate artifacts to process.")
+    parser.add_argument("--force", action="store_true", help="Rejudge every router artifact, including valid existing model judgements.")
     args = parser.parse_args()
-    result = asyncio.run(scan_and_rejudge(Path(args.base_dir), write=bool(args.write), limit=max(0, int(args.limit or 0))))
+    result = asyncio.run(
+        scan_and_rejudge(
+            Path(args.base_dir),
+            write=bool(args.write),
+            limit=max(0, int(args.limit or 0)),
+            force=bool(args.force),
+        )
+    )
     print(json.dumps(result, indent=2, ensure_ascii=True))
 
 

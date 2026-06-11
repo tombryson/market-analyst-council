@@ -128,7 +128,7 @@ class ScenarioRouterObservability:
         for child in base.iterdir():
             if not child.is_dir():
                 continue
-            if child.name in {"by_run", "dedupe"}:
+            if child.name in {"by_run", "dedupe", "reviews"}:
                 continue
             for path in child.glob("*.json"):
                 if path.name == "latest.json":
@@ -149,7 +149,7 @@ class ScenarioRouterObservability:
             1
             for item in evaluations
             if isinstance(item, dict)
-            and str(item.get("status") or "").strip() in EVIDENCE_ENGAGED_STATUSES
+            and str(item.get("status") or "").strip() == "matched"
             and str(item.get("group") or "").strip() in {"required", "failure"}
             and str(item.get("matched_via") or "").strip() != "market_facts"
         )
@@ -158,6 +158,14 @@ class ScenarioRouterObservability:
             for item in evaluations
             if isinstance(item, dict)
             and str(item.get("status") or "").strip() in EVIDENCE_ENGAGED_STATUSES
+            and str(item.get("group") or "").strip() in {"red_flag", "confirmatory"}
+            and str(item.get("matched_via") or "").strip() != "market_facts"
+        )
+        checked_watchlist = sum(
+            1
+            for item in evaluations
+            if isinstance(item, dict)
+            and str(item.get("status") or "").strip() == "checked_not_triggered"
             and str(item.get("group") or "").strip() in {"red_flag", "confirmatory"}
             and str(item.get("matched_via") or "").strip() != "market_facts"
         )
@@ -205,6 +213,11 @@ class ScenarioRouterObservability:
             **report,
             "trajectory_state": str(display_projection.get("trajectory_state") or report.get("trajectory_state") or "").strip(),
             "impact_level": str(display_projection.get("impact_level") or report.get("impact_level") or "").strip(),
+            "filing_type": str(display_projection.get("filing_type") or report.get("filing_type") or "").strip(),
+            "evidence_scope": str(display_projection.get("evidence_scope") or report.get("evidence_scope") or "").strip(),
+            "thesis_relationship": str(display_projection.get("thesis_relationship") or report.get("thesis_relationship") or "").strip(),
+            "impact_verdict": str(display_projection.get("impact_verdict") or report.get("impact_verdict") or "").strip(),
+            "impact_dimension": str(display_projection.get("impact_dimension") or report.get("impact_dimension") or "").strip(),
             "status": str(payload.get("status") or "ok").strip() or "ok",
         }
         display_decision = {
@@ -218,6 +231,7 @@ class ScenarioRouterObservability:
             matched_conditions_count=matched_conditions,
             triggered_watchlist_count=triggered_watchlist,
             triggered_verification_count=triggered_verification,
+            checked_watchlist_count=checked_watchlist,
         )
 
         return {
@@ -231,7 +245,12 @@ class ScenarioRouterObservability:
             "action": display_action,
             "impact_level": str(display_projection.get("impact_level") or report.get("impact_level") or "").strip(),
             "announcement_class": str(report.get("announcement_class") or facts.get("announcement_class") or "").strip(),
+            "filing_type": str(display_projection.get("filing_type") or report.get("filing_type") or "").strip(),
             "materiality": str(report.get("materiality") or facts.get("materiality") or "").strip(),
+            "evidence_scope": str(display_projection.get("evidence_scope") or report.get("evidence_scope") or "").strip(),
+            "thesis_relationship": str(display_projection.get("thesis_relationship") or report.get("thesis_relationship") or "").strip(),
+            "impact_verdict": str(display_projection.get("impact_verdict") or report.get("impact_verdict") or "").strip(),
+            "impact_dimension": str(display_projection.get("impact_dimension") or report.get("impact_dimension") or "").strip(),
             "relationship_priority": report.get("relationship_priority", 0),
             "relationship_kind": str(report.get("relationship_kind") or "").strip(),
             "relationship_strength": str(report.get("relationship_strength") or "").strip(),
@@ -265,9 +284,15 @@ class ScenarioRouterObservability:
             "processing_duration_ms": int(payload.get("processing_duration_ms") or 0),
             "matched_conditions_count": matched_conditions,
             "triggered_watchlist_count": triggered_watchlist,
+            "checked_watchlist_count": checked_watchlist,
             "triggered_verification_count": triggered_verification,
             "market_conditions_count": market_conditions,
-            "matched_conditions": _condition_details(evaluations, groups={"required", "failure"}, exclude_market=True),
+            "matched_conditions": _condition_details(
+                evaluations,
+                groups={"required", "failure"},
+                statuses={"matched"},
+                exclude_market=True,
+            ),
             "triggered_watchlist": _condition_details(evaluations, groups={"red_flag", "confirmatory"}, exclude_market=True),
             "triggered_verification": _condition_details(evaluations, groups={"verification"}, exclude_market=True),
             "market_context_conditions": _condition_details(
@@ -279,21 +304,21 @@ class ScenarioRouterObservability:
             "announcement_condition_checks": _condition_details(
                 evaluations,
                 groups={"required", "failure"},
-                statuses={"matched", "partial_match", "not_matched", "contradicted", "unclear"},
+                statuses={"matched", "partial_match", "checked_not_triggered", "not_matched", "contradicted", "unclear"},
                 exclude_market=True,
                 limit=40,
             ),
             "watchlist_condition_checks": _condition_details(
                 evaluations,
                 groups={"red_flag", "confirmatory"},
-                statuses={"matched", "partial_match", "not_matched", "contradicted", "unclear"},
+                statuses={"matched", "partial_match", "checked_not_triggered", "not_matched", "contradicted", "unclear"},
                 exclude_market=True,
                 limit=30,
             ),
             "verification_condition_checks": _condition_details(
                 evaluations,
                 groups={"verification"},
-                statuses={"matched", "partial_match", "not_matched", "contradicted", "unclear"},
+                statuses={"matched", "partial_match", "checked_not_triggered", "not_matched", "contradicted", "unclear"},
                 exclude_market=True,
                 limit=30,
             ),
@@ -388,6 +413,7 @@ def _condition_details(
         label = str(item.get("label") or item.get("condition_id") or "").strip()
         if not label:
             continue
+        evidence = item.get("evidence") if isinstance(item.get("evidence"), dict) else {}
         rows.append(
             {
                 "label": label,
@@ -409,6 +435,9 @@ def _condition_details(
                 "observed_value": item.get("observed_value"),
                 "comparator": str(item.get("comparator") or "").strip(),
                 "threshold_value": item.get("threshold_value"),
+                "evidence_quote": str(evidence.get("quote_excerpt") or "").strip(),
+                "source_url": str(evidence.get("source_url") or "").strip(),
+                "source_title": str(evidence.get("source_title") or "").strip(),
             }
         )
         if len(rows) >= max(1, int(limit or 10)):

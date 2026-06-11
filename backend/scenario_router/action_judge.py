@@ -255,6 +255,45 @@ class ActionJudge:
         direction = str(getattr(report, "relationship_direction", "") or "").strip().lower()
         summary = str(getattr(report, "relationship_summary", "") or "").strip()
         sections = list(sorted(set(affected_domains) | material_change_types))
+        trajectory_state = str(getattr(report, "trajectory_state", "") or "").strip().lower()
+        path_transition = str(getattr(report, "path_transition", "") or "").strip()
+        filing_type = str(getattr(report, "filing_type", "") or "").strip().lower()
+        score = getattr(report, "trajectory_score", {}) or {}
+        event_delta = 0.0
+        if isinstance(score, dict):
+            try:
+                event_delta = float(score.get("event_delta") or 0.0)
+            except (TypeError, ValueError):
+                event_delta = 0.0
+
+        if filing_type == "administrative" or trajectory_state == "administrative_filing":
+            return ActionDecision(
+                action="ignore",
+                confidence=0.92,
+                reason=summary or "Administrative filing recorded without changing the thesis path.",
+                should_trigger_workflow=False,
+                run_reuse_ok=True,
+                invalidated_sections=[],
+                follow_up_steps=["Record the filing without changing the saved thesis path."],
+                tags=[f"priority_{priority}", "administrative"],
+            )
+
+        if (
+            trajectory_state == "no_thesis_change"
+            and kind != "material_unmapped"
+            and direction == "neutral"
+            and abs(event_delta) <= 0.0001
+        ):
+            return ActionDecision(
+                action="ignore",
+                confidence=0.9,
+                reason=summary or "Saved thesis relationship was checked without changing the thesis path.",
+                should_trigger_workflow=False,
+                run_reuse_ok=True,
+                invalidated_sections=[],
+                follow_up_steps=["Record the filing without changing the saved thesis path."],
+                tags=[f"priority_{priority}", kind or "saved_relationship", "no_thesis_change"],
+            )
 
         if priority >= 7:
             if impact == "critical" or run_validity == "invalidated":
@@ -290,8 +329,8 @@ class ActionJudge:
             if (
                 kind == "saved_thesis_condition"
                 and direction == "neutral"
-                and str(getattr(report, "trajectory_state", "") or "").strip().lower() == "no_thesis_change"
-                and not str(getattr(report, "path_transition", "") or "").strip()
+                and trajectory_state == "no_thesis_change"
+                and not path_transition
             ):
                 return ActionDecision(
                     action="ignore",
@@ -341,6 +380,22 @@ class ActionJudge:
                     "Update the saved thesis note with the relationship strength.",
                 ],
                 tags=[f"priority_{priority}", kind or "saved_relationship"],
+            )
+
+        if priority == 3 and trajectory_state in {"risk_increased", "thesis_weakened", "timeline_delayed"}:
+            return ActionDecision(
+                action="annotate_run",
+                confidence=0.82,
+                reason=summary or "Unmapped negative risk event needs thesis review before the saved run is trusted.",
+                should_trigger_workflow=False,
+                run_reuse_ok=True,
+                requires_human_ack=True,
+                follow_up_steps=[
+                    "Attach the filing to the thesis log.",
+                    "Review whether safety, regulatory, timeline, or governance risk needs thesis-map coverage.",
+                    "Refresh the evidence pack if the saved analysis does not cover this risk.",
+                ],
+                tags=["priority_3", kind or "coverage_gap", "negative_risk"],
             )
 
         if priority == 3:

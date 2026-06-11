@@ -3168,6 +3168,15 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         and str(item.get("matched_via") or "").strip() != "market_facts"
         and str(item.get("label") or item.get("condition_id") or "").strip()
     ][:8]
+    checked_watchlist = [
+        str(item.get("label") or item.get("condition_id") or "").strip()
+        for item in condition_evaluations
+        if isinstance(item, dict)
+        and str(item.get("status") or "").strip() == "checked_not_triggered"
+        and str(item.get("group") or "").strip() in {"red_flag", "confirmatory"}
+        and str(item.get("matched_via") or "").strip() != "market_facts"
+        and str(item.get("label") or item.get("condition_id") or "").strip()
+    ][:8]
     triggered_verification = [
         str(item.get("label") or item.get("condition_id") or "").strip()
         for item in condition_evaluations
@@ -3315,6 +3324,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
             matched_conditions_count=len(matched_conditions),
             triggered_watchlist_count=len(triggered_watchlist),
             triggered_verification_count=len(triggered_verification),
+            checked_watchlist_count=len(checked_watchlist),
         )
         if build_router_display_contract
         else {}
@@ -3365,6 +3375,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
         "matched_conditions": matched_conditions,
         "matched_condition_details": matched_condition_details,
         "triggered_watchlist": triggered_watchlist,
+        "checked_watchlist": checked_watchlist,
         "triggered_watchlist_details": triggered_watchlist_details,
         "triggered_verification": triggered_verification,
         "triggered_verification_details": triggered_verification_details,
@@ -3373,7 +3384,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
             router_condition_details(
                 condition_evaluations,
                 groups={"required", "failure"},
-                statuses={"matched", "partial_match", "not_matched", "contradicted", "unclear"},
+                statuses={"matched", "partial_match", "checked_not_triggered", "not_matched", "contradicted", "unclear"},
                 exclude_market=True,
                 limit=40,
             )
@@ -3384,7 +3395,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
             router_condition_details(
                 condition_evaluations,
                 groups={"red_flag", "confirmatory"},
-                statuses={"matched", "partial_match", "not_matched", "contradicted", "unclear"},
+                statuses={"matched", "partial_match", "checked_not_triggered", "not_matched", "contradicted", "unclear"},
                 exclude_market=True,
                 limit=30,
             )
@@ -3395,7 +3406,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
             router_condition_details(
                 condition_evaluations,
                 groups={"verification"},
-                statuses={"matched", "partial_match", "not_matched", "contradicted", "unclear"},
+                statuses={"matched", "partial_match", "checked_not_triggered", "not_matched", "contradicted", "unclear"},
                 exclude_market=True,
                 limit=30,
             )
@@ -3403,6 +3414,7 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
             else triggered_verification_details
         ),
         "triggered_verification_count": len(triggered_verification),
+        "checked_watchlist_count": len(checked_watchlist),
         "trajectory_projection": (
             comparison.get("trajectory_projection")
             if isinstance(comparison.get("trajectory_projection"), dict)

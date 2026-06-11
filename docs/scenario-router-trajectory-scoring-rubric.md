@@ -9,6 +9,7 @@ Each routed filing may carry a `trajectory_score` object:
 - `direction`: `positive`, `negative`, `neutral`, or `mixed`.
 - `intensity`: `none`, `low`, `medium`, `high`, or `critical`.
 - `event_delta`: the one-filing score movement.
+- `unvalidated_event_delta`: directional pressure from material evidence that has not been mapped to a saved thesis, watchlist, verification, or timeline item.
 - `cumulative_delta`: the running score movement for the ticker and saved run.
 - `baseline_score`: the starting score implied by the saved thesis path.
 - `score_after_event`: baseline plus this filing only.
@@ -89,7 +90,7 @@ Unmapped material filings:
 | --- | --- | ---: |
 | `material_unmapped` | Filing appears material, but no saved thesis, watchlist, or verification condition covers it. | 0.0 validation bonus |
 
-An unmapped material filing can still score from its base intensity, usually `+2.0` or `-2.0` for a medium filing. It should be labelled as trajectory evidence outside the saved thesis map, not as a fully validated bull or bear case.
+An unmapped material filing may carry directional pressure, but it does not receive a validated `event_delta` until the relationship is mapped to the saved thesis evidence set. The model can still say the filing is positive or negative; that movement is recorded as `unvalidated_event_delta` and shown as review context, not as a completed bull/base/bear condition.
 
 ## Guardrails
 
@@ -99,6 +100,8 @@ An unmapped material filing can still score from its base intensity, usually `+2
 - Saved failure conditions are the strongest negative signal.
 - Red flags are stronger than generic negative filings.
 - Verification-queue hits support evidence refresh, but should not be treated as strongly as a thesis condition or watchlist catalyst.
+- Fatalities, serious safety incidents, formal investigations, and safety-related shutdowns are risk events even when the company says no immediate production impact is expected. A non-triggered production-delay watchlist item can be shown as checked, but it must not neutralize the risk verdict.
+- A saved or replayed model judgement must be normalized through the same contract as a fresh model response. Stored artifacts are not allowed to bypass safety and scoring invariants.
 - Do not label a filing as "Bull case" solely because it is positive and material. Use "Bull-leaning" unless the cumulative score reaches the bull band or the saved bull condition is actually satisfied.
 - Review state must not erase case type. A reviewed unmapped material filing remains an unmapped material filing in history.
 
@@ -106,11 +109,12 @@ An unmapped material filing can still score from its base intensity, usually `+2
 
 | Filing | Saved condition context | Expected score |
 | --- | --- | --- |
-| Power infrastructure contract; no saved condition covers it | Material but unmapped | `+2.0`, bull-leaning evidence outside map |
+| Power infrastructure contract; no saved condition covers it | Material but unmapped | `event_delta=0.0`, positive `unvalidated_event_delta` until mapped |
 | Binding offtake agreement where watchlist asks for binding offtake | Full confirmatory watchlist hit | `+2.5` |
 | Non-binding offtake LoI where watchlist asks for binding offtake | Partial confirmatory watchlist hit | `+2.0` |
 | Announcement satisfies a saved bull required condition | Saved thesis condition | `+3.0` |
 | Permit revocation satisfies a saved bull failure condition | Saved thesis failure | `-4.0` |
+| Fatal safety incident with no expected production delay | Risk event outside thesis map; production-delay red flag checked but not triggered | `event_delta=0.0`, negative `unvalidated_event_delta`, open review |
 
 ## Implementation
 

@@ -47,6 +47,7 @@ SYSTEM_ACTION_LABELS = {
 QUEUE_BUCKET_LABELS = {
     "open_review": "Needs thesis decision",
     "positive_movement": "Thesis improved",
+    "negative_movement": "Thesis weakened",
     "cleared": "Cleared",
     "administrative": "Administrative",
     "all": "All filings",
@@ -60,7 +61,7 @@ REVIEW_LABELS = {
 
 PRIMARY_REASONS = {
     "needs_classification": "The filing was captured, but the router could not confidently classify its thesis impact.",
-    "material_unmapped": "No saved bull/base/bear condition covers this material filing.",
+    "material_unmapped": "No saved thesis condition covers this filing.",
     "thesis_weakened": "The filing weakens the saved thesis path.",
     "timeline_delayed": "The filing pushes the saved timeline out.",
     "risk_increased": "The filing increases risk against the saved thesis path.",
@@ -126,6 +127,7 @@ def build_router_display_contract(
     matched_conditions_count: int = 0,
     triggered_watchlist_count: int = 0,
     triggered_verification_count: int = 0,
+    checked_watchlist_count: int = 0,
 ) -> Dict[str, Any]:
     """Normalize router output into user-facing display axes.
 
@@ -148,11 +150,25 @@ def build_router_display_contract(
     relationship_kind = _norm(report.get("relationship_kind"))
     relationship_strength = _norm(report.get("relationship_strength"))
     relationship_priority = report.get("relationship_priority", 0)
+    filing_type = _norm(report.get("filing_type"))
+    evidence_scope = _norm(report.get("evidence_scope"))
+    thesis_relationship = _norm(report.get("thesis_relationship"))
+    impact_verdict = _norm(report.get("impact_verdict"))
+    impact_dimension = _norm(report.get("impact_dimension"))
+    unvalidated_positive_support = _is_unvalidated_positive_support(
+        report=report,
+        impact_verdict=impact_verdict,
+        direct_hit_count=direct_hit_count,
+    )
 
     queue_bucket = _queue_bucket(
         state=state,
         action=action_key,
         has_verification_hit=has_verification_hit,
+        filing_type=filing_type,
+        thesis_relationship=thesis_relationship,
+        impact_verdict=impact_verdict,
+        unvalidated_positive_support=unvalidated_positive_support,
     )
     review_status = _review_status(queue_bucket)
     review_reason = _review_reason(
@@ -160,6 +176,9 @@ def build_router_display_contract(
         queue_bucket=queue_bucket,
         has_verification_hit=has_verification_hit,
         direct_hit_count=direct_hit_count,
+        thesis_relationship=thesis_relationship,
+        impact_verdict=impact_verdict,
+        unvalidated_positive_support=unvalidated_positive_support,
     )
     tone = _tone(
         state=state,
@@ -170,8 +189,19 @@ def build_router_display_contract(
     )
 
     return {
+        "filing_type": filing_type,
+        "evidence_scope": evidence_scope,
+        "thesis_relationship": thesis_relationship,
+        "impact_verdict": impact_verdict,
+        "impact_dimension": impact_dimension,
         "trajectory_state": state,
-        "trajectory_label": TRAJECTORY_LABELS.get(state) or _titleize(state) or "Not assessed",
+        "trajectory_label": _trajectory_label(
+            state=state,
+            filing_type=filing_type,
+            thesis_relationship=thesis_relationship,
+            impact_verdict=impact_verdict,
+            unvalidated_positive_support=unvalidated_positive_support,
+        ),
         "queue_bucket": queue_bucket,
         "queue_label": QUEUE_BUCKET_LABELS.get(queue_bucket, "All filings"),
         "review_status": review_status,
@@ -182,17 +212,25 @@ def build_router_display_contract(
         "system_action_label": SYSTEM_ACTION_LABELS.get(action_key) or _titleize(action_key) or "No maintenance",
         "evidence_label": _evidence_label(
             state=state,
+            thesis_relationship=thesis_relationship,
+            relationship_kind=relationship_kind,
             matched_conditions_count=matched_conditions_count,
             triggered_watchlist_count=triggered_watchlist_count,
             triggered_verification_count=triggered_verification_count,
+            checked_watchlist_count=checked_watchlist_count,
         ),
         "relationship_label": _relationship_label(
             kind=relationship_kind,
             strength=relationship_strength,
             priority=relationship_priority,
         ),
-        "primary_reason": _primary_reason(state=state, action=action, direct_hit_count=direct_hit_count),
-        "tone": tone,
+        "primary_reason": _primary_reason(
+            state=state,
+            action=action,
+            direct_hit_count=direct_hit_count,
+            unvalidated_positive_support=unvalidated_positive_support,
+        ),
+        "tone": "warn" if unvalidated_positive_support else tone,
     }
 
 
@@ -216,6 +254,11 @@ def market_only_watch_projection(
         "affected_domains": [],
         "thesis_effect": "no_change",
         "run_validity": "watch",
+        "filing_type": "market_context",
+        "evidence_scope": "market_backdrop_only",
+        "thesis_relationship": "unrelated",
+        "impact_verdict": "neutral",
+        "impact_dimension": "general",
         "trajectory_state": "market_backdrop_only",
         "trajectory_effect": "no_clear_change",
         "price_time_effect": "Market-only context; no direct announcement-led trajectory change identified.",
@@ -237,6 +280,16 @@ def watchlist_engagement_projection(
         return {}
     if int(triggered_watchlist_count or 0) <= 0:
         return {}
+    score = report.get("trajectory_score") if isinstance(report.get("trajectory_score"), dict) else {}
+    validation_type = _norm(score.get("validation_type"))
+    score_direction = _norm(score.get("direction"))
+    event_delta = _to_float(score.get("event_delta"))
+    if not validation_type.startswith("watchlist_"):
+        return {}
+    if score_direction not in {"positive", "negative"}:
+        return {}
+    if event_delta is None or abs(event_delta) <= 0.0001:
+        return {}
 
     action_key = _norm(action.get("action"))
     impact = _norm(report.get("impact_level"))
@@ -248,13 +301,12 @@ def watchlist_engagement_projection(
     ):
         return {}
 
-    finding_text = _findings_text(report)
-    is_red_flag = "red_flag" in finding_text or "red flag" in finding_text
-    is_confirmatory = "confirmatory" in finding_text
+    is_red_flag = "red_flag" in validation_type
+    is_confirmatory = "confirmatory" in validation_type
     if not is_red_flag and not is_confirmatory:
         return {}
 
-    is_partial = "partial" in finding_text or "partially" in finding_text
+    is_partial = "partial" in validation_type
     direction = "negative" if is_red_flag else "positive"
     trajectory_state = "risk_increased" if is_red_flag else "thesis_strengthened"
     thesis_effect = "undermines" if is_red_flag else "confirms"
@@ -292,6 +344,11 @@ def watchlist_engagement_projection(
         "trajectory_effect": "weakens" if is_red_flag else "strengthens",
         "thesis_effect": thesis_effect,
         "run_validity": str(report.get("run_validity") or "watch").strip() or "watch",
+        "filing_type": str(report.get("filing_type") or "company_event").strip() or "company_event",
+        "evidence_scope": "saved_watchlist_evidence",
+        "thesis_relationship": "watchlist_match",
+        "impact_verdict": direction,
+        "impact_dimension": str(report.get("impact_dimension") or "general").strip() or "general",
         "display_adjustment": "watchlist_engagement_projection",
         "trajectory_score": {
             "direction": direction,
@@ -310,13 +367,32 @@ def watchlist_engagement_projection(
     }
 
 
-def _queue_bucket(*, state: str, action: str, has_verification_hit: bool) -> str:
-    if state in ADMINISTRATIVE_STATES:
+def _queue_bucket(
+    *,
+    state: str,
+    action: str,
+    has_verification_hit: bool,
+    filing_type: str = "",
+    thesis_relationship: str = "",
+    impact_verdict: str = "",
+    unvalidated_positive_support: bool = False,
+) -> str:
+    if filing_type == "administrative" or state in ADMINISTRATIVE_STATES:
         return "administrative"
-    if state in OPEN_REVIEW_STATES or has_verification_hit or action == "urgent_human_review":
+    if unvalidated_positive_support:
         return "open_review"
-    if state in POSITIVE_TRAJECTORY_STATES:
+    if thesis_relationship == "related_unmapped":
+        return "open_review"
+    if state == "material_unmapped":
+        return "open_review"
+    if impact_verdict in {"negative", "mixed", "uncertain"}:
+        return "open_review"
+    if has_verification_hit or action == "urgent_human_review":
+        return "open_review"
+    if impact_verdict == "positive" or state in POSITIVE_TRAJECTORY_STATES:
         return "positive_movement"
+    if state in NEGATIVE_TRAJECTORY_STATES:
+        return "open_review"
     if state in CLEARED_STATES:
         return "cleared"
     if action in {"full_rerun", "rerun_stage1", "run_delta_only"}:
@@ -338,11 +414,18 @@ def _review_reason(
     queue_bucket: str,
     has_verification_hit: bool,
     direct_hit_count: int,
+    thesis_relationship: str = "",
+    impact_verdict: str = "",
+    unvalidated_positive_support: bool = False,
 ) -> str:
+    if unvalidated_positive_support:
+        return "thesis_map_gap"
     if state == "needs_classification":
         return "classification_unresolved"
-    if state == "material_unmapped":
+    if thesis_relationship == "related_unmapped" or state == "material_unmapped":
         return "thesis_map_gap"
+    if impact_verdict in {"mixed", "uncertain"}:
+        return "classification_unresolved"
     if state in NEGATIVE_TRAJECTORY_STATES:
         return "negative_trajectory"
     if has_verification_hit:
@@ -352,6 +435,46 @@ def _review_reason(
     if direct_hit_count > 0 and queue_bucket == "open_review":
         return "mapped_evidence_hit"
     return "none"
+
+
+def _trajectory_label(
+    *,
+    state: str,
+    filing_type: str = "",
+    thesis_relationship: str = "",
+    impact_verdict: str = "",
+    unvalidated_positive_support: bool = False,
+) -> str:
+    if filing_type == "administrative":
+        return "Administrative"
+    if unvalidated_positive_support:
+        return "Related thesis evidence"
+    if state in {
+        "thesis_strengthened",
+        "thesis_weakened",
+        "timeline_accelerated",
+        "timeline_delayed",
+        "risk_reduced",
+        "risk_increased",
+    }:
+        return TRAJECTORY_LABELS.get(state) or _titleize(state)
+    if impact_verdict == "positive":
+        return "Thesis improved"
+    if impact_verdict == "negative":
+        return "Thesis weakened"
+    if thesis_relationship == "related_unmapped":
+        return "Needs assessment"
+    if impact_verdict in {"mixed", "uncertain", "unclear"}:
+        return "Needs assessment"
+    if impact_verdict == "neutral":
+        return "No thesis impact"
+    if state == "material_unmapped":
+        return "Needs assessment"
+    if state in {"material_unmapped", "market_backdrop_only", "no_thesis_change"}:
+        return "No thesis impact"
+    if state == "needs_classification":
+        return "Needs assessment"
+    return TRAJECTORY_LABELS.get(state) or _titleize(state) or "Not assessed"
 
 
 def _tone(
@@ -377,7 +500,15 @@ def _tone(
     return "neutral"
 
 
-def _primary_reason(*, state: str, action: Dict[str, Any], direct_hit_count: int) -> str:
+def _primary_reason(
+    *,
+    state: str,
+    action: Dict[str, Any],
+    direct_hit_count: int,
+    unvalidated_positive_support: bool = False,
+) -> str:
+    if unvalidated_positive_support:
+        return "Related to the saved thesis, but no saved condition was achieved."
     if direct_hit_count > 0:
         return f"Engaged {direct_hit_count} saved thesis, watchlist, or verification item{'' if direct_hit_count == 1 else 's'}."
     if state in PRIMARY_REASONS:
@@ -388,9 +519,12 @@ def _primary_reason(*, state: str, action: Dict[str, Any], direct_hit_count: int
 def _evidence_label(
     *,
     state: str,
+    thesis_relationship: str = "",
+    relationship_kind: str = "",
     matched_conditions_count: int,
     triggered_watchlist_count: int,
     triggered_verification_count: int,
+    checked_watchlist_count: int = 0,
 ) -> str:
     if int(matched_conditions_count or 0) > 0:
         return "Thesis condition matched"
@@ -398,7 +532,13 @@ def _evidence_label(
         return "Watchlist condition matched"
     if int(triggered_verification_count or 0) > 0:
         return "Verification item matched"
-    if state == "material_unmapped":
+    if state in {"risk_increased", "thesis_weakened", "timeline_delayed"} and (
+        thesis_relationship == "related_unmapped" or relationship_kind == "material_unmapped"
+    ):
+        return "Risk event outside thesis map"
+    if int(checked_watchlist_count or 0) > 0:
+        return "Watchlist checked, not triggered"
+    if thesis_relationship == "related_unmapped" or state == "material_unmapped":
         return "No saved condition match"
     if state == "needs_classification":
         return "Classification unresolved"
@@ -407,6 +547,20 @@ def _evidence_label(
     if state == "administrative_filing":
         return "Administrative only"
     return "No condition match"
+
+
+def _is_unvalidated_positive_support(*, report: Dict[str, Any], impact_verdict: str, direct_hit_count: int) -> bool:
+    if impact_verdict != "positive" or int(direct_hit_count or 0) > 0:
+        return False
+    score = report.get("trajectory_score") if isinstance(report.get("trajectory_score"), dict) else {}
+    validation_type = _norm(score.get("validation_type"))
+    event_delta = _to_float(score.get("event_delta"))
+    mapped = bool(score.get("mapped_condition"))
+    if validation_type not in {"", "none", "related_unmapped", "material_unmapped"}:
+        return False
+    if mapped:
+        return False
+    return event_delta is None or abs(event_delta) <= 0.0001
 
 
 def _relationship_label(*, kind: str, strength: str, priority: Any) -> str:
@@ -418,17 +572,17 @@ def _relationship_label(*, kind: str, strength: str, priority: Any) -> str:
     return label
 
 
-def _findings_text(report: Dict[str, Any]) -> str:
-    chunks = []
-    for item in report.get("key_findings") or []:
-        if not isinstance(item, dict):
-            continue
-        chunks.extend([str(item.get("type") or ""), str(item.get("summary") or "")])
-    return " ".join(chunks).strip().lower()
-
-
 def _norm(value: Any) -> str:
     return str(value or "").strip().lower()
+
+
+def _to_float(value: Any) -> float | None:
+    try:
+        if value is None or value == "":
+            return None
+        return float(value)
+    except Exception:
+        return None
 
 
 def _titleize(value: str) -> str:

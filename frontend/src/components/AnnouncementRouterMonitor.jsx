@@ -246,6 +246,7 @@ function defaultFollowUpReason(router) {
   const display = routerDisplay(router);
   const reviewStatus = String(display.review_status || '').trim().toLowerCase();
   const state = routerTrajectoryState(router);
+  const relationship = routerThesisRelationship(router);
   if (reviewStatus === 'auto_cleared' || ['no_thesis_change', 'administrative_filing', 'market_backdrop_only'].includes(state)) {
     return 'no_follow_up';
   }
@@ -259,7 +260,7 @@ function defaultFollowUpReason(router) {
     return 'needs_evidence_refresh';
   }
   if (displayReason === 'verification_hit') return 'source_verification';
-  if (state === 'material_unmapped') return 'thesis_map_gap';
+  if (relationship === 'related_unmapped' || state === 'material_unmapped') return 'thesis_map_gap';
   if (state === 'needs_classification') return 'router_misclassified';
   if (state === 'timeline_delayed' || state === 'timeline_accelerated') return 'timeline_changed';
   if (state === 'thesis_weakened') return 'contradicts_saved_thesis';
@@ -361,6 +362,21 @@ function routerTrajectoryState(router) {
   return String(router?.trajectory_state || '').trim().toLowerCase();
 }
 
+function routerImpactVerdict(router) {
+  const display = routerDisplay(router);
+  return String(display.impact_verdict || router?.impact_verdict || '').trim().toLowerCase();
+}
+
+function routerFilingType(router) {
+  const display = routerDisplay(router);
+  return String(display.filing_type || router?.filing_type || '').trim().toLowerCase();
+}
+
+function routerThesisRelationship(router) {
+  const display = routerDisplay(router);
+  return String(display.thesis_relationship || router?.thesis_relationship || '').trim().toLowerCase();
+}
+
 function labelTrajectoryState(value) {
   const state = String(value || '').trim().toLowerCase();
   const labels = {
@@ -422,8 +438,13 @@ function routerItemMeta(item) {
   const parts = [];
   if (item.scenario) parts.push(labelScenarioPath(item.scenario));
   if (item.group) parts.push(titleizeKey(item.group));
-  if (item.status) parts.push(titleizeKey(item.status));
+  if (item.status) parts.push(conditionStatusLabel(item.status));
   if (item.reason) parts.push(String(item.reason));
+  const missing = Array.isArray(item.missing_for_full_match)
+    ? item.missing_for_full_match.filter(Boolean).join('; ')
+    : '';
+  if (missing) parts.push(`Missing: ${missing}`);
+  if (item.evidence_quote) parts.push(`Quote: "${String(item.evidence_quote)}"`);
   return parts.filter(Boolean).join(' | ');
 }
 
@@ -609,13 +630,34 @@ function routerActionBucket(router) {
 }
 
 function routerCaseBucket(router) {
+  const verdict = routerImpactVerdict(router);
+  const filingType = routerFilingType(router);
+  const relationship = routerThesisRelationship(router);
+  const score = routerTrajectoryScore(router);
+  const validationType = String(score?.validation_type || '').trim().toLowerCase();
+  const eventDelta = Number(score?.event_delta);
+  const directHits = Number(router?.matched_conditions_count || 0) +
+    Number(router?.triggered_watchlist_count || 0) +
+    Number(router?.triggered_verification_count || 0);
+  const unvalidatedPositive = verdict === 'positive' &&
+    !directHits &&
+    (!validationType || ['none', 'related_unmapped', 'material_unmapped'].includes(validationType)) &&
+    (!Number.isFinite(eventDelta) || Math.abs(eventDelta) <= 0.0001) &&
+    !score?.mapped_condition;
+  if (filingType === 'administrative') return 'administrative';
+  if (unvalidatedPositive) return 'needs_assessment';
+  if (verdict === 'positive') return 'thesis_improved';
+  if (verdict === 'negative') return 'thesis_weakened';
+  if (relationship === 'related_unmapped') return 'needs_assessment';
+  if (['mixed', 'uncertain', 'unclear'].includes(verdict)) return 'needs_assessment';
+  if (verdict === 'neutral') return 'no_thesis_impact';
+
   const state = routerTrajectoryState(router);
-  if (state === 'material_unmapped') return 'material_unmapped';
-  if (['thesis_weakened', 'timeline_delayed', 'risk_increased'].includes(state)) return 'trajectory_risk';
-  if (['thesis_strengthened', 'timeline_accelerated', 'risk_reduced'].includes(state)) return 'positive_movement';
-  if (state === 'needs_classification') return 'needs_classification';
+  if (['thesis_weakened', 'timeline_delayed', 'risk_increased'].includes(state)) return 'thesis_weakened';
+  if (['thesis_strengthened', 'timeline_accelerated', 'risk_reduced'].includes(state)) return 'thesis_improved';
+  if (state === 'needs_classification') return 'needs_assessment';
   if (state === 'administrative_filing') return 'administrative';
-  if (['no_thesis_change', 'market_backdrop_only'].includes(state)) return 'no_thesis_change';
+  if (['no_thesis_change', 'market_backdrop_only', 'material_unmapped'].includes(state)) return 'no_thesis_impact';
   return 'uncategorized';
 }
 
@@ -643,13 +685,27 @@ function routerTrajectoryScore(router) {
 }
 
 function hasTrajectoryScore(score) {
-  return Number.isFinite(Number(score?.event_delta)) && Number(score.event_delta) !== 0;
+  const validationType = String(score?.validation_type || '').trim().toLowerCase();
+  const eventDelta = Number(score?.event_delta);
+  const unvalidatedDelta = Number(score?.unvalidated_event_delta);
+  if (validationType === 'related_unmapped' || validationType === 'material_unmapped') {
+    return Number.isFinite(unvalidatedDelta) && unvalidatedDelta !== 0;
+  }
+  return Number.isFinite(eventDelta) && eventDelta !== 0;
+}
+
+function trajectoryScoreDisplayDelta(score) {
+  const validationType = String(score?.validation_type || '').trim().toLowerCase();
+  if (validationType === 'related_unmapped' || validationType === 'material_unmapped') {
+    return Number(score?.unvalidated_event_delta);
+  }
+  return Number(score?.event_delta);
 }
 
 function trajectoryScoreTone(score) {
   const direction = String(score?.direction || '').trim().toLowerCase();
   const validationType = String(score?.validation_type || '').trim().toLowerCase();
-  if (validationType === 'material_unmapped') return 'warn';
+  if (validationType === 'related_unmapped' || validationType === 'material_unmapped') return 'warn';
   if (direction === 'positive') return 'positive';
   if (direction === 'negative') return 'urgent';
   if (direction === 'mixed') return 'warn';
@@ -659,8 +715,7 @@ function trajectoryScoreTone(score) {
 function trajectoryScoreDirectionLabel(score) {
   const direction = String(score?.direction || '').trim().toLowerCase();
   const validationType = String(score?.validation_type || '').trim().toLowerCase();
-  if (validationType === 'material_unmapped' && direction === 'positive') return 'Positive drift';
-  if (validationType === 'material_unmapped' && direction === 'negative') return 'Negative drift';
+  if (validationType === 'related_unmapped' || validationType === 'material_unmapped') return 'Provisional thesis evidence';
   if (direction === 'positive') return 'Bull-leaning evidence';
   if (direction === 'negative') return 'Bear-leaning evidence';
   if (direction === 'mixed') return 'Mixed evidence';
@@ -671,7 +726,7 @@ function safeTrajectoryPositionLabel(score, key = 'position_label') {
   const raw = String(score?.[key] || '').trim();
   if (!raw) return '';
   const validationType = String(score?.validation_type || '').trim().toLowerCase();
-  if (validationType === 'material_unmapped') {
+  if (validationType === 'related_unmapped' || validationType === 'material_unmapped') {
     if (/bull case/i.test(raw)) return 'Bull-leaning, unvalidated';
     if (/bear case/i.test(raw)) return 'Bear-leaning, unvalidated';
   }
@@ -685,7 +740,7 @@ function trajectoryScoreReason(score) {
   const raw = String(score?.reason || '').trim();
   if (!raw) return 'Directional evidence was scored against the saved scenario path.';
   const validationType = String(score?.validation_type || '').trim().toLowerCase();
-  if (validationType !== 'material_unmapped') return raw;
+  if (validationType !== 'material_unmapped' && validationType !== 'related_unmapped') return raw;
   return raw
     .replace(/^Bull-leaning\b/i, 'Positive')
     .replace(/^Bear-leaning\b/i, 'Negative');
@@ -697,6 +752,11 @@ function routerDirectHitCount(router) {
     routerVerificationItems(router).length;
 }
 
+function checkedNotTriggeredWatchlist(router) {
+  const rows = Array.isArray(router?.watchlist_condition_checks) ? router.watchlist_condition_checks : [];
+  return rows.filter((item) => String(item?.status || '').trim().toLowerCase() === 'checked_not_triggered');
+}
+
 function routerConflictCount(router) {
   return Array.isArray(router?.conflicts_with_run) ? router.conflicts_with_run.length : 0;
 }
@@ -706,7 +766,8 @@ function routerIsQuietCleared(router) {
   return (
     ['no_thesis_change', 'administrative_filing', 'market_backdrop_only'].includes(state) &&
     !routerDirectHitCount(router) &&
-    !routerConflictCount(router)
+    !routerConflictCount(router) &&
+    !checkedNotTriggeredWatchlist(router).length
   );
 }
 
@@ -811,6 +872,7 @@ function conditionTone(status, group = '') {
   if (normalized === 'matched' && ['failure', 'red_flag'].includes(normalizedGroup)) return 'contradict';
   if (normalized === 'matched') return 'confirm';
   if (normalized === 'partial_match') return 'unclear';
+  if (normalized === 'checked_not_triggered') return 'muted';
   if (normalized === 'contradicted') return 'contradict';
   if (normalized === 'unclear') return 'unclear';
   return 'muted';
@@ -821,6 +883,7 @@ function conditionStatusLabel(status) {
   if (normalized === 'not_matched') return 'Not matched';
   if (normalized === 'matched') return 'Matched';
   if (normalized === 'partial_match') return 'Partially matched';
+  if (normalized === 'checked_not_triggered') return 'Checked, not triggered';
   if (normalized === 'contradicted') return 'Contradicted';
   if (normalized === 'unclear') return 'Unclear';
   return normalized ? titleizeKey(normalized) : 'Monitor';
@@ -843,7 +906,7 @@ function countStatuses(items) {
       acc[status] = (acc[status] || 0) + 1;
       return acc;
     },
-    { total: 0, matched: 0, partial_match: 0, not_matched: 0, contradicted: 0, unclear: 0, unknown: 0 }
+    { total: 0, matched: 0, partial_match: 0, checked_not_triggered: 0, not_matched: 0, contradicted: 0, unclear: 0, unknown: 0 }
   );
 }
 
@@ -853,6 +916,7 @@ function compactStatusSummary(items, empty = 'none checked') {
   const parts = [
     counts.matched && `${counts.matched} matched`,
     counts.partial_match && `${counts.partial_match} partial`,
+    counts.checked_not_triggered && `${counts.checked_not_triggered} not triggered`,
     counts.contradicted && `${counts.contradicted} contradicted`,
     counts.unclear && `${counts.unclear} unclear`,
     counts.not_matched && `${counts.not_matched} not matched`,
@@ -871,7 +935,9 @@ function auditTrailSummary(announcementChecks, watchlistChecks, verificationChec
 
 function routerWhyHeadline(router, directHits = 0) {
   const state = routerTrajectoryState(router);
+  const checkedWatchlist = checkedNotTriggeredWatchlist(router);
   if (directHits) return 'Mapped evidence was found';
+  if (checkedWatchlist.length) return 'Watchlist risk checked, not triggered';
   if (state === 'needs_classification') return 'Classification is unresolved';
   if (state === 'material_unmapped') return 'Material filing is not covered by the thesis map';
   if (state === 'administrative_filing') return 'Procedural filing with no mapped thesis impact';
@@ -886,12 +952,23 @@ function routerWhyCopy(router, directHits = 0) {
   const state = routerTrajectoryState(router);
   const announcementChecks = Array.isArray(router?.announcement_condition_checks) ? router.announcement_condition_checks : [];
   const watchlistChecks = Array.isArray(router?.watchlist_condition_checks) ? router.watchlist_condition_checks : [];
+  const checkedWatchlistRows = checkedNotTriggeredWatchlist(router);
   const verificationChecks = Array.isArray(router?.verification_condition_checks) ? router.verification_condition_checks : [];
   const marketConditions = Array.isArray(router?.market_context_conditions) ? router.market_context_conditions : [];
   const marketCount = marketConditions.length || Object.keys(router?.market_facts_used || {}).length;
 
   if (directHits) {
     return `The filing matched ${directHits} saved thesis, watchlist, or verification item${directHits === 1 ? '' : 's'}. Review the evidence rows below before changing the saved run.`;
+  }
+  const checkedWatchlist = checkedNotTriggeredWatchlist(router);
+  if (checkedWatchlist.length) {
+    const first = checkedWatchlist[0] || {};
+    const label = routerItemLabel(first) || 'a saved watchlist item';
+    const reason = String(first.reason || '').trim();
+    return [
+      `The router compared the filing against "${label}" and did not treat it as triggered.`,
+      reason || 'The filing touched the risk area, but did not establish the watched condition.',
+    ].filter(Boolean).join(' ');
   }
   if (state === 'needs_classification') {
     return router?.classification_reason || 'The filing was captured, but the classifier could not map it to a known filing type or saved thesis driver. It should be labelled by a human rather than treated as urgent thesis damage.';
@@ -1395,7 +1472,9 @@ function TrajectoryScorePanel({ router }) {
   const cumulative = Number(score?.cumulative_delta);
   const eventLabel = safeTrajectoryPositionLabel(score, 'position_label') || 'Position not assessed';
   const cumulativeLabel = safeTrajectoryPositionLabel(score, 'cumulative_position_label') || eventLabel;
-  const eventDelta = Number(score.event_delta);
+  const validationType = String(score?.validation_type || '').trim().toLowerCase();
+  const isProvisional = validationType === 'related_unmapped' || validationType === 'material_unmapped';
+  const eventDelta = isProvisional ? Number(score.unvalidated_event_delta) : Number(score.event_delta);
   return (
     <div className="announcement-router-score-panel" data-tone={trajectoryScoreTone(score)}>
       <span>Path movement</span>
@@ -1405,7 +1484,7 @@ function TrajectoryScorePanel({ router }) {
       </strong>
       <p>{trajectoryScoreReason(score)}</p>
       <div>
-        <b>Event: {eventLabel}</b>
+        <b>{isProvisional ? 'Provisional' : 'Event'}: {eventLabel}</b>
         {Number.isFinite(cumulative) && (
           <b>Cumulative: {cumulativeLabel || 'Position not assessed'} ({fmtSignedDelta(cumulative)})</b>
         )}
@@ -1715,7 +1794,7 @@ function RouterQueue({ events, selectedEventId, onSelect }) {
 	                  <b>{vm.trajectoryLabel}</b>
                     {hasTrajectoryScore(score) && (
                       <em className="announcement-router-queue-delta" data-tone={trajectoryScoreTone(score)}>
-                        {fmtSignedDelta(score.event_delta)}
+	                        {fmtSignedDelta(trajectoryScoreDisplayDelta(score))}
                       </em>
                     )}
 	                </span>
@@ -1836,6 +1915,8 @@ function DecisionPanel({
   const quietCleared = routerIsQuietCleared(router);
   const whyCount = directHits
     ? `${directHits} mapped condition${directHits === 1 ? '' : 's'}`
+    : checkedWatchlistRows.length
+      ? `${checkedWatchlistRows.length} watchlist checked`
     : 'no mapped condition';
 
   if (!decisionAvailable) {
@@ -1912,6 +1993,7 @@ function DecisionPanel({
             <ConfidenceBreakdown router={router} />
             <EvidenceRows title="Matched Thesis Conditions" items={matchedConditions} />
             <EvidenceRows title="Watchlist Matches" items={watchHits} />
+            <ConditionChecks title="Watchlist Checked, Not Triggered" items={checkedWatchlistRows} />
             <EvidenceRows title="Verification Matches" items={verificationHits} />
           </RouterSection>
         </>
@@ -2078,11 +2160,10 @@ export default function AnnouncementRouterMonitor({
     const count = (key) => countEventsByCase(queueEvents, key, activeReviewFilter, activeScenarioFilter);
     return [
       { key: 'all', label: 'All case types', tone: 'neutral', count: count('all') },
-      { key: 'material_unmapped', label: 'Outside thesis map', tone: 'warn', count: count('material_unmapped') },
-      { key: 'trajectory_risk', label: 'Thesis risk', tone: 'urgent', count: count('trajectory_risk') },
-      { key: 'positive_movement', label: 'Thesis improved', tone: 'positive', count: count('positive_movement') },
-      { key: 'needs_classification', label: 'Needs classification', tone: 'warn', count: count('needs_classification') },
-      { key: 'no_thesis_change', label: 'No thesis change', tone: 'neutral', count: count('no_thesis_change') },
+      { key: 'thesis_improved', label: 'Thesis improved', tone: 'positive', count: count('thesis_improved') },
+      { key: 'thesis_weakened', label: 'Thesis weakened', tone: 'urgent', count: count('thesis_weakened') },
+      { key: 'needs_assessment', label: 'Needs assessment', tone: 'warn', count: count('needs_assessment') },
+      { key: 'no_thesis_impact', label: 'No thesis impact', tone: 'neutral', count: count('no_thesis_impact') },
       { key: 'administrative', label: 'Administrative', tone: 'neutral', count: count('administrative') },
       { key: 'uncategorized', label: 'Uncategorised', tone: 'neutral', count: count('uncategorized') },
     ];

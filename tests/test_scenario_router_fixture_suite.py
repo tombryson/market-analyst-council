@@ -9,7 +9,7 @@ class ScenarioRouterFixtureSuiteTests(unittest.TestCase):
 
         self.assertEqual(suite["suite_id"], "atlas_operating_co_suite")
         self.assertEqual(suite["company_id"], "atlas_operating_co")
-        self.assertEqual(len(suite["cases"]), 10)
+        self.assertEqual(len(suite["cases"]), 12)
 
         first_case = suite["cases"][0]
         self.assertEqual(first_case["ticker"], "TEST:ATLAS")
@@ -22,7 +22,7 @@ class ScenarioRouterFixtureSuiteTests(unittest.TestCase):
     def test_backwards_designed_fixture_suite_routes_expected_paths(self):
         result = run_router_fixture_suite("atlas_operating_co_suite")
 
-        self.assertEqual(result["total_cases"], 10)
+        self.assertEqual(result["total_cases"], 12)
         self.assertEqual(result["failed_cases"], 0, _failed_assertions(result))
         self.assertEqual(result["pass_rate_pct"], 100.0)
 
@@ -32,7 +32,8 @@ class ScenarioRouterFixtureSuiteTests(unittest.TestCase):
         self.assertEqual(by_id["base_regulatory_pending"]["actual"]["current_path"], "base")
         self.assertEqual(by_id["administrative_appendix"]["actual"]["user_bucket"], "administrative")
         self.assertEqual(by_id["administrative_appendix"]["actual"]["display"]["queue_bucket"], "administrative")
-        self.assertEqual(by_id["material_unmapped_acquisition"]["actual"]["trajectory_state"], "material_unmapped")
+        self.assertEqual(by_id["material_unmapped_acquisition"]["actual"]["trajectory_state"], "no_thesis_change")
+        self.assertEqual(by_id["material_unmapped_acquisition"]["actual"]["display"]["thesis_relationship"], "related_unmapped")
         self.assertEqual(by_id["material_unmapped_acquisition"]["actual"]["display"]["queue_bucket"], "open_review")
         self.assertEqual(by_id["bull_regulatory_approval_ahead"]["actual"]["display"]["trajectory_label"], "Timeline accelerated")
         self.assertEqual(by_id["bull_regulatory_approval_ahead"]["actual"]["display"]["queue_bucket"], "open_review")
@@ -43,6 +44,9 @@ class ScenarioRouterFixtureSuiteTests(unittest.TestCase):
         self.assertEqual(by_id["false_positive_facility_not_expanded"]["actual"]["matched_condition_ids"], ["base_facility_available"])
         self.assertEqual(by_id["false_positive_customer_expansion_not_signed"]["actual"]["matched_condition_ids"], [])
         self.assertEqual(by_id["mixed_approval_granted_with_cost_pressure"]["actual"]["current_path"], "bull")
+        self.assertEqual(by_id["serious_workplace_incident_no_shutdown"]["actual"]["trajectory_state"], "risk_increased")
+        self.assertEqual(by_id["serious_workplace_incident_no_shutdown"]["actual"]["display"]["evidence_label"], "Risk event outside thesis map")
+        self.assertEqual(by_id["routine_capital_management_update"]["actual"]["display"]["queue_bucket"], "cleared")
 
 
 def _condition_ids(case, scenario, group):

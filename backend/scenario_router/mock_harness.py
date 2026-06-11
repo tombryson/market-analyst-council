@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 from .action_judge import ActionJudge
 from .announcement_interpreter import AnnouncementInterpreter as LegacyRuleBasedAnnouncementInterpreter
 from .display_contract import build_router_display_contract
+from .model_thesis_judge import ModelAnnouncementThesisJudge, normalize_model_thesis_payload
 from .models import AnnouncementFacts, BaselineRunPacket, EvidenceRef
 from .thesis_comparator import ThesisComparator
 
@@ -117,7 +118,12 @@ def build_mock_announcement_facts(case: Dict[str, Any]) -> AnnouncementFacts:
 
     source_confidence = 1.0 if source_url.startswith("https://announcements.asx.com.au/") else 0.8
     extraction_confidence = _mock_extraction_confidence(parse_quality)
-    return AnnouncementFacts(
+    model_judgement = case.get("model_judgement") if isinstance(case.get("model_judgement"), dict) else {}
+    if str(model_judgement.get("status") or "").strip().lower() == "valid":
+        normalized_judgement, _error = normalize_model_thesis_payload(model_judgement)
+        if normalized_judgement:
+            model_judgement = normalized_judgement
+    facts = AnnouncementFacts(
         event_id=str(case.get("event_id") or case.get("case_id") or "mock-announcement").strip(),
         ticker=ticker,
         company_name=str(case.get("company_name") or "Mock Company").strip(),
@@ -141,7 +147,11 @@ def build_mock_announcement_facts(case: Dict[str, Any]) -> AnnouncementFacts:
             },
             "extraction": parse_quality,
         },
+        model_judgement=model_judgement,
     )
+    if str(model_judgement.get("status") or "").strip().lower() == "valid":
+        facts = ModelAnnouncementThesisJudge._apply_payload(facts, model_judgement)
+    return facts
 
 
 def build_mock_baseline_run(case: Dict[str, Any]) -> BaselineRunPacket:
@@ -227,12 +237,20 @@ def build_mock_baseline_run(case: Dict[str, Any]) -> BaselineRunPacket:
 
 
 def _actual_result(facts: AnnouncementFacts, report, action) -> Dict[str, Any]:
+    checked_watchlist_count = sum(
+        1
+        for item in report.condition_evaluations or []
+        if str(item.status or "").strip() == "checked_not_triggered"
+        and str(item.group or "").strip() in {"red_flag", "confirmatory"}
+        and str(item.matched_via or "").strip() != "market_facts"
+    )
     display = build_router_display_contract(
         report.to_dict(),
         action.to_dict(),
         matched_conditions_count=len(report.matched_condition_ids or []),
         triggered_watchlist_count=len(report.triggered_watchlist_ids or []),
         triggered_verification_count=len(getattr(report, "triggered_verification_ids", []) or []),
+        checked_watchlist_count=checked_watchlist_count,
     )
     return {
         "announcement_class": facts.announcement_class,

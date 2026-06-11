@@ -8,7 +8,7 @@ from backend.scenario_router.models import AnnouncementFacts, BaselineRunPacket,
 from backend.scenario_router.run_selector import LatestRunSelector
 from backend.scenario_router.semantic_adjudicator import parse_adjudicator_json
 from backend.scenario_router.thesis_comparator import ThesisComparator
-from backend.scenario_router.trajectory_scoring import apply_cumulative_scores
+from backend.scenario_router.trajectory_scoring import apply_cumulative_scores, build_trajectory_score
 
 
 def baseline(template_id="software_saas", leaning="base", conditions=None):
@@ -60,7 +60,9 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
 
         self.assertEqual(interpreted.domain_profile, "resources")
         self.assertIn("drilling_exploration", interpreted.affected_drivers)
-        self.assertEqual(report.trajectory_state, "material_unmapped")
+        self.assertEqual(report.trajectory_state, "no_thesis_change")
+        self.assertEqual(report.thesis_relationship, "related_unmapped")
+        self.assertEqual(report.impact_verdict, "neutral")
         self.assertEqual(report.relationship_priority, 3)
         self.assertEqual(report.relationship_kind, "material_unmapped")
         self.assertEqual(action.action, "annotate_run")
@@ -143,7 +145,9 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         )
         report = ThesisComparator().compare(interpreted, baseline(template_id="rare_earths_critical_minerals", leaning="base"))
 
-        self.assertEqual(report.trajectory_state, "material_unmapped")
+        self.assertEqual(report.trajectory_state, "no_thesis_change")
+        self.assertEqual(report.thesis_relationship, "related_unmapped")
+        self.assertEqual(report.impact_verdict, "neutral")
         self.assertEqual(report.trajectory_score["direction"], "neutral")
         self.assertEqual(report.trajectory_score["event_delta"], 0.0)
         self.assertEqual(report.trajectory_score["position_label"], "Base evidence zone")
@@ -175,6 +179,37 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         self.assertEqual(report.trajectory_score["position_label"], "Base, bull-leaning")
         self.assertTrue(report.trajectory_score["mapped_condition"])
 
+    def test_neutral_state_overrides_positive_evidence_hits_in_scoring(self):
+        score = build_trajectory_score(
+            baseline_path="base",
+            current_path="base",
+            trajectory_state="no_thesis_change",
+            trajectory_effect="strengthens",
+            thesis_effect="confirms",
+            timeline_effect="accelerated",
+            impact_level="medium",
+            materiality="medium",
+            classification_confidence=0.9,
+            thesis_match_confidence=0.8,
+            direct_match_count=2,
+            thesis_required_hits=1,
+            thesis_failure_hits=0,
+            red_flag_hits=0,
+            confirmatory_hits=1,
+            red_flag_partial_hits=0,
+            confirmatory_partial_hits=0,
+            verification_hits=0,
+            positive=True,
+            negative=False,
+            price_time_effect="Would otherwise look positive.",
+        )
+
+        self.assertEqual(score["direction"], "neutral")
+        self.assertEqual(score["intensity"], "none")
+        self.assertEqual(score["event_delta"], 0.0)
+        self.assertEqual(score["score_after_event"], 0.0)
+        self.assertIn("No price/time thesis movement", score["reason"])
+
     def test_negative_material_unmapped_does_not_move_validated_path(self):
         announcement = facts(
             "Key Permit Decision Delayed",
@@ -187,7 +222,9 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         )
         report = ThesisComparator().compare(interpreted, baseline(template_id="rare_earths_critical_minerals", leaning="base"))
 
-        self.assertEqual(report.trajectory_state, "material_unmapped")
+        self.assertEqual(report.trajectory_state, "no_thesis_change")
+        self.assertEqual(report.thesis_relationship, "related_unmapped")
+        self.assertEqual(report.impact_verdict, "neutral")
         self.assertEqual(report.trajectory_score["direction"], "neutral")
         self.assertEqual(report.trajectory_score["event_delta"], 0.0)
         self.assertEqual(report.trajectory_score["position_band"], "base")
@@ -432,6 +469,9 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         self.assertIn("verify_jorc_resource", [item.condition_id for item in report.condition_evaluations if item.status == "matched"])
         self.assertEqual(report.relationship_priority, 5)
         self.assertEqual(report.relationship_kind, "verification_queue")
+        self.assertEqual(report.trajectory_score["validation_type"], "verification_queue")
+        self.assertEqual(report.trajectory_score["validation_weight"], 1.5)
+        self.assertEqual(report.trajectory_score["event_delta"], 1.5)
         self.assertEqual(action.action, "run_delta_only")
         self.assertEqual(report.trajectory_projection["rerun_signal"], "annotate_evidence")
 
