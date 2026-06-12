@@ -8,6 +8,37 @@ from backend.scenario_router.display_contract import MARKET_ONLY_WATCH_REASON, b
 from backend.scenario_router.review_store import apply_review_overlay, save_review
 
 
+class ScenarioRouterSignalMapTests(unittest.TestCase):
+    def test_signal_map_returns_latest_validated_score_per_ticker(self):
+        observer = ScenarioRouterObservability()
+        rows = [
+            {
+                "ticker": "ASX:VMM",
+                "trajectory_score": {"cumulative_validated_delta": 3.0},
+            },
+            {
+                "ticker": "ASX:VMM",
+                "trajectory_score": {"cumulative_validated_delta": -1.0},
+            },
+            {
+                "ticker": "ASX:WWI",
+                "trajectory_score": {"cumulative_validated_delta": -1.5},
+            },
+        ]
+
+        observer.list_recent_events = lambda *, limit=500, ticker="": [
+            row for row in rows if not ticker or row["ticker"] == ticker
+        ]
+
+        self.assertEqual(observer.build_signal_map(), {"ASX:VMM": 3, "ASX:WWI": -1.5})
+
+    def test_signal_map_returns_zero_for_requested_ticker_without_events(self):
+        observer = ScenarioRouterObservability()
+        observer.list_recent_events = lambda *, limit=500, ticker="": []
+
+        self.assertEqual(observer.build_signal_map(ticker="ASX:XYZ"), {"ASX:XYZ": 0})
+
+
 class InboxSentinelCompanyHintTests(unittest.TestCase):
     def test_hotcopper_boilerplate_is_not_used_as_company_hint(self):
         body = """

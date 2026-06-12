@@ -3983,6 +3983,17 @@ async def list_scenario_router_events(limit: int = 50, ticker: str = ""):
     }
 
 
+@app.get("/api/announcement-router/signal")
+@app.get("/api/announcement-router/signals")
+@app.get("/api/scenario-router/signal")
+@app.get("/api/scenario-router/signals")
+async def get_scenario_router_signals(limit: int = 500, ticker: str = ""):
+    from .scenario_router.observability import ScenarioRouterObservability
+
+    observer = ScenarioRouterObservability()
+    return observer.build_signal_map(limit=max(1, min(int(limit or 500), 5000)), ticker=str(ticker or "").strip())
+
+
 @app.get("/api/market-path/security-history/{ticker:path}")
 async def get_market_path_security_history(ticker: str):
     from .price_history_bridge import fetch_alpha_edge_security_history

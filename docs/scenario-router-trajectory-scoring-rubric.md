@@ -131,3 +131,13 @@ The rubric is implemented in `backend/scenario_router/trajectory_scoring.py`.
 - verification-queue hits
 
 The focused regression coverage is in `tests/test_scenario_router_trajectory.py`.
+
+## External Signal API
+
+Trading Terminal should consume the compact router signal API rather than the full event rows:
+
+```text
+GET /api/announcement-router/signals
+```
+
+The contract is documented in `docs/announcement-router-signal-api.md`.

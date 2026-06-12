@@ -90,6 +90,19 @@ class ScenarioRouterObservability:
             "recent_events": rows[:12],
         }
 
+    def build_signal_map(self, *, limit: int = 500, ticker: str = "") -> Dict[str, int | float]:
+        wanted = str(ticker or "").strip().upper()
+        rows = self.list_recent_events(limit=max(1, int(limit)), ticker=wanted)
+        signals: Dict[str, int | float] = {}
+        for row in rows:
+            row_ticker = str(row.get("ticker") or "").strip().upper()
+            if not row_ticker or row_ticker in signals:
+                continue
+            signals[row_ticker] = _compact_number(_validated_signal_score(row))
+        if wanted and wanted not in signals:
+            signals[wanted] = 0
+        return signals
+
     def run_evaluation_suite(self) -> Dict[str, Any]:
         cases = self._load_evaluation_cases()
         results: List[Dict[str, Any]] = []
@@ -443,6 +456,22 @@ def _condition_details(
         if len(rows) >= max(1, int(limit or 10)):
             break
     return rows
+
+
+def _validated_signal_score(row: Dict[str, Any]) -> float:
+    score = row.get("trajectory_score") if isinstance(row.get("trajectory_score"), dict) else {}
+    raw = score.get("cumulative_validated_delta")
+    if raw is None:
+        raw = score.get("cumulative_delta")
+    try:
+        return round(float(raw or 0), 2)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _compact_number(value: float) -> int | float:
+    rounded = round(float(value or 0), 2)
+    return int(rounded) if rounded.is_integer() else rounded
 
 
 def _thesis_snapshot(baseline_run: Dict[str, Any]) -> Dict[str, Any]:
