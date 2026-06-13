@@ -188,6 +188,15 @@ function isGeneratedReviewNote(note, router) {
   return text.split(':').length === 2;
 }
 
+function reviewStateSubtext(vm) {
+  if (vm.reviewStatus === 'reviewed') return 'Handled and cleared from the active list.';
+  if (vm.reviewStatus === 'dismissed') return 'Cleared with no further action.';
+  if (vm.reviewStatus === 'open') return 'The router cannot safely clear this filing. Decide whether the saved thesis map, evidence pack, or classification needs work.';
+  if (vm.reviewStatus === 'tracking') return 'The filing supports the saved path. Track it against the run before changing the narrative.';
+  if (vm.reviewStatus === 'auto_cleared') return 'No active analyst decision is required for this filing.';
+  return 'No manual case action recorded.';
+}
+
 function labelMarketPath(value) {
   const path = String(value || '').trim().toLowerCase();
   if (path === 'bull') return 'Closest to bull';
@@ -541,6 +550,10 @@ function routerCompanyThesisPath(router) {
   return 'base';
 }
 
+function routerScenarioPath(router) {
+  return routerCompanyThesisPath(router);
+}
+
 function routerTrajectoryScore(router) {
   return router?.trajectory_score && typeof router.trajectory_score === 'object' ? router.trajectory_score : {};
 }
@@ -706,6 +719,17 @@ function routerPresentation(router) {
   };
 }
 
+function routerRelationshipLabel(router) {
+  const displayRelationship = String(routerDisplay(router)?.relationship_label || '').trim();
+  if (displayRelationship) return displayRelationship;
+  const kind = String(router?.relationship_kind || '').trim();
+  if (!kind) return 'Not assessed';
+  const strength = String(router?.relationship_strength || '').trim();
+  return [strength && strength !== 'none' ? titleizeKey(strength) : '', titleizeKey(kind)]
+    .filter(Boolean)
+    .join(' ');
+}
+
 function pathExplanation(router) {
   const path = String(router?.baseline_path || router?.current_path || '').trim();
   if (!path) return '';
@@ -798,6 +822,7 @@ function routerWhyCopy(router, directHits = 0) {
   const state = routerTrajectoryState(router);
   const announcementChecks = Array.isArray(router?.announcement_condition_checks) ? router.announcement_condition_checks : [];
   const watchlistChecks = Array.isArray(router?.watchlist_condition_checks) ? router.watchlist_condition_checks : [];
+  const checkedWatchlistRows = checkedNotTriggeredWatchlist(router);
   const verificationChecks = Array.isArray(router?.verification_condition_checks) ? router.verification_condition_checks : [];
   const marketConditions = Array.isArray(router?.market_context_conditions) ? router.market_context_conditions : [];
   const marketCount = marketConditions.length || Object.keys(router?.market_facts_used || {}).length;
@@ -1574,7 +1599,7 @@ function RouterQueue({ events, selectedEventId, onSelect }) {
   return (
     <article className="announcement-router-queue">
       <div className="announcement-router-queue-head">
-        <h4>Announcement Events</h4>
+        <h4>Announcement Queue</h4>
         <span>{events.length} shown</span>
       </div>
       <div className="announcement-router-queue-list">
@@ -1606,6 +1631,7 @@ function RouterQueue({ events, selectedEventId, onSelect }) {
 	                </span>
 	                <span className="announcement-router-queue-title">{routerTitle(row)}</span>
 	                <span className="announcement-router-queue-meta">
+                  <span>Path: {labelCompanyThesisPathShort(routerCompanyThesisPath(row))}</span>
                       {hasTrajectoryScore(score) && <span>{safeTrajectoryPositionLabel(score, 'cumulative_position_label') || safeTrajectoryPositionLabel(score, 'position_label')}</span>}
 		                  <span>{routerMaterialityLabel(row)}</span>
 		                  <span>{routerDriverLabel(row)}</span>
@@ -1622,94 +1648,6 @@ function RouterQueue({ events, selectedEventId, onSelect }) {
   );
 }
 
-function CompanyQueue({ companies, selectedEventId, onSelect }) {
-  return (
-    <article className="announcement-router-queue">
-      <div className="announcement-router-queue-head">
-        <h4>Company States</h4>
-        <span>{companies.length} shown</span>
-      </div>
-      <div className="announcement-router-queue-list">
-        {companies.map((company) => {
-          const latest = company.latestEvent || {};
-          const vm = routerPresentation(latest);
-          const score = routerTrajectoryScore(latest);
-          const selected = selectedEventId
-            ? selectedEventId === latest.event_id
-            : companies[0]?.latestEvent?.event_id === latest.event_id;
-          return (
-            <button
-              type="button"
-              className={`announcement-router-queue-row ${selected ? 'is-selected' : ''}`}
-              data-tone={company.pathTone}
-              key={company.ticker}
-              onClick={() => onSelect(latest.event_id || '')}
-            >
-              <span className="announcement-router-queue-severity" />
-              <span className="announcement-router-queue-glyph" aria-hidden="true" />
-              <span className="announcement-router-queue-body">
-                <span className="announcement-router-queue-topline">
-                  <strong>{company.ticker}</strong>
-                  <b>{labelCompanyThesisPath(company.path)}</b>
-                  {hasTrajectoryScore(score) && (
-                    <em className="announcement-router-queue-delta" data-tone={trajectoryScoreTone(score)}>
-                      {fmtSignedDelta(trajectoryScoreDisplayDelta(score))}
-                    </em>
-                  )}
-                </span>
-                <span className="announcement-router-queue-title">{vm.trajectoryLabel}</span>
-                <span className="announcement-router-queue-meta">
-                  <span>{company.eventCount} filing{company.eventCount === 1 ? '' : 's'}</span>
-                  <span>Latest: {routerTitle(latest)}</span>
-                  {hasTrajectoryScore(score) && <span>{safeTrajectoryPositionLabel(score, 'cumulative_position_label') || safeTrajectoryPositionLabel(score, 'position_label')}</span>}
-                </span>
-              </span>
-              <span className="announcement-router-queue-time">{latest.saved_at_utc ? fmtRelativeSince(latest.saved_at_utc) : 'n/a'}</span>
-            </button>
-          );
-        })}
-        {!companies.length && <div className="watch-empty">No companies in this filter.</div>}
-      </div>
-    </article>
-  );
-}
-
-function eventTimeMs(row) {
-  return parseIsoDateOrNull(row?.saved_at_utc)?.getTime() || parseIsoDateOrNull(row?.received_at_utc)?.getTime() || 0;
-}
-
-function compareEventsDesc(a, b) {
-  return eventTimeMs(b) - eventTimeMs(a);
-}
-
-function buildCompanyRows(events) {
-  const byTicker = new Map();
-  (Array.isArray(events) ? events : []).forEach((row) => {
-    const ticker = String(row?.ticker || 'n/a').trim().toUpperCase() || 'n/a';
-    if (!byTicker.has(ticker)) byTicker.set(ticker, []);
-    byTicker.get(ticker).push(row);
-  });
-  return [...byTicker.entries()]
-    .map(([ticker, rows]) => {
-      const sortedRows = [...rows].sort(compareEventsDesc);
-      const latestEvent = sortedRows[0] || {};
-      const path = routerCompanyThesisPath(latestEvent);
-      const pathTone = path === 'bull' ? 'positive' : path === 'bear' ? 'urgent' : 'warn';
-      return {
-        ticker,
-        path,
-        pathTone,
-        latestEvent,
-        events: sortedRows,
-        eventCount: sortedRows.length,
-      };
-    })
-    .sort((a, b) => {
-      const pathRank = { bull: 0, base: 1, bear: 2 };
-      return (pathRank[a.path] ?? 1) - (pathRank[b.path] ?? 1) || a.ticker.localeCompare(b.ticker);
-    });
-}
-
 function eventMatchesCaseFilter(row, filterKey) {
   if (filterKey === 'all') return true;
   return routerCaseBucket(row) === filterKey;
@@ -1720,10 +1658,16 @@ function eventMatchesReviewFilter(row, filterKey) {
   return routerReviewBucket(row) === filterKey;
 }
 
-function eventMatchesFilters(row, { caseFilter = 'all', reviewFilter = 'all' } = {}) {
+function eventMatchesScenarioFilter(row, filterKey) {
+  if (filterKey === 'all') return true;
+  return routerCompanyThesisPath(row) === filterKey;
+}
+
+function eventMatchesFilters(row, { caseFilter = 'all', reviewFilter = 'all', scenarioFilter = 'all' } = {}) {
   return (
     eventMatchesCaseFilter(row, caseFilter) &&
-    eventMatchesReviewFilter(row, reviewFilter)
+    eventMatchesReviewFilter(row, reviewFilter) &&
+    eventMatchesScenarioFilter(row, scenarioFilter)
   );
 }
 
@@ -1731,34 +1675,34 @@ function countEventsMatching(events, filters) {
   return events.filter((row) => eventMatchesFilters(row, filters)).length;
 }
 
-function countEventsByCase(events, key, activeReviewFilter) {
+function countEventsByCase(events, key, activeReviewFilter, activeScenarioFilter) {
   if (key === 'all') {
-    return countEventsMatching(events, { reviewFilter: activeReviewFilter });
+    return countEventsMatching(events, { reviewFilter: activeReviewFilter, scenarioFilter: activeScenarioFilter });
   }
-  return countEventsMatching(events, { caseFilter: key, reviewFilter: activeReviewFilter });
+  return countEventsMatching(events, { caseFilter: key, reviewFilter: activeReviewFilter, scenarioFilter: activeScenarioFilter });
 }
 
-function countEventsByReview(events, key, activeCaseFilter) {
+function countEventsByReview(events, key, activeCaseFilter, activeScenarioFilter) {
   if (key === 'all') {
-    return countEventsMatching(events, { caseFilter: activeCaseFilter });
+    return countEventsMatching(events, { caseFilter: activeCaseFilter, scenarioFilter: activeScenarioFilter });
   }
-  return countEventsMatching(events, { caseFilter: activeCaseFilter, reviewFilter: key });
+  return countEventsMatching(events, { caseFilter: activeCaseFilter, reviewFilter: key, scenarioFilter: activeScenarioFilter });
 }
 
-function countCompaniesByScenario(companies, key) {
-  if (key === 'all') return companies.length;
-  return companies.filter((company) => company.path === key).length;
+function countEventsByScenario(events, key, activeCaseFilter, activeReviewFilter) {
+  if (key === 'all') {
+    return countEventsMatching(events, { caseFilter: activeCaseFilter, reviewFilter: activeReviewFilter });
+  }
+  return countEventsMatching(events, { caseFilter: activeCaseFilter, reviewFilter: activeReviewFilter, scenarioFilter: key });
 }
 
-function activeFilterSummary(view, caseFilter, reviewFilter, scenarioFilter) {
-  if (view === 'companies') {
-    return scenarioFilter !== 'all' ? `Path: ${labelCompanyThesisPathShort(scenarioFilter)}` : 'All companies';
-  }
+function activeFilterSummary(caseFilter, reviewFilter, scenarioFilter) {
   const active = [
     caseFilter !== 'all' && `Case: ${titleizeKey(caseFilter)}`,
     reviewFilter !== 'all' && `Review: ${titleizeKey(reviewFilter)}`,
+    scenarioFilter !== 'all' && `Path: ${labelCompanyThesisPathShort(scenarioFilter)}`,
   ].filter(Boolean);
-  return active.length ? active.join(' | ') : 'All announcements';
+  return active.length ? active.join(' | ') : 'All filings';
 }
 
 function resetFilters(setCaseFilter, setReviewFilter, setScenarioFilter, setSelectedEventId) {
@@ -1768,9 +1712,8 @@ function resetFilters(setCaseFilter, setReviewFilter, setScenarioFilter, setSele
   setSelectedEventId('');
 }
 
-function hasActiveFilters(view, caseFilter, reviewFilter, scenarioFilter) {
-  if (view === 'companies') return scenarioFilter !== 'all';
-  return caseFilter !== 'all' || reviewFilter !== 'all';
+function hasActiveFilters(caseFilter, reviewFilter, scenarioFilter) {
+  return caseFilter !== 'all' || reviewFilter !== 'all' || scenarioFilter !== 'all';
 }
 
 function DecisionPanel({
@@ -1964,7 +1907,6 @@ export default function AnnouncementRouterMonitor({
   const [error, setError] = useState('');
   const [tickerFilter, setTickerFilter] = useState('');
   const [selectedEventId, setSelectedEventId] = useState('');
-  const [activeRouterView, setActiveRouterView] = useState('companies');
   const [activeCaseFilter, setActiveCaseFilter] = useState('all');
   const [activeReviewFilter, setActiveReviewFilter] = useState('all');
   const [activeScenarioFilter, setActiveScenarioFilter] = useState('all');
@@ -2021,16 +1963,12 @@ export default function AnnouncementRouterMonitor({
     () => [...recentEvents].sort((a, b) => {
       const priorityDiff = routerPriorityRank(a) - routerPriorityRank(b);
       if (priorityDiff) return priorityDiff;
-      return compareEventsDesc(a, b);
+      return (parseIsoDateOrNull(b?.saved_at_utc)?.getTime() || 0) - (parseIsoDateOrNull(a?.saved_at_utc)?.getTime() || 0);
     }),
     [recentEvents]
   );
-  const companyRows = useMemo(
-    () => buildCompanyRows(recentEvents),
-    [recentEvents]
-  );
   const caseFilters = useMemo(() => {
-    const count = (key) => countEventsByCase(queueEvents, key, activeReviewFilter);
+    const count = (key) => countEventsByCase(queueEvents, key, activeReviewFilter, activeScenarioFilter);
     return [
       { key: 'all', label: 'All case types', tone: 'neutral', count: count('all') },
       { key: 'thesis_improved', label: 'Thesis improved', tone: 'positive', count: count('thesis_improved') },
@@ -2040,9 +1978,9 @@ export default function AnnouncementRouterMonitor({
       { key: 'administrative', label: 'Administrative', tone: 'neutral', count: count('administrative') },
       { key: 'uncategorized', label: 'Uncategorised', tone: 'neutral', count: count('uncategorized') },
     ];
-  }, [queueEvents, activeReviewFilter]);
+  }, [queueEvents, activeReviewFilter, activeScenarioFilter]);
   const reviewFilters = useMemo(() => {
-    const count = (key) => countEventsByReview(queueEvents, key, activeCaseFilter);
+    const count = (key) => countEventsByReview(queueEvents, key, activeCaseFilter, activeScenarioFilter);
     return [
       { key: 'all', label: 'All review states', tone: 'neutral', count: count('all') },
       { key: 'needs_decision', label: 'Needs decision', tone: 'warn', count: count('needs_decision') },
@@ -2051,41 +1989,27 @@ export default function AnnouncementRouterMonitor({
       { key: 'auto_cleared', label: 'Auto-cleared', tone: 'neutral', count: count('auto_cleared') },
       { key: 'tracking', label: 'Tracking', tone: 'info', count: count('tracking') },
     ];
-  }, [queueEvents, activeCaseFilter]);
+  }, [queueEvents, activeCaseFilter, activeScenarioFilter]);
   const scenarioFilters = useMemo(() => {
-    const count = (key) => countCompaniesByScenario(companyRows, key);
+    const count = (key) => countEventsByScenario(queueEvents, key, activeCaseFilter, activeReviewFilter);
     return [
       { key: 'all', label: 'All', tone: 'neutral', count: count('all') },
       { key: 'bull', label: 'Bull', tone: 'positive', count: count('bull') },
       { key: 'base', label: 'Base', tone: 'warn', count: count('base') },
       { key: 'bear', label: 'Bear', tone: 'urgent', count: count('bear') },
     ];
-  }, [companyRows]);
+  }, [queueEvents, activeCaseFilter, activeReviewFilter]);
   const filteredEvents = useMemo(
     () => queueEvents.filter((row) => eventMatchesFilters(row, {
       caseFilter: activeCaseFilter,
       reviewFilter: activeReviewFilter,
+      scenarioFilter: activeScenarioFilter,
     })),
-    [queueEvents, activeCaseFilter, activeReviewFilter]
-  );
-  const filteredCompanies = useMemo(
-    () => activeScenarioFilter === 'all'
-      ? companyRows
-      : companyRows.filter((company) => company.path === activeScenarioFilter),
-    [companyRows, activeScenarioFilter]
+    [queueEvents, activeCaseFilter, activeReviewFilter, activeScenarioFilter]
   );
   const selectedEvent = useMemo(
-    () => {
-      if (activeRouterView === 'companies') {
-        const explicitEvent = queueEvents.find((row) => row?.event_id === selectedEventId);
-        if (explicitEvent) return explicitEvent;
-        return filteredCompanies
-          .map((company) => company.latestEvent)
-          .find((row) => row?.event_id === selectedEventId) || filteredCompanies[0]?.latestEvent || {};
-      }
-      return filteredEvents.find((row) => row?.event_id === selectedEventId) || filteredEvents[0] || {};
-    },
-    [activeRouterView, filteredCompanies, filteredEvents, queueEvents, selectedEventId]
+    () => filteredEvents.find((row) => row?.event_id === selectedEventId) || filteredEvents[0] || {},
+    [filteredEvents, selectedEventId]
   );
   const selectedRouter = useMemo(
     () => (embedded ? (runRouter || {}) : selectedEvent),
@@ -2216,64 +2140,37 @@ export default function AnnouncementRouterMonitor({
           <div className="announcement-router-console">
             <aside className="announcement-router-side-rail">
 	              <div className="announcement-router-side-head">
-	                <span>{activeFilterSummary(activeRouterView, activeCaseFilter, activeReviewFilter, activeScenarioFilter)}</span>
-                <strong>{activeRouterView === 'companies' ? filteredCompanies.length : filteredEvents.length}</strong>
+	                <span>{activeFilterSummary(activeCaseFilter, activeReviewFilter, activeScenarioFilter)}</span>
+                <strong>{filteredEvents.length}</strong>
               </div>
-              <div className="announcement-router-view-switch" role="tablist" aria-label="Router monitor view">
-                <button
-                  type="button"
-                  className={activeRouterView === 'companies' ? 'is-active' : ''}
-                  onClick={() => {
-                    setActiveRouterView('companies');
-                    setSelectedEventId('');
-                  }}
-                >
-                  Companies
-                </button>
-                <button
-                  type="button"
-                  className={activeRouterView === 'announcements' ? 'is-active' : ''}
-                  onClick={() => {
-                    setActiveRouterView('announcements');
-                    setSelectedEventId('');
-                  }}
-                >
-                  Announcements
-                </button>
-              </div>
-              {activeRouterView === 'companies' ? (
-                <RouterKpiStrip
-                  title="Company thesis path"
-                  filters={scenarioFilters}
-                  activeFilter={activeScenarioFilter}
-                  onSelect={(key) => {
-                    setActiveScenarioFilter(key);
-                    setSelectedEventId('');
-                  }}
-                />
-              ) : (
-                <>
-                  <RouterKpiStrip
-                    title="Announcement effect"
-                    filters={caseFilters}
-                    activeFilter={activeCaseFilter}
-                    onSelect={(key) => {
-                      setActiveCaseFilter(key);
-                      setSelectedEventId('');
-                    }}
-                  />
-                  <RouterKpiStrip
-                    title="Review state"
-                    filters={reviewFilters}
-                    activeFilter={activeReviewFilter}
-                    onSelect={(key) => {
-                      setActiveReviewFilter(key);
-                      setSelectedEventId('');
-                    }}
-                  />
-                </>
-              )}
-              {hasActiveFilters(activeRouterView, activeCaseFilter, activeReviewFilter, activeScenarioFilter) && (
+              <RouterKpiStrip
+                title="Announcement effect"
+                filters={caseFilters}
+                activeFilter={activeCaseFilter}
+                onSelect={(key) => {
+                  setActiveCaseFilter(key);
+                  setSelectedEventId('');
+                }}
+              />
+              <RouterKpiStrip
+                title="Company thesis path"
+                filters={scenarioFilters}
+                activeFilter={activeScenarioFilter}
+                onSelect={(key) => {
+                  setActiveScenarioFilter(key);
+                  setSelectedEventId('');
+                }}
+              />
+              <RouterKpiStrip
+                title="Review state"
+                filters={reviewFilters}
+                activeFilter={activeReviewFilter}
+                onSelect={(key) => {
+                  setActiveReviewFilter(key);
+                  setSelectedEventId('');
+                }}
+              />
+              {hasActiveFilters(activeCaseFilter, activeReviewFilter, activeScenarioFilter) && (
                 <button
                   type="button"
                   className="announcement-router-reset-filters"
@@ -2286,19 +2183,11 @@ export default function AnnouncementRouterMonitor({
 
             <div className="announcement-router-main-stage">
               <div className="announcement-router-workspace">
-                {activeRouterView === 'companies' ? (
-                  <CompanyQueue
-                    companies={filteredCompanies}
-                    selectedEventId={selectedEvent?.event_id || selectedEventId}
-                    onSelect={setSelectedEventId}
-                  />
-                ) : (
-                  <RouterQueue
-                    events={filteredEvents}
-                    selectedEventId={selectedEvent?.event_id || selectedEventId}
-                    onSelect={setSelectedEventId}
-                  />
-                )}
+                <RouterQueue
+                  events={filteredEvents}
+                  selectedEventId={selectedEvent?.event_id || selectedEventId}
+                  onSelect={setSelectedEventId}
+                />
                 <DecisionPanel
                   router={selectedRouter}
                   emptyTitle="No routed announcements yet"
