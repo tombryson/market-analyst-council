@@ -134,6 +134,24 @@ function labelScenarioPathShort(value) {
   return labelScenarioPath(value).replace(' scenario', '');
 }
 
+function labelCompanyThesisPath(value) {
+  const path = String(value || '').trim().toLowerCase();
+  if (path === 'bull') return 'Bull path';
+  if (path === 'base') return 'Base path';
+  if (path === 'bear') return 'Bear path';
+  if (path === 'mixed') return 'Mixed path';
+  return 'Missing path';
+}
+
+function labelCompanyThesisPathShort(value) {
+  const path = String(value || '').trim().toLowerCase();
+  if (path === 'bull') return 'Bull';
+  if (path === 'base') return 'Base';
+  if (path === 'bear') return 'Bear';
+  if (path === 'mixed') return 'Mixed';
+  return 'Missing';
+}
+
 function labelScenarioAction(value) {
   const action = String(value || '').trim().toLowerCase();
   const labels = {
@@ -272,7 +290,8 @@ function scenarioTone(name) {
   const k = String(name || '').toLowerCase();
   if (k === 'bull') return 'bull';
   if (k === 'bear') return 'bear';
-  return 'base';
+  if (k === 'base') return 'base';
+  return 'neutral';
 }
 
 function hasRouterDecision(router) {
@@ -436,8 +455,8 @@ function routerVerdictCopy(router) {
   const directHits = routerDirectHitCount(router);
   const transition = String(router?.path_transition || '').trim();
   const labels = {
-    thesis_strengthened: 'The filing improves the saved thesis path. Check the mapped conditions and evidence before updating the run narrative.',
-    thesis_weakened: 'The filing weakens the saved thesis path. This deserves human review before the thesis stays unchanged.',
+    thesis_strengthened: 'The filing improves the company thesis path. Check the mapped conditions and evidence before updating the run narrative.',
+    thesis_weakened: 'The filing weakens the company thesis path. This deserves human review before the thesis stays unchanged.',
     timeline_accelerated: 'The filing pulls the expected path forward. The timing assumptions in the saved thesis may need updating.',
     timeline_delayed: 'The filing pushes the expected path out. The saved timeline should be reviewed before this is dismissed.',
     risk_reduced: 'The filing reduces a tracked risk in the saved thesis map.',
@@ -530,12 +549,16 @@ function routerReviewBucket(router) {
   return 'unknown';
 }
 
-function routerScenarioPath(router) {
+function routerCompanyThesisPath(router) {
   const current = String(router?.current_path || '').trim().toLowerCase();
   const baseline = String(router?.baseline_path || '').trim().toLowerCase();
   if (SCENARIO_PATHS.has(current)) return current;
   if (SCENARIO_PATHS.has(baseline)) return baseline;
   return 'unknown';
+}
+
+function routerScenarioPath(router) {
+  return routerCompanyThesisPath(router);
 }
 
 function routerTrajectoryScore(router) {
@@ -717,7 +740,7 @@ function routerRelationshipLabel(router) {
 function pathExplanation(router) {
   const path = String(router?.baseline_path || router?.current_path || '').trim();
   if (!path) return '';
-  return `${labelScenarioPath(path)} is the saved view from the latest lab run before this announcement. The router only changes it when the filing matches mapped bull/base/bear conditions.`;
+  return `${labelCompanyThesisPath(path)} is the company-level saved view from the latest council run before this announcement. Announcement verdicts are assessed separately.`;
 }
 
 function conditionTone(status, group = '') {
@@ -797,8 +820,8 @@ function routerWhyHeadline(router, directHits = 0) {
   if (state === 'administrative_filing') return 'Procedural filing with no mapped thesis impact';
   if (state === 'market_backdrop_only') return 'Market context only';
   if (state === 'no_thesis_change') return 'No mapped thesis condition changed';
-  if (['thesis_weakened', 'timeline_delayed', 'risk_increased'].includes(state)) return 'Saved thesis path is under pressure';
-  if (['thesis_strengthened', 'timeline_accelerated', 'risk_reduced'].includes(state)) return 'Saved thesis path improved';
+  if (['thesis_weakened', 'timeline_delayed', 'risk_increased'].includes(state)) return 'Company thesis path is under pressure';
+  if (['thesis_strengthened', 'timeline_accelerated', 'risk_reduced'].includes(state)) return 'Company thesis path improved';
   return 'Router basis';
 }
 
@@ -837,7 +860,7 @@ function routerWhyCopy(router, directHits = 0) {
     return 'The announcement itself did not match a saved thesis condition. Market facts were checked as backdrop only and are not the filing verdict.';
   }
   if (state === 'no_thesis_change') {
-    return 'The filing was checked against the saved announcement and watchlist conditions; none changed the saved thesis path.';
+    return 'The filing was checked against the saved announcement and watchlist conditions; none changed the company thesis path.';
   }
   if (announcementChecks.length || watchlistChecks.length) {
     return `Checked ${announcementChecks.length} announcement condition${announcementChecks.length === 1 ? '' : 's'}, ${watchlistChecks.length} watchlist condition${watchlistChecks.length === 1 ? '' : 's'}, and ${verificationChecks.length} verification item${verificationChecks.length === 1 ? '' : 's'} without a mapped thesis change.`;
@@ -1135,23 +1158,32 @@ function PathTransition({ router }) {
   const baseline = transition?.from || String(router?.baseline_path || router?.current_path || '').trim().toLowerCase();
   const current = transition?.to || String(router?.current_path || router?.baseline_path || '').trim().toLowerCase();
   const changed = Boolean(transition && transition.from !== transition.to);
+  const companyPath = SCENARIO_PATHS.has(current) ? current : SCENARIO_PATHS.has(baseline) ? baseline : 'unknown';
+  const pathCopy = companyPath === 'unknown'
+    ? 'Missing saved company path'
+    : changed
+      ? `Moved from ${labelCompanyThesisPathShort(baseline)} after this filing`
+      : 'Company remains on saved path';
   return (
     <div className="announcement-router-path-bar">
-      <span className="announcement-router-path-label">Saved thesis path</span>
-      <div className="announcement-router-path-stack" aria-label="Saved thesis path">
-        {['bull', 'base', 'bear'].map((name) => (
-          <span
-            key={name}
-            className={`announcement-router-path-pill tone-${name} ${baseline === name ? 'is-on' : ''}`}
-          >
-            {labelScenarioPath(name).replace(' scenario', '')}
-          </span>
-        ))}
+      <div className="announcement-router-path-main">
+        <span className="announcement-router-path-label">Company thesis path</span>
+        <div className="announcement-router-path-stack" aria-label="Company thesis path">
+          {['bull', 'base', 'bear'].map((name) => (
+            <span
+              key={name}
+              className={`announcement-router-path-pill tone-${name} ${companyPath === name ? 'is-on' : ''}`}
+            >
+              {labelCompanyThesisPathShort(name)}
+            </span>
+          ))}
+        </div>
+        <span className="announcement-router-path-arrow">{pathCopy}</span>
       </div>
-      <span className="announcement-router-path-arrow">{changed ? 'moves to' : 'stays at'}</span>
-      <span className={`announcement-router-path-pill tone-${scenarioTone(current)} is-current`}>
-        {labelScenarioPath(current)}
-      </span>
+      <div className="announcement-router-path-effect">
+        <span>Announcement effect</span>
+        <strong>{routerOutcomeLabel(router)}</strong>
+      </div>
     </div>
   );
 }
@@ -1576,7 +1608,7 @@ function RouterQueue({ events, selectedEventId, onSelect }) {
   return (
     <article className="announcement-router-queue">
       <div className="announcement-router-queue-head">
-        <h4>Thesis Decision Queue</h4>
+        <h4>Announcement Queue</h4>
         <span>{events.length} shown</span>
       </div>
       <div className="announcement-router-queue-list">
@@ -1608,7 +1640,7 @@ function RouterQueue({ events, selectedEventId, onSelect }) {
 	                </span>
 	                <span className="announcement-router-queue-title">{routerTitle(row)}</span>
 	                <span className="announcement-router-queue-meta">
-		                  <span>{labelScenarioPathShort(routerScenarioPath(row))}</span>
+                  <span>Company path: {labelCompanyThesisPathShort(routerCompanyThesisPath(row))}</span>
                       {hasTrajectoryScore(score) && <span>{safeTrajectoryPositionLabel(score, 'cumulative_position_label') || safeTrajectoryPositionLabel(score, 'position_label')}</span>}
 		                  <span>{routerMaterialityLabel(row)}</span>
 		                  <span>{routerDriverLabel(row)}</span>
@@ -1637,7 +1669,7 @@ function eventMatchesReviewFilter(row, filterKey) {
 
 function eventMatchesScenarioFilter(row, filterKey) {
   if (filterKey === 'all') return true;
-  return routerScenarioPath(row) === filterKey;
+  return routerCompanyThesisPath(row) === filterKey;
 }
 
 function eventMatchesFilters(row, { caseFilter = 'all', reviewFilter = 'all', scenarioFilter = 'all' } = {}) {
@@ -1677,7 +1709,7 @@ function activeFilterSummary(caseFilter, reviewFilter, scenarioFilter) {
   const active = [
     caseFilter !== 'all' && `Case: ${titleizeKey(caseFilter)}`,
     reviewFilter !== 'all' && `Review: ${titleizeKey(reviewFilter)}`,
-    scenarioFilter !== 'all' && `Path: ${labelScenarioPathShort(scenarioFilter)}`,
+    scenarioFilter !== 'all' && `Company path: ${labelCompanyThesisPathShort(scenarioFilter)}`,
   ].filter(Boolean);
   return active.length ? active.join(' | ') : 'All filings';
 }
@@ -1970,12 +2002,12 @@ export default function AnnouncementRouterMonitor({
   const scenarioFilters = useMemo(() => {
     const count = (key) => countEventsByScenario(queueEvents, key, activeCaseFilter, activeReviewFilter);
     return [
-      { key: 'all', label: 'All scenarios', tone: 'neutral', count: count('all') },
-      { key: 'bull', label: 'Bull', tone: 'positive', count: count('bull') },
-      { key: 'base', label: 'Base', tone: 'warn', count: count('base') },
-      { key: 'bear', label: 'Bear', tone: 'urgent', count: count('bear') },
-      { key: 'mixed', label: 'Mixed', tone: 'warn', count: count('mixed') },
-      { key: 'unknown', label: 'Unknown', tone: 'neutral', count: count('unknown') },
+      { key: 'all', label: 'All company paths', tone: 'neutral', count: count('all') },
+      { key: 'bull', label: 'Bull-path companies', tone: 'positive', count: count('bull') },
+      { key: 'base', label: 'Base-path companies', tone: 'warn', count: count('base') },
+      { key: 'bear', label: 'Bear-path companies', tone: 'urgent', count: count('bear') },
+      { key: 'mixed', label: 'Mixed-path companies', tone: 'warn', count: count('mixed') },
+      { key: 'unknown', label: 'Missing company path', tone: 'neutral', count: count('unknown') },
     ];
   }, [queueEvents, activeCaseFilter, activeReviewFilter]);
   const filteredEvents = useMemo(
@@ -2123,7 +2155,7 @@ export default function AnnouncementRouterMonitor({
                 <strong>{filteredEvents.length}</strong>
               </div>
               <RouterKpiStrip
-                title="Case type"
+                title="Announcement effect"
                 filters={caseFilters}
                 activeFilter={activeCaseFilter}
                 onSelect={(key) => {
@@ -2132,7 +2164,7 @@ export default function AnnouncementRouterMonitor({
                 }}
               />
               <RouterKpiStrip
-                title="Scenario path"
+                title="Company thesis path"
                 filters={scenarioFilters}
                 activeFilter={activeScenarioFilter}
                 onSelect={(key) => {

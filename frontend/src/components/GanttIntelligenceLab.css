@@ -2319,11 +2319,20 @@
 .announcement-router-path-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
+  justify-content: space-between;
   padding: 13px 24px;
   background: var(--router-bg);
   border-bottom: 1px solid var(--router-rule);
+}
+
+.announcement-router-path-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .announcement-router-path-label {
@@ -2400,6 +2409,31 @@
 .announcement-router-path-arrow {
   color: var(--router-text-3);
   font-size: 11.5px;
+}
+
+.announcement-router-path-effect {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.announcement-router-path-effect span {
+  color: var(--router-text-3);
+  font-size: 11.5px;
+  letter-spacing: 0;
+}
+
+.announcement-router-path-effect strong {
+  color: var(--router-text);
+  font-size: 12.5px;
+  font-weight: 750;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
 }
 
 .announcement-router-projection {
@@ -4093,6 +4127,22 @@ details pre {
 
   .announcement-router-kpi-strip {
     grid-template-columns: 1fr;
+  }
+
+  .announcement-router-path-bar,
+  .announcement-router-path-main,
+  .announcement-router-path-effect {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .announcement-router-path-effect {
+    margin-left: 0;
+  }
+
+  .announcement-router-path-effect strong {
+    max-width: 100%;
+    white-space: normal;
   }
 
   .announcement-router-telemetry-grid {
