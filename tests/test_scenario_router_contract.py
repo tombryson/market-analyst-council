@@ -290,35 +290,6 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
             self.assertEqual(review["review_status"], "dismissed")
             self.assertEqual(review["review_note"], "Not relevant.")
 
-    def test_legacy_escalated_review_is_treated_as_open_without_workflow_labels(self):
-        review = {
-            "event_id": "evt-escalate",
-            "review_status": "escalated",
-            "review_note": "Project delivery contract is missing from mapped catalysts.",
-        }
-        row = {
-            "event_id": "evt-escalate",
-            "display": {
-                "queue_bucket": "cleared",
-                "queue_label": "Cleared",
-                "review_status": "auto_cleared",
-                "review_label": "Auto-cleared",
-                "is_user_action_required": False,
-                "tone": "neutral",
-            },
-        }
-        updated = apply_review_overlay(row, review)
-
-        self.assertEqual(updated["display"]["queue_bucket"], "cleared")
-        self.assertEqual(updated["display"]["review_status"], "auto_cleared")
-        self.assertEqual(updated["review_overlay"]["review_status"], "open")
-        self.assertEqual(updated["display"]["queue_label"], "Cleared")
-        self.assertNotIn("review_queue_label", updated["display"])
-        self.assertNotIn("review_reason_label", updated["display"])
-        self.assertNotIn("next_action_label", updated["display"])
-        self.assertFalse(updated["display"]["is_user_action_required"])
-        self.assertEqual(updated["display"]["tone"], "neutral")
-
     def test_display_contract_separates_trajectory_review_and_system_action(self):
         display = build_router_display_contract(
             {"trajectory_state": "material_unmapped", "impact_level": "medium"},
@@ -334,6 +305,24 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
         self.assertEqual(display["evidence_label"], "No saved condition match")
         self.assertEqual(display["relationship_label"], "Not assessed")
         self.assertTrue(display["is_user_action_required"])
+
+    def test_neutral_mapped_evidence_keeps_neutral_card_tone(self):
+        display = build_router_display_contract(
+            {
+                "trajectory_state": "no_thesis_change",
+                "impact_verdict": "neutral",
+                "relationship_kind": "saved_thesis_condition",
+                "relationship_strength": "full",
+                "relationship_priority": 6,
+            },
+            {"action": "ignore", "reason": "Evidence matched but did not move the thesis."},
+            matched_conditions_count=1,
+        )
+
+        self.assertEqual(display["trajectory_label"], "No thesis impact")
+        self.assertEqual(display["evidence_label"], "Thesis condition matched")
+        self.assertEqual(display["tone"], "neutral")
+        self.assertFalse(display["is_user_action_required"])
 
     def test_display_contract_prioritises_unmapped_evidence_over_market_context(self):
         display = build_router_display_contract(

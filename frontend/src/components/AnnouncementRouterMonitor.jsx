@@ -412,8 +412,7 @@ function reviewLabelFromStatus(status) {
 
 function applyReviewOverlayToEvent(row, review) {
   if (!row || !review || row.event_id !== review.event_id) return row;
-  const rawStatus = String(review.review_status || '').trim().toLowerCase();
-  const status = rawStatus === 'escalated' ? 'open' : rawStatus;
+  const status = String(review.review_status || '').trim().toLowerCase();
   const label = reviewLabelFromStatus(status);
   const currentDisplay = routerDisplay(row);
   return {
@@ -427,7 +426,6 @@ function applyReviewOverlayToEvent(row, review) {
       review_label: label || currentDisplay.review_label,
       review_owner: review.review_owner || currentDisplay.review_owner,
       is_user_action_required: status === 'open',
-      tone: currentDisplay.tone,
     },
   };
 }
@@ -534,6 +532,9 @@ function routerReviewBucket(router) {
 }
 
 function routerCompanyThesisPath(router) {
+  const score = routerTrajectoryScore(router);
+  const cumulativePath = String(score?.cumulative_position_band || '').trim().toLowerCase();
+  if (COMPANY_THESIS_PATHS.has(cumulativePath)) return cumulativePath;
   const current = String(router?.current_path || '').trim().toLowerCase();
   const baseline = String(router?.baseline_path || '').trim().toLowerCase();
   if (COMPANY_THESIS_PATHS.has(current)) return current;
@@ -659,20 +660,23 @@ function routerIsQuietCleared(router) {
 }
 
 function routerPriorityTone(router) {
-  const displayTone = String(routerDisplay(router)?.tone || '').trim();
-  if (displayTone) return displayTone;
+  const verdict = routerImpactVerdict(router);
   const state = routerTrajectoryState(router);
   const action = routerActionKey(router);
   const status = String(router?.status || '').trim().toLowerCase();
+  if (status === 'error' || action === 'urgent_human_review' || action === 'full_rerun') return 'urgent';
+  if (verdict === 'negative') return 'urgent';
+  if (verdict === 'positive') return 'positive';
+  if (['mixed', 'uncertain', 'unclear'].includes(verdict)) return 'warn';
+  if (verdict === 'neutral') return 'neutral';
   if (['thesis_weakened', 'timeline_delayed', 'risk_increased'].includes(state)) return 'urgent';
   if (['needs_classification', 'material_unmapped'].includes(state)) return 'warn';
   if (['thesis_strengthened', 'timeline_accelerated', 'risk_reduced'].includes(state)) return 'positive';
   if (['market_backdrop_only', 'no_thesis_change', 'administrative_filing'].includes(state)) return 'neutral';
-  if (status === 'error' || action === 'urgent_human_review' || action === 'full_rerun') return 'urgent';
   if (action === 'rerun_stage1' || action === 'run_delta_only' || routerConflictCount(router)) return 'alarm';
   if (routerDirectHitCount(router) || action === 'annotate_run') return 'warn';
   if (action === 'watch') return 'info';
-  return 'neutral';
+  return String(routerDisplay(router)?.tone || '').trim() || 'neutral';
 }
 
 function routerPriorityRank(router) {
@@ -892,15 +896,6 @@ function conditionMetaText(item) {
     item?.source_to_monitor,
   ];
   return parts.filter(Boolean).join(' | ');
-}
-
-function DetailRow({ label, value, tone = '' }) {
-  return (
-    <div className="scenario-router-detail-row">
-      <span>{label}</span>
-      <strong className={tone ? `tone-${tone}` : ''}>{value}</strong>
-    </div>
-  );
 }
 
 function DetailList({ title, items, conflict = false, market = false }) {
@@ -1147,15 +1142,24 @@ function splitScenarioTransition(value) {
   return { from, to };
 }
 
-function PathTransition({ router }) {
+function PathTransition({ router, companyPath = '' }) {
   const transition = splitScenarioTransition(router?.path_transition);
   const baseline = transition?.from || String(router?.baseline_path || router?.current_path || '').trim().toLowerCase();
   const current = transition?.to || String(router?.current_path || router?.baseline_path || '').trim().toLowerCase();
   const changed = Boolean(transition && transition.from !== transition.to);
-  const companyPath = COMPANY_THESIS_PATHS.has(current) ? current : COMPANY_THESIS_PATHS.has(baseline) ? baseline : 'base';
-  const pathCopy = changed
-    ? `Moved from ${labelCompanyThesisPathShort(baseline)} after this filing`
-    : 'Current saved path';
+  const normalizedCompanyPath = String(companyPath || '').trim().toLowerCase();
+  const displayPath = COMPANY_THESIS_PATHS.has(normalizedCompanyPath)
+    ? normalizedCompanyPath
+    : COMPANY_THESIS_PATHS.has(current)
+      ? current
+      : COMPANY_THESIS_PATHS.has(baseline)
+        ? baseline
+        : 'base';
+  const pathCopy = COMPANY_THESIS_PATHS.has(normalizedCompanyPath)
+    ? 'Current company path'
+    : changed
+      ? `Moved from ${labelCompanyThesisPathShort(baseline)} after this filing`
+      : 'Current saved path';
   return (
     <div className="announcement-router-path-bar">
       <div className="announcement-router-path-main">
@@ -1164,7 +1168,7 @@ function PathTransition({ router }) {
           {['bull', 'base', 'bear'].map((name) => (
             <span
               key={name}
-              className={`announcement-router-path-pill tone-${name} ${companyPath === name ? 'is-on' : ''}`}
+              className={`announcement-router-path-pill tone-${name} ${displayPath === name ? 'is-on' : ''}`}
             >
               {labelCompanyThesisPathShort(name)}
             </span>
@@ -1607,6 +1611,7 @@ function RouterQueue({ events, selectedEventId, onSelect, companyPathByTicker })
         {events.map((row) => {
           const vm = routerPresentation(row);
           const score = routerTrajectoryScore(row);
+          const companyPath = companyPathForEvent(row, companyPathByTicker);
           const selected = selectedEventId
             ? selectedEventId === row.event_id
             : events[0]?.event_id === row.event_id;
@@ -1632,7 +1637,9 @@ function RouterQueue({ events, selectedEventId, onSelect, companyPathByTicker })
 	                </span>
 	                <span className="announcement-router-queue-title">{routerTitle(row)}</span>
 	                <span className="announcement-router-queue-meta">
-                  <span>Company now: {labelCompanyThesisPathShort(companyPathForEvent(row, companyPathByTicker))}</span>
+                  <span className={`announcement-router-queue-path-pill tone-${companyPath}`}>
+                    Company: {labelCompanyThesisPathShort(companyPath)}
+                  </span>
                       {hasTrajectoryScore(score) && <span>{safeTrajectoryPositionLabel(score, 'cumulative_position_label') || safeTrajectoryPositionLabel(score, 'position_label')}</span>}
 		                  <span>{routerMaterialityLabel(row)}</span>
 		                  <span>{routerDriverLabel(row)}</span>
@@ -1814,6 +1821,7 @@ function DecisionPanel({
   reviewBusy = '',
   priceHistory = [],
   routerEvents = [],
+  companyPath = '',
 }) {
   const decisionAvailable = hasRouterDecision(router);
   const matchedConditions = routerDetailItems(router, 'matched_condition_details', 'matched_conditions');
@@ -1826,7 +1834,6 @@ function DecisionPanel({
   const watchlistChecks = Array.isArray(router?.watchlist_condition_checks) ? router.watchlist_condition_checks : [];
   const checkedWatchlistRows = checkedNotTriggeredWatchlist(router);
   const verificationChecks = Array.isArray(router?.verification_condition_checks) ? router.verification_condition_checks : [];
-  const followUps = Array.isArray(router?.follow_up_steps) ? router.follow_up_steps : [];
   const directHits = matchedConditions.length + watchHits.length + verificationHits.length;
   const vm = routerPresentation(router);
   const classificationConfidence = router?.classification_confidence ?? router?.semantic_confidence ?? router?.parser_confidence;
@@ -1879,7 +1886,7 @@ function DecisionPanel({
           reviewBusy={reviewBusy}
         />
       </div>
-      <PathTransition router={router} />
+      <PathTransition router={router} companyPath={companyPath} />
       <MarketPathProjection router={router} actualPrices={priceHistory} routerEvents={routerEvents} />
 
       <RouterSection title="Why This Verdict" count={whyCount} muted={quietCleared}>
@@ -1955,17 +1962,6 @@ function DecisionPanel({
               summary={`${Object.keys(router.market_facts_used || {}).length} value${Object.keys(router.market_facts_used || {}).length === 1 ? '' : 's'}`}
             >
               <MarketFactsGrid facts={router.market_facts_used || {}} />
-            </CollapsibleSection>
-          )}
-          {!!followUps.length && (
-            <CollapsibleSection title="Next Steps" summary={`${followUps.length} suggested`}>
-              <div className="scenario-router-detail-list">
-                {followUps.map((item, idx) => (
-                  <div key={`follow-up-${idx}`} className="scenario-router-detail-item">
-                    <strong>{item}</strong>
-                  </div>
-                ))}
-              </div>
             </CollapsibleSection>
           )}
           <ThesisSnapshot snapshot={router?.thesis_snapshot} router={router} />
@@ -2305,6 +2301,7 @@ export default function AnnouncementRouterMonitor({
                   reviewBusy={selectedRouter?.event_id ? reviewBusy : ''}
                   priceHistory={selectedPriceHistory}
                   routerEvents={selectedRouterEvents}
+                  companyPath={companyPathByTicker.get(selectedRouterTicker)}
                 />
               </div>
 

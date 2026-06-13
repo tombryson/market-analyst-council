@@ -68,11 +68,7 @@ def apply_review_overlay(row: Dict[str, Any], review: Dict[str, Any]) -> Dict[st
     if not isinstance(row, dict) or not isinstance(review, dict) or not review:
         return row
     status = str(review.get("review_status") or "").strip().lower()
-    if status == "escalated":
-        status = "open"
     if status not in VALID_REVIEW_STATUSES or status == "open":
-        if status == "open":
-            review = {**review, "review_status": "open"}
         row["review_overlay"] = review
         return row
 
@@ -81,7 +77,6 @@ def apply_review_overlay(row: Dict[str, Any], review: Dict[str, Any]) -> Dict[st
         "reviewed": "Reviewed",
         "dismissed": "Cleared",
     }.get(status, status.title())
-    current_tone = str(display.get("tone") or "").strip()
     row["display"] = {
         **display,
         "queue_bucket": str(display.get("queue_bucket") or "").strip(),
@@ -90,7 +85,6 @@ def apply_review_overlay(row: Dict[str, Any], review: Dict[str, Any]) -> Dict[st
         "review_label": label,
         "review_owner": str(review.get("review_owner") or "").strip(),
         "is_user_action_required": False,
-        "tone": current_tone or str(display.get("tone") or "").strip(),
     }
     row["review_overlay"] = review
     return row

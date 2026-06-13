@@ -1803,6 +1803,31 @@
   line-height: 1.35;
 }
 
+.announcement-router-queue-path-pill {
+  border: 1px solid var(--router-rule);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-weight: 750;
+}
+
+.announcement-router-queue-path-pill.tone-bull {
+  color: var(--router-scenario-bull);
+  border-color: rgba(var(--router-scenario-bull-rgb), 0.4);
+  background: var(--router-scenario-bull-soft);
+}
+
+.announcement-router-queue-path-pill.tone-base {
+  color: var(--router-scenario-base);
+  border-color: rgba(var(--router-scenario-base-rgb), 0.4);
+  background: var(--router-scenario-base-soft);
+}
+
+.announcement-router-queue-path-pill.tone-bear {
+  color: var(--router-scenario-bear);
+  border-color: rgba(var(--router-scenario-bear-rgb), 0.4);
+  background: var(--router-scenario-bear-soft);
+}
+
 .announcement-router-queue-time {
   color: var(--router-text-4);
   font-size: 11px;

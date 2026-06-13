@@ -185,7 +185,7 @@ def build_router_display_contract(
         action=action_key,
         status=status,
         queue_bucket=queue_bucket,
-        has_direct_hit=direct_hit_count > 0,
+        impact_verdict=impact_verdict,
     )
 
     return {
@@ -483,10 +483,18 @@ def _tone(
     action: str,
     status: str,
     queue_bucket: str,
-    has_direct_hit: bool,
+    impact_verdict: str = "",
 ) -> str:
     if status == "error" or action in {"urgent_human_review", "full_rerun"}:
         return "urgent"
+    if impact_verdict == "negative":
+        return "urgent"
+    if impact_verdict == "positive":
+        return "positive"
+    if impact_verdict in {"mixed", "uncertain", "unclear"}:
+        return "warn"
+    if impact_verdict == "neutral":
+        return "neutral"
     if state in NEGATIVE_TRAJECTORY_STATES:
         return "urgent"
     if state in {"needs_classification", "material_unmapped"} or queue_bucket == "open_review":
@@ -495,8 +503,6 @@ def _tone(
         return "positive"
     if action in {"rerun_stage1", "run_delta_only"}:
         return "alarm"
-    if has_direct_hit or action == "annotate_run":
-        return "warn"
     return "neutral"
 
 
