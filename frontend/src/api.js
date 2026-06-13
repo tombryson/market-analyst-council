@@ -8,8 +8,60 @@ const DEFAULT_API_BASE =
     : 'http://localhost:8001';
 const API_BASE = import.meta.env.VITE_API_BASE || DEFAULT_API_BASE;
 const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const API_TOKEN_STORAGE_KEY = 'LLM_COUNCIL_API_TOKEN';
+let tokenPromptPromise = null;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function storedApiToken() {
+  if (typeof window === 'undefined') return '';
+  try {
+    return window.localStorage.getItem(API_TOKEN_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function saveApiToken(token) {
+  if (typeof window === 'undefined') return;
+  try {
+    const clean = String(token || '').trim();
+    if (clean) window.localStorage.setItem(API_TOKEN_STORAGE_KEY, clean);
+  } catch {
+    // Ignore private-mode storage failures; the request will still fail closed.
+  }
+}
+
+async function promptForApiToken() {
+  if (typeof window === 'undefined' || typeof window.prompt !== 'function') return '';
+  if (!tokenPromptPromise) {
+    tokenPromptPromise = Promise.resolve().then(() => {
+      const token = window.prompt('Enter LLM Council API token');
+      saveApiToken(token);
+      return String(token || '').trim();
+    }).finally(() => {
+      tokenPromptPromise = null;
+    });
+  }
+  return tokenPromptPromise;
+}
+
+function withAuthHeaders(init = {}, token = storedApiToken()) {
+  const headers = new Headers(init.headers || {});
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  return { ...init, headers };
+}
+
+async function authFetch(url, init = {}) {
+  let response = await fetch(url, withAuthHeaders(init));
+  if (response.status !== 401) return response;
+  const token = await promptForApiToken();
+  if (!token) return response;
+  response = await fetch(url, withAuthHeaders(init, token));
+  return response;
+}
 
 async function readJsonSafe(response) {
   try {
@@ -34,7 +86,7 @@ async function fetchJsonWithRetry(url, init = {}, options = {}) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetch(url, { ...init, signal: controller.signal });
+      const response = await authFetch(url, { ...init, signal: controller.signal });
       clearTimeout(timeout);
       const body = await readJsonSafe(response);
       if (response.ok || !RETRYABLE_HTTP_STATUSES.has(response.status) || attempt >= retries) {
@@ -56,7 +108,7 @@ export const api = {
    * List all available analysis templates.
    */
   async listTemplates() {
-    const response = await fetch(`${API_BASE}/api/templates`);
+    const response = await authFetch(`${API_BASE}/api/templates`);
     if (!response.ok) {
       throw new Error('Failed to list templates');
     }
@@ -67,7 +119,7 @@ export const api = {
    * List all available company types.
    */
   async listCompanyTypes() {
-    const response = await fetch(`${API_BASE}/api/company-types`);
+    const response = await authFetch(`${API_BASE}/api/company-types`);
     if (!response.ok) {
       throw new Error('Failed to list company types');
     }
@@ -78,7 +130,7 @@ export const api = {
    * List all available exchanges.
    */
   async listExchanges() {
-    const response = await fetch(`${API_BASE}/api/exchanges`);
+    const response = await authFetch(`${API_BASE}/api/exchanges`);
     if (!response.ok) {
       throw new Error('Failed to list exchanges');
     }
@@ -208,7 +260,7 @@ export const api = {
    * Submit an async analysis job.
    */
   async createAnalysisJob(payload) {
-    const response = await fetch(`${API_BASE}/api/analysis-jobs`, {
+    const response = await authFetch(`${API_BASE}/api/analysis-jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload || {}),
@@ -223,7 +275,7 @@ export const api = {
    * List async analysis jobs.
    */
   async listAnalysisJobs(limit = 20) {
-    const response = await fetch(
+    const response = await authFetch(
       `${API_BASE}/api/analysis-jobs?limit=${encodeURIComponent(limit)}`
     );
     if (!response.ok) {
@@ -236,7 +288,7 @@ export const api = {
    * Get one async analysis job status.
    */
   async getAnalysisJob(jobId) {
-    const response = await fetch(
+    const response = await authFetch(
       `${API_BASE}/api/analysis-jobs/${encodeURIComponent(jobId)}`
     );
     if (!response.ok) {
@@ -249,7 +301,7 @@ export const api = {
    * Get completed result for an async analysis job.
    */
   async getAnalysisJobResult(jobId) {
-    const response = await fetch(
+    const response = await authFetch(
       `${API_BASE}/api/analysis-jobs/${encodeURIComponent(jobId)}/result`
     );
     if (!response.ok) {
@@ -260,32 +312,60 @@ export const api = {
 
   /**
    * Subscribe to live async analysis job events (SSE).
-   * Returns EventSource; caller should call `close()` when finished.
+   * Returns a stream handle; caller should call `close()` when finished.
    */
   streamAnalysisJobEvents(jobId, handlers = {}) {
-    const source = new EventSource(
-      `${API_BASE}/api/analysis-jobs/${encodeURIComponent(jobId)}/events`
-    );
-
     const onUpdate =
       typeof handlers.onUpdate === 'function' ? handlers.onUpdate : () => {};
     const onError =
       typeof handlers.onError === 'function' ? handlers.onError : () => {};
-
-    source.addEventListener('analysis_job', (event) => {
+    const controller = new AbortController();
+    const processPayload = (payload) => {
       try {
-        const payload = JSON.parse(event.data || '{}');
-        onUpdate(payload);
+        const event = JSON.parse(payload || '{}');
+        onUpdate(event);
       } catch (err) {
         onError(err);
       }
+    };
+    authFetch(
+      `${API_BASE}/api/analysis-jobs/${encodeURIComponent(jobId)}/events`,
+      { method: 'GET', signal: controller.signal }
+    ).then(async (response) => {
+      if (!response.ok || !response.body) {
+        throw new Error('Failed to stream analysis job events');
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const processBuffer = () => {
+        buffer = buffer.replace(/\r\n/g, '\n');
+        let boundary = buffer.indexOf('\n\n');
+        while (boundary !== -1) {
+          const rawEvent = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          const payload = rawEvent
+            .split('\n')
+            .filter((line) => line.startsWith('data:'))
+            .map((line) => line.slice(5).trimStart())
+            .join('\n');
+          if (payload) processPayload(payload);
+          boundary = buffer.indexOf('\n\n');
+        }
+      };
+      while (!controller.signal.aborted) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        processBuffer();
+      }
+      buffer += decoder.decode();
+      processBuffer();
+    }).catch((err) => {
+      if (!controller.signal.aborted) onError(err);
     });
 
-    source.addEventListener('error', (event) => {
-      onError(event);
-    });
-
-    return source;
+    return { close: () => controller.abort() };
   },
 
   /**
@@ -425,7 +505,7 @@ export const api = {
    * Load a markdown memo artifact from outputs/.
    */
   async getMemo(memoName) {
-    const response = await fetch(`${API_BASE}/api/memos/${encodeURIComponent(memoName)}`);
+    const response = await authFetch(`${API_BASE}/api/memos/${encodeURIComponent(memoName)}`);
     if (!response.ok) {
       throw new Error('Failed to load memo artifact');
     }
@@ -436,7 +516,7 @@ export const api = {
    * List all conversations.
    */
   async listConversations() {
-    const response = await fetch(`${API_BASE}/api/conversations`);
+    const response = await authFetch(`${API_BASE}/api/conversations`);
     if (!response.ok) {
       throw new Error('Failed to list conversations');
     }
@@ -447,7 +527,7 @@ export const api = {
    * Create a new conversation.
    */
   async createConversation() {
-    const response = await fetch(`${API_BASE}/api/conversations`, {
+    const response = await authFetch(`${API_BASE}/api/conversations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -464,7 +544,7 @@ export const api = {
    * Get a specific conversation.
    */
   async getConversation(conversationId) {
-    const response = await fetch(
+    const response = await authFetch(
       `${API_BASE}/api/conversations/${conversationId}`
     );
     if (!response.ok) {
@@ -477,7 +557,7 @@ export const api = {
    * Send a message in a conversation.
    */
   async sendMessage(conversationId, content) {
-    const response = await fetch(
+    const response = await authFetch(
       `${API_BASE}/api/conversations/${conversationId}/message`,
       {
         method: 'POST',
@@ -569,7 +649,7 @@ export const api = {
       formData.append('supplementary_file', supplementaryFile);
     }
 
-    const response = await fetch(
+    const response = await authFetch(
       `${API_BASE}/api/conversations/${conversationId}/message/stream`,
       {
         method: 'POST',

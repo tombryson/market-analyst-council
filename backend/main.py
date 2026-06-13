@@ -614,7 +614,8 @@ _OPEN_PATHS: frozenset[str] = frozenset({"/", "/api/health"})
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     # OPTIONS preflight and open paths are always allowed.
-    if request.method == "OPTIONS" or request.url.path in _OPEN_PATHS:
+    path = request.url.path
+    if request.method == "OPTIONS" or path in _OPEN_PATHS or not path.startswith("/api/"):
         return await call_next(request)
 
     # Auth disabled (local dev only).

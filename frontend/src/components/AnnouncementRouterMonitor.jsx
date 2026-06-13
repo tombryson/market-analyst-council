@@ -136,20 +136,13 @@ function labelScenarioPathShort(value) {
 
 function labelCompanyThesisPath(value) {
   const path = String(value || '').trim().toLowerCase();
-  if (path === 'bull') return 'Bull path';
-  if (path === 'base') return 'Base path';
-  if (path === 'bear') return 'Bear path';
-  if (path === 'mixed') return 'Mixed path';
-  return 'Missing path';
+  if (path === 'bull') return 'Bull';
+  if (path === 'bear') return 'Bear';
+  return 'Base';
 }
 
 function labelCompanyThesisPathShort(value) {
-  const path = String(value || '').trim().toLowerCase();
-  if (path === 'bull') return 'Bull';
-  if (path === 'base') return 'Base';
-  if (path === 'bear') return 'Bear';
-  if (path === 'mixed') return 'Mixed';
-  return 'Missing';
+  return labelCompanyThesisPath(value);
 }
 
 function labelScenarioAction(value) {
@@ -178,7 +171,7 @@ function labelProjectionRerunSignal(value) {
   return labels[signal] || (signal ? titleizeKey(signal) : 'No rerun signal');
 }
 
-const SCENARIO_PATHS = new Set(['bull', 'base', 'bear', 'mixed']);
+const COMPANY_THESIS_PATHS = new Set(['bull', 'base', 'bear']);
 
 function defaultReviewNote(router, status) {
   const title = routerTitle(router);
@@ -552,9 +545,9 @@ function routerReviewBucket(router) {
 function routerCompanyThesisPath(router) {
   const current = String(router?.current_path || '').trim().toLowerCase();
   const baseline = String(router?.baseline_path || '').trim().toLowerCase();
-  if (SCENARIO_PATHS.has(current)) return current;
-  if (SCENARIO_PATHS.has(baseline)) return baseline;
-  return 'unknown';
+  if (COMPANY_THESIS_PATHS.has(current)) return current;
+  if (COMPANY_THESIS_PATHS.has(baseline)) return baseline;
+  return 'base';
 }
 
 function routerScenarioPath(router) {
@@ -1158,12 +1151,10 @@ function PathTransition({ router }) {
   const baseline = transition?.from || String(router?.baseline_path || router?.current_path || '').trim().toLowerCase();
   const current = transition?.to || String(router?.current_path || router?.baseline_path || '').trim().toLowerCase();
   const changed = Boolean(transition && transition.from !== transition.to);
-  const companyPath = SCENARIO_PATHS.has(current) ? current : SCENARIO_PATHS.has(baseline) ? baseline : 'unknown';
-  const pathCopy = companyPath === 'unknown'
-    ? 'Missing saved company path'
-    : changed
-      ? `Moved from ${labelCompanyThesisPathShort(baseline)} after this filing`
-      : 'Company remains on saved path';
+  const companyPath = COMPANY_THESIS_PATHS.has(current) ? current : COMPANY_THESIS_PATHS.has(baseline) ? baseline : 'base';
+  const pathCopy = changed
+    ? `Moved from ${labelCompanyThesisPathShort(baseline)} after this filing`
+    : 'Current saved path';
   return (
     <div className="announcement-router-path-bar">
       <div className="announcement-router-path-main">
@@ -1640,7 +1631,7 @@ function RouterQueue({ events, selectedEventId, onSelect }) {
 	                </span>
 	                <span className="announcement-router-queue-title">{routerTitle(row)}</span>
 	                <span className="announcement-router-queue-meta">
-                  <span>Company path: {labelCompanyThesisPathShort(routerCompanyThesisPath(row))}</span>
+                  <span>Path: {labelCompanyThesisPathShort(routerCompanyThesisPath(row))}</span>
                       {hasTrajectoryScore(score) && <span>{safeTrajectoryPositionLabel(score, 'cumulative_position_label') || safeTrajectoryPositionLabel(score, 'position_label')}</span>}
 		                  <span>{routerMaterialityLabel(row)}</span>
 		                  <span>{routerDriverLabel(row)}</span>
@@ -1709,7 +1700,7 @@ function activeFilterSummary(caseFilter, reviewFilter, scenarioFilter) {
   const active = [
     caseFilter !== 'all' && `Case: ${titleizeKey(caseFilter)}`,
     reviewFilter !== 'all' && `Review: ${titleizeKey(reviewFilter)}`,
-    scenarioFilter !== 'all' && `Company path: ${labelCompanyThesisPathShort(scenarioFilter)}`,
+    scenarioFilter !== 'all' && `Path: ${labelCompanyThesisPathShort(scenarioFilter)}`,
   ].filter(Boolean);
   return active.length ? active.join(' | ') : 'All filings';
 }
@@ -2002,12 +1993,10 @@ export default function AnnouncementRouterMonitor({
   const scenarioFilters = useMemo(() => {
     const count = (key) => countEventsByScenario(queueEvents, key, activeCaseFilter, activeReviewFilter);
     return [
-      { key: 'all', label: 'All company paths', tone: 'neutral', count: count('all') },
-      { key: 'bull', label: 'Bull-path companies', tone: 'positive', count: count('bull') },
-      { key: 'base', label: 'Base-path companies', tone: 'warn', count: count('base') },
-      { key: 'bear', label: 'Bear-path companies', tone: 'urgent', count: count('bear') },
-      { key: 'mixed', label: 'Mixed-path companies', tone: 'warn', count: count('mixed') },
-      { key: 'unknown', label: 'Missing company path', tone: 'neutral', count: count('unknown') },
+      { key: 'all', label: 'All', tone: 'neutral', count: count('all') },
+      { key: 'bull', label: 'Bull', tone: 'positive', count: count('bull') },
+      { key: 'base', label: 'Base', tone: 'warn', count: count('base') },
+      { key: 'bear', label: 'Bear', tone: 'urgent', count: count('bear') },
     ];
   }, [queueEvents, activeCaseFilter, activeReviewFilter]);
   const filteredEvents = useMemo(
