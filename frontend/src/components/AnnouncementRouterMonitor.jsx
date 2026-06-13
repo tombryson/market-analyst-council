@@ -188,15 +188,6 @@ function isGeneratedReviewNote(note, router) {
   return text.split(':').length === 2;
 }
 
-function reviewStateSubtext(vm) {
-  if (vm.reviewStatus === 'reviewed') return 'Handled and cleared from the active list.';
-  if (vm.reviewStatus === 'dismissed') return 'Cleared with no further action.';
-  if (vm.reviewStatus === 'open') return 'The router cannot safely clear this filing. Decide whether the saved thesis map, evidence pack, or classification needs work.';
-  if (vm.reviewStatus === 'tracking') return 'The filing supports the saved path. Track it against the run before changing the narrative.';
-  if (vm.reviewStatus === 'auto_cleared') return 'No active analyst decision is required for this filing.';
-  return 'No manual case action recorded.';
-}
-
 function labelMarketPath(value) {
   const path = String(value || '').trim().toLowerCase();
   if (path === 'bull') return 'Closest to bull';
@@ -550,8 +541,30 @@ function routerCompanyThesisPath(router) {
   return 'base';
 }
 
-function routerScenarioPath(router) {
-  return routerCompanyThesisPath(router);
+function routerEventTimeMs(row) {
+  return parseIsoDateOrNull(row?.saved_at_utc)?.getTime() || parseIsoDateOrNull(row?.received_at_utc)?.getTime() || 0;
+}
+
+function buildCompanyPathMap(events) {
+  const rows = Array.isArray(events) ? events : [];
+  const latestByTicker = new Map();
+  rows.forEach((row) => {
+    const ticker = String(row?.ticker || 'n/a').trim().toUpperCase() || 'n/a';
+    const current = latestByTicker.get(ticker);
+    if (!current || routerEventTimeMs(row) > routerEventTimeMs(current)) {
+      latestByTicker.set(ticker, row);
+    }
+  });
+  const pathByTicker = new Map();
+  latestByTicker.forEach((row, ticker) => {
+    pathByTicker.set(ticker, routerCompanyThesisPath(row));
+  });
+  return pathByTicker;
+}
+
+function companyPathForEvent(row, pathByTicker) {
+  const ticker = String(row?.ticker || 'n/a').trim().toUpperCase() || 'n/a';
+  return pathByTicker?.get(ticker) || routerCompanyThesisPath(row);
 }
 
 function routerTrajectoryScore(router) {
@@ -719,17 +732,6 @@ function routerPresentation(router) {
   };
 }
 
-function routerRelationshipLabel(router) {
-  const displayRelationship = String(routerDisplay(router)?.relationship_label || '').trim();
-  if (displayRelationship) return displayRelationship;
-  const kind = String(router?.relationship_kind || '').trim();
-  if (!kind) return 'Not assessed';
-  const strength = String(router?.relationship_strength || '').trim();
-  return [strength && strength !== 'none' ? titleizeKey(strength) : '', titleizeKey(kind)]
-    .filter(Boolean)
-    .join(' ');
-}
-
 function pathExplanation(router) {
   const path = String(router?.baseline_path || router?.current_path || '').trim();
   if (!path) return '';
@@ -822,7 +824,6 @@ function routerWhyCopy(router, directHits = 0) {
   const state = routerTrajectoryState(router);
   const announcementChecks = Array.isArray(router?.announcement_condition_checks) ? router.announcement_condition_checks : [];
   const watchlistChecks = Array.isArray(router?.watchlist_condition_checks) ? router.watchlist_condition_checks : [];
-  const checkedWatchlistRows = checkedNotTriggeredWatchlist(router);
   const verificationChecks = Array.isArray(router?.verification_condition_checks) ? router.verification_condition_checks : [];
   const marketConditions = Array.isArray(router?.market_context_conditions) ? router.market_context_conditions : [];
   const marketCount = marketConditions.length || Object.keys(router?.market_facts_used || {}).length;
@@ -1595,7 +1596,7 @@ function RouterTimeline({ events, selectedEventId, onSelect }) {
   );
 }
 
-function RouterQueue({ events, selectedEventId, onSelect }) {
+function RouterQueue({ events, selectedEventId, onSelect, companyPathByTicker }) {
   return (
     <article className="announcement-router-queue">
       <div className="announcement-router-queue-head">
@@ -1631,7 +1632,7 @@ function RouterQueue({ events, selectedEventId, onSelect }) {
 	                </span>
 	                <span className="announcement-router-queue-title">{routerTitle(row)}</span>
 	                <span className="announcement-router-queue-meta">
-                  <span>Path: {labelCompanyThesisPathShort(routerCompanyThesisPath(row))}</span>
+                  <span>Company now: {labelCompanyThesisPathShort(companyPathForEvent(row, companyPathByTicker))}</span>
                       {hasTrajectoryScore(score) && <span>{safeTrajectoryPositionLabel(score, 'cumulative_position_label') || safeTrajectoryPositionLabel(score, 'position_label')}</span>}
 		                  <span>{routerMaterialityLabel(row)}</span>
 		                  <span>{routerDriverLabel(row)}</span>
@@ -1658,16 +1659,16 @@ function eventMatchesReviewFilter(row, filterKey) {
   return routerReviewBucket(row) === filterKey;
 }
 
-function eventMatchesScenarioFilter(row, filterKey) {
+function eventMatchesScenarioFilter(row, filterKey, companyPathByTicker) {
   if (filterKey === 'all') return true;
-  return routerCompanyThesisPath(row) === filterKey;
+  return companyPathForEvent(row, companyPathByTicker) === filterKey;
 }
 
-function eventMatchesFilters(row, { caseFilter = 'all', reviewFilter = 'all', scenarioFilter = 'all' } = {}) {
+function eventMatchesFilters(row, { caseFilter = 'all', reviewFilter = 'all', scenarioFilter = 'all', companyPathByTicker = null } = {}) {
   return (
     eventMatchesCaseFilter(row, caseFilter) &&
     eventMatchesReviewFilter(row, reviewFilter) &&
-    eventMatchesScenarioFilter(row, scenarioFilter)
+    eventMatchesScenarioFilter(row, scenarioFilter, companyPathByTicker)
   );
 }
 
@@ -1675,25 +1676,24 @@ function countEventsMatching(events, filters) {
   return events.filter((row) => eventMatchesFilters(row, filters)).length;
 }
 
-function countEventsByCase(events, key, activeReviewFilter, activeScenarioFilter) {
+function countEventsByCase(events, key, activeReviewFilter, activeScenarioFilter, companyPathByTicker) {
   if (key === 'all') {
-    return countEventsMatching(events, { reviewFilter: activeReviewFilter, scenarioFilter: activeScenarioFilter });
+    return countEventsMatching(events, { reviewFilter: activeReviewFilter, scenarioFilter: activeScenarioFilter, companyPathByTicker });
   }
-  return countEventsMatching(events, { caseFilter: key, reviewFilter: activeReviewFilter, scenarioFilter: activeScenarioFilter });
+  return countEventsMatching(events, { caseFilter: key, reviewFilter: activeReviewFilter, scenarioFilter: activeScenarioFilter, companyPathByTicker });
 }
 
-function countEventsByReview(events, key, activeCaseFilter, activeScenarioFilter) {
+function countEventsByReview(events, key, activeCaseFilter, activeScenarioFilter, companyPathByTicker) {
   if (key === 'all') {
-    return countEventsMatching(events, { caseFilter: activeCaseFilter, scenarioFilter: activeScenarioFilter });
+    return countEventsMatching(events, { caseFilter: activeCaseFilter, scenarioFilter: activeScenarioFilter, companyPathByTicker });
   }
-  return countEventsMatching(events, { caseFilter: activeCaseFilter, reviewFilter: key, scenarioFilter: activeScenarioFilter });
+  return countEventsMatching(events, { caseFilter: activeCaseFilter, reviewFilter: key, scenarioFilter: activeScenarioFilter, companyPathByTicker });
 }
 
-function countEventsByScenario(events, key, activeCaseFilter, activeReviewFilter) {
-  if (key === 'all') {
-    return countEventsMatching(events, { caseFilter: activeCaseFilter, reviewFilter: activeReviewFilter });
-  }
-  return countEventsMatching(events, { caseFilter: activeCaseFilter, reviewFilter: activeReviewFilter, scenarioFilter: key });
+function countCompaniesByScenario(companyPathByTicker, key) {
+  const paths = [...(companyPathByTicker?.values() || [])];
+  if (key === 'all') return paths.length;
+  return paths.filter((path) => path === key).length;
 }
 
 function activeFilterSummary(caseFilter, reviewFilter, scenarioFilter) {
@@ -1963,12 +1963,16 @@ export default function AnnouncementRouterMonitor({
     () => [...recentEvents].sort((a, b) => {
       const priorityDiff = routerPriorityRank(a) - routerPriorityRank(b);
       if (priorityDiff) return priorityDiff;
-      return (parseIsoDateOrNull(b?.saved_at_utc)?.getTime() || 0) - (parseIsoDateOrNull(a?.saved_at_utc)?.getTime() || 0);
+      return routerEventTimeMs(b) - routerEventTimeMs(a);
     }),
     [recentEvents]
   );
+  const companyPathByTicker = useMemo(
+    () => buildCompanyPathMap(queueEvents),
+    [queueEvents]
+  );
   const caseFilters = useMemo(() => {
-    const count = (key) => countEventsByCase(queueEvents, key, activeReviewFilter, activeScenarioFilter);
+    const count = (key) => countEventsByCase(queueEvents, key, activeReviewFilter, activeScenarioFilter, companyPathByTicker);
     return [
       { key: 'all', label: 'All case types', tone: 'neutral', count: count('all') },
       { key: 'thesis_improved', label: 'Thesis improved', tone: 'positive', count: count('thesis_improved') },
@@ -1978,9 +1982,9 @@ export default function AnnouncementRouterMonitor({
       { key: 'administrative', label: 'Administrative', tone: 'neutral', count: count('administrative') },
       { key: 'uncategorized', label: 'Uncategorised', tone: 'neutral', count: count('uncategorized') },
     ];
-  }, [queueEvents, activeReviewFilter, activeScenarioFilter]);
+  }, [queueEvents, activeReviewFilter, activeScenarioFilter, companyPathByTicker]);
   const reviewFilters = useMemo(() => {
-    const count = (key) => countEventsByReview(queueEvents, key, activeCaseFilter, activeScenarioFilter);
+    const count = (key) => countEventsByReview(queueEvents, key, activeCaseFilter, activeScenarioFilter, companyPathByTicker);
     return [
       { key: 'all', label: 'All review states', tone: 'neutral', count: count('all') },
       { key: 'needs_decision', label: 'Needs decision', tone: 'warn', count: count('needs_decision') },
@@ -1989,23 +1993,24 @@ export default function AnnouncementRouterMonitor({
       { key: 'auto_cleared', label: 'Auto-cleared', tone: 'neutral', count: count('auto_cleared') },
       { key: 'tracking', label: 'Tracking', tone: 'info', count: count('tracking') },
     ];
-  }, [queueEvents, activeCaseFilter, activeScenarioFilter]);
+  }, [queueEvents, activeCaseFilter, activeScenarioFilter, companyPathByTicker]);
   const scenarioFilters = useMemo(() => {
-    const count = (key) => countEventsByScenario(queueEvents, key, activeCaseFilter, activeReviewFilter);
+    const count = (key) => countCompaniesByScenario(companyPathByTicker, key);
     return [
       { key: 'all', label: 'All', tone: 'neutral', count: count('all') },
       { key: 'bull', label: 'Bull', tone: 'positive', count: count('bull') },
       { key: 'base', label: 'Base', tone: 'warn', count: count('base') },
       { key: 'bear', label: 'Bear', tone: 'urgent', count: count('bear') },
     ];
-  }, [queueEvents, activeCaseFilter, activeReviewFilter]);
+  }, [companyPathByTicker]);
   const filteredEvents = useMemo(
     () => queueEvents.filter((row) => eventMatchesFilters(row, {
       caseFilter: activeCaseFilter,
       reviewFilter: activeReviewFilter,
       scenarioFilter: activeScenarioFilter,
+      companyPathByTicker,
     })),
-    [queueEvents, activeCaseFilter, activeReviewFilter, activeScenarioFilter]
+    [queueEvents, activeCaseFilter, activeReviewFilter, activeScenarioFilter, companyPathByTicker]
   );
   const selectedEvent = useMemo(
     () => filteredEvents.find((row) => row?.event_id === selectedEventId) || filteredEvents[0] || {},
@@ -2187,6 +2192,7 @@ export default function AnnouncementRouterMonitor({
                   events={filteredEvents}
                   selectedEventId={selectedEvent?.event_id || selectedEventId}
                   onSelect={setSelectedEventId}
+                  companyPathByTicker={companyPathByTicker}
                 />
                 <DecisionPanel
                   router={selectedRouter}
