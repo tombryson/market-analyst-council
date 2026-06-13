@@ -594,6 +594,49 @@ async def _prepare_generated_supplementary_for_job(
         "pipeline_label": getattr(pipeline_spec, "industry_label", "") if pipeline_spec else "",
     }
 
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
+_AUTH_DISABLED: bool = os.getenv("AUTH_DISABLED", "").strip().lower() in {"1", "true", "yes"}
+_API_TOKEN: str = os.getenv("API_TOKEN", "").strip()
+
+if not _API_TOKEN and not _AUTH_DISABLED:
+    # Fail at startup — do not run an unauthenticated API in production.
+    raise RuntimeError(
+        "API_TOKEN env var is not set and AUTH_DISABLED is not true. "
+        "Set API_TOKEN via fly secrets set or set AUTH_DISABLED=true for local dev."
+    )
+
+# Routes that do not require authentication.
+_OPEN_PATHS: frozenset[str] = frozenset({"/", "/api/health"})
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    # OPTIONS preflight and open paths are always allowed.
+    if request.method == "OPTIONS" or request.url.path in _OPEN_PATHS:
+        return await call_next(request)
+
+    # Auth disabled (local dev only).
+    if _AUTH_DISABLED:
+        return await call_next(request)
+
+    # Blank configured token never matches — fail closed.
+    if not _API_TOKEN:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    # Bearer token check.
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        provided = auth_header[len("Bearer "):]
+        if hmac.compare_digest(provided, _API_TOKEN):
+            return await call_next(request)
+
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+
 # Enable CORS for local development
 app.add_middleware(
     CORSMiddleware,
