@@ -506,7 +506,7 @@ function routerCaseBucket(router) {
     (!validationType || ['none', 'related_unmapped', 'material_unmapped'].includes(validationType)) &&
     (!Number.isFinite(eventDelta) || Math.abs(eventDelta) <= 0.0001) &&
     !score?.mapped_condition;
-  if (filingType === 'administrative') return 'administrative';
+  if (filingType === 'administrative') return 'no_thesis_impact';
   if (unvalidatedPositive) return 'needs_assessment';
   if (verdict === 'positive') return 'thesis_improved';
   if (verdict === 'negative') return 'thesis_weakened';
@@ -518,9 +518,9 @@ function routerCaseBucket(router) {
   if (['thesis_weakened', 'timeline_delayed', 'risk_increased'].includes(state)) return 'thesis_weakened';
   if (['thesis_strengthened', 'timeline_accelerated', 'risk_reduced'].includes(state)) return 'thesis_improved';
   if (state === 'needs_classification') return 'needs_assessment';
-  if (state === 'administrative_filing') return 'administrative';
+  if (state === 'administrative_filing') return 'no_thesis_impact';
   if (['no_thesis_change', 'market_backdrop_only', 'material_unmapped'].includes(state)) return 'no_thesis_impact';
-  return 'uncategorized';
+  return 'no_thesis_impact';
 }
 
 function routerReviewBucket(router) {
@@ -1675,7 +1675,7 @@ function CompanyPathQueue({ companies, selectedEventId, onSelect }) {
   return (
     <article className="announcement-router-queue announcement-router-company-queue">
       <div className="announcement-router-queue-head">
-        <h4>Company Thesis Path</h4>
+        <h4>Company Thesis</h4>
         <span>{companies.length} companies · {announcementCount} filings</span>
       </div>
       <div className="announcement-router-queue-list">
@@ -1869,9 +1869,7 @@ function DecisionPanel({
           {router?.source_url && (
             <a className="announcement-router-primary-link" href={router.source_url} target="_blank" rel="noreferrer">Open filing</a>
           )}
-          {!quietCleared && (
-            <span className="announcement-router-hero-metric">{classificationConfidence != null && classificationConfidence !== '' ? `Classification confidence ${fmtPct(classificationConfidence)}` : 'Classification confidence n/a'}</span>
-          )}
+          <span className="announcement-router-hero-metric">{classificationConfidence != null && classificationConfidence !== '' ? `Classification confidence ${fmtPct(classificationConfidence)}` : 'Classification confidence n/a'}</span>
           <span className="announcement-router-hero-tag">{router?.source_type ? titleizeKey(router.source_type) : 'Source unresolved'}</span>
         </div>
         <ReviewWorkflow
@@ -1881,24 +1879,20 @@ function DecisionPanel({
           reviewBusy={reviewBusy}
         />
       </div>
-      {!quietCleared && (
-        <>
-          <PathTransition router={router} />
-          <MarketPathProjection router={router} actualPrices={priceHistory} routerEvents={routerEvents} />
+      <PathTransition router={router} />
+      <MarketPathProjection router={router} actualPrices={priceHistory} routerEvents={routerEvents} />
 
-          <RouterSection title="Why This Verdict" count={whyCount}>
-            <div className={`announcement-router-impact-callout ${directHits ? 'has-hit' : 'no-hit'}`}>
-              <strong>{routerWhyHeadline(router, directHits)}</strong>
-              <span>{routerWhyCopy(router, directHits)}</span>
-            </div>
-            <ConfidenceBreakdown router={router} />
-            <EvidenceRows title="Matched Thesis Conditions" items={matchedConditions} />
-            <EvidenceRows title="Watchlist Matches" items={watchHits} />
-            <ConditionChecks title="Watchlist Checked, Not Triggered" items={checkedWatchlistRows} />
-            <EvidenceRows title="Verification Matches" items={verificationHits} />
-          </RouterSection>
-        </>
-      )}
+      <RouterSection title="Why This Verdict" count={whyCount} muted={quietCleared}>
+        <div className={`announcement-router-impact-callout ${directHits ? 'has-hit' : 'no-hit'}`}>
+          <strong>{routerWhyHeadline(router, directHits)}</strong>
+          <span>{routerWhyCopy(router, directHits)}</span>
+        </div>
+        <ConfidenceBreakdown router={router} />
+        <EvidenceRows title="Matched Thesis Conditions" items={matchedConditions} />
+        <EvidenceRows title="Watchlist Matches" items={watchHits} />
+        <ConditionChecks title="Watchlist Checked, Not Triggered" items={checkedWatchlistRows} />
+        <EvidenceRows title="Verification Matches" items={verificationHits} />
+      </RouterSection>
 
       {!!(conflicts.length || findings.length) && (
         <RouterSection title="Conflicts And Findings" count={`${conflicts.length + findings.length} item${conflicts.length + findings.length === 1 ? '' : 's'}`}>
@@ -2070,8 +2064,6 @@ export default function AnnouncementRouterMonitor({
       { key: 'thesis_weakened', label: 'Thesis weakened', tone: 'urgent', count: count('thesis_weakened') },
       { key: 'needs_assessment', label: 'Needs assessment', tone: 'warn', count: count('needs_assessment') },
       { key: 'no_thesis_impact', label: 'No thesis impact', tone: 'neutral', count: count('no_thesis_impact') },
-      { key: 'administrative', label: 'Administrative', tone: 'neutral', count: count('administrative') },
-      { key: 'uncategorized', label: 'Uncategorised', tone: 'neutral', count: count('uncategorized') },
     ];
   }, [queueEvents, companyPathByTicker]);
   const reviewFilters = useMemo(() => {
@@ -2244,7 +2236,7 @@ export default function AnnouncementRouterMonitor({
                 <strong>{filteredEvents.length}</strong>
               </div>
               <RouterKpiStrip
-                title="Announcement effect"
+                title="Announcements"
                 filters={caseFilters}
                 activeFilter={activeFilterGroup === 'case' ? activeCaseFilter : ''}
                 onSelect={(key) => {
@@ -2256,7 +2248,7 @@ export default function AnnouncementRouterMonitor({
                 }}
               />
               <RouterKpiStrip
-                title="Company thesis path"
+                title="Company Thesis"
                 filters={scenarioFilters}
                 activeFilter={activeFilterGroup === 'scenario' ? activeScenarioFilter : ''}
                 onSelect={(key) => {
@@ -2268,7 +2260,7 @@ export default function AnnouncementRouterMonitor({
                 }}
               />
               <RouterKpiStrip
-                title="Review state"
+                title="Review State"
                 filters={reviewFilters}
                 activeFilter={activeFilterGroup === 'review' ? activeReviewFilter : ''}
                 onSelect={(key) => {
