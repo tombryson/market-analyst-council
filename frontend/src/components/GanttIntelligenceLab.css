@@ -1275,6 +1275,33 @@
   min-width: 0;
 }
 
+.announcement-router-view-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  border: 1px solid var(--router-rule);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--router-rule);
+}
+
+.announcement-router-view-switch button {
+  border: 0;
+  border-radius: 0;
+  background: var(--router-bg-1);
+  color: var(--router-text-3);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 10px 8px;
+}
+
+.announcement-router-view-switch button:hover,
+.announcement-router-view-switch button.is-active {
+  background: var(--router-bg-3);
+  color: var(--router-text);
+}
+
 .announcement-router-filter-group {
   display: grid;
   gap: 6px;
