@@ -572,19 +572,30 @@ function routerTrajectoryScore(router) {
   return router?.trajectory_score && typeof router.trajectory_score === 'object' ? router.trajectory_score : {};
 }
 
-function hasTrajectoryScore(score) {
-  const validationType = String(score?.validation_type || '').trim().toLowerCase();
+function scoreValidationType(score) {
+  return String(score?.validation_type || '').trim().toLowerCase();
+}
+
+function hasValidatedTrajectoryScore(score) {
   const eventDelta = Number(score?.event_delta);
-  const unvalidatedDelta = Number(score?.unvalidated_event_delta);
-  if (validationType === 'related_unmapped' || validationType === 'material_unmapped') {
-    return Number.isFinite(unvalidatedDelta) && unvalidatedDelta !== 0;
-  }
   return Number.isFinite(eventDelta) && eventDelta !== 0;
 }
 
+function isProvisionalTrajectoryScore(score) {
+  const validationType = scoreValidationType(score);
+  const eventDelta = Number(score?.event_delta);
+  const unvalidatedDelta = Number(score?.unvalidated_event_delta);
+  if (!Number.isFinite(unvalidatedDelta) || unvalidatedDelta === 0) return false;
+  if (validationType === 'related_unmapped' || validationType === 'material_unmapped') return true;
+  return !Number.isFinite(eventDelta) || eventDelta === 0;
+}
+
+function hasTrajectoryScore(score) {
+  return hasValidatedTrajectoryScore(score) || isProvisionalTrajectoryScore(score);
+}
+
 function trajectoryScoreDisplayDelta(score) {
-  const validationType = String(score?.validation_type || '').trim().toLowerCase();
-  if (validationType === 'related_unmapped' || validationType === 'material_unmapped') {
+  if (isProvisionalTrajectoryScore(score)) {
     return Number(score?.unvalidated_event_delta);
   }
   return Number(score?.event_delta);
@@ -592,8 +603,8 @@ function trajectoryScoreDisplayDelta(score) {
 
 function trajectoryScoreTone(score) {
   const direction = String(score?.direction || '').trim().toLowerCase();
-  const validationType = String(score?.validation_type || '').trim().toLowerCase();
-  if (validationType === 'related_unmapped' || validationType === 'material_unmapped') return 'warn';
+  if (isProvisionalTrajectoryScore(score) && direction === 'negative') return 'urgent';
+  if (isProvisionalTrajectoryScore(score)) return 'warn';
   if (direction === 'positive') return 'positive';
   if (direction === 'negative') return 'urgent';
   if (direction === 'mixed') return 'warn';
@@ -602,8 +613,11 @@ function trajectoryScoreTone(score) {
 
 function trajectoryScoreDirectionLabel(score) {
   const direction = String(score?.direction || '').trim().toLowerCase();
-  const validationType = String(score?.validation_type || '').trim().toLowerCase();
-  if (validationType === 'related_unmapped' || validationType === 'material_unmapped') return 'Provisional thesis evidence';
+  if (isProvisionalTrajectoryScore(score)) {
+    if (direction === 'positive') return 'Provisional positive evidence';
+    if (direction === 'negative') return 'Provisional negative evidence';
+    return 'Provisional thesis evidence';
+  }
   if (direction === 'positive') return 'Bull-leaning evidence';
   if (direction === 'negative') return 'Bear-leaning evidence';
   if (direction === 'mixed') return 'Mixed evidence';
@@ -613,8 +627,7 @@ function trajectoryScoreDirectionLabel(score) {
 function safeTrajectoryPositionLabel(score, key = 'position_label') {
   const raw = String(score?.[key] || '').trim();
   if (!raw) return '';
-  const validationType = String(score?.validation_type || '').trim().toLowerCase();
-  if (validationType === 'related_unmapped' || validationType === 'material_unmapped') {
+  if (isProvisionalTrajectoryScore(score)) {
     if (/bull case/i.test(raw)) return 'Bull-leaning, unvalidated';
     if (/bear case/i.test(raw)) return 'Bear-leaning, unvalidated';
   }
@@ -627,8 +640,7 @@ function safeTrajectoryPositionLabel(score, key = 'position_label') {
 function trajectoryScoreReason(score) {
   const raw = String(score?.reason || '').trim();
   if (!raw) return 'Directional evidence was scored against the saved scenario path.';
-  const validationType = String(score?.validation_type || '').trim().toLowerCase();
-  if (validationType !== 'material_unmapped' && validationType !== 'related_unmapped') return raw;
+  if (!isProvisionalTrajectoryScore(score)) return raw;
   return raw
     .replace(/^Bull-leaning\b/i, 'Positive')
     .replace(/^Bear-leaning\b/i, 'Negative');
@@ -664,18 +676,25 @@ function routerPriorityTone(router) {
   const state = routerTrajectoryState(router);
   const action = routerActionKey(router);
   const status = String(router?.status || '').trim().toLowerCase();
+  const materiality = routerMateriality(router);
+  const score = routerTrajectoryScore(router);
+  const isMaterial = ['medium', 'high', 'critical'].includes(materiality);
+  const isAdministrative = routerFilingType(router) === 'administrative' || state === 'administrative_filing';
   if (status === 'error' || action === 'urgent_human_review' || action === 'full_rerun') return 'urgent';
   if (verdict === 'negative') return 'urgent';
-  if (verdict === 'positive') return 'positive';
+  if (verdict === 'positive') return hasValidatedTrajectoryScore(score) ? 'positive' : 'warn';
   if (['mixed', 'uncertain', 'unclear'].includes(verdict)) return 'warn';
-  if (verdict === 'neutral') return 'neutral';
   if (['thesis_weakened', 'timeline_delayed', 'risk_increased'].includes(state)) return 'urgent';
-  if (['needs_classification', 'material_unmapped'].includes(state)) return 'warn';
-  if (['thesis_strengthened', 'timeline_accelerated', 'risk_reduced'].includes(state)) return 'positive';
+  if (['thesis_strengthened', 'timeline_accelerated', 'risk_reduced'].includes(state)) {
+    return hasValidatedTrajectoryScore(score) ? 'positive' : 'warn';
+  }
+  if (isAdministrative) return 'neutral';
+  if (isMaterial || ['needs_classification', 'material_unmapped'].includes(state)) return 'warn';
+  if (verdict === 'neutral') return 'neutral';
   if (['market_backdrop_only', 'no_thesis_change', 'administrative_filing'].includes(state)) return 'neutral';
   if (action === 'rerun_stage1' || action === 'run_delta_only' || routerConflictCount(router)) return 'alarm';
   if (routerDirectHitCount(router) || action === 'annotate_run') return 'warn';
-  if (action === 'watch') return 'info';
+  if (action === 'watch') return 'neutral';
   return String(routerDisplay(router)?.tone || '').trim() || 'neutral';
 }
 
@@ -1354,9 +1373,8 @@ function TrajectoryScorePanel({ router }) {
   const cumulative = Number(score?.cumulative_delta);
   const eventLabel = safeTrajectoryPositionLabel(score, 'position_label') || 'Position not assessed';
   const cumulativeLabel = safeTrajectoryPositionLabel(score, 'cumulative_position_label') || eventLabel;
-  const validationType = String(score?.validation_type || '').trim().toLowerCase();
-  const isProvisional = validationType === 'related_unmapped' || validationType === 'material_unmapped';
-  const eventDelta = isProvisional ? Number(score.unvalidated_event_delta) : Number(score.event_delta);
+  const isProvisional = isProvisionalTrajectoryScore(score);
+  const eventDelta = trajectoryScoreDisplayDelta(score);
   return (
     <div className="announcement-router-score-panel" data-tone={trajectoryScoreTone(score)}>
       <span>Path movement</span>
@@ -1600,7 +1618,7 @@ function RouterTimeline({ events, selectedEventId, onSelect }) {
   );
 }
 
-function RouterQueue({ events, selectedEventId, onSelect, companyPathByTicker }) {
+function RouterQueue({ events, selectedEventId, onSelect }) {
   return (
     <article className="announcement-router-queue">
       <div className="announcement-router-queue-head">
@@ -1611,7 +1629,6 @@ function RouterQueue({ events, selectedEventId, onSelect, companyPathByTicker })
         {events.map((row) => {
           const vm = routerPresentation(row);
           const score = routerTrajectoryScore(row);
-          const companyPath = companyPathForEvent(row, companyPathByTicker);
           const selected = selectedEventId
             ? selectedEventId === row.event_id
             : events[0]?.event_id === row.event_id;
@@ -1637,9 +1654,6 @@ function RouterQueue({ events, selectedEventId, onSelect, companyPathByTicker })
 	                </span>
 	                <span className="announcement-router-queue-title">{routerTitle(row)}</span>
 	                <span className="announcement-router-queue-meta">
-                  <span className={`announcement-router-queue-path-pill tone-${companyPath}`}>
-                    Company: {labelCompanyThesisPathShort(companyPath)}
-                  </span>
                       {hasTrajectoryScore(score) && <span>{safeTrajectoryPositionLabel(score, 'cumulative_position_label') || safeTrajectoryPositionLabel(score, 'position_label')}</span>}
 		                  <span>{routerMaterialityLabel(row)}</span>
 		                  <span>{routerDriverLabel(row)}</span>
@@ -2291,7 +2305,6 @@ export default function AnnouncementRouterMonitor({
                     events={filteredEvents}
                     selectedEventId={selectedEvent?.event_id || selectedEventId}
                     onSelect={setSelectedEventId}
-                    companyPathByTicker={companyPathByTicker}
                   />
                 )}
                 <DecisionPanel

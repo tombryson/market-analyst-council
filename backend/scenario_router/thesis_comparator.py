@@ -398,10 +398,14 @@ class ThesisComparator:
             facts=facts,
             relationship=relationship,
         )
+        insider_buying_signal = str(relationship.kind or "").strip().lower() == "insider_buying"
         neutral_path = (
-            self._model_verdict_is_neutral_terminal(model_verdict)
-            or same_case_low_maintenance
-            or neutral_saved_relationship
+            not insider_buying_signal
+            and (
+                self._model_verdict_is_neutral_terminal(model_verdict)
+                or same_case_low_maintenance
+                or neutral_saved_relationship
+            )
         )
         if neutral_path:
             relationship = replace(relationship, direction="neutral")
@@ -462,7 +466,7 @@ class ThesisComparator:
         )
         if filing_type == "administrative":
             impact_verdict = "neutral"
-        if same_case_low_maintenance or neutral_saved_relationship:
+        if not insider_buying_signal and (same_case_low_maintenance or neutral_saved_relationship):
             impact_verdict = "neutral"
         impact_dimension = self._impact_dimension(
             verdict=model_verdict,
@@ -525,7 +529,10 @@ class ThesisComparator:
             direction = str(model_verdict.get("direction") or "").strip().lower()
             score_positive = direction == "positive"
             score_negative = direction == "negative"
-        if same_case_low_maintenance or neutral_saved_relationship:
+        if insider_buying_signal:
+            score_positive = True
+            score_negative = False
+        if not insider_buying_signal and (same_case_low_maintenance or neutral_saved_relationship):
             score_positive = False
             score_negative = False
         if thesis_relationship == "related_unmapped":
@@ -731,6 +738,8 @@ class ThesisComparator:
     def _filing_type(*, announcement_class: str, relationship: ThesisRelationship) -> str:
         announcement = str(announcement_class or "").strip().lower()
         kind = str(getattr(relationship, "kind", "") or "").strip().lower()
+        if kind == "insider_buying":
+            return "company_event"
         if announcement == "administrative" or kind == "administrative":
             return "administrative"
         if announcement == "market_backdrop" or kind == "market_backdrop_only":
@@ -781,6 +790,10 @@ class ThesisComparator:
     @staticmethod
     def _impact_verdict_from_model(*, verdict: Dict[str, str], relationship: ThesisRelationship) -> str:
         direction = str((verdict or {}).get("direction") or "").strip().lower()
+        relationship_kind = str(getattr(relationship, "kind", "") or "").strip().lower()
+        relationship_direction = str(getattr(relationship, "direction", "") or "").strip().lower()
+        if direction == "neutral" and relationship_kind == "insider_buying" and relationship_direction == "positive":
+            return "positive"
         if direction in {"positive", "negative", "neutral", "mixed"}:
             return direction
         if direction in {"unclear", "uncertain"}:
@@ -792,7 +805,6 @@ class ThesisComparator:
             return "negative"
         if state == "needs_classification":
             return "uncertain"
-        relationship_direction = str(getattr(relationship, "direction", "") or "").strip().lower()
         if relationship_direction in {"positive", "negative", "mixed"}:
             return relationship_direction
         if str(getattr(relationship, "kind", "") or "").strip().lower() == "needs_classification":
@@ -1914,6 +1926,8 @@ class ThesisComparator:
             for item in list(facts.affected_drivers or []) + list(facts.material_topics or [])
             if str(item or "").strip()
         ]
+        if ThesisComparator._is_insider_buying_signal(facts):
+            return {"governance", "insider_transaction", "management"}
         if str(facts.announcement_class or "").strip().lower() == "administrative" and str(facts.materiality or "").strip().lower() in {"", "none"}:
             return {"administrative"}
         domains.update(driver for driver in semantic_drivers if driver not in {"administrative", "needs_classification"})
@@ -1934,6 +1948,59 @@ class ThesisComparator:
         if " " in term or "-" in term:
             return term in haystack
         return re.search(rf"\b{re.escape(term)}\b", haystack) is not None
+
+    @staticmethod
+    def _is_insider_buying_signal(facts: AnnouncementFacts) -> bool:
+        domains = {
+            str(item or "").strip().lower()
+            for item in list(facts.affected_drivers or []) + list(facts.material_topics or [])
+            if str(item or "").strip()
+        }
+        if "insider_transaction" not in domains:
+            return False
+        haystack = "\n".join(
+            [
+                facts.title or "",
+                facts.summary or "",
+                facts.semantic_summary or "",
+                facts.filing_summary or "",
+                facts.price_time_effect or "",
+            ]
+            + [str(item or "") for item in (facts.extracted_facts or [])]
+        ).lower()
+        if not haystack.strip():
+            return False
+        non_buying_terms = {
+            "consolidation",
+            "share consolidation",
+            "sale",
+            "sold",
+            "dispose",
+            "disposed",
+            "disposal",
+            "reduced",
+            "decreased",
+            "ceased",
+            "ceasing",
+            "no change",
+        }
+        if any(ThesisComparator._keyword_in_text(term, haystack) for term in non_buying_terms):
+            return False
+        buying_terms = {
+            "on-market purchase",
+            "on market purchase",
+            "purchased",
+            "purchase of",
+            "bought",
+            "acquired",
+            "increased his stake",
+            "increased her stake",
+            "increased their stake",
+            "increased its stake",
+            "increased holding",
+            "increased holdings",
+        }
+        return any(ThesisComparator._keyword_in_text(term, haystack) for term in buying_terms)
 
     @staticmethod
     def _matched_count(evaluations: List[ConditionEvaluation], *, scenario: str = "", group: str = "") -> int:
@@ -2011,6 +2078,15 @@ class ThesisComparator:
 
         materiality = str(semantic_materiality or "").strip().lower()
         announcement = str(announcement_class or "").strip().lower()
+        if self._is_insider_buying_signal(facts):
+            return ThesisRelationship(
+                priority=2,
+                kind="insider_buying",
+                strength="partial",
+                direction="positive",
+                confidence=float(facts.classification_confidence or facts.semantic_confidence or 0.0),
+                summary="Director on-market buying is a weak positive governance and alignment signal.",
+            )
         if announcement == "administrative" and materiality in {"", "none", "low"}:
             return ThesisRelationship(
                 priority=0,
@@ -2249,6 +2325,8 @@ class ThesisComparator:
             return "high"
         if materiality == "high":
             return "high"
+        if "insider_transaction" in affected_domains and affected_domains <= {"governance", "insider_transaction", "management"}:
+            return "low"
         if current_path == "bull" and baseline_path in {"base", "bear"}:
             return "medium"
         if confirmatory_hits > 0:
