@@ -4013,7 +4013,7 @@ async def get_scenario_router_overview(limit: int = 100, ticker: str = ""):
     from .scenario_router.observability import ScenarioRouterObservability
 
     observer = ScenarioRouterObservability()
-    return observer.build_overview(recent_limit=max(1, min(int(limit or 100), 500)), ticker=str(ticker or "").strip())
+    return observer.build_overview(recent_limit=max(1, min(int(limit or 100), 5000)), ticker=str(ticker or "").strip())
 
 
 @app.get("/api/announcement-router/events")
@@ -4023,7 +4023,7 @@ async def list_scenario_router_events(limit: int = 50, ticker: str = ""):
 
     observer = ScenarioRouterObservability()
     return {
-        "events": observer.list_recent_events(limit=max(1, min(int(limit or 50), 500)), ticker=str(ticker or "").strip()),
+        "events": observer.list_recent_events(limit=max(1, min(int(limit or 50), 5000)), ticker=str(ticker or "").strip()),
     }
 
 

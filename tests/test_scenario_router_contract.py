@@ -9,6 +9,24 @@ from backend.scenario_router.review_store import apply_review_overlay, save_revi
 
 
 class ScenarioRouterSignalMapTests(unittest.TestCase):
+    def test_overview_returns_requested_recent_events_not_fixed_twelve_row_slice(self):
+        observer = ScenarioRouterObservability()
+        rows = [
+            {
+                "event_id": f"event-{idx}",
+                "ticker": "ASX:BRK",
+                "status": "ok",
+                "saved_at_utc": f"2026-06-{idx + 1:02d}T00:00:00Z",
+            }
+            for idx in range(20)
+        ]
+        observer.list_recent_events = lambda *, limit=100, ticker="": rows[:limit]
+
+        overview = observer.build_overview(recent_limit=20)
+
+        self.assertEqual(overview["total_events"], 20)
+        self.assertEqual(len(overview["recent_events"]), 20)
+
     def test_signal_map_returns_latest_router_signal_per_ticker(self):
         observer = ScenarioRouterObservability()
         rows = [

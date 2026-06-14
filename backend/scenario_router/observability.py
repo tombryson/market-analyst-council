@@ -87,7 +87,7 @@ class ScenarioRouterObservability:
             "current_path_counts": dict(current_path_counts),
             "path_transition_counts": dict(transition_counts),
             "source_type_counts": dict(source_type_counts),
-            "recent_events": rows[:12],
+            "recent_events": rows,
         }
 
     def build_signal_map(self, *, limit: int = 500, ticker: str = "") -> Dict[str, int | float]:

@@ -172,6 +172,7 @@ function labelProjectionRerunSignal(value) {
 }
 
 const COMPANY_THESIS_PATHS = new Set(['bull', 'base', 'bear']);
+const ROUTER_MONITOR_LIMIT = 5000;
 
 function defaultReviewNote(router, status) {
   const title = routerTitle(router);
@@ -544,6 +545,19 @@ function routerCompanyThesisPath(router) {
 
 function routerEventTimeMs(row) {
   return parseIsoDateOrNull(row?.saved_at_utc)?.getTime() || parseIsoDateOrNull(row?.received_at_utc)?.getTime() || 0;
+}
+
+function routerEventKey(row) {
+  return String(row?.event_id || `${row?.ticker || ''}-${row?.saved_at_utc || ''}-${routerTitle(row)}`).trim();
+}
+
+function mergeRouterEventRows(currentRows, incomingRows) {
+  const byKey = new Map();
+  [...(Array.isArray(currentRows) ? currentRows : []), ...(Array.isArray(incomingRows) ? incomingRows : [])].forEach((row) => {
+    const key = routerEventKey(row);
+    if (key) byKey.set(key, row);
+  });
+  return [...byKey.values()];
 }
 
 function buildCompanyPathMap(events) {
@@ -1712,17 +1726,24 @@ function buildCompanyQueueGroups(events, companyPathByTicker) {
     .map(([ticker, rows]) => {
       const sortedRows = [...rows].sort((a, b) => routerEventTimeMs(b) - routerEventTimeMs(a));
       const latestEvent = sortedRows[0] || {};
+      const pathBasis = sortedRows
+        .filter((row) => {
+          const delta = Number(routerTrajectoryScore(row)?.event_delta);
+          return Number.isFinite(delta) && delta !== 0;
+        })
+        .sort((a, b) => Math.abs(Number(routerTrajectoryScore(b)?.event_delta || 0)) - Math.abs(Number(routerTrajectoryScore(a)?.event_delta || 0)));
       return {
         ticker,
         path: companyPathByTicker?.get(ticker) || routerCompanyThesisPath(latestEvent),
         latestEvent,
+        pathBasis,
         events: sortedRows,
       };
     })
     .sort((a, b) => a.ticker.localeCompare(b.ticker));
 }
 
-function CompanyPathQueue({ companies, selectedEventId, onSelect }) {
+function CompanyPathQueue({ companies, selectedEventId, onSelect, onLoadAll, expandedTickers, busyTicker }) {
   const announcementCount = companies.reduce((sum, company) => sum + company.events.length, 0);
   return (
     <article className="announcement-router-queue announcement-router-company-queue">
@@ -1733,6 +1754,8 @@ function CompanyPathQueue({ companies, selectedEventId, onSelect }) {
       <div className="announcement-router-queue-list">
         {companies.map((company) => {
           const latestVm = routerPresentation(company.latestEvent);
+          const isBusy = busyTicker === company.ticker;
+          const isExpanded = expandedTickers?.has(company.ticker);
           return (
             <section className="announcement-router-company-group" key={company.ticker}>
               <div className="announcement-router-company-head">
@@ -1740,15 +1763,44 @@ function CompanyPathQueue({ companies, selectedEventId, onSelect }) {
                   <strong>{company.ticker}</strong>
                   <span>{company.events.length} filing{company.events.length === 1 ? '' : 's'}</span>
                 </div>
-                <b className={`announcement-router-company-path tone-${company.path}`}>
-                  {labelCompanyThesisPath(company.path)}
-                </b>
+                <div className="announcement-router-company-actions">
+                  <button
+                    type="button"
+                    className="announcement-router-company-load-all"
+                    disabled={isBusy || isExpanded}
+                    onClick={() => onLoadAll?.(company.ticker)}
+                  >
+                    {isBusy ? 'Loading...' : isExpanded ? 'All announcements loaded' : 'Show all announcements'}
+                  </button>
+                  <b className={`announcement-router-company-path tone-${company.path}`}>
+                    {labelCompanyThesisPath(company.path)}
+                  </b>
+                </div>
               </div>
               <div className="announcement-router-company-latest">
-                <span>Latest</span>
+                <span>Latest filing</span>
                 <strong>{latestVm.trajectoryLabel}</strong>
                 <em>{routerTitle(company.latestEvent)}</em>
               </div>
+              {!!company.pathBasis.length && (
+                <div className="announcement-router-company-basis">
+                  <span>Path basis</span>
+                  {company.pathBasis.map((row) => {
+                    const score = routerTrajectoryScore(row);
+                    return (
+                      <button
+                        type="button"
+                        key={`basis-${row.event_id || `${row.ticker}-${row.saved_at_utc}-${routerTitle(row)}`}`}
+                        onClick={() => onSelect(row.event_id || '')}
+                      >
+                        <em data-tone={trajectoryScoreTone(score)}>{fmtSignedDelta(trajectoryScoreDisplayDelta(score))}</em>
+                        <strong>{routerTitle(row)}</strong>
+                        <small>{row.saved_at_utc ? fmtRelativeSince(row.saved_at_utc) : 'n/a'}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <div className="announcement-router-company-events">
                 {company.events.map((row) => {
                   const vm = routerPresentation(row);
@@ -1834,6 +1886,9 @@ function countCompaniesByScenario(companyPathByTicker, key) {
 }
 
 function activeFilterSummary(activeFilterGroup, caseFilter, reviewFilter, scenarioFilter) {
+  if (activeFilterGroup === 'case' && caseFilter === 'all') return 'All announcements';
+  if (activeFilterGroup === 'review' && reviewFilter === 'all') return 'All review states';
+  if (activeFilterGroup === 'scenario' && scenarioFilter === 'all') return 'All company theses';
   const active = [
     activeFilterGroup === 'case' && caseFilter !== 'all' && `Case: ${titleizeKey(caseFilter)}`,
     activeFilterGroup === 'review' && reviewFilter !== 'all' && `Review: ${titleizeKey(reviewFilter)}`,
@@ -2037,6 +2092,8 @@ export default function AnnouncementRouterMonitor({
   const [activeReviewFilter, setActiveReviewFilter] = useState('all');
   const [activeScenarioFilter, setActiveScenarioFilter] = useState('all');
   const [reviewBusy, setReviewBusy] = useState('');
+  const [companyFetchBusy, setCompanyFetchBusy] = useState('');
+  const [expandedCompanyTickers, setExpandedCompanyTickers] = useState(() => new Set());
   const [selectedPriceHistory, setSelectedPriceHistory] = useState([]);
 
   const effectiveTicker = useMemo(
@@ -2067,7 +2124,7 @@ export default function AnnouncementRouterMonitor({
       try {
         setLoading(true);
         setError('');
-        const payload = await api.getAnnouncementRouterOverview(120, effectiveTicker);
+        const payload = await api.getAnnouncementRouterOverview(ROUTER_MONITOR_LIMIT, effectiveTicker);
         if (!cancelled) setOverview(payload || null);
       } catch (err) {
         if (!cancelled) setError(err?.message || 'Failed to load announcement router monitor');
@@ -2186,6 +2243,29 @@ export default function AnnouncementRouterMonitor({
     openAnnouncementRouter();
   }, [onOpenFullMonitor]);
 
+  const loadAllCompanyAnnouncements = useCallback(async (ticker) => {
+    const cleanTicker = String(ticker || '').trim().toUpperCase();
+    if (!cleanTicker) return;
+    setCompanyFetchBusy(cleanTicker);
+    try {
+      const payload = await api.listAnnouncementRouterEvents(ROUTER_MONITOR_LIMIT, cleanTicker);
+      const rows = Array.isArray(payload?.events) ? payload.events : [];
+      setOverview((current) => ({
+        ...(current || {}),
+        recent_events: mergeRouterEventRows(current?.recent_events, rows),
+      }));
+      setExpandedCompanyTickers((current) => {
+        const next = new Set(current);
+        next.add(cleanTicker);
+        return next;
+      });
+    } catch (err) {
+      setError(err?.message || `Failed to load announcements for ${cleanTicker}`);
+    } finally {
+      setCompanyFetchBusy('');
+    }
+  }, []);
+
   const updateReview = useCallback(async (row, status, options = {}) => {
     const eventId = String(row?.event_id || '').trim();
     const reviewStatus = String(status || '').trim().toLowerCase();
@@ -2284,7 +2364,7 @@ export default function AnnouncementRouterMonitor({
                   setActiveCaseFilter(key);
                   setActiveReviewFilter('all');
                   setActiveScenarioFilter('all');
-                  setActiveFilterGroup(key === 'all' ? '' : 'case');
+                  setActiveFilterGroup('case');
                   setSelectedEventId('');
                 }}
               />
@@ -2296,7 +2376,7 @@ export default function AnnouncementRouterMonitor({
                   setActiveCaseFilter('all');
                   setActiveReviewFilter('all');
                   setActiveScenarioFilter(key);
-                  setActiveFilterGroup(key === 'all' ? '' : 'scenario');
+                  setActiveFilterGroup('scenario');
                   setSelectedEventId('');
                 }}
               />
@@ -2308,7 +2388,7 @@ export default function AnnouncementRouterMonitor({
                   setActiveCaseFilter('all');
                   setActiveReviewFilter(key);
                   setActiveScenarioFilter('all');
-                  setActiveFilterGroup(key === 'all' ? '' : 'review');
+                  setActiveFilterGroup('review');
                   setSelectedEventId('');
                 }}
               />
@@ -2330,6 +2410,9 @@ export default function AnnouncementRouterMonitor({
                     companies={filteredCompanyGroups}
                     selectedEventId={selectedEvent?.event_id || selectedEventId}
                     onSelect={setSelectedEventId}
+                    onLoadAll={loadAllCompanyAnnouncements}
+                    expandedTickers={expandedCompanyTickers}
+                    busyTicker={companyFetchBusy}
                   />
                 ) : (
                   <RouterQueue
