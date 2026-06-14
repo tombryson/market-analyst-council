@@ -181,9 +181,32 @@ def apply_cumulative_scores(rows: List[Dict[str, Any]]) -> None:
         for row in sorted(group_rows, key=_row_time_key):
             score = row.get("trajectory_score") if isinstance(row.get("trajectory_score"), dict) else {}
             event_delta = _to_float(score.get("event_delta"))
+            validation_type = str(score.get("validation_type") or "").strip().lower()
+            raw_secondary_delta = _to_float(score.get("raw_secondary_delta"))
+            if raw_secondary_delta is None or abs(raw_secondary_delta) <= 0.0001:
+                raw_secondary_delta = _to_float(score.get("unvalidated_event_delta"))
+            legacy_secondary = (
+                validation_type in {"", "none"}
+                and raw_secondary_delta is not None
+                and abs(raw_secondary_delta) > 0.0001
+                and not bool(score.get("mapped_condition"))
+            )
+            if validation_type in SECONDARY_TYPES or legacy_secondary:
+                if legacy_secondary:
+                    validation_type = "related_unmapped"
+                    score["validation_type"] = validation_type
+                if (
+                    raw_secondary_delta is not None
+                    and abs(raw_secondary_delta) > 0.0001
+                    and (event_delta is None or abs(event_delta) <= 0.0001)
+                ):
+                    event_delta = _secondary_event_delta(raw_secondary_delta)
+                    score["event_delta"] = round(event_delta, 2)
+                    score["raw_secondary_delta"] = round(raw_secondary_delta, 2)
+                    score["secondary_event_delta"] = round(event_delta, 2)
+                    score["primary_event_delta"] = 0.0
             if event_delta is None:
                 continue
-            validation_type = str(score.get("validation_type") or "").strip().lower()
             cumulative = round(cumulative + event_delta, 2)
             baseline_path = str(row.get("baseline_path") or "").strip().lower()
             baseline_score = _to_float(score.get("baseline_score"))
@@ -194,6 +217,13 @@ def apply_cumulative_scores(rows: List[Dict[str, Any]]) -> None:
             secondary_delta = event_delta if validation_type in SECONDARY_TYPES else 0.0
             cumulative_primary = round(cumulative_primary + primary_delta, 2)
             cumulative_secondary = round(cumulative_secondary + secondary_delta, 2)
+            score["score_after_event"] = round(baseline_score + event_delta, 2)
+            score["position_band"] = score_band(score["score_after_event"])
+            score["position_label"] = position_label(
+                baseline_path,
+                score["score_after_event"],
+                validated_delta=event_delta,
+            )
             score.update(
                 {
                     "cumulative_delta": cumulative,

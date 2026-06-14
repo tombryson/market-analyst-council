@@ -368,6 +368,57 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         self.assertEqual(rows[2]["trajectory_score"]["cumulative_secondary_delta"], 0.5)
         self.assertEqual(rows[2]["trajectory_score"]["cumulative_position_label"], "Base evidence zone")
 
+    def test_legacy_secondary_rows_are_weighted_before_display(self):
+        rows = [
+            {
+                "ticker": "ASX:TST",
+                "run_id": "run-1",
+                "saved_at_utc": "2026-01-01T00:00:00Z",
+                "baseline_path": "base",
+                "trajectory_score": {
+                    "direction": "positive",
+                    "event_delta": 0.0,
+                    "unvalidated_event_delta": 2.0,
+                    "baseline_score": 0.0,
+                    "validation_type": "related_unmapped",
+                },
+            }
+        ]
+
+        apply_cumulative_scores(rows)
+
+        score = rows[0]["trajectory_score"]
+        self.assertEqual(score["event_delta"], 1.0)
+        self.assertEqual(score["raw_secondary_delta"], 2.0)
+        self.assertEqual(score["secondary_event_delta"], 1.0)
+        self.assertEqual(score["cumulative_delta"], 1.0)
+
+    def test_legacy_none_rows_with_raw_secondary_delta_are_treated_as_secondary(self):
+        rows = [
+            {
+                "ticker": "ASX:TST",
+                "run_id": "run-1",
+                "saved_at_utc": "2026-01-01T00:00:00Z",
+                "baseline_path": "base",
+                "trajectory_score": {
+                    "direction": "positive",
+                    "event_delta": 0.0,
+                    "unvalidated_event_delta": 2.0,
+                    "baseline_score": 0.0,
+                    "mapped_condition": False,
+                    "validation_type": "none",
+                },
+            }
+        ]
+
+        apply_cumulative_scores(rows)
+
+        score = rows[0]["trajectory_score"]
+        self.assertEqual(score["validation_type"], "related_unmapped")
+        self.assertEqual(score["event_delta"], 1.0)
+        self.assertEqual(score["raw_secondary_delta"], 2.0)
+        self.assertEqual(score["cumulative_delta"], 1.0)
+
     def test_unknown_filing_exposes_confidence_breakdown(self):
         announcement = facts(
             "Corporate Update",
