@@ -173,6 +173,8 @@ function labelProjectionRerunSignal(value) {
 
 const COMPANY_THESIS_PATHS = new Set(['bull', 'base', 'bear']);
 const ROUTER_MONITOR_LIMIT = 5000;
+const COMPANY_SUMMARY_EVENT_LIMIT = 5;
+const COMPANY_SUMMARY_BASIS_LIMIT = 3;
 
 function defaultReviewNote(router, status) {
   const title = routerTitle(router);
@@ -1756,22 +1758,35 @@ function CompanyPathQueue({ companies, selectedEventId, onSelect, onLoadAll, exp
           const latestVm = routerPresentation(company.latestEvent);
           const isBusy = busyTicker === company.ticker;
           const isExpanded = expandedTickers?.has(company.ticker);
+          const visibleBasis = isExpanded
+            ? company.pathBasis
+            : company.pathBasis.slice(0, COMPANY_SUMMARY_BASIS_LIMIT);
+          const visibleEvents = isExpanded
+            ? company.events
+            : company.events.slice(0, COMPANY_SUMMARY_EVENT_LIMIT);
+          const hiddenCount = Math.max(0, company.events.length - visibleEvents.length);
           return (
             <section className="announcement-router-company-group" key={company.ticker}>
               <div className="announcement-router-company-head">
                 <div>
                   <strong>{company.ticker}</strong>
-                  <span>{company.events.length} filing{company.events.length === 1 ? '' : 's'}</span>
+                  <span>
+                    {visibleEvents.length} of {company.events.length} filing{company.events.length === 1 ? '' : 's'} shown
+                  </span>
                 </div>
                 <div className="announcement-router-company-actions">
-                  <button
-                    type="button"
-                    className="announcement-router-company-load-all"
-                    disabled={isBusy || isExpanded}
-                    onClick={() => onLoadAll?.(company.ticker)}
-                  >
-                    {isBusy ? 'Loading...' : isExpanded ? 'All announcements loaded' : 'Show all announcements'}
-                  </button>
+                  {hiddenCount > 0 ? (
+                    <button
+                      type="button"
+                      className="announcement-router-company-load-all"
+                      disabled={isBusy}
+                      onClick={() => onLoadAll?.(company.ticker)}
+                    >
+                      {isBusy ? 'Loading...' : `Show all ${company.events.length} announcements`}
+                    </button>
+                  ) : (
+                    <span className="announcement-router-company-loaded">All shown</span>
+                  )}
                   <b className={`announcement-router-company-path tone-${company.path}`}>
                     {labelCompanyThesisPath(company.path)}
                   </b>
@@ -1782,10 +1797,10 @@ function CompanyPathQueue({ companies, selectedEventId, onSelect, onLoadAll, exp
                 <strong>{latestVm.trajectoryLabel}</strong>
                 <em>{routerTitle(company.latestEvent)}</em>
               </div>
-              {!!company.pathBasis.length && (
+              {!!visibleBasis.length && (
                 <div className="announcement-router-company-basis">
                   <span>Path basis</span>
-                  {company.pathBasis.map((row) => {
+                  {visibleBasis.map((row) => {
                     const score = routerTrajectoryScore(row);
                     return (
                       <button
@@ -1802,7 +1817,7 @@ function CompanyPathQueue({ companies, selectedEventId, onSelect, onLoadAll, exp
                 </div>
               )}
               <div className="announcement-router-company-events">
-                {company.events.map((row) => {
+                {visibleEvents.map((row) => {
                   const vm = routerPresentation(row);
                   const score = routerTrajectoryScore(row);
                   const selected = selectedEventId === row.event_id;
@@ -1829,6 +1844,16 @@ function CompanyPathQueue({ companies, selectedEventId, onSelect, onLoadAll, exp
                   );
                 })}
               </div>
+              {hiddenCount > 0 && (
+                <button
+                  type="button"
+                  className="announcement-router-company-more"
+                  disabled={isBusy}
+                  onClick={() => onLoadAll?.(company.ticker)}
+                >
+                  {isBusy ? 'Loading...' : `${hiddenCount} older announcement${hiddenCount === 1 ? '' : 's'} hidden`}
+                </button>
+              )}
             </section>
           );
         })}
