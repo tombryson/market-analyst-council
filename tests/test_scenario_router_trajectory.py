@@ -210,6 +210,39 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         self.assertEqual(score["score_after_event"], 0.0)
         self.assertIn("No price/time thesis movement", score["reason"])
 
+    def test_secondary_analysis_is_weighted_below_primary_analysis(self):
+        score = build_trajectory_score(
+            baseline_path="base",
+            current_path="base",
+            trajectory_state="material_unmapped",
+            trajectory_effect="strengthens",
+            thesis_effect="confirms",
+            timeline_effect="accelerated",
+            impact_level="medium",
+            materiality="medium",
+            classification_confidence=0.9,
+            thesis_match_confidence=0.0,
+            direct_match_count=0,
+            thesis_required_hits=0,
+            thesis_failure_hits=0,
+            red_flag_hits=0,
+            confirmatory_hits=0,
+            red_flag_partial_hits=0,
+            confirmatory_partial_hits=0,
+            verification_hits=0,
+            positive=True,
+            negative=False,
+            thesis_relationship="related_unmapped",
+            price_time_effect="De-risks the delivery path.",
+        )
+
+        self.assertEqual(score["validation_type"], "related_unmapped")
+        self.assertEqual(score["raw_secondary_delta"], 2.0)
+        self.assertEqual(score["secondary_event_delta"], 1.0)
+        self.assertEqual(score["primary_event_delta"], 0.0)
+        self.assertEqual(score["event_delta"], 1.0)
+        self.assertEqual(score["score_after_event"], 1.0)
+
     def test_negative_material_unmapped_does_not_move_validated_path(self):
         announcement = facts(
             "Key Permit Decision Delayed",
@@ -285,7 +318,7 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
         self.assertEqual(rows[2]["trajectory_score"]["cumulative_delta"], 2.5)
         self.assertEqual(rows[2]["trajectory_score"]["cumulative_position_label"], "Base, bull-leaning")
 
-    def test_unmapped_cumulative_score_does_not_move_validated_path(self):
+    def test_secondary_analysis_rolls_forward_at_reduced_weight(self):
         rows = [
             {
                 "ticker": "ASX:TST",
@@ -294,9 +327,10 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
                 "baseline_path": "base",
                 "trajectory_score": {
                     "direction": "positive",
-                    "event_delta": 2.0,
+                    "event_delta": 1.0,
+                    "raw_secondary_delta": 2.0,
                     "baseline_score": 0.0,
-                    "validation_type": "material_unmapped",
+                    "validation_type": "related_unmapped",
                 },
             },
             {
@@ -306,9 +340,10 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
                 "baseline_path": "base",
                 "trajectory_score": {
                     "direction": "positive",
-                    "event_delta": 2.0,
+                    "event_delta": 1.0,
+                    "raw_secondary_delta": 2.0,
                     "baseline_score": 0.0,
-                    "validation_type": "material_unmapped",
+                    "validation_type": "related_unmapped",
                 },
             },
             {
@@ -317,18 +352,20 @@ class ScenarioRouterTrajectoryTests(unittest.TestCase):
                 "saved_at_utc": "2026-03-01T00:00:00Z",
                 "baseline_path": "base",
                 "trajectory_score": {
-                    "direction": "positive",
-                    "event_delta": 6.0,
+                    "direction": "negative",
+                    "event_delta": -1.5,
+                    "raw_secondary_delta": -3.0,
                     "baseline_score": 0.0,
-                    "validation_type": "material_unmapped",
+                    "validation_type": "related_unmapped",
                 },
             },
         ]
 
         apply_cumulative_scores(rows)
 
-        self.assertEqual(rows[2]["trajectory_score"]["cumulative_delta"], 0.0)
-        self.assertEqual(rows[2]["trajectory_score"]["cumulative_validated_delta"], 0.0)
+        self.assertEqual(rows[2]["trajectory_score"]["cumulative_delta"], 0.5)
+        self.assertEqual(rows[2]["trajectory_score"]["cumulative_primary_delta"], 0.0)
+        self.assertEqual(rows[2]["trajectory_score"]["cumulative_secondary_delta"], 0.5)
         self.assertEqual(rows[2]["trajectory_score"]["cumulative_position_label"], "Base evidence zone")
 
     def test_unknown_filing_exposes_confidence_breakdown(self):

@@ -19,6 +19,9 @@ INTENSITY_DELTAS = {
     "critical": 3.0,
 }
 
+SECONDARY_SIGNAL_MULTIPLIER = 0.5
+SECONDARY_SIGNAL_CAP = 1.5
+
 VALIDATED_TYPES = {
     "saved_thesis_condition",
     "saved_thesis_failure",
@@ -29,6 +32,11 @@ VALIDATED_TYPES = {
     "verification_queue",
     "verification_queue_partial",
     "mapped_condition",
+}
+
+SECONDARY_TYPES = {
+    "related_unmapped",
+    "material_unmapped",
 }
 
 TERMINAL_NEUTRAL_STATES = {
@@ -112,12 +120,15 @@ def build_trajectory_score(
         unvalidated_event_delta = magnitude
     if validation_type in VALIDATED_TYPES:
         event_delta = unvalidated_event_delta
+    elif validation_type in SECONDARY_TYPES:
+        event_delta = _secondary_event_delta(unvalidated_event_delta)
     else:
         event_delta = 0.0
 
     baseline_score = baseline_path_score(baseline_path)
     score_after_event = round(baseline_score + event_delta, 2)
     event_validated_delta = event_delta if validation_type in VALIDATED_TYPES else 0.0
+    event_secondary_delta = event_delta if validation_type in SECONDARY_TYPES else 0.0
     confidence = _confidence(
         classification_confidence=classification_confidence,
         thesis_match_confidence=thesis_match_confidence,
@@ -129,6 +140,9 @@ def build_trajectory_score(
         "intensity": intensity,
         "event_delta": round(event_delta, 2),
         "unvalidated_event_delta": round(unvalidated_event_delta, 2),
+        "raw_secondary_delta": round(unvalidated_event_delta if validation_type in SECONDARY_TYPES else 0.0, 2),
+        "primary_event_delta": round(event_validated_delta, 2),
+        "secondary_event_delta": round(event_secondary_delta, 2),
         "baseline_score": baseline_score,
         "score_after_event": score_after_event,
         "position_band": score_band(score_after_event),
@@ -162,32 +176,36 @@ def apply_cumulative_scores(rows: List[Dict[str, Any]]) -> None:
 
     for group_rows in groups.values():
         cumulative = 0.0
-        cumulative_validated = 0.0
+        cumulative_primary = 0.0
+        cumulative_secondary = 0.0
         for row in sorted(group_rows, key=_row_time_key):
             score = row.get("trajectory_score") if isinstance(row.get("trajectory_score"), dict) else {}
             event_delta = _to_float(score.get("event_delta"))
             if event_delta is None:
                 continue
             validation_type = str(score.get("validation_type") or "").strip().lower()
-            effective_event_delta = event_delta if validation_type in VALIDATED_TYPES else 0.0
-            cumulative = round(cumulative + effective_event_delta, 2)
+            cumulative = round(cumulative + event_delta, 2)
             baseline_path = str(row.get("baseline_path") or "").strip().lower()
             baseline_score = _to_float(score.get("baseline_score"))
             if baseline_score is None:
                 baseline_score = baseline_path_score(baseline_path)
             score_after_cumulative = round(baseline_score + cumulative, 2)
-            validated_delta = effective_event_delta if validation_type in VALIDATED_TYPES else 0.0
-            cumulative_validated = round(cumulative_validated + validated_delta, 2)
+            primary_delta = event_delta if validation_type in VALIDATED_TYPES else 0.0
+            secondary_delta = event_delta if validation_type in SECONDARY_TYPES else 0.0
+            cumulative_primary = round(cumulative_primary + primary_delta, 2)
+            cumulative_secondary = round(cumulative_secondary + secondary_delta, 2)
             score.update(
                 {
                     "cumulative_delta": cumulative,
-                    "cumulative_validated_delta": cumulative_validated,
+                    "cumulative_validated_delta": cumulative_primary,
+                    "cumulative_primary_delta": cumulative_primary,
+                    "cumulative_secondary_delta": cumulative_secondary,
                     "score_after_cumulative": score_after_cumulative,
                     "cumulative_position_band": score_band(score_after_cumulative),
                     "cumulative_position_label": position_label(
                         baseline_path,
                         score_after_cumulative,
-                        validated_delta=cumulative_validated,
+                        validated_delta=cumulative,
                     ),
                 }
             )
@@ -438,6 +456,16 @@ def _validated_magnitude(validation_type: str, intensity: str, validation_weight
     if validation == "verification_queue_partial":
         return min(magnitude, 1.0)
     return magnitude
+
+
+def _secondary_event_delta(raw_delta: float) -> float:
+    value = _to_float(raw_delta)
+    if value is None or abs(value) <= 0.0001:
+        return 0.0
+    weighted = value * SECONDARY_SIGNAL_MULTIPLIER
+    if weighted > 0:
+        return round(min(weighted, SECONDARY_SIGNAL_CAP), 2)
+    return round(max(weighted, -SECONDARY_SIGNAL_CAP), 2)
 
 
 def _row_time_key(row: Dict[str, Any]) -> str:

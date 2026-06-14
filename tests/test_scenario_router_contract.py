@@ -9,20 +9,20 @@ from backend.scenario_router.review_store import apply_review_overlay, save_revi
 
 
 class ScenarioRouterSignalMapTests(unittest.TestCase):
-    def test_signal_map_returns_latest_validated_score_per_ticker(self):
+    def test_signal_map_returns_latest_router_signal_per_ticker(self):
         observer = ScenarioRouterObservability()
         rows = [
             {
                 "ticker": "ASX:VMM",
-                "trajectory_score": {"cumulative_validated_delta": 3.0},
+                "trajectory_score": {"cumulative_delta": 3.5, "cumulative_validated_delta": 3.0},
             },
             {
                 "ticker": "ASX:VMM",
-                "trajectory_score": {"cumulative_validated_delta": -1.0},
+                "trajectory_score": {"cumulative_delta": -1.0, "cumulative_validated_delta": -1.0},
             },
             {
                 "ticker": "ASX:WWI",
-                "trajectory_score": {"cumulative_validated_delta": -1.5},
+                "trajectory_score": {"cumulative_delta": -2.0, "cumulative_validated_delta": -1.5},
             },
         ]
 
@@ -30,7 +30,7 @@ class ScenarioRouterSignalMapTests(unittest.TestCase):
             row for row in rows if not ticker or row["ticker"] == ticker
         ]
 
-        self.assertEqual(observer.build_signal_map(), {"ASX:VMM": 3, "ASX:WWI": -1.5})
+        self.assertEqual(observer.build_signal_map(), {"ASX:VMM": 3.5, "ASX:WWI": -2})
 
     def test_signal_map_returns_zero_for_requested_ticker_without_events(self):
         observer = ScenarioRouterObservability()
@@ -237,8 +237,9 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
         self.assertEqual(report["trajectory_state"], "risk_increased")
         self.assertEqual(report["impact_verdict"], "negative")
         self.assertEqual(report["relationship_kind"], "material_unmapped")
-        self.assertEqual(report["trajectory_score"]["event_delta"], 0.0)
-        self.assertLess(report["trajectory_score"]["unvalidated_event_delta"], 0.0)
+        self.assertEqual(report["trajectory_score"]["event_delta"], -1.0)
+        self.assertEqual(report["trajectory_score"]["raw_secondary_delta"], -2.0)
+        self.assertLess(report["trajectory_score"]["secondary_event_delta"], 0.0)
         self.assertEqual(action["action"], "annotate_run")
         self.assertTrue(action["requires_human_ack"])
         self.assertEqual(row["display"]["trajectory_label"], "Risk increased")

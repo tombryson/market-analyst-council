@@ -98,7 +98,7 @@ class ScenarioRouterObservability:
             row_ticker = str(row.get("ticker") or "").strip().upper()
             if not row_ticker or row_ticker in signals:
                 continue
-            signals[row_ticker] = _compact_number(_validated_signal_score(row))
+            signals[row_ticker] = _compact_number(_router_signal_score(row))
         if wanted and wanted not in signals:
             signals[wanted] = 0
         return signals
@@ -458,11 +458,11 @@ def _condition_details(
     return rows
 
 
-def _validated_signal_score(row: Dict[str, Any]) -> float:
+def _router_signal_score(row: Dict[str, Any]) -> float:
     score = row.get("trajectory_score") if isinstance(row.get("trajectory_score"), dict) else {}
-    raw = score.get("cumulative_validated_delta")
+    raw = score.get("cumulative_delta")
     if raw is None:
-        raw = score.get("cumulative_delta")
+        raw = score.get("cumulative_validated_delta")
     try:
         return round(float(raw or 0), 2)
     except (TypeError, ValueError):

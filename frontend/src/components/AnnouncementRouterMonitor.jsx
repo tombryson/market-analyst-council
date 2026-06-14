@@ -595,33 +595,28 @@ function hasTrajectoryScore(score) {
 }
 
 function trajectoryScoreDisplayDelta(score) {
-  if (isProvisionalTrajectoryScore(score)) {
-    return Number(score?.unvalidated_event_delta);
-  }
   return Number(score?.event_delta);
 }
 
 function trajectoryScoreTone(score) {
   const direction = String(score?.direction || '').trim().toLowerCase();
-  if (isProvisionalTrajectoryScore(score) && direction === 'negative') return 'urgent';
-  if (isProvisionalTrajectoryScore(score)) return 'warn';
   if (direction === 'positive') return 'positive';
   if (direction === 'negative') return 'urgent';
   if (direction === 'mixed') return 'warn';
+  if (isProvisionalTrajectoryScore(score)) return 'warn';
   return 'neutral';
+}
+
+function trajectoryScoreTrackLabel(score) {
+  return isProvisionalTrajectoryScore(score) ? 'Secondary Analysis' : 'Primary Thesis Analysis';
 }
 
 function trajectoryScoreDirectionLabel(score) {
   const direction = String(score?.direction || '').trim().toLowerCase();
-  if (isProvisionalTrajectoryScore(score)) {
-    if (direction === 'positive') return 'Provisional positive evidence';
-    if (direction === 'negative') return 'Provisional negative evidence';
-    return 'Provisional thesis evidence';
-  }
-  if (direction === 'positive') return 'Bull-leaning evidence';
-  if (direction === 'negative') return 'Bear-leaning evidence';
-  if (direction === 'mixed') return 'Mixed evidence';
-  return 'No trajectory move';
+  if (direction === 'positive') return 'Positive contribution';
+  if (direction === 'negative') return 'Negative contribution';
+  if (direction === 'mixed') return 'Mixed contribution';
+  return 'No contribution';
 }
 
 function safeTrajectoryPositionLabel(score, key = 'position_label') {
@@ -632,18 +627,48 @@ function safeTrajectoryPositionLabel(score, key = 'position_label') {
     if (/bear case/i.test(raw)) return 'Bear-leaning, unvalidated';
   }
   return raw
-    .replace(/\bBull case\b/g, 'Bull evidence zone')
-    .replace(/\bBear case\b/g, 'Bear evidence zone')
-    .replace(/\bBase case\b/g, 'Base evidence zone');
+    .replace(/\bBull evidence zone\b/g, 'Bull zone')
+    .replace(/\bBear evidence zone\b/g, 'Bear zone')
+    .replace(/\bBase evidence zone\b/g, 'Base zone')
+    .replace(/\bBull case\b/g, 'Bull zone')
+    .replace(/\bBear case\b/g, 'Bear zone')
+    .replace(/\bBase case\b/g, 'Base zone');
 }
 
 function trajectoryScoreReason(score) {
   const raw = String(score?.reason || '').trim();
   if (!raw) return 'Directional evidence was scored against the saved scenario path.';
-  if (!isProvisionalTrajectoryScore(score)) return raw;
-  return raw
-    .replace(/^Bull-leaning\b/i, 'Positive')
-    .replace(/^Bear-leaning\b/i, 'Negative');
+  if (!isProvisionalTrajectoryScore(score)) {
+    return raw
+      .replace(/^Bull-leaning\b/i, 'Positive')
+      .replace(/^Bear-leaning\b/i, 'Negative');
+  }
+  const detail = raw.includes(':') ? raw.slice(raw.indexOf(':') + 1).trim() : raw;
+  return `Outside the saved thesis map: ${detail}`
+    .replace(/\ba outside saved conditions\b/i, 'outside the saved thesis map')
+    .replace(/^Outside the saved thesis map:\s*Related filing outside the saved thesis map;\s*/i, 'Outside the saved thesis map; ');
+}
+
+function scoreBandLabel(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '';
+  if (num <= -4) return 'Bear';
+  if (num <= -2) return 'Bear-leaning';
+  if (num < 2) return 'Base';
+  if (num < 4) return 'Bull-leaning';
+  return 'Bull';
+}
+
+function secondaryAnalysisPathLabel(score) {
+  const baselineScore = Number(score?.baseline_score);
+  const delta = Number(score?.event_delta);
+  if (!Number.isFinite(baselineScore) || !Number.isFinite(delta)) return '';
+  return scoreBandLabel(baselineScore + delta);
+}
+
+function rawSecondaryDelta(score) {
+  const delta = Number(score?.raw_secondary_delta ?? score?.unvalidated_event_delta);
+  return Number.isFinite(delta) && delta !== 0 ? delta : null;
 }
 
 function routerDirectHitCount(router) {
@@ -677,17 +702,14 @@ function routerPriorityTone(router) {
   const action = routerActionKey(router);
   const status = String(router?.status || '').trim().toLowerCase();
   const materiality = routerMateriality(router);
-  const score = routerTrajectoryScore(router);
   const isMaterial = ['medium', 'high', 'critical'].includes(materiality);
   const isAdministrative = routerFilingType(router) === 'administrative' || state === 'administrative_filing';
   if (status === 'error' || action === 'urgent_human_review' || action === 'full_rerun') return 'urgent';
   if (verdict === 'negative') return 'urgent';
-  if (verdict === 'positive') return hasValidatedTrajectoryScore(score) ? 'positive' : 'warn';
+  if (verdict === 'positive') return 'positive';
   if (['mixed', 'uncertain', 'unclear'].includes(verdict)) return 'warn';
   if (['thesis_weakened', 'timeline_delayed', 'risk_increased'].includes(state)) return 'urgent';
-  if (['thesis_strengthened', 'timeline_accelerated', 'risk_reduced'].includes(state)) {
-    return hasValidatedTrajectoryScore(score) ? 'positive' : 'warn';
-  }
+  if (['thesis_strengthened', 'timeline_accelerated', 'risk_reduced'].includes(state)) return 'positive';
   if (isAdministrative) return 'neutral';
   if (isMaterial || ['needs_classification', 'material_unmapped'].includes(state)) return 'warn';
   if (verdict === 'neutral') return 'neutral';
@@ -1175,15 +1197,15 @@ function PathTransition({ router, companyPath = '' }) {
         ? baseline
         : 'base';
   const pathCopy = COMPANY_THESIS_PATHS.has(normalizedCompanyPath)
-    ? 'Current company path'
+    ? 'Current path'
     : changed
       ? `Moved from ${labelCompanyThesisPathShort(baseline)} after this filing`
       : 'Current saved path';
   return (
     <div className="announcement-router-path-bar">
       <div className="announcement-router-path-main">
-        <span className="announcement-router-path-label">Company thesis path</span>
-        <div className="announcement-router-path-stack" aria-label="Company thesis path">
+        <span className="announcement-router-path-label">Thesis path</span>
+        <div className="announcement-router-path-stack" aria-label="Thesis path">
           {['bull', 'base', 'bear'].map((name) => (
             <span
               key={name}
@@ -1370,23 +1392,32 @@ function MarketFactsGrid({ facts }) {
 function TrajectoryScorePanel({ router }) {
   const score = routerTrajectoryScore(router);
   if (!hasTrajectoryScore(score)) return null;
-  const cumulative = Number(score?.cumulative_delta);
+  const tickerSignal = Number(score?.cumulative_delta);
   const eventLabel = safeTrajectoryPositionLabel(score, 'position_label') || 'Position not assessed';
-  const cumulativeLabel = safeTrajectoryPositionLabel(score, 'cumulative_position_label') || eventLabel;
+  const tickerSignalLabel = safeTrajectoryPositionLabel(score, 'cumulative_position_label') || eventLabel;
   const isProvisional = isProvisionalTrajectoryScore(score);
   const eventDelta = trajectoryScoreDisplayDelta(score);
+  const secondaryPathLabel = secondaryAnalysisPathLabel(score);
+  const rawDelta = rawSecondaryDelta(score);
   return (
     <div className="announcement-router-score-panel" data-tone={trajectoryScoreTone(score)}>
-      <span>Path movement</span>
+      <span>{trajectoryScoreTrackLabel(score)}</span>
       <strong>
         {trajectoryScoreDirectionLabel(score)}
         <em>{fmtSignedDelta(eventDelta)}</em>
       </strong>
       <p>{trajectoryScoreReason(score)}</p>
       <div>
-        <b>{isProvisional ? 'Provisional' : 'Event'}: {eventLabel}</b>
-        {Number.isFinite(cumulative) && (
-          <b>Cumulative: {cumulativeLabel || 'Position not assessed'} ({fmtSignedDelta(cumulative)})</b>
+        <b>
+          {isProvisional
+            ? `Reduced weight: ${secondaryPathLabel || eventLabel}`
+            : 'Full weight'}
+        </b>
+        {isProvisional && rawDelta !== null && (
+          <b>Raw model assessment: {fmtSignedDelta(rawDelta)}</b>
+        )}
+        {Number.isFinite(tickerSignal) && (
+          <b>Router Score: {tickerSignalLabel || 'Position not assessed'} ({fmtSignedDelta(tickerSignal)})</b>
         )}
       </div>
     </div>
@@ -1654,7 +1685,7 @@ function RouterQueue({ events, selectedEventId, onSelect }) {
 	                </span>
 	                <span className="announcement-router-queue-title">{routerTitle(row)}</span>
 	                <span className="announcement-router-queue-meta">
-                      {hasTrajectoryScore(score) && <span>{safeTrajectoryPositionLabel(score, 'cumulative_position_label') || safeTrajectoryPositionLabel(score, 'position_label')}</span>}
+                      {hasTrajectoryScore(score) && <span>{trajectoryScoreTrackLabel(score)}</span>}
 		                  <span>{routerMaterialityLabel(row)}</span>
 		                  <span>{routerDriverLabel(row)}</span>
 		                  {vm.reviewStatus && vm.reviewStatus !== 'auto_cleared' && <span>{vm.reviewLabel}</span>}

@@ -2,7 +2,7 @@
 
 This is the minimal machine contract for Trading Terminal / Alpha Edge.
 
-The announcement router remains the source of truth for thesis-evidence scoring. Trading Terminal should not ingest router event rows, replay the router, or reimplement thesis matching. It should request the current validated signal by ticker and use that as one input into its existing allocation and momentum logic.
+The announcement router remains the source of truth for thesis-evidence scoring. Trading Terminal should not ingest router event rows, replay the router, or reimplement thesis matching. It should request the current Router Score and use that as one input into its existing allocation and momentum logic.
 
 ## Endpoint
 
@@ -46,15 +46,22 @@ When a specific ticker is requested and the router has no stored event for it, t
 
 ## Score Definition
 
-The exported score is the latest `cumulative_validated_delta` for that ticker from the announcement router event store.
+The exported score is the latest counted Router Score for that ticker from the announcement router event store.
+
+Internally this is stored as `trajectory_score.cumulative_delta`. That field includes:
+
+- Primary Thesis Analysis at full weight.
+- Secondary Analysis at reduced weight.
 
 That means:
 
-- positive values indicate validated thesis evidence has moved in a favourable direction
-- negative values indicate validated thesis evidence has moved in an unfavourable direction
-- zero means no validated router movement is available
+- positive values indicate routed evidence has moved in a favourable direction
+- negative values indicate routed evidence has moved in an unfavourable direction
+- zero means no counted router movement is available
 
-Unmapped or unvalidated directional pressure is not exported through this endpoint. It remains available in the full router events endpoint for human inspection, but it should not silently change Trading Terminal sizing or allocation.
+Primary Thesis Analysis means evidence matched to the saved thesis map, monitoring watchlist, or verification queue. Secondary Analysis means directional model assessment outside the saved thesis evidence set; it is lower quality and therefore contributes at reduced weight.
+
+Raw secondary model assessments are not exported directly. They remain available in the full router events endpoint for audit inspection.
 
 ## Trading Terminal Usage
 
@@ -100,4 +107,3 @@ Trading Terminal owns:
 - breakout rules
 - watchlist and position UX
 - any decision to use, cap, ignore, or display the router score
-
