@@ -11,6 +11,11 @@ import socket
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+# ResearchService singleton — shared between conversations stream handler and
+# analysis-job executor. Imported lazily here to avoid circular-import issues
+# at module load time; the actual object is instantiated once below.
+from ..research import ResearchService  # noqa: E402
+
 # ---------------------------------------------------------------------------
 # Output / artifact directories
 # ---------------------------------------------------------------------------
@@ -130,3 +135,9 @@ _ANALYSIS_STAGE_RANGES: Dict[str, Tuple[int, int]] = {
     "stage4": (96, 98),
     "stage3_secondary": (96, 98),
 }
+
+# ---------------------------------------------------------------------------
+# Shared service singletons
+# ---------------------------------------------------------------------------
+
+research_service = ResearchService()
