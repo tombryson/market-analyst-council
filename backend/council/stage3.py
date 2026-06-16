@@ -56,7 +56,7 @@ async def stage3_synthesize_final(
     )
 
     if use_structured_analysis and template_id and label_to_model:
-        from .investment_synthesis import synthesize_structured_analysis
+        from ..synthesis import synthesize_structured_analysis
         return await synthesize_structured_analysis(
             enhanced_context,
             stage1_results,

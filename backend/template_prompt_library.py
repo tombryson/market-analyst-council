@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from .investment_synthesis import PHARMA_RUBRIC, RESOURCES_RUBRIC
+from .synthesis import PHARMA_RUBRIC, RESOURCES_RUBRIC
 
 
 def _score_lines(items: List[str], default: str) -> str:
