@@ -1,7 +1,6 @@
 """FastAPI backend for LLM Council."""
 
 import hashlib
-import hmac
 
 from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,13 +16,25 @@ from contextlib import asynccontextmanager
 import re
 import sys
 import os
-import socket
 import time
 from pathlib import Path
 from datetime import datetime, timezone
 
 from . import storage
 from .logging_config import configure_logging
+from .middleware import auth_middleware
+from .jobs.state import (
+    OUTPUTS_DIR, PROJECT_ROOT, JOBS_OUTPUTS_DIR, JOBS_META_DIR,
+    PORTFOLIO_POSITIONING_OUTPUTS_DIR, PREPASS_OUTPUTS_DIR,
+    ANALYSIS_JOB_LOG_TAIL_CHARS, ANALYSIS_JOBS, ANALYSIS_JOBS_LOCK,
+    SYNTHETIC_RUN_JOB_PREFIX, GANTT_RUN_LIST_CACHE_TTL_SEC,
+    _GANTT_RUN_LIST_CACHE, _PORTFOLIO_POSITIONING_RUN_LIST_CACHE,
+    INSTANCE_ID, SUPPLEMENTARY_DOC_MAX_CHARS, SUPPLEMENTARY_DOC_ALLOWED_EXTENSIONS,
+    SCENARIO_ROUTER_EVENTS_DIR, SCENARIO_ROUTER_DEDUPE_DIR,
+    LEGACY_FRESHNESS_EVENTS_DIR, LEGACY_FRESHNESS_DEDUPE_DIR,
+    _ANALYSIS_PROGRESS_MARKERS, _ANALYSIS_STAGE_ORDER, _ANALYSIS_STAGE_RANGES,
+)
+from .routers import misc, memos, company_types as company_types_router
 import logging
 logger = logging.getLogger(__name__)
 from .council import (
@@ -109,92 +120,8 @@ async def _lifespan(app: FastAPI):
 
 app = FastAPI(title="LLM Council API", lifespan=_lifespan)
 research_service = ResearchService()
-OUTPUTS_DIR = Path(
-    os.getenv("ANALYSIS_OUTPUTS_DIR", str(Path(__file__).resolve().parents[1] / "outputs"))
-)
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-JOBS_OUTPUTS_DIR = Path(os.getenv("ANALYSIS_JOBS_DIR", str(OUTPUTS_DIR / "jobs")))
-JOBS_META_DIR = JOBS_OUTPUTS_DIR / "meta"
-PORTFOLIO_POSITIONING_OUTPUTS_DIR = Path(
-    os.getenv("PORTFOLIO_POSITIONING_OUTPUTS_DIR", str(JOBS_OUTPUTS_DIR / "portfolio_positioning"))
-)
-PREPASS_OUTPUTS_DIR = Path(
-    os.getenv("ANALYSIS_PREPASS_DIR", str(JOBS_OUTPUTS_DIR / "prepass"))
-)
-ANALYSIS_JOB_LOG_TAIL_CHARS = 24000
-ANALYSIS_JOBS: Dict[str, Dict[str, Any]] = {}
-ANALYSIS_JOBS_LOCK = asyncio.Lock()
-SYNTHETIC_RUN_JOB_PREFIX = "run::"
-GANTT_RUN_LIST_CACHE_TTL_SEC = max(
-    1,
-    int(os.getenv("GANTT_RUN_LIST_CACHE_TTL_SEC", "15")),
-)
-_GANTT_RUN_LIST_CACHE: Dict[str, Any] = {
-    "expires_at": 0.0,
-    "key": None,
-    "runs": None,
-}
-_PORTFOLIO_POSITIONING_RUN_LIST_CACHE: Dict[str, Any] = {
-    "expires_at": 0.0,
-    "key": None,
-    "runs": None,
-}
-INSTANCE_ID = (
-    str(os.getenv("FLY_MACHINE_ID") or "").strip()
-    or str(os.getenv("HOSTNAME") or "").strip()
-    or socket.gethostname()
-)
-SUPPLEMENTARY_DOC_MAX_CHARS = 12000
-SUPPLEMENTARY_DOC_ALLOWED_EXTENSIONS = {".pdf", ".md", ".txt", ".json"}
-SCENARIO_ROUTER_EVENTS_DIR = OUTPUTS_DIR / "scenario_router_events"
-SCENARIO_ROUTER_DEDUPE_DIR = SCENARIO_ROUTER_EVENTS_DIR / "dedupe"
-LEGACY_FRESHNESS_EVENTS_DIR = OUTPUTS_DIR / "freshness_events"
-LEGACY_FRESHNESS_DEDUPE_DIR = LEGACY_FRESHNESS_EVENTS_DIR / "dedupe"
-
-_ANALYSIS_PROGRESS_MARKERS: List[Tuple[str, str, int]] = [
-    ("market facts prepass start", "prepass", 4),
-    ("market facts prepass done", "prepass", 8),
-    ("primary injection prepass start", "prepass", 10),
-    ("primary injection bundle ready", "prepass", 16),
-    ("stage 1 start", "stage1", 18),
-    ("stage 1 done", "stage1", 55),
-    ("stage 2 start", "stage2", 60),
-    ("stage 2 done", "stage2", 72),
-    ("stage 2.5 revision pass start", "stage2_5", 76),
-    ("stage 2.5 revision pass done", "stage2_5", 84),
-    ("stage 3 start", "stage3", 88),
-    ("stage 3 primary done", "stage3", 95),
-    ("stage 4 start", "stage4", 96),
-    ("stage 4 done", "stage4", 98),
-    ("stage 3 secondary start", "stage3_secondary", 96),
-    ("stage 3 secondary done", "stage3_secondary", 98),
-    ("run complete", "complete", 100),
-    ("mvp quality test complete", "complete", 100),
-]
-
-_ANALYSIS_STAGE_ORDER: Dict[str, int] = {
-    "queued": 0,
-    "initializing": 1,
-    "prepass": 2,
-    "stage1": 3,
-    "stage2": 4,
-    "stage2_5": 5,
-    "stage3": 6,
-    "stage4": 7,
-    "stage3_secondary": 8,
-    "complete": 9,
-    "failed": 10,
-}
-
-_ANALYSIS_STAGE_RANGES: Dict[str, Tuple[int, int]] = {
-    "prepass": (4, 16),
-    "stage1": (18, 55),
-    "stage2": (60, 72),
-    "stage2_5": (76, 84),
-    "stage3": (88, 95),
-    "stage4": (96, 98),
-    "stage3_secondary": (96, 98),
-}
+# Shared state (paths, ANALYSIS_JOBS dict, caches, progress markers) lives in
+# backend/jobs/state.py and is imported at the top of this file.
 
 
 def _build_scenario_router_service():
@@ -610,48 +537,9 @@ async def _prepare_generated_supplementary_for_job(
     }
 
 # ---------------------------------------------------------------------------
-# Authentication
+# Middleware (auth lives in backend/middleware.py)
 # ---------------------------------------------------------------------------
-_AUTH_DISABLED: bool = os.getenv("AUTH_DISABLED", "").strip().lower() in {"1", "true", "yes"}
-_API_TOKEN: str = os.getenv("API_TOKEN", "").strip()
-
-if not _API_TOKEN and not _AUTH_DISABLED:
-    # Fail at startup — do not run an unauthenticated API in production.
-    raise RuntimeError(
-        "API_TOKEN env var is not set and AUTH_DISABLED is not true. "
-        "Set API_TOKEN via fly secrets set or set AUTH_DISABLED=true for local dev."
-    )
-
-# Routes that do not require authentication.
-_OPEN_PATHS: frozenset[str] = frozenset({"/", "/api/health"})
-
-
-@app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    # OPTIONS preflight and open paths are always allowed.
-    path = request.url.path
-    if request.method == "OPTIONS" or path in _OPEN_PATHS or not path.startswith("/api/"):
-        return await call_next(request)
-
-    # Auth disabled (local dev only).
-    if _AUTH_DISABLED:
-        return await call_next(request)
-
-    # Blank configured token never matches — fail closed.
-    if not _API_TOKEN:
-        from fastapi.responses import JSONResponse
-        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
-
-    # Bearer token check.
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        provided = auth_header[len("Bearer "):]
-        if hmac.compare_digest(provided, _API_TOKEN):
-            return await call_next(request)
-
-    from fastapi.responses import JSONResponse
-    return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
-
+app.middleware("http")(auth_middleware)
 
 # Enable CORS for local development
 app.add_middleware(
@@ -671,6 +559,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ---------------------------------------------------------------------------
+# Extracted routers (backend/routers/)
+# ---------------------------------------------------------------------------
+app.include_router(misc.router)
+app.include_router(memos.router)
+app.include_router(company_types_router.router)
+
 
 class CreateConversationRequest(BaseModel):
     """Request to create a new conversation."""
@@ -681,13 +576,6 @@ class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
     content: str
 
-
-class CompanyTypeDetectRequest(BaseModel):
-    """Request payload for company-type detection prepass."""
-    content: str = ""
-    ticker: Optional[str] = None
-    company_name: Optional[str] = None
-    exchange: Optional[str] = None
 
 
 class CreateAnalysisJobRequest(BaseModel):
@@ -749,37 +637,6 @@ class Conversation(BaseModel):
     title: str
     messages: List[Dict[str, Any]]
 
-
-@app.get("/")
-async def root():
-    """Health check endpoint."""
-    return {
-        "status": "ok",
-        "service": "LLM Council API",
-        "system_enabled": bool(SYSTEM_ENABLED),
-        "shutdown_reason": SYSTEM_SHUTDOWN_REASON if not SYSTEM_ENABLED else "",
-    }
-
-
-@app.get("/api/templates")
-async def list_templates():
-    """List all available analysis templates."""
-    from .template_loader import list_available_templates
-    return list_available_templates()
-
-
-@app.get("/api/company-types")
-async def list_company_types():
-    """List predefined company types and mapped templates."""
-    from .template_loader import list_company_types as list_available_company_types
-    return list_available_company_types()
-
-
-@app.get("/api/exchanges")
-async def list_exchanges():
-    """List predefined exchange profiles used for assumption substitution."""
-    from .template_loader import list_exchanges as list_available_exchanges
-    return list_available_exchanges()
 
 
 def _extract_stage3_structured_from_artifact(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -4276,30 +4133,6 @@ async def post_delta_check(
     return result
 
 
-@app.get("/api/memos/{memo_name}")
-async def get_memo_file(memo_name: str):
-    """
-    Load a markdown memo artifact from outputs/ by filename.
-    Example: /api/memos/analyst_memo_regen_20260306_115115
-    """
-    safe_name = Path(memo_name).name
-    if not safe_name.endswith(".md"):
-        safe_name = f"{safe_name}.md"
-
-    path = OUTPUTS_DIR / safe_name
-    if not path.exists() or not path.is_file():
-        raise HTTPException(status_code=404, detail="Memo artifact not found")
-
-    try:
-        markdown = path.read_text(encoding="utf-8")
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to read memo artifact: {exc}") from exc
-
-    return {
-        "id": safe_name,
-        "markdown": markdown,
-    }
-
 
 @app.post("/api/analysis-jobs", status_code=202)
 async def create_analysis_job(
@@ -4641,29 +4474,6 @@ async def stream_analysis_job_events(job_id: str, poll_ms: int = 1000):
         },
     )
 
-
-@app.post("/api/company-types/detect")
-async def detect_company_type(request: CompanyTypeDetectRequest):
-    """
-    Deterministic company-type detection for template routing.
-    """
-    from .template_loader import get_template_loader
-
-    loader = get_template_loader()
-    selected = loader.detect_company_type(
-        user_query=request.content,
-        ticker=request.ticker,
-    )
-    return {
-        "status": "ok" if selected else "unresolved",
-        "provider": "deterministic_resolver",
-        "selected_company_type": selected,
-        "candidate_company_type": selected,
-        "applied": bool(selected),
-        "confidence": 1.0 if selected else 0.0,
-        "company_name": loader.infer_company_name(request.content, ticker=request.ticker),
-        "exchange": loader.normalize_exchange(request.exchange) or "unknown",
-    }
 
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
