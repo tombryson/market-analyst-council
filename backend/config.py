@@ -382,8 +382,9 @@ PERPLEXITY_STAGE1_MODEL_PREFLIGHT_FAIL_OPEN = _get_bool(
 
 # Tavily Search API
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-ENABLE_SEARCH_BY_DEFAULT = True
-MAX_SEARCH_RESULTS = 5
+# These were previously hardcoded; now env-driven with the same defaults.
+ENABLE_SEARCH_BY_DEFAULT = _get_bool("ENABLE_SEARCH_BY_DEFAULT", default=True)
+MAX_SEARCH_RESULTS = _get_int("MAX_SEARCH_RESULTS", 5)
 
 # xAI API (supplementary sector news brief lane)
 XAI_API_KEY = os.getenv("XAI_API_KEY")

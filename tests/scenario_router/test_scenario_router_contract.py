@@ -371,6 +371,22 @@ class ScenarioRouterDisplayContractTests(unittest.TestCase):
         self.assertEqual(display["review_status"], "tracking")
         self.assertFalse(display["is_user_action_required"])
 
+    def test_positive_trajectory_keeps_positive_tone_even_when_system_action_rebuilds_run(self):
+        display = build_router_display_contract(
+            {
+                "trajectory_state": "timeline_accelerated",
+                "impact_verdict": "positive",
+                "impact_level": "medium",
+            },
+            {"action": "full_rerun"},
+            triggered_watchlist_count=1,
+        )
+
+        self.assertEqual(display["trajectory_label"], "Timeline accelerated")
+        self.assertEqual(display["queue_bucket"], "positive_movement")
+        self.assertEqual(display["system_action_label"], "Rebuild council run")
+        self.assertEqual(display["tone"], "positive")
+
     def test_display_contract_does_not_call_unvalidated_positive_support_thesis_improved(self):
         display = build_router_display_contract(
             {

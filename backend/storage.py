@@ -5,7 +5,47 @@ import os
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+from pydantic import BaseModel, Field
 from .config import DATA_DIR
+
+
+# ---------------------------------------------------------------------------
+# Pydantic models — validate on write so structural errors fail at insertion
+# time rather than silently corrupting JSON and surfacing at render time.
+# ---------------------------------------------------------------------------
+
+class LoadingState(BaseModel):
+    search: bool = False
+    evidence: bool = False
+    attachments: bool = False
+    stage1: bool = False
+    stage2: bool = False
+    stage3: bool = False
+    stage1Progress: int = 0
+    stage1Completed: int = 0
+    stage1Total: int = 0
+    stage1Model: str = ""
+    stage1Message: str = ""
+
+
+class AssistantMessage(BaseModel):
+    role: str = "assistant"
+    status: str = "complete"
+    stage1: Optional[Any] = None
+    stage2: Optional[Any] = None
+    stage3: Optional[Any] = None
+    search_results: Optional[Any] = None
+    evidence_pack: Optional[Any] = None
+    attachments_processed: Optional[Any] = None
+    loading: LoadingState = Field(default_factory=LoadingState)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class Conversation(BaseModel):
+    id: str
+    created_at: str
+    title: str = "New Conversation"
+    messages: List[Any] = Field(default_factory=list)
 
 
 def ensure_data_dir():
@@ -251,20 +291,13 @@ def add_assistant_placeholder_message(
     if conversation is None:
         raise ValueError(f"Conversation {conversation_id} not found")
 
-    message = {
-        "role": "assistant",
-        "status": "running",
-        "stage1": None,
-        "stage2": None,
-        "stage3": None,
-        "search_results": None,
-        "evidence_pack": None,
-        "attachments_processed": None,
-        "metadata": dict(metadata or {}),
-        "loading": _default_loading_state(),
-    }
-    message["loading"]["stage1"] = True
-    message["loading"]["stage1Message"] = "Preparing analysis..."
+    loading = LoadingState(stage1=True, stage1Message="Preparing analysis...")
+    validated = AssistantMessage(
+        status="running",
+        metadata=dict(metadata or {}),
+        loading=loading,
+    )
+    message = validated.model_dump()
 
     conversation["messages"].append(message)
     save_conversation(conversation)
@@ -316,28 +349,20 @@ def add_assistant_message_with_metadata(
     if conversation is None:
         raise ValueError(f"Conversation {conversation_id} not found")
 
-    existing_metadata = {}
+    existing_metadata: Dict[str, Any] = {}
     if conversation["messages"] and conversation["messages"][-1].get("role") == "assistant":
         existing_metadata = dict(conversation["messages"][-1].get("metadata") or {})
 
-    message = {
-        "role": "assistant",
-        "status": "complete",
-        "stage1": stage1,
-        "stage2": stage2,
-        "stage3": stage3,
-        "loading": _default_loading_state(),
-    }
-
-    if existing_metadata:
-        message["metadata"] = existing_metadata
-
-    # Add optional metadata
-    if search_results:
-        message["search_results"] = search_results
-
-    if attachments_processed:
-        message["attachments_processed"] = attachments_processed
+    validated = AssistantMessage(
+        status="complete",
+        stage1=stage1,
+        stage2=stage2,
+        stage3=stage3,
+        search_results=search_results or None,
+        attachments_processed=attachments_processed or None,
+        metadata=existing_metadata,
+    )
+    message = validated.model_dump()
 
     if conversation["messages"] and conversation["messages"][-1].get("role") == "assistant":
         conversation["messages"][-1] = message
