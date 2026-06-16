@@ -28,6 +28,7 @@ from ..config import (
     XAI_API_URL,
 )
 from .stage1_attempt import _progress_log
+from .stage1_attempt import _SUPPLEMENTARY_MACRO_PROFILE_CONFIG
 
 logger = logging.getLogger(__name__)
 

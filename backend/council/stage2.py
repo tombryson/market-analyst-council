@@ -29,6 +29,7 @@ from ..config import (
 )
 from ..openrouter import query_model, query_models_parallel
 from .stage1_attempt import _progress_log
+from ..source_fact_context import build_source_fact_context
 
 logger = logging.getLogger(__name__)
 
@@ -1009,4 +1010,89 @@ async def stage2_collect_reconciliation(
     )
     return out
 
+
+def parse_ranking_from_text(ranking_text: str) -> List[str]:
+    """
+    Parse the FINAL RANKING section from the model's response.
+
+    Args:
+        ranking_text: The full text response from the model
+
+    Returns:
+        List of response labels in ranked order
+    """
+    import re
+
+    # Look for "FINAL RANKING:" section
+    if "FINAL RANKING:" in ranking_text:
+        # Extract everything after "FINAL RANKING:"
+        parts = ranking_text.split("FINAL RANKING:")
+        if len(parts) >= 2:
+            ranking_section = parts[1]
+            # Try to extract numbered list format (e.g., "1. Response A")
+            # This pattern looks for: number, period, optional space, "Response X"
+            numbered_matches = re.findall(r'\d+\.\s*Response [A-Z]', ranking_section)
+            if numbered_matches:
+                # Extract just the "Response X" part
+                return [re.search(r'Response [A-Z]', m).group() for m in numbered_matches]
+
+            # Fallback: Extract all "Response X" patterns in order
+            matches = re.findall(r'Response [A-Z]', ranking_section)
+            return matches
+
+    # Fallback: try to find any "Response X" patterns in order
+    matches = re.findall(r'Response [A-Z]', ranking_text)
+    return matches
+
+
+def calculate_aggregate_rankings(
+    stage2_results: List[Dict[str, Any]],
+    label_to_model: Dict[str, str]
+) -> List[Dict[str, Any]]:
+    """
+    Calculate aggregate rankings across all models.
+
+    Args:
+        stage2_results: Rankings from each model
+        label_to_model: Mapping from anonymous labels to model names
+
+    Returns:
+        List of dicts with model name and average rank, sorted best to worst
+    """
+    from collections import defaultdict
+
+    # Track positions for each model
+    model_positions = defaultdict(list)
+    first_place_votes = defaultdict(int)
+    borda_scores = defaultdict(int)
+
+    for ranking in stage2_results:
+        parsed_ranking = _ranking_labels_from_result(ranking)
+        total = len(parsed_ranking)
+
+        for position, label in enumerate(parsed_ranking, start=1):
+            if label in label_to_model:
+                model_name = label_to_model[label]
+                model_positions[model_name].append(position)
+                borda_scores[model_name] += (total - position + 1)
+                if position == 1:
+                    first_place_votes[model_name] += 1
+
+    # Calculate average position for each model
+    aggregate = []
+    for model, positions in model_positions.items():
+        if positions:
+            avg_rank = sum(positions) / len(positions)
+            aggregate.append({
+                "model": model,
+                "average_rank": round(avg_rank, 2),
+                "rankings_count": len(positions),
+                "first_place_votes": int(first_place_votes.get(model, 0)),
+                "borda_score": int(borda_scores.get(model, 0)),
+            })
+
+    # Sort by average rank (lower is better)
+    aggregate.sort(key=lambda x: (x['average_rank'], -x.get('first_place_votes', 0), -x.get('borda_score', 0)))
+
+    return aggregate
 

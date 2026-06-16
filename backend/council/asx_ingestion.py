@@ -28,6 +28,9 @@ from ..config import (
 )
 from .source_analysis import _excerpt_material_signal_score
 from .stage1_attempt import _progress_log
+import copy
+from urllib.parse import parse_qs
+from .fact_digest import _ASX_ANNOUNCEMENT_SEARCH_URL, _ASX_DETERMINISTIC_CACHE
 
 logger = logging.getLogger(__name__)
 

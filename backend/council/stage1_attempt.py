@@ -25,6 +25,8 @@ from ..config import (
     SYSTEM_ENABLED,
     SYSTEM_SHUTDOWN_REASON,
 )
+from urllib.parse import urlparse
+from ..reasoning import normalize_reasoning_effort
 
 logger = logging.getLogger(__name__)
 
@@ -511,3 +513,35 @@ _SUPPLEMENTARY_MACRO_PROFILE_CONFIG: Dict[str, Dict[str, Any]] = {
     },
 }
 
+
+_STAGE1_RUBRIC_SECTION_MARKERS = [
+    ("quality_score", ["quality score", "quality_score"]),
+    ("value_score", ["value score", "value_score"]),
+    (
+        "price_targets",
+        ["12-month", "24-month", "12/24", "price target", "price_targets"],
+    ),
+    ("development_timeline", ["development timeline", "timeline", "milestone"]),
+    ("certainty", ["certainty", "certainty %", "certainty_pct"]),
+    ("headwinds_tailwinds", ["headwind", "tailwind", "headwinds", "tailwinds"]),
+    (
+        "management_competition_assessment",
+        [
+            "management & competition",
+            "management_competition_assessment",
+            "management quality",
+            "governance",
+            "insider ownership",
+            "board",
+            "executive",
+        ],
+    ),
+    ("npv_assessment", ["npv", "risked npv", "dcf"]),
+]
+
+_STAGE1_RUBRIC_CRITICAL_SECTIONS = {
+    "quality_score",
+    "value_score",
+    "price_targets",
+    "development_timeline",
+}

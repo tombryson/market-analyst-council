@@ -11,6 +11,7 @@ from ..config import CHAIRMAN_MODEL
 from ..openrouter import query_model
 from .stage1_attempt import _progress_log
 from .stage2 import _source_evidence_pack_from_stage1_results
+import json
 
 logger = logging.getLogger(__name__)
 

@@ -9,6 +9,8 @@ import logging
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
+from .perplexity_client import _FACT_PACK_KEYWORDS
 
 logger = logging.getLogger(__name__)
 

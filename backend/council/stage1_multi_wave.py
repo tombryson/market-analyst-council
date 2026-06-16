@@ -17,6 +17,9 @@ from .source_analysis import (
     _is_low_signal_notice_source_item,
     _source_authority_rank,
 )
+import copy
+from .perplexity_client import _FACT_DIGEST_V2_KEYWORDS, _FACT_DIGEST_V2_NARRATIVE_ORDER, _STAGE1_DEFAULT_TIMELINE_FOCUS_TERMS, _STAGE1_DEFAULT_TIMELINE_TERMS
+from .stage1_attempt import _STAGE1_RUBRIC_CRITICAL_SECTIONS, _STAGE1_RUBRIC_SECTION_MARKERS
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 """Price-target extraction and scenario-driver enrichment."""
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import logging
 
 from .verdict import _to_float

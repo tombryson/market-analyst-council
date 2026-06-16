@@ -142,6 +142,8 @@ from .stage1_multi_wave import (
 )
 from .stage1_xai_lane import _collect_stage1_supplementary_macro_news
 from .stage2 import _coerce_bool, _coerce_float, _parse_json_object_from_text
+from ..config import ASX_DETERMINISTIC_FETCH_TIMEOUT_SECONDS, ASX_DETERMINISTIC_INCLUDE_NON_SENSITIVE_FILL, ASX_DETERMINISTIC_LOOKBACK_YEARS, ASX_DETERMINISTIC_MAX_DECODE, ASX_DETERMINISTIC_PRICE_SENSITIVE_ONLY, ASX_DETERMINISTIC_TARGET_ANNOUNCEMENTS, PERPLEXITY_STAGE1_FACT_DIGEST_V2_MAX_FACTS_PER_SECTION, PERPLEXITY_STAGE1_FACT_DIGEST_V2_MAX_NARRATIVE_WORDS, PERPLEXITY_STAGE1_FACT_DIGEST_V2_MAX_SUMMARY_BULLETS, PERPLEXITY_STAGE1_MODEL_PREFLIGHT_FAIL_OPEN, PERPLEXITY_STAGE1_MODEL_PREFLIGHT_TIMEOUT_SECONDS, PERPLEXITY_STAGE1_OPENAI_BASE_GUARDRAILS_ENABLED, PERPLEXITY_STAGE1_OPENAI_BASE_MAX_SOURCES, PERPLEXITY_STAGE1_OPENAI_BASE_MAX_STEPS, PERPLEXITY_STAGE1_OPENAI_BASE_REASONING_EFFORT, PERPLEXITY_STAGE1_SHARED_RETRIEVAL_ENABLED, PERPLEXITY_STAGE1_SONAR_MULTISTEP_REQUIRED, PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_MAX_RECENCY_DAYS, PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_MAX_SOURCES, PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_RETRIEVAL_MAX_SOURCES, PERPLEXITY_STAGE1_TEMPLATE_RETRY_ENABLED, STAGE1_CASHFLOW_DETECTION_MAX_SOURCES
+from .perplexity_client import _FACT_DIGEST_V2_KEYWORDS, _FACT_DIGEST_V2_NARRATIVE_ORDER, _FACT_PACK_KEYWORDS, _FACT_PACK_SECTIONS, _STAGE1_DEFAULT_TIMELINE_FOCUS_TERMS, _STAGE1_DEFAULT_TIMELINE_TERMS, _STAGE1_SECOND_PASS_MIN_RESPONSE_CHARS
 
 logger = logging.getLogger(__name__)
 
@@ -2903,37 +2905,8 @@ async def _assess_stage1_truncation(
     }
 
 
-_STAGE1_RUBRIC_SECTION_MARKERS = [
-    ("quality_score", ["quality score", "quality_score"]),
-    ("value_score", ["value score", "value_score"]),
-    (
-        "price_targets",
-        ["12-month", "24-month", "12/24", "price target", "price_targets"],
-    ),
-    ("development_timeline", ["development timeline", "timeline", "milestone"]),
-    ("certainty", ["certainty", "certainty %", "certainty_pct"]),
-    ("headwinds_tailwinds", ["headwind", "tailwind", "headwinds", "tailwinds"]),
-    (
-        "management_competition_assessment",
-        [
-            "management & competition",
-            "management_competition_assessment",
-            "management quality",
-            "governance",
-            "insider ownership",
-            "board",
-            "executive",
-        ],
-    ),
-    ("npv_assessment", ["npv", "risked npv", "dcf"]),
-]
+from .stage1_attempt import _STAGE1_RUBRIC_SECTION_MARKERS, _STAGE1_RUBRIC_CRITICAL_SECTIONS
 
-_STAGE1_RUBRIC_CRITICAL_SECTIONS = {
-    "quality_score",
-    "value_score",
-    "price_targets",
-    "development_timeline",
-}
 
 
 def _evaluate_stage1_rubric_coverage(

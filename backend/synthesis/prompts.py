@@ -1,5 +1,6 @@
 """Chairman XML prompt, jsonifier prompt, context-block helpers, and sector rubrics."""
 
+import json
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple

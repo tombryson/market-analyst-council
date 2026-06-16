@@ -4,7 +4,7 @@ import asyncio
 import json
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 import logging
 
 from ..timeline_normalization import normalize_timeline_rows as _standardize_timeline_rows

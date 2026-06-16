@@ -21,6 +21,7 @@ from .source_analysis import (
     _window_to_quarter_index,
 )
 from .stage1_multi_wave import _normalize_terms_list
+from .perplexity_client import _FACT_DIGEST_V2_KEYWORDS, _FACT_DIGEST_V2_NARRATIVE_ORDER, _FACT_DIGEST_V2_SECTIONS, _STAGE1_DEFAULT_TIMELINE_FOCUS_TERMS
 
 logger = logging.getLogger(__name__)
 
