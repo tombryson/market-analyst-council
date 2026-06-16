@@ -22,3 +22,20 @@ data/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+
+# macOS metadata
+**/.DS_Store
+
+# Built frontend output
+frontend/dist/
+frontend/.vite/
+
+# Root-level scratch/debug scripts
+tmp_*.py
+
+# Experiment env archive (no secrets, but no need to track)
+.env.archive/
+
+# Job and analysis outputs
+outputs/
+data/
