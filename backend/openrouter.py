@@ -1,10 +1,13 @@
 """OpenRouter API client for making LLM requests."""
 
 import asyncio
+import logging
 import httpx
 from typing import List, Dict, Any, Optional, Callable
 from .config import OPENROUTER_API_KEY, OPENROUTER_API_URL
 from .reasoning import build_reasoning_payload, normalize_reasoning_effort
+
+logger = logging.getLogger(__name__)
 
 
 async def query_model(
@@ -86,16 +89,19 @@ async def query_model(
     except httpx.HTTPStatusError as e:
         status = e.response.status_code if e.response is not None else "unknown"
         body = (e.response.text or "")[:500] if e.response is not None else ""
-        print(f"Error querying model {model}: HTTP {status} body={body}")
+        logger.error("Error querying model %s: HTTP %s body=%s", model, status, body)
         return None
     except Exception as e:
-        print(f"Error querying model {model}: {type(e).__name__}: {e}")
+        logger.error("Error querying model %s: %s: %s", model, type(e).__name__, e)
         return None
 
 
 async def query_models_parallel(
     models: List[str],
     messages: List[Dict[str, str]],
+    timeout: float = 120.0,
+    max_tokens: Optional[int] = None,
+    reasoning_effort: str = "",
     on_model_complete: Optional[Callable[[str, Optional[Dict[str, Any]], int, int], None]] = None,
 ) -> Dict[str, Optional[Dict[str, Any]]]:
     """
@@ -104,12 +110,22 @@ async def query_models_parallel(
     Args:
         models: List of OpenRouter model identifiers
         messages: List of message dicts to send to each model
+        timeout: Per-model request timeout in seconds
+        max_tokens: Optional completion token cap applied to every model
+        reasoning_effort: Optional reasoning effort override applied to every model
+        on_model_complete: Optional progress callback (model, response, completed, total)
 
     Returns:
         Dict mapping model identifier to response dict (or None if failed)
     """
     async def _run_model(model: str) -> tuple[str, Optional[Dict[str, Any]]]:
-        return model, await query_model(model, messages)
+        return model, await query_model(
+            model,
+            messages,
+            timeout=timeout,
+            max_tokens=max_tokens,
+            reasoning_effort=reasoning_effort,
+        )
 
     tasks = [asyncio.create_task(_run_model(model)) for model in models]
     responses: Dict[str, Optional[Dict[str, Any]]] = {}

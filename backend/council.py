@@ -3,6 +3,7 @@
 import asyncio
 import copy
 import json
+import logging
 import re
 import uuid
 import httpx
@@ -13,6 +14,8 @@ from time import perf_counter
 from urllib.parse import urljoin, urlparse, parse_qs
 from .openrouter import query_models_parallel, query_model
 from .reasoning import build_reasoning_payload, normalize_reasoning_effort
+
+logger = logging.getLogger(__name__)
 from .source_fact_context import build_source_fact_context
 from .config import (
     OPENROUTER_API_KEY,
@@ -129,11 +132,14 @@ from .config import (
 
 
 def _progress_log(message: str) -> None:
-    """Timestamped progress logs for long-running research orchestration."""
+    """Debug-level progress logs for long-running research orchestration.
+
+    Gated by PROGRESS_LOGGING so they don't appear in normal production output.
+    The logging framework handles timestamps and levels — no need to embed them.
+    """
     if not PROGRESS_LOGGING:
         return
-    ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{ts}][council] {message}", flush=True)
+    logger.debug("[council] %s", message)
 
 
 def _ensure_system_enabled(*, diagnostic_mode: bool = False) -> None:

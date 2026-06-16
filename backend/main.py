@@ -13,6 +13,7 @@ import uuid
 import json
 import asyncio
 import contextlib
+from contextlib import asynccontextmanager
 import re
 import sys
 import os
@@ -22,6 +23,9 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 from . import storage
+from .logging_config import configure_logging
+import logging
+logger = logging.getLogger(__name__)
 from .council import (
     run_full_council,
     generate_conversation_title,
@@ -92,7 +96,18 @@ from .delta_monitor import (
     run_delta_check,
 )
 
-app = FastAPI(title="LLM Council API")
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Configure logging and load persisted analysis jobs at startup."""
+    configure_logging()
+    loaded = _load_analysis_jobs_from_disk()
+    async with ANALYSIS_JOBS_LOCK:
+        ANALYSIS_JOBS.clear()
+        ANALYSIS_JOBS.update(loaded)
+    yield
+
+
+app = FastAPI(title="LLM Council API", lifespan=_lifespan)
 research_service = ResearchService()
 OUTPUTS_DIR = Path(
     os.getenv("ANALYSIS_OUTPUTS_DIR", str(Path(__file__).resolve().parents[1] / "outputs"))
@@ -744,15 +759,6 @@ async def root():
         "system_enabled": bool(SYSTEM_ENABLED),
         "shutdown_reason": SYSTEM_SHUTDOWN_REASON if not SYSTEM_ENABLED else "",
     }
-
-
-@app.on_event("startup")
-async def _hydrate_analysis_jobs_from_disk() -> None:
-    """Load persisted async analysis jobs when API process starts."""
-    loaded = _load_analysis_jobs_from_disk()
-    async with ANALYSIS_JOBS_LOCK:
-        ANALYSIS_JOBS.clear()
-        ANALYSIS_JOBS.update(loaded)
 
 
 @app.get("/api/templates")
@@ -4713,11 +4719,13 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
     )
 
     # Add assistant message with all stages
-    storage.add_assistant_message(
+    storage.add_assistant_message_with_metadata(
         conversation_id,
         stage1_results,
         stage2_results,
-        stage3_result
+        stage3_result,
+        search_results=None,
+        attachments_processed=[],
     )
 
     # Return the complete response with metadata
@@ -4890,15 +4898,12 @@ async def send_message_stream(
                 template_selection.get("exchange_assumptions", ""),
             )
 
-            print(
-                "Template selection: "
-                f"template={selected_template_id} "
-                f"company={selected_company_name} "
-                f"company_type={selected_company_type} "
-                f"exchange={selected_exchange} "
-                f"source={template_selection_source} "
-                f"exchange_source={exchange_selection_source} "
-                f"structured={use_structured_analysis}"
+            logger.info(
+                "Template selection: template=%s company=%s company_type=%s "
+                "exchange=%s source=%s exchange_source=%s structured=%s",
+                selected_template_id, selected_company_name, selected_company_type,
+                selected_exchange, template_selection_source, exchange_selection_source,
+                use_structured_analysis,
             )
             yield (
                 "data: "
@@ -4978,23 +4983,30 @@ async def send_message_stream(
                                 }
                             )
 
-                        print(
-                            "Research service complete "
-                            f"(provider={search_results.get('provider', 'unknown')}): "
-                            f"{search_results.get('result_count', 0)} results"
+                        logger.info(
+                            "Research service complete (provider=%s): %d results",
+                            search_results.get("provider", "unknown"),
+                            search_results.get("result_count", 0),
                         )
                     else:
                         if search_ticker:
                             # If we have a ticker, do financial search on JUST the ticker
-                            print(f"Using ticker: {search_ticker}, performing targeted financial search")
+                            logger.info("Using ticker: %s, performing targeted financial search", search_ticker)
                             search_results = await perform_financial_search(search_ticker)
-                            print(f"Financial search complete: {search_results.get('result_count', 0)} results, {len(search_results.get('pdfs_processed', []))} PDFs downloaded")
+                            logger.info(
+                                "Financial search complete: %d results, %d PDFs downloaded",
+                                search_results.get("result_count", 0),
+                                len(search_results.get("pdfs_processed", [])),
+                            )
                         else:
                             # No ticker found, do standard search with reformulated query
                             search_query = await reformulate_query_for_search(content)
-                            print(f"Search query reformulated: '{content[:50]}...' -> '{search_query}'")
+                            logger.info(
+                                "Search query reformulated: '%s...' -> '%s'",
+                                content[:50], search_query,
+                            )
                             search_results = await perform_search(search_query)
-                            print(f"Search results: {search_results.get('result_count', 0)} results")
+                            logger.info("Search results: %d results", search_results.get("result_count", 0))
 
                     yield f"data: {json.dumps({'type': 'search_complete', 'data': search_results})}\n\n"
                     _persist_assistant_patch(
@@ -5004,9 +5016,7 @@ async def send_message_stream(
                         }
                     )
                 except Exception as e:
-                    print(f"Search error: {str(e)}")
-                    import traceback
-                    traceback.print_exc()
+                    logger.error("Search error: %s", e, exc_info=True)
                     search_results = {
                         "error": f"Search failed: {str(e)}",
                         "results": [],
@@ -5137,14 +5147,11 @@ async def send_message_stream(
                     market_facts,
                 )
                 if PROGRESS_LOGGING:
-                    print(
-                        "Stage1 prompt assembly: "
-                        f"structured_template={use_structured_analysis}, "
-                        f"template_id={selected_template_id}, "
-                        f"market_facts_prefixed={bool(market_facts)}, "
-                        f"query_core_chars={len(stage1_query_core)}, "
-                        f"query_sent_chars={len(stage1_effective_query)}, "
-                        f"brief_chars={len(stage1_effective_research_brief)}"
+                    logger.debug(
+                        "Stage1 prompt assembly: structured_template=%s template_id=%s "
+                        "market_facts_prefixed=%s query_core_chars=%d query_sent_chars=%d brief_chars=%d",
+                        use_structured_analysis, selected_template_id, bool(market_facts),
+                        len(stage1_query_core), len(stage1_effective_query), len(stage1_effective_research_brief),
                     )
                 yield f"data: {json.dumps({'type': 'prepass_start'})}\n\n"
                 try:
@@ -5202,9 +5209,9 @@ async def send_message_stream(
                     if item.get("model") and not _is_openrouter_compatible_model(item.get("model"))
                 ]
                 if excluded_stage2_models and PROGRESS_LOGGING:
-                    print(
-                        "Stage2 judge-model filter excluded non-OpenRouter models: "
-                        f"{excluded_stage2_models}"
+                    logger.debug(
+                        "Stage2 judge-model filter excluded non-OpenRouter models: %s",
+                        excluded_stage2_models,
                     )
                 if stage2_ranking_models:
                     stage3_chairman_model = (
@@ -5463,7 +5470,7 @@ def build_enhanced_context(
         parts.append("\n\n--- INTERNET SEARCH RESULTS ---")
         formatted = format_search_results_for_prompt(search_results)
         parts.append(formatted)
-        print(f"Search context added to prompt: {len(formatted)} chars")
+        logger.debug("Search context added to prompt: %d chars", len(formatted))
 
         evidence_pack = search_results.get("evidence_pack")
         if evidence_pack:
@@ -5471,7 +5478,7 @@ def build_enhanced_context(
             if evidence_text:
                 parts.append("\n\n--- NORMALIZED EVIDENCE PACK ---")
                 parts.append(evidence_text)
-                print(f"Evidence pack context added: {len(evidence_text)} chars")
+                logger.debug("Evidence pack context added: %d chars", len(evidence_text))
 
     if attachments_processed:
         pdf_context = format_pdf_context_for_prompt(attachments_processed)
@@ -5484,7 +5491,7 @@ def build_enhanced_context(
         parts.append(str(supplementary_context).strip())
 
     enhanced = "\n".join(parts)
-    print(f"Enhanced context total length: {len(enhanced)} chars")
+    logger.debug("Enhanced context total length: %d chars", len(enhanced))
     return enhanced
 
 
