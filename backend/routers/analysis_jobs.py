@@ -118,7 +118,7 @@ async def create_analysis_job(
             detail="Provide at least one of: query, ticker",
         )
 
-    from .template_loader import get_template_loader
+    from ..template_loader import get_template_loader
     loader = get_template_loader()
     requested_exchange = str(job_request.exchange or "").strip()
     requested_ticker = str(job_request.ticker or "").strip().upper()
@@ -387,6 +387,5 @@ async def stream_analysis_job_events(job_id: str, poll_ms: int = 1000):
             "X-Accel-Buffering": "no",
         },
     )
-
 
 
