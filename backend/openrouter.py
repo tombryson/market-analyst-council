@@ -8,6 +8,28 @@ from .config import OPENROUTER_API_KEY, OPENROUTER_API_URL
 from .reasoning import build_reasoning_payload, normalize_reasoning_effort
 
 logger = logging.getLogger(__name__)
+_TRANSIENT_HTTP_STATUS_CODES = {408, 409, 425, 429, 500, 502, 503, 504}
+
+
+def _build_error_response(
+    *,
+    model: str,
+    status: Optional[int] = None,
+    body: str = "",
+    error_type: str,
+    error_message: str,
+    retryable: bool,
+) -> Dict[str, Any]:
+    return {
+        "content": "",
+        "provider": "openrouter",
+        "model": model,
+        "error": error_message,
+        "error_type": error_type,
+        "error_status": status,
+        "error_body": body,
+        "error_retryable": bool(retryable),
+    }
 
 
 async def query_model(
@@ -16,6 +38,7 @@ async def query_model(
     timeout: float = 120.0,
     max_tokens: Optional[int] = None,
     reasoning_effort: str = "",
+    include_error_details: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """
     Query a single model via OpenRouter API.
@@ -26,6 +49,9 @@ async def query_model(
         timeout: Request timeout in seconds
         max_tokens: Optional completion token cap for the model response
         reasoning_effort: Optional reasoning effort override
+        include_error_details: When true, return structured failure metadata
+            instead of None so callers can distinguish permanent from retryable
+            errors.
 
     Returns:
         Response dict with 'content' and metadata, or None if failed.
@@ -90,9 +116,41 @@ async def query_model(
         status = e.response.status_code if e.response is not None else "unknown"
         body = (e.response.text or "")[:500] if e.response is not None else ""
         logger.error("Error querying model %s: HTTP %s body=%s", model, status, body)
+        if include_error_details:
+            status_int = status if isinstance(status, int) else None
+            body_lower = body.lower()
+            if status_int == 402 and (
+                "more credits" in body_lower
+                or "can only afford" in body_lower
+                or "\"code\":402" in body_lower
+            ):
+                return _build_error_response(
+                    model=model,
+                    status=status_int,
+                    body=body,
+                    error_type="insufficient_credits",
+                    error_message=f"openrouter_insufficient_credits_http_{status_int}",
+                    retryable=False,
+                )
+            return _build_error_response(
+                model=model,
+                status=status_int,
+                body=body,
+                error_type="http_error",
+                error_message=f"openrouter_http_{status}",
+                retryable=status_int in _TRANSIENT_HTTP_STATUS_CODES,
+            )
         return None
     except Exception as e:
         logger.error("Error querying model %s: %s: %s", model, type(e).__name__, e)
+        if include_error_details:
+            error_type = "timeout" if isinstance(e, (httpx.TimeoutException, asyncio.TimeoutError)) else "transport_error"
+            return _build_error_response(
+                model=model,
+                error_type=error_type,
+                error_message=f"openrouter_{type(e).__name__.lower()}",
+                retryable=error_type == "timeout",
+            )
         return None
 
 

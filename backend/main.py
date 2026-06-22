@@ -19,6 +19,10 @@ from .routers import conversations as conversations_router
 from .routers import scenario_router_routes
 from .routers import runs as runs_router
 from .routers import analysis_jobs as analysis_jobs_router
+from .routers.conversations import (
+    build_enhanced_context,
+    build_template_context_for_prompt,
+)
 
 logger = logging.getLogger(__name__)
 

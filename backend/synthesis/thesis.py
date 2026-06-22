@@ -1243,7 +1243,7 @@ async def _parse_stage1_reference_row_with_model(
     stage1_response_text: str,
 ) -> Optional[Dict[str, Any]]:
     """Use a small model to extract stage1 score/target fields robustly."""
-    from .openrouter import query_model
+    from ..openrouter import query_model
 
     prompt = f"""You are a strict extraction engine.
 Extract structured score/target fields from one model response.
@@ -1290,7 +1290,7 @@ MODEL RESPONSE TO PARSE:
 
 async def _extract_stage1_reference_rows(stage1_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Build compact per-model score/target rows using model parser first, regex fallback."""
-    from .config import (
+    from ..config import (
         STAGE1_REFERENCE_PARSER_ENABLED,
         STAGE1_REFERENCE_PARSER_MODEL,
         STAGE1_REFERENCE_PARSER_TIMEOUT_SECONDS,
@@ -1338,5 +1338,4 @@ async def _extract_stage1_reference_rows(stage1_results: List[Dict[str, Any]]) -
         merged.append(_merge_stage1_reference_rows(base_row=base_row, parsed_row=parsed_row))
 
     return merged
-
 

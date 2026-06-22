@@ -1,7 +1,7 @@
 """Source-fact and energy guardrails for Stage-3 synthesis output."""
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import logging
 
 from ..market_facts import minimal_market_facts_payload
@@ -244,5 +244,4 @@ def _apply_source_fact_guardrails(
         metadata.setdefault("source_fact_guardrail_warnings", []).append(
             "Hedging verification queue was rewritten because source guardrails contained explicit hedge positions."
         )
-
 

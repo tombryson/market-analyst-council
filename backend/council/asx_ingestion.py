@@ -532,7 +532,7 @@ async def _collect_deterministic_asx_sources(
             return_exceptions=False,
         )
 
-    from .research.providers.perplexity import PerplexityResearchProvider
+    from ..research.providers.perplexity import PerplexityResearchProvider
 
     decoder = PerplexityResearchProvider()
     decode_targets = resolved_rows[: min(len(resolved_rows), decode_limit)]
@@ -714,5 +714,4 @@ async def _augment_run_with_deterministic_asx_sources(
         f"cache_hit={ingestion_summary.get('cache_hit')}"
     )
     return run, ingestion_summary
-
 

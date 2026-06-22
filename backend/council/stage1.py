@@ -4068,7 +4068,29 @@ async def _run_stage1_second_pass_analysis(
                 timeout=timeout,
                 max_tokens=int(PERPLEXITY_STAGE1_SECOND_PASS_MAX_OUTPUT_TOKENS),
                 reasoning_effort=attempt_reasoning_effort,
+                include_error_details=True,
             )
+        if response and response.get("error"):
+            last_response_provider = str(response.get("provider", "") or "")
+            last_error = str(response.get("error", "") or "second_pass_failed")
+            error_type = str(response.get("error_type", "") or "unknown")
+            error_status = response.get("error_status")
+            retryable = bool(response.get("error_retryable", False))
+            last_truncation_assessment = {
+                "used": False,
+                "truncated": False,
+                "confidence_pct": 100.0 if not retryable else 0.0,
+                "reason": error_type,
+            }
+            _progress_log(
+                f"Stage1 second-pass model error model={model} "
+                f"attempt={attempt}/{max_attempts} "
+                f"type={error_type} status={error_status} retryable={retryable} "
+                f"error={last_error}"
+            )
+            if retryable and attempt < max_attempts:
+                continue
+            break
         if response:
             last_response_finish_reason = str(response.get("finish_reason", "") or "")
             last_response_id = str(response.get("id", "") or "")
@@ -5129,7 +5151,7 @@ async def stage1_collect_perplexity_research_responses(
     """
     _ensure_system_enabled(diagnostic_mode=diagnostic_mode)
     import asyncio
-    from .research.providers.perplexity import PerplexityResearchProvider
+    from ..research.providers.perplexity import PerplexityResearchProvider
 
     if prepass_source_rows is None and source_rows_override is not None:
         prepass_source_rows = list(source_rows_override)
@@ -6664,5 +6686,3 @@ def _aggregate_perplexity_research_runs(
             ),
         },
     }
-
-

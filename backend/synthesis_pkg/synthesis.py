@@ -238,8 +238,8 @@ async def _generate_human_readable_analyst_document(
     ticker: str,
 ) -> Dict[str, Any]:
     """Generate a market-analyst style human-readable memo from Stage 3 outputs."""
-    from .openrouter import query_model
-    from .config import (
+    from ..openrouter import query_model
+    from ..config import (
         STAGE3_ANALYST_MEMO_ENABLED,
         STAGE3_ANALYST_MEMO_MODEL,
         STAGE3_ANALYST_MEMO_TIMEOUT_SECONDS,
@@ -1708,8 +1708,8 @@ async def synthesize_structured_analysis(
     Returns:
         Dict with structured analysis + JSON output
     """
-    from .openrouter import query_model
-    from .config import (
+    from ..openrouter import query_model
+    from ..config import (
         CHAIRMAN_MODEL,
         CHAIRMAN_MAX_OUTPUT_TOKENS,
         CHAIRMAN_TIMEOUT_SECONDS,
@@ -1719,7 +1719,7 @@ async def synthesize_structured_analysis(
         CHAIRMAN_JSONIFIER_TIMEOUT_SECONDS,
         CHAIRMAN_JSONIFIER_MAX_OUTPUT_TOKENS,
     )
-    from .template_loader import get_template_loader
+    from ..template_loader import get_template_loader
 
     # Load the template
     loader = get_template_loader()
