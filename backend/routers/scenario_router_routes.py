@@ -38,15 +38,15 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 def _build_scenario_router_service():
-    from .scenario_router.document_reader import DocumentReader
-    from .scenario_router.lab_scribe import LabScribe
-    from .scenario_router.market_facts_resolver import ScenarioMarketFactsResolver
-    from .scenario_router.model_thesis_judge import ModelAnnouncementThesisJudge
-    from .scenario_router.run_selector import LatestRunSelector
-    from .scenario_router.semantic_adjudicator import ModelSemanticAdjudicator
-    from .scenario_router.source_resolver import SourceResolver
-    from .scenario_router.thesis_comparator import ThesisComparator
-    from .scenario_router.service import (
+    from ..scenario_router.document_reader import DocumentReader
+    from ..scenario_router.lab_scribe import LabScribe
+    from ..scenario_router.market_facts_resolver import ScenarioMarketFactsResolver
+    from ..scenario_router.model_thesis_judge import ModelAnnouncementThesisJudge
+    from ..scenario_router.run_selector import LatestRunSelector
+    from ..scenario_router.semantic_adjudicator import ModelSemanticAdjudicator
+    from ..scenario_router.source_resolver import SourceResolver
+    from ..scenario_router.thesis_comparator import ThesisComparator
+    from ..scenario_router.service import (
         ScenarioRouterDependencies,
         ScenarioRouterService,
     )
@@ -179,7 +179,7 @@ class ProcessScenarioRouterAnnouncementRequest(BaseModel):
 @router.get("/api/announcement-router/overview")
 @router.get("/api/scenario-router/overview")
 async def get_scenario_router_overview(limit: int = 100, ticker: str = ""):
-    from .scenario_router.observability import ScenarioRouterObservability
+    from ..scenario_router.observability import ScenarioRouterObservability
 
     observer = ScenarioRouterObservability()
     return observer.build_overview(recent_limit=max(1, min(int(limit or 100), 5000)), ticker=str(ticker or "").strip())
@@ -188,7 +188,7 @@ async def get_scenario_router_overview(limit: int = 100, ticker: str = ""):
 @router.get("/api/announcement-router/events")
 @router.get("/api/scenario-router/events")
 async def list_scenario_router_events(limit: int = 50, ticker: str = ""):
-    from .scenario_router.observability import ScenarioRouterObservability
+    from ..scenario_router.observability import ScenarioRouterObservability
 
     observer = ScenarioRouterObservability()
     return {
@@ -201,7 +201,7 @@ async def list_scenario_router_events(limit: int = 50, ticker: str = ""):
 @router.get("/api/scenario-router/signal")
 @router.get("/api/scenario-router/signals")
 async def get_scenario_router_signals(limit: int = 500, ticker: str = ""):
-    from .scenario_router.observability import ScenarioRouterObservability
+    from ..scenario_router.observability import ScenarioRouterObservability
 
     observer = ScenarioRouterObservability()
     return observer.build_signal_map(limit=max(1, min(int(limit or 500), 5000)), ticker=str(ticker or "").strip())
@@ -209,7 +209,7 @@ async def get_scenario_router_signals(limit: int = 500, ticker: str = ""):
 
 @router.get("/api/market-path/security-history/{ticker:path}")
 async def get_market_path_security_history(ticker: str):
-    from .price_history_bridge import fetch_alpha_edge_security_history
+    from ..price_history_bridge import fetch_alpha_edge_security_history
 
     return await fetch_alpha_edge_security_history(str(ticker or "").strip())
 
@@ -217,7 +217,7 @@ async def get_market_path_security_history(ticker: str):
 @router.post("/api/announcement-router/reviews/{event_id}")
 @router.post("/api/scenario-router/reviews/{event_id}")
 async def post_scenario_router_review(event_id: str, payload: Dict[str, Any]):
-    from .scenario_router.review_store import save_review
+    from ..scenario_router.review_store import save_review
 
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="Payload must be a JSON object")
@@ -237,7 +237,7 @@ async def post_scenario_router_review(event_id: str, payload: Dict[str, Any]):
 @router.get("/api/announcement-router/evaluations")
 @router.get("/api/scenario-router/evaluations")
 async def get_scenario_router_evaluations():
-    from .scenario_router.observability import ScenarioRouterObservability
+    from ..scenario_router.observability import ScenarioRouterObservability
 
     observer = ScenarioRouterObservability()
     return observer.run_evaluation_suite()
@@ -252,7 +252,7 @@ async def post_scenario_router_mock_evaluate(payload: Dict[str, Any]):
     artifact write. It is intended for thesis-by-thesis router regression tests
     and manual QA.
     """
-    from .scenario_router.mock_harness import run_mock_router_case, run_mock_router_cases
+    from ..scenario_router.mock_harness import run_mock_router_case, run_mock_router_cases
 
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="Payload must be a JSON object")
@@ -305,8 +305,8 @@ async def process_scenario_router_announcement(
                     "processed_at_utc": str(existing.get("processed_at_utc") or "").strip(),
                 },
             }
-    from .scenario_router.inbox_sentinel import InboxSentinel
-    from .scenario_router.lab_scribe import LabScribe
+    from ..scenario_router.inbox_sentinel import InboxSentinel
+    from ..scenario_router.lab_scribe import LabScribe
 
     sentinel = InboxSentinel()
     scribe = LabScribe()
@@ -398,5 +398,4 @@ async def process_scenario_router_announcement(
         },
         "decision": decision.to_dict(),
     }
-
 

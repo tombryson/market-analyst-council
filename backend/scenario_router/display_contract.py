@@ -485,7 +485,7 @@ def _tone(
     queue_bucket: str,
     impact_verdict: str = "",
 ) -> str:
-    if status == "error" or action in {"urgent_human_review", "full_rerun"}:
+    if status == "error":
         return "urgent"
     if impact_verdict == "negative":
         return "urgent"
@@ -501,6 +501,8 @@ def _tone(
         return "warn"
     if state in POSITIVE_TRAJECTORY_STATES:
         return "positive"
+    if action in {"urgent_human_review", "full_rerun"}:
+        return "urgent"
     if action in {"rerun_stage1", "run_delta_only"}:
         return "alarm"
     return "neutral"

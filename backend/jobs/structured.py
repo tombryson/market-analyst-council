@@ -12,7 +12,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from ..council import compact_stage2_rankings_for_telemetry
+from ..council import (
+    calculate_aggregate_rankings,
+    compact_stage2_rankings_for_telemetry,
+)
+from ..timeline_normalization import normalize_timeline_rows as _standardize_timeline_rows
 
 logger = logging.getLogger(__name__)
 
@@ -743,7 +747,7 @@ def _build_summary_fields(structured: Dict[str, Any], freshness: Dict[str, Any])
 
 def _load_latest_scenario_router_state(run_id: str) -> Dict[str, Any]:
     try:
-        from .scenario_router.lab_scribe import LabScribe
+        from ..scenario_router.lab_scribe import LabScribe
 
         return LabScribe.load_latest_for_run(run_id)
     except Exception:
@@ -761,14 +765,14 @@ def _build_scenario_router_summary(router_state: Dict[str, Any]) -> Dict[str, An
     router_condition_details = None
     router_thesis_snapshot = None
     try:
-        from .scenario_router.artifact_replay import replay_comparison_from_artifact
-        from .scenario_router.display_contract import (
+        from ..scenario_router.artifact_replay import replay_comparison_from_artifact
+        from ..scenario_router.display_contract import (
             build_router_display_contract,
             market_only_watch_projection,
             should_project_market_only_watch,
             watchlist_engagement_projection,
         )
-        from .scenario_router.observability import (
+        from ..scenario_router.observability import (
             _condition_details as router_condition_details,
             _thesis_snapshot as router_thesis_snapshot,
         )
@@ -1212,5 +1216,3 @@ def _build_portfolio_positioning_run_label(filename: str, structured: Dict[str, 
     if date_label:
         return f"{head} ({date_label})"
     return head or filename
-
-

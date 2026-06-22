@@ -720,7 +720,7 @@ function routerPriorityTone(router) {
   const materiality = routerMateriality(router);
   const isMaterial = ['medium', 'high', 'critical'].includes(materiality);
   const isAdministrative = routerFilingType(router) === 'administrative' || state === 'administrative_filing';
-  if (status === 'error' || action === 'urgent_human_review' || action === 'full_rerun') return 'urgent';
+  if (status === 'error') return 'urgent';
   if (verdict === 'negative') return 'urgent';
   if (verdict === 'positive') return 'positive';
   if (['mixed', 'uncertain', 'unclear'].includes(verdict)) return 'warn';
@@ -730,6 +730,7 @@ function routerPriorityTone(router) {
   if (isMaterial || ['needs_classification', 'material_unmapped'].includes(state)) return 'warn';
   if (verdict === 'neutral') return 'neutral';
   if (['market_backdrop_only', 'no_thesis_change', 'administrative_filing'].includes(state)) return 'neutral';
+  if (action === 'urgent_human_review' || action === 'full_rerun') return 'urgent';
   if (action === 'rerun_stage1' || action === 'run_delta_only' || routerConflictCount(router)) return 'alarm';
   if (routerDirectHitCount(router) || action === 'annotate_run') return 'warn';
   if (action === 'watch') return 'neutral';

@@ -9,7 +9,7 @@ import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .state import (
     JOBS_META_DIR,
@@ -450,5 +450,4 @@ def _collect_portfolio_positioning_related_paths(run_id: str) -> List[Path]:
                 related[str(meta_path.resolve())] = meta_path
 
     return sorted(related.values(), key=lambda path: str(path))
-
 
