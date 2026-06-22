@@ -351,7 +351,7 @@ def _expected_domains_for_exchange(exchange: str) -> List[str]:
     key = (exchange or "").strip()
     key_upper = key.upper()
     try:
-        from .template_loader import get_template_loader
+        from ..template_loader import get_template_loader
 
         loader = get_template_loader()
         normalized = loader.normalize_exchange(key) or loader.normalize_exchange(key_upper)

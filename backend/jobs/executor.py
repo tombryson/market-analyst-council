@@ -186,7 +186,7 @@ async def _prepare_generated_supplementary_for_job(
     if str(request_payload.get("reuse_supplementary_from_job_id") or "").strip():
         return None, [], {"mode": mode, "generated": False, "reason": "reused_supplementary_precedence"}
 
-    from .template_loader import get_template_loader
+    from ..template_loader import get_template_loader
 
     loader = get_template_loader()
     ticker = str(request_payload.get("ticker") or "").strip().upper()

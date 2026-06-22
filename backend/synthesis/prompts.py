@@ -307,7 +307,7 @@ def create_weighted_context(
 
 def _infer_company_name(enhanced_context: str, ticker: str = None) -> str:
     """Infer company name via shared template-loader heuristics."""
-    from .template_loader import get_template_loader
+    from ..template_loader import get_template_loader
     loader = get_template_loader()
     return loader.infer_company_name(enhanced_context, ticker=ticker)
 
@@ -777,5 +777,4 @@ def _render_stage3_template_contract_guidance(
     if max_chars > 0 and len(rendered) > max_chars:
         rendered = rendered[: max_chars - 3].rstrip() + "..."
     return rendered
-
 

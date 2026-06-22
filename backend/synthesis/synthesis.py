@@ -1719,7 +1719,7 @@ async def synthesize_structured_analysis(
         CHAIRMAN_JSONIFIER_TIMEOUT_SECONDS,
         CHAIRMAN_JSONIFIER_MAX_OUTPUT_TOKENS,
     )
-    from .template_loader import get_template_loader
+    from ..template_loader import get_template_loader
 
     # Load the template
     loader = get_template_loader()
