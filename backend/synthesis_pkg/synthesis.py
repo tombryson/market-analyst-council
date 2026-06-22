@@ -1979,7 +1979,10 @@ Begin your JSON output now:"""
             structured_data["council_metadata"]["resolved_company_name"] = resolved_company_name
 
         # Add full Stage 2 ranking telemetry.
-        from .council import calculate_aggregate_rankings, compact_stage2_rankings_for_telemetry
+        from ..council.stage2 import (
+            calculate_aggregate_rankings,
+            compact_stage2_rankings_for_telemetry,
+        )
         aggregate = calculate_aggregate_rankings(stage2_results, label_to_model)
         if aggregate:
             structured_data["council_metadata"]["stage2_aggregate_rankings"] = aggregate
@@ -2048,7 +2051,7 @@ Begin your JSON output now:"""
 
 def create_rankings_summary(stage2_results: List[Dict[str, Any]], label_to_model: Dict[str, str]) -> str:
     """Create a readable summary of the peer rankings."""
-    from .council import calculate_aggregate_rankings
+    from ..council.stage2 import calculate_aggregate_rankings
 
     aggregate = calculate_aggregate_rankings(stage2_results, label_to_model)
 

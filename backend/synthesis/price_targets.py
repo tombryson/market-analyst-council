@@ -92,7 +92,7 @@ def _build_top_rank_consensus_nudge(
 ) -> str:
     """Build a compact consensus anchor from the top-ranked Stage 1 models."""
     from statistics import median
-    from .council import calculate_aggregate_rankings
+    from ..council.stage2 import calculate_aggregate_rankings
 
     aggregate = calculate_aggregate_rankings(stage2_results, label_to_model)
     if not aggregate:
@@ -492,5 +492,4 @@ def _apply_scenario_driver_enrichment(
             price_targets["upside_12m_pct"] = round(((target_12m / current_price) - 1.0) * 100.0, 2)
         if _to_float(price_targets.get("upside_24m_pct")) is None and target_24m is not None:
             price_targets["upside_24m_pct"] = round(((target_24m / current_price) - 1.0) * 100.0, 2)
-
 

@@ -257,7 +257,7 @@ def create_weighted_context(
     model_positions = defaultdict(list)
 
     for ranking in stage2_results:
-        from .council import _ranking_labels_from_result
+        from ..council.stage2 import _ranking_labels_from_result
         parsed_ranking = _ranking_labels_from_result(ranking)
 
         for position, label in enumerate(parsed_ranking, start=1):
@@ -776,4 +776,3 @@ def _render_stage3_template_contract_guidance(
     if max_chars > 0 and len(rendered) > max_chars:
         rendered = rendered[: max_chars - 3].rstrip() + "..."
     return rendered
-

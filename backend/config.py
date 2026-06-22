@@ -122,7 +122,7 @@ _COUNCIL_MODELS = _get_csv("COUNCIL_MODELS")
 COUNCIL_MODELS = _COUNCIL_MODELS or [
     "x-ai/grok-4.3",
     "qwen/qwen3.7-max",
-    "z-ai/glm-5.1",
+    "z-ai/glm-5.2",
     "moonshotai/kimi-k2.6",
     "deepseek/deepseek-v4-pro",
     "openrouter/owl-alpha",
