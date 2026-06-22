@@ -90,7 +90,7 @@ def _build_stage1_verification_profile(template_id: Optional[str]) -> Dict[str, 
     if not template_id:
         return profile
 
-    from .template_loader import get_template_loader
+    from ..template_loader import get_template_loader
 
     loader = get_template_loader()
     template_data = loader.get_template(template_id) or {}
@@ -570,5 +570,4 @@ def _merge_stage1_wave_runs(
         "wave_reports": wave_reports,
     }
     return merged
-
 

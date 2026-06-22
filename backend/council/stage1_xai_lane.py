@@ -38,7 +38,7 @@ def _resolve_template_commodity_profile(template_id: str) -> str:
     if not key:
         return ""
     try:
-        from .template_loader import get_template_loader
+        from ..template_loader import get_template_loader
 
         loader = get_template_loader()
         behavior = loader.get_template_behavior(key) or {}
@@ -264,7 +264,7 @@ async def _collect_stage1_supplementary_macro_news(
     sector_label = ""
     query_focus = ""
     try:
-        from .template_loader import get_template_loader
+        from ..template_loader import get_template_loader
 
         loader = get_template_loader()
         behavior = loader.get_template_behavior(str(template_id or "").strip()) or {}
@@ -324,5 +324,4 @@ async def _collect_stage1_supplementary_macro_news(
         "max_sources": int(max_sources),
         "max_recency_days": int(max(7, int(PERPLEXITY_STAGE1_SUPPLEMENTARY_NEWS_MAX_RECENCY_DAYS))),
     }
-
 
