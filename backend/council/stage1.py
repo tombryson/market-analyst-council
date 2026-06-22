@@ -5129,7 +5129,7 @@ async def stage1_collect_perplexity_research_responses(
     """
     _ensure_system_enabled(diagnostic_mode=diagnostic_mode)
     import asyncio
-    from .research.providers.perplexity import PerplexityResearchProvider
+    from ..research.providers.perplexity import PerplexityResearchProvider
 
     if prepass_source_rows is None and source_rows_override is not None:
         prepass_source_rows = list(source_rows_override)
@@ -6664,5 +6664,4 @@ def _aggregate_perplexity_research_runs(
             ),
         },
     }
-
 

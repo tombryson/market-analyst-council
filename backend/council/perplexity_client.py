@@ -340,7 +340,7 @@ async def _query_model_via_perplexity(
 
     content = ""
     try:
-        from .research.providers.perplexity import PerplexityResearchProvider
+        from ..research.providers.perplexity import PerplexityResearchProvider
         parser = PerplexityResearchProvider()
         content = parser._extract_content(data).strip()
     except Exception:
@@ -760,5 +760,4 @@ _STAGE1_DEFAULT_TIMELINE_FOCUS_TERMS = [
     "target",
 ]
 _STAGE1_SECOND_PASS_MIN_RESPONSE_CHARS = 300
-
 
