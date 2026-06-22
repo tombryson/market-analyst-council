@@ -22,6 +22,9 @@ from .routers import analysis_jobs as analysis_jobs_router
 
 logger = logging.getLogger(__name__)
 
+build_enhanced_context = conversations_router.build_enhanced_context
+build_template_context_for_prompt = conversations_router.build_template_context_for_prompt
+
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):

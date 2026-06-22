@@ -4,10 +4,12 @@ Handles job creation, status polling, streaming log output, result
 retrieval, and admin endpoints.
 """
 
+import asyncio
 import json
 import logging
 import os
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -387,5 +389,3 @@ async def stream_analysis_job_events(job_id: str, poll_ms: int = 1000):
             "X-Accel-Buffering": "no",
         },
     )
-
-

@@ -17,11 +17,11 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 COPY backend ./backend
-COPY test_quality_mvp.py ./test_quality_mvp.py
-COPY portfolio_positioning_memo.py ./portfolio_positioning_memo.py
-COPY test_emulated_council.py ./test_emulated_council.py
-COPY test_perplexity_pdf_dump.py ./test_perplexity_pdf_dump.py
-COPY test_pdf_dump_worker_summaries.py ./test_pdf_dump_worker_summaries.py
+COPY tests/integration/test_quality_mvp.py ./test_quality_mvp.py
+COPY scripts/portfolio_positioning_memo.py ./portfolio_positioning_memo.py
+COPY tests/integration/test_emulated_council.py ./test_emulated_council.py
+COPY tests/integration/test_perplexity_pdf_dump.py ./test_perplexity_pdf_dump.py
+COPY tests/integration/test_pdf_dump_worker_summaries.py ./test_pdf_dump_worker_summaries.py
 COPY scripts ./scripts
 COPY docs ./docs
 COPY .env.example ./.env.example

@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -41,6 +42,15 @@ from .state import (
     research_service,
 )
 from .prepass import _tail_text
+from .runs import (
+    _invalidate_gantt_run_cache,
+    _invalidate_portfolio_positioning_run_cache,
+    _resolve_run_artifact_path,
+)
+from .structured import (
+    _extract_stage3_result_from_artifact,
+    _extract_stage3_structured_from_artifact,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1107,5 +1117,3 @@ def _build_synthetic_job_record_from_run(run_meta: Dict[str, Any]) -> Dict[str, 
         "analysis_date": str(run_meta.get("analysis_date") or ""),
         "is_synthetic": True,
     }
-
-

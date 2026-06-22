@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ausgoldStage3Sample } from '../data/ausgoldStage3Sample';
+import { ausgoldStage3Sample } from '../fixtures/ausgoldStage3Sample';
 import { mapStage3ToGanttModel } from '../utils/stage3GanttMapper';
 import './GanttMappingDemo.css';
 
