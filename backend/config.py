@@ -120,10 +120,11 @@ LITEPARSE_TIMEOUT_SECONDS = _get_float("LITEPARSE_TIMEOUT_SECONDS", 240.0)
 # Council members - list of OpenRouter model identifiers
 _COUNCIL_MODELS = _get_csv("COUNCIL_MODELS")
 COUNCIL_MODELS = _COUNCIL_MODELS or [
-    "x-ai/grok-4.3",
+    "x-ai/grok-4.5",
     "qwen/qwen3.7-max",
     "z-ai/glm-5.2",
-    "moonshotai/kimi-k2.6",
+    "moonshotai/kimi-k3",
+    "thinkingmachines/inkling",
     "deepseek/deepseek-v4-pro",
     "openrouter/owl-alpha",
 ]
@@ -358,9 +359,9 @@ COUNCIL_EXECUTION_MODE = os.getenv("COUNCIL_EXECUTION_MODE", "local").strip().lo
 # Note: Perplexity model IDs can differ from OpenRouter IDs (e.g. xai/... vs x-ai/...).
 _PERPLEXITY_COUNCIL_MODELS = _get_csv("PERPLEXITY_COUNCIL_MODELS")
 PERPLEXITY_COUNCIL_MODELS = _PERPLEXITY_COUNCIL_MODELS or [
-    "openai/gpt-5.5",
+    "openai/gpt-5.6-sol",
     "google/gemini-3.1-pro-preview",
-    "anthropic/claude-sonnet-4-6",
+    "anthropic/claude-sonnet-5",
 ]
 PERPLEXITY_STAGE1_MIXED_MODE_ENABLED = _get_bool(
     "PERPLEXITY_STAGE1_MIXED_MODE_ENABLED",
@@ -419,7 +420,7 @@ PERPLEXITY_API_URL = os.getenv(
     "PERPLEXITY_API_URL",
     "https://api.perplexity.ai/v1/responses",
 )
-PERPLEXITY_MODEL = os.getenv("PERPLEXITY_MODEL", "openai/gpt-5.5")
+PERPLEXITY_MODEL = os.getenv("PERPLEXITY_MODEL", "openai/gpt-5.6-sol")
 PERPLEXITY_PRESET = os.getenv("PERPLEXITY_PRESET", "deep-research")
 PERPLEXITY_PRESET_STRATEGY = os.getenv(
     "PERPLEXITY_PRESET_STRATEGY",

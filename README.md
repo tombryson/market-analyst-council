@@ -228,7 +228,7 @@ To enable mixed-provider Stage 1 fanout (single shared retrieval + dual analysis
 COUNCIL_EXECUTION_MODE=perplexity_emulated
 PERPLEXITY_COUNCIL_MODELS=openai/gpt-5.1,google/gemini-3-pro-preview,anthropic/claude-sonnet-4-5
 PERPLEXITY_STAGE1_MIXED_MODE_ENABLED=true
-PERPLEXITY_STAGE1_OPENROUTER_MODELS=openai/gpt-5.2,anthropic/claude-opus-4.6,moonshotai/kimi-k2.6
+PERPLEXITY_STAGE1_OPENROUTER_MODELS=openai/gpt-5.2,anthropic/claude-opus-4.6,moonshotai/kimi-k3
 ```
 - Perplexity pool models are analyzed via Perplexity API.
 - OpenRouter pool models are analyzed via OpenRouter API.
