@@ -121,11 +121,11 @@ LITEPARSE_TIMEOUT_SECONDS = _get_float("LITEPARSE_TIMEOUT_SECONDS", 240.0)
 _COUNCIL_MODELS = _get_csv("COUNCIL_MODELS")
 COUNCIL_MODELS = _COUNCIL_MODELS or [
     "x-ai/grok-4.5",
-    "qwen/qwen3.7-max",
+    "qwen/qwen3.8-max",
     "z-ai/glm-5.2",
     "moonshotai/kimi-k3",
     "thinkingmachines/inkling",
-    "deepseek/deepseek-v4-pro",
+    "deepseek/deepseek-v4-flash-0731",
     "openrouter/owl-alpha",
 ]
 
