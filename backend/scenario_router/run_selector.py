@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from .. import main as main_api
+from ..routers import runs as runs_api
 from .models import BaselineRunPacket
 
 
@@ -18,7 +18,9 @@ class LatestRunSelector:
         if not normalized_ticker:
             raise RuntimeError("LatestRunSelector requires a ticker.")
 
-        listing = await main_api.list_gantt_runs(limit=max(1, int(self.limit)), ticker=normalized_ticker)
+        listing = await runs_api.list_gantt_runs(
+            limit=max(1, int(self.limit)), ticker=normalized_ticker
+        )
         runs = list((listing or {}).get("runs") or [])
         if not runs:
             raise RuntimeError(f"No saved lab runs found for {normalized_ticker}.")
@@ -28,7 +30,7 @@ class LatestRunSelector:
         if not run_id:
             raise RuntimeError(f"Saved run entry for {normalized_ticker} is missing an id.")
 
-        packet = await main_api.get_gantt_run_report_packet(run_id)
+        packet = await runs_api.get_gantt_run_report_packet(run_id)
         return self._coerce_report_packet(packet)
 
     def _pick_best_run(self, runs: list, ticker: str, exchange: str) -> Dict[str, Any]:

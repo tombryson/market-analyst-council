@@ -908,15 +908,15 @@ class LatestRunSelectorTests(unittest.IsolatedAsyncioTestCase):
 
         from backend.scenario_router import run_selector as run_selector_module
 
-        original_list = run_selector_module.main_api.list_gantt_runs
-        original_packet = run_selector_module.main_api.get_gantt_run_report_packet
-        run_selector_module.main_api.list_gantt_runs = fake_list_gantt_runs
-        run_selector_module.main_api.get_gantt_run_report_packet = fake_get_gantt_run_report_packet
+        original_list = run_selector_module.runs_api.list_gantt_runs
+        original_packet = run_selector_module.runs_api.get_gantt_run_report_packet
+        run_selector_module.runs_api.list_gantt_runs = fake_list_gantt_runs
+        run_selector_module.runs_api.get_gantt_run_report_packet = fake_get_gantt_run_report_packet
         try:
             packet = await selector.select_latest("ASX:BTR", "ASX")
         finally:
-            run_selector_module.main_api.list_gantt_runs = original_list
-            run_selector_module.main_api.get_gantt_run_report_packet = original_packet
+            run_selector_module.runs_api.list_gantt_runs = original_list
+            run_selector_module.runs_api.get_gantt_run_report_packet = original_packet
 
         self.assertEqual(packet.run_id, "run-123.json")
         self.assertEqual(packet.template_id, "resources_gold_monometallic")
@@ -1008,9 +1008,9 @@ class LabScribeTests(unittest.IsolatedAsyncioTestCase):
 
 class ScenarioRouterWebhookHelperTests(unittest.TestCase):
     def test_choose_scenario_router_event_key_prefers_gmail_message_id(self):
-        from backend import main as main_module
+        from backend.routers import scenario_router_routes as router_module
 
-        key = main_module._choose_scenario_router_event_key(
+        key = router_module._choose_scenario_router_event_key(
             {
                 "gmail_message_id": "gmail-evt-1",
                 "event_id": "evt-1",
@@ -1020,11 +1020,11 @@ class ScenarioRouterWebhookHelperTests(unittest.TestCase):
         self.assertEqual(key, "gmail-evt-1")
 
     def test_persist_and_load_scenario_router_dedupe_marker(self):
-        from backend import main as main_module
+        from backend.routers import scenario_router_routes as router_module
 
         with TemporaryDirectory() as tmpdir:
-            original_dir = main_module.SCENARIO_ROUTER_DEDUPE_DIR
-            main_module.SCENARIO_ROUTER_DEDUPE_DIR = Path(tmpdir)
+            original_dir = router_module.SCENARIO_ROUTER_DEDUPE_DIR
+            router_module.SCENARIO_ROUTER_DEDUPE_DIR = Path(tmpdir)
             try:
                 payload = {
                     "event_key": "gmail-evt-2",
@@ -1032,10 +1032,10 @@ class ScenarioRouterWebhookHelperTests(unittest.TestCase):
                     "baseline_run_id": "run-99",
                     "action": "annotate_run",
                 }
-                main_module._persist_scenario_router_dedupe("gmail-evt-2", payload)
-                loaded = main_module._load_scenario_router_dedupe("gmail-evt-2")
+                router_module._persist_scenario_router_dedupe("gmail-evt-2", payload)
+                loaded = router_module._load_scenario_router_dedupe("gmail-evt-2")
             finally:
-                main_module.SCENARIO_ROUTER_DEDUPE_DIR = original_dir
+                router_module.SCENARIO_ROUTER_DEDUPE_DIR = original_dir
 
         self.assertEqual(loaded.get("ticker"), "ASX:TOR")
         self.assertEqual(loaded.get("baseline_run_id"), "run-99")

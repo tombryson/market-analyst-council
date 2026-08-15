@@ -1,7 +1,7 @@
 import asyncio
 import unittest
 
-from backend.main import _build_integration_packet
+from backend.jobs.structured import _build_integration_packet
 from backend.scenario_router.action_judge import ActionJudge
 from backend.scenario_router.announcement_interpreter import AnnouncementInterpreter
 from backend.scenario_router.models import AnnouncementFacts, BaselineRunPacket, EvidenceRef
