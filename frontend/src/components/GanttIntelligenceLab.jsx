@@ -2128,7 +2128,6 @@ export default function GanttIntelligenceLab({ monitorOnly = false }) {
                       <span>avg {fmtRankMetric(row.average_rank)}</span>
                       <span>{row.rankings_count ?? 0} votes</span>
                       <span>{row.first_place_votes ?? 0} firsts</span>
-                      <span>borda {row.borda_score ?? 'n/a'}</span>
                     </div>
                   ))}
                 </div>

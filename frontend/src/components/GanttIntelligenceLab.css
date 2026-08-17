@@ -4030,13 +4030,14 @@
 
 .ranking-row {
   display: grid;
-  grid-template-columns: 22px minmax(180px, 1fr) repeat(4, max-content);
-  gap: 8px;
+  grid-template-columns: 22px minmax(0, 1fr) repeat(3, max-content);
+  gap: 6px;
   align-items: center;
   font-size: 11px;
   color: #cae0f1;
   border-bottom: 1px solid rgba(171, 208, 231, 0.12);
   padding: 3px 0;
+  min-width: 0;
 }
 
 .ranking-row:last-child {
