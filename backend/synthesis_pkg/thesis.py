@@ -72,6 +72,8 @@ def _extract_headwinds_tailwinds_from_text(chairman_text: str) -> Dict[str, List
         "quantitative tailwinds": ("quantitative", "Tailwind"),
         "qualitative headwinds": ("qualitative", "Headwind"),
         "qualitative tailwinds": ("qualitative", "Tailwind"),
+        "headwinds": ("auto", "Headwind"),
+        "tailwinds": ("auto", "Tailwind"),
     }
 
     for raw_line in str(section or "").splitlines():
@@ -96,11 +98,19 @@ def _extract_headwinds_tailwinds_from_text(chairman_text: str) -> Dict[str, List
         line = re.sub(r"^[\-\*\u2022]+\s*", "", line).strip()
         if not line:
             continue
+        target_bucket = bucket
+        if target_bucket == "auto":
+            if re.search(r"\bquantitative\b", line, re.IGNORECASE):
+                target_bucket = "quantitative"
+            elif re.search(r"\bqualitative\b", line, re.IGNORECASE):
+                target_bucket = "qualitative"
+            else:
+                target_bucket = "qualitative"
         if prefix:
             line = f"{prefix}: {line}"
-        if bucket == "quantitative":
+        if target_bucket == "quantitative":
             quantitative.append(line)
-        elif bucket == "qualitative":
+        elif target_bucket == "qualitative":
             qualitative.append(line)
 
     return {
@@ -1337,4 +1347,3 @@ async def _extract_stage1_reference_rows(stage1_results: List[Dict[str, Any]]) -
         merged.append(_merge_stage1_reference_rows(base_row=base_row, parsed_row=parsed_row))
 
     return merged
-

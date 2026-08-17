@@ -633,6 +633,7 @@ def _ensure_structured_fields_for_template(
     }
     gantt_normalized_template_keys = set(resource_template_keys) | {
         "pharma_biotech",
+        "medtech",
         "financials_bank_insurance",
         "software_saas",
         "industrials_consumer_reit",
