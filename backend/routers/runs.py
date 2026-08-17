@@ -51,6 +51,7 @@ from ..jobs.state import (
     _GANTT_RUN_LIST_CACHE,
     _PORTFOLIO_POSITIONING_RUN_LIST_CACHE,
 )
+from ..synthesis.timeline import _extract_development_timeline_from_text
 from ..utils import _ensure_system_enabled
 
 router = APIRouter()
@@ -340,10 +341,17 @@ async def get_gantt_run(run_id: str):
     ):
         price_targets["current_price"] = market_data.get("current_price")
 
-    # Normalize timeline rows for frontend charting (avoid TBD when chairman/jsonifier emits strings).
-    structured["development_timeline"] = _normalize_timeline_rows_for_api(
-        structured.get("development_timeline")
-    )
+    # Normalize timeline rows for frontend charting. If the JSONifier omitted the
+    # structured field, recover it from the saved chairman XML memo.
+    timeline_rows = _normalize_timeline_rows_for_api(structured.get("development_timeline"))
+    if not timeline_rows:
+        extracted_rows, extracted_stage, _ = _extract_development_timeline_from_text(
+            stage3_result.get("response") or ""
+        )
+        timeline_rows = _normalize_timeline_rows_for_api(extracted_rows)
+        if extracted_stage and not structured.get("current_development_stage"):
+            structured["current_development_stage"] = extracted_stage
+    structured["development_timeline"] = timeline_rows
     # Keep historical catalyst references lightweight: max one prior catalyst, rest future/current.
     extended_analysis = structured.get("extended_analysis")
     if isinstance(extended_analysis, dict) and isinstance(extended_analysis.get("next_major_catalysts"), list):
@@ -505,6 +513,5 @@ async def post_delta_check(
         raise HTTPException(status_code=500, detail=f"Delta-check failed: {exc}") from exc
 
     return result
-
 
 
