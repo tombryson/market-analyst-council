@@ -126,7 +126,7 @@ COUNCIL_MODELS = _COUNCIL_MODELS or [
     "moonshotai/kimi-k3",
     "thinkingmachines/inkling",
     "deepseek/deepseek-v4-flash-0731",
-    "openrouter/owl-alpha",
+    "meituan/longcat-2.0",
 ]
 
 # Chairman model - synthesizes final response
