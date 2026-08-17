@@ -130,7 +130,7 @@ COUNCIL_MODELS = _COUNCIL_MODELS or [
 ]
 
 # Chairman model - synthesizes final response
-CHAIRMAN_MODEL = os.getenv("CHAIRMAN_MODEL", "google/gemini-3.1-pro-preview").strip()
+CHAIRMAN_MODEL = os.getenv("CHAIRMAN_MODEL", "google/gemini-3.7-flash").strip()
 CHAIRMAN_TIMEOUT_SECONDS = _get_float("CHAIRMAN_TIMEOUT_SECONDS", 300.0)
 # Explicit Stage 3 completion budget for chairman calls.
 # Set to 0 only if you intentionally want provider-default limits.
@@ -360,7 +360,7 @@ COUNCIL_EXECUTION_MODE = os.getenv("COUNCIL_EXECUTION_MODE", "local").strip().lo
 _PERPLEXITY_COUNCIL_MODELS = _get_csv("PERPLEXITY_COUNCIL_MODELS")
 PERPLEXITY_COUNCIL_MODELS = _PERPLEXITY_COUNCIL_MODELS or [
     "openai/gpt-5.6-sol",
-    "google/gemini-3.1-pro-preview",
+    "google/gemini-3.7-flash",
     "anthropic/claude-sonnet-5",
 ]
 PERPLEXITY_STAGE1_MIXED_MODE_ENABLED = _get_bool(
