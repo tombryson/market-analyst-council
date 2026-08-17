@@ -229,6 +229,209 @@ def _build_analyst_memo_fallback(
     return "\n".join(lines)
 
 
+def _ensure_gantt_timeline_fields(
+    structured_data: Dict[str, Any],
+    chairman_text: str,
+) -> None:
+    """Normalize/recover Gantt timeline fields independent of template choice."""
+    timeline_raw = structured_data.get("development_timeline")
+    if isinstance(timeline_raw, list):
+        normalized_timeline: List[Dict[str, Any]] = []
+        period_pattern = re.compile(
+            r"\b(Q[1-4](?:\s*[-/]\s*Q[1-4])?\s*20\d{2}|H[12]\s*20\d{2}|20\d{2})\b",
+            re.IGNORECASE,
+        )
+        for idx, item in enumerate(timeline_raw):
+            if isinstance(item, dict):
+                milestone = str(
+                    item.get("milestone")
+                    or item.get("event")
+                    or item.get("name")
+                    or item.get("goal")
+                    or item.get("title")
+                    or ""
+                ).strip()
+                target_period = str(
+                    item.get("target_period")
+                    or item.get("targetPeriod")
+                    or item.get("period")
+                    or item.get("when")
+                    or item.get("date")
+                    or ""
+                ).strip()
+                if milestone and not target_period:
+                    inline_period, cleaned_milestone = _extract_inline_timeline_period(milestone)
+                    if inline_period:
+                        target_period = inline_period
+                        milestone = cleaned_milestone or milestone
+                status = str(
+                    item.get("status")
+                    or item.get("current_status")
+                    or item.get("state")
+                    or "unspecified"
+                ).strip()
+                inferred_status = _infer_timeline_status_from_text(milestone)
+                if inferred_status and status.lower() in {"", "unspecified", "planned"}:
+                    status = inferred_status
+                confidence = _to_float(
+                    item.get("confidence_pct")
+                    if item.get("confidence_pct") is not None
+                    else item.get("certainty_pct")
+                )
+                if milestone or target_period:
+                    normalized_target_period = _normalize_target_period_label(target_period)
+                    normalized_timeline.append(
+                        {
+                            "milestone": milestone or f"Milestone {idx + 1}",
+                            "target_period": normalized_target_period or target_period,
+                            "status": status or "unspecified",
+                            "confidence_pct": confidence,
+                            "primary_risk": str(
+                                item.get("primary_risk")
+                                or item.get("risk")
+                                or ""
+                            ).strip(),
+                            **(
+                                {"raw_target_period": target_period}
+                                if normalized_target_period and normalized_target_period != target_period
+                                else {}
+                            ),
+                        }
+                    )
+                continue
+
+            if isinstance(item, str):
+                text = item.strip()
+                if not text:
+                    continue
+                milestone = text
+                target_period = ""
+
+                # Common chairman line: "Q1-Q2 2026: Milestone"
+                colon_split = re.match(r"^([^:]{2,40}):\s*(.+)$", text)
+                if colon_split:
+                    lhs = str(colon_split.group(1) or "").strip()
+                    rhs = str(colon_split.group(2) or "").strip()
+                    if lhs and period_pattern.search(lhs):
+                        target_period = lhs
+                        milestone = rhs or text
+
+                if not target_period:
+                    period_match = period_pattern.search(text)
+                    if period_match:
+                        target_period = str(period_match.group(1) or "").strip()
+                        stripped = re.sub(r"^[:\-\s]+", "", text.replace(period_match.group(0), "")).strip()
+                        milestone = stripped or text
+
+                normalized_target_period = _normalize_target_period_label(target_period)
+                normalized_timeline.append(
+                    {
+                        "milestone": milestone or f"Milestone {idx + 1}",
+                        "target_period": normalized_target_period or target_period,
+                        "status": "unspecified",
+                        "confidence_pct": None,
+                        "primary_risk": "",
+                        **(
+                            {"raw_target_period": target_period}
+                            if normalized_target_period and normalized_target_period != target_period
+                            else {}
+                        ),
+                    }
+                )
+        structured_data["development_timeline"] = _standardize_timeline_rows(normalized_timeline)
+    else:
+        structured_data["development_timeline"] = []
+
+    if not isinstance(structured_data.get("current_development_stage"), str):
+        structured_data["current_development_stage"] = ""
+
+    # First fallback: parse timeline directly from chairman XML tag text.
+    if not structured_data["development_timeline"]:
+        extracted_rows, extracted_stage, _ = _extract_development_timeline_from_text(
+            chairman_text
+        )
+        if extracted_rows:
+            structured_data["development_timeline"] = extracted_rows
+        if not structured_data["current_development_stage"] and extracted_stage:
+            structured_data["current_development_stage"] = extracted_stage
+
+    # Second fallback: derive a minimal timeline from projects if still empty.
+    if not structured_data["development_timeline"]:
+        derived: List[Dict[str, Any]] = []
+        for project in (structured_data.get("projects") or [])[:3]:
+            if not isinstance(project, dict):
+                continue
+            project_name = (
+                project.get("project_name")
+                or project.get("name")
+                or "Project"
+            )
+            stage = (
+                project.get("stage")
+                or project.get("development_stage")
+                or project.get("current_stage")
+                or ""
+            )
+            milestone = str(stage).strip() or "Current development stage"
+            derived.append(
+                {
+                    "milestone": f"{project_name}: {milestone}",
+                    "target_period": "",
+                    "status": "current",
+                    "confidence_pct": None,
+                }
+            )
+        if derived:
+            structured_data["development_timeline"] = derived
+
+    # Third fallback: derive a minimal timeline from pipeline (common in pharma template).
+    if not structured_data["development_timeline"]:
+        derived_pipeline: List[Dict[str, Any]] = []
+        for item in (structured_data.get("pipeline") or [])[:3]:
+            if isinstance(item, dict):
+                name = (
+                    item.get("candidate")
+                    or item.get("name")
+                    or item.get("asset")
+                    or "Pipeline asset"
+                )
+                stage = (
+                    item.get("stage")
+                    or item.get("phase")
+                    or item.get("status")
+                    or "Pipeline milestone"
+                )
+            else:
+                name = str(item or "").strip() or "Pipeline asset"
+                stage = "Pipeline milestone"
+            derived_pipeline.append(
+                {
+                    "milestone": f"{name}: {stage}",
+                    "target_period": "",
+                    "status": "planned",
+                    "confidence_pct": None,
+                }
+            )
+        if derived_pipeline:
+            structured_data["development_timeline"] = derived_pipeline
+
+    # Limit retrospective milestones to one reference item; keep focus on forward timeline.
+    if isinstance(structured_data.get("development_timeline"), list):
+        structured_data["development_timeline"] = _standardize_timeline_rows(
+            structured_data.get("development_timeline") or []
+        )
+        structured_data["development_timeline"] = _cap_previous_timeline_rows(
+            structured_data.get("development_timeline") or [],
+            max_previous=1,
+        )
+    if not structured_data["current_development_stage"]:
+        derived_stage = _derive_current_stage_from_timeline_rows(
+            structured_data.get("development_timeline") or []
+        )
+        if derived_stage:
+            structured_data["current_development_stage"] = derived_stage
+
+
 async def _generate_human_readable_analyst_document(
     *,
     stage1_results: List[Dict[str, Any]],
@@ -631,7 +834,7 @@ def _ensure_structured_fields_for_template(
         "resources_uranium_monometallic",
         "energy_oil_gas",
     }
-    gantt_normalized_template_keys = set(resource_template_keys) | {
+    stage3_template_normalized_keys = set(resource_template_keys) | {
         "pharma_biotech",
         "medtech",
         "financials_bank_insurance",
@@ -639,6 +842,7 @@ def _ensure_structured_fields_for_template(
         "industrials_consumer_reit",
         "general_equity",
     }
+    _ensure_gantt_timeline_fields(structured_data, chairman_text)
 
     def _normalize_key(raw: Any) -> str:
         text = str(raw or "").strip().lower()
@@ -673,7 +877,7 @@ def _ensure_structured_fields_for_template(
         ordered.update(leftovers)
         return ordered
 
-    if template_key in gantt_normalized_template_keys:
+    if template_key in stage3_template_normalized_keys:
         quality_score = structured_data.get("quality_score")
         if not isinstance(quality_score, dict):
             quality_score = {}
@@ -882,115 +1086,6 @@ def _ensure_structured_fields_for_template(
         if _to_float(price_targets.get("prob_weighted_target_24m")) is None:
             price_targets["prob_weighted_target_24m"] = None
 
-        timeline_raw = structured_data.get("development_timeline")
-        if isinstance(timeline_raw, list):
-            normalized_timeline: List[Dict[str, Any]] = []
-            period_pattern = re.compile(
-                r"\b(Q[1-4](?:\s*[-/]\s*Q[1-4])?\s*20\d{2}|H[12]\s*20\d{2}|20\d{2})\b",
-                re.IGNORECASE,
-            )
-            for idx, item in enumerate(timeline_raw):
-                if isinstance(item, dict):
-                    milestone = str(
-                        item.get("milestone")
-                        or item.get("event")
-                        or item.get("name")
-                        or item.get("goal")
-                        or item.get("title")
-                        or ""
-                    ).strip()
-                    target_period = str(
-                        item.get("target_period")
-                        or item.get("targetPeriod")
-                        or item.get("period")
-                        or item.get("when")
-                        or item.get("date")
-                        or ""
-                    ).strip()
-                    if milestone and not target_period:
-                        inline_period, cleaned_milestone = _extract_inline_timeline_period(milestone)
-                        if inline_period:
-                            target_period = inline_period
-                            milestone = cleaned_milestone or milestone
-                    status = str(
-                        item.get("status")
-                        or item.get("current_status")
-                        or item.get("state")
-                        or "unspecified"
-                    ).strip()
-                    inferred_status = _infer_timeline_status_from_text(milestone)
-                    if inferred_status and status.lower() in {"", "unspecified", "planned"}:
-                        status = inferred_status
-                    confidence = _to_float(
-                        item.get("confidence_pct")
-                        if item.get("confidence_pct") is not None
-                        else item.get("certainty_pct")
-                    )
-                    if milestone or target_period:
-                        normalized_target_period = _normalize_target_period_label(target_period)
-                        normalized_timeline.append(
-                            {
-                                "milestone": milestone or f"Milestone {idx + 1}",
-                                "target_period": normalized_target_period or target_period,
-                                "status": status or "unspecified",
-                                "confidence_pct": confidence,
-                                "primary_risk": str(
-                                    item.get("primary_risk")
-                                    or item.get("risk")
-                                    or ""
-                                ).strip(),
-                                **(
-                                    {"raw_target_period": target_period}
-                                    if normalized_target_period and normalized_target_period != target_period
-                                    else {}
-                                ),
-                            }
-                        )
-                    continue
-
-                if isinstance(item, str):
-                    text = item.strip()
-                    if not text:
-                        continue
-                    milestone = text
-                    target_period = ""
-
-                    # Common chairman line: "Q1-Q2 2026: Milestone"
-                    colon_split = re.match(r"^([^:]{2,40}):\s*(.+)$", text)
-                    if colon_split:
-                        lhs = str(colon_split.group(1) or "").strip()
-                        rhs = str(colon_split.group(2) or "").strip()
-                        if lhs and period_pattern.search(lhs):
-                            target_period = lhs
-                            milestone = rhs or text
-
-                    if not target_period:
-                        period_match = period_pattern.search(text)
-                        if period_match:
-                            target_period = str(period_match.group(1) or "").strip()
-                            stripped = re.sub(r"^[:\-\s]+", "", text.replace(period_match.group(0), "")).strip()
-                            milestone = stripped or text
-
-                    normalized_timeline.append(
-                        {
-                            "milestone": milestone or f"Milestone {idx + 1}",
-                            "target_period": _normalize_target_period_label(target_period) or target_period,
-                            "status": "unspecified",
-                            "confidence_pct": None,
-                            "primary_risk": "",
-                            **(
-                                {"raw_target_period": target_period}
-                                if (_normalize_target_period_label(target_period) and _normalize_target_period_label(target_period) != target_period)
-                                else {}
-                            ),
-                        }
-                    )
-            structured_data["development_timeline"] = _standardize_timeline_rows(normalized_timeline)
-        else:
-            structured_data["development_timeline"] = []
-        if not isinstance(structured_data.get("current_development_stage"), str):
-            structured_data["current_development_stage"] = ""
-
         headwinds_tailwinds = structured_data.get("headwinds_tailwinds")
         if not isinstance(headwinds_tailwinds, dict):
             headwinds_tailwinds = {}
@@ -1008,91 +1103,6 @@ def _ensure_structured_fields_for_template(
             if extracted_headwinds.get("qualitative"):
                 headwinds_tailwinds["qualitative"] = extracted_headwinds.get("qualitative") or []
 
-        # First fallback: parse timeline directly from chairman XML tag text.
-        if not structured_data["development_timeline"]:
-            extracted_rows, extracted_stage, _ = _extract_development_timeline_from_text(
-                chairman_text
-            )
-            if extracted_rows:
-                structured_data["development_timeline"] = extracted_rows
-            if not structured_data["current_development_stage"] and extracted_stage:
-                structured_data["current_development_stage"] = extracted_stage
-
-        # Second fallback: derive a minimal timeline from projects if still empty.
-        if not structured_data["development_timeline"]:
-            derived: List[Dict[str, Any]] = []
-            for project in (structured_data.get("projects") or [])[:3]:
-                if not isinstance(project, dict):
-                    continue
-                project_name = (
-                    project.get("project_name")
-                    or project.get("name")
-                    or "Project"
-                )
-                stage = (
-                    project.get("stage")
-                    or project.get("development_stage")
-                    or project.get("current_stage")
-                    or ""
-                )
-                milestone = str(stage).strip() or "Current development stage"
-                derived.append(
-                    {
-                        "milestone": f"{project_name}: {milestone}",
-                        "target_period": "",
-                        "status": "current",
-                        "confidence_pct": None,
-                    }
-                )
-            if derived:
-                structured_data["development_timeline"] = derived
-
-        # Third fallback: derive a minimal timeline from pipeline (common in pharma template).
-        if not structured_data["development_timeline"]:
-            derived_pipeline: List[Dict[str, Any]] = []
-            for item in (structured_data.get("pipeline") or [])[:3]:
-                if isinstance(item, dict):
-                    name = (
-                        item.get("candidate")
-                        or item.get("name")
-                        or item.get("asset")
-                        or "Pipeline asset"
-                    )
-                    stage = (
-                        item.get("stage")
-                        or item.get("phase")
-                        or item.get("status")
-                        or "Pipeline milestone"
-                    )
-                else:
-                    name = str(item or "").strip() or "Pipeline asset"
-                    stage = "Pipeline milestone"
-                derived_pipeline.append(
-                    {
-                        "milestone": f"{name}: {stage}",
-                        "target_period": "",
-                        "status": "planned",
-                        "confidence_pct": None,
-                    }
-                )
-            if derived_pipeline:
-                structured_data["development_timeline"] = derived_pipeline
-
-        # Limit retrospective milestones to one reference item; keep focus on forward timeline.
-        if isinstance(structured_data.get("development_timeline"), list):
-            structured_data["development_timeline"] = _standardize_timeline_rows(
-                structured_data.get("development_timeline") or []
-            )
-            structured_data["development_timeline"] = _cap_previous_timeline_rows(
-                structured_data.get("development_timeline") or [],
-                max_previous=1,
-            )
-        if not structured_data["current_development_stage"]:
-            derived_stage = _derive_current_stage_from_timeline_rows(
-                structured_data.get("development_timeline") or []
-            )
-            if derived_stage:
-                structured_data["current_development_stage"] = derived_stage
         structured_data.pop("certainty_pct_24m", None)
         if isinstance(structured_data.get("investment_verdict"), dict):
             structured_data["investment_verdict"].pop("certainty_pct_24m", None)

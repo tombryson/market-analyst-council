@@ -1,5 +1,6 @@
 import unittest
 
+from backend.synthesis.synthesis import _ensure_structured_fields_for_template
 from backend.timeline_normalization import normalize_timeline_rows, standardize_timeline_row
 
 
@@ -63,6 +64,32 @@ class TimelineNormalizationTests(unittest.TestCase):
             "Execution of 70,000m Drill Program Across Satellite Tags (Obradov Potok) and Shanac Upon Approval",
         )
         self.assertEqual(rows[2]["status"], "planned")
+
+    def test_synthesis_timeline_recovery_is_not_template_gated(self):
+        structured_data = {
+            "development_timeline": [],
+            "current_development_stage": "",
+        }
+        chairman_text = """
+        <development_timeline>
+        - Q2 2026: Placement completed
+        - H2 2026: FDA decision expected
+        </development_timeline>
+        """
+
+        _ensure_structured_fields_for_template(
+            structured_data,
+            "consumer_retail",
+            chairman_text=chairman_text,
+        )
+
+        self.assertEqual(len(structured_data["development_timeline"]), 2)
+        self.assertEqual(
+            structured_data["development_timeline"][0]["milestone"],
+            "Placement",
+        )
+        self.assertEqual(structured_data["development_timeline"][0]["target_period"], "Q2 2026")
+        self.assertEqual(structured_data["development_timeline"][0]["status"], "achieved")
 
 
 if __name__ == "__main__":
